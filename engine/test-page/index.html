@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAW Engine - LNA Test</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 { color: #00d9ff; }
+        h2 { color: #74c0fc; margin-top: 0; }
+        .panel {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #0f3460;
+            color: #eee;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #1a4a7a; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .connected { border-left: 4px solid #00ff88; }
+        .disconnected { border-left: 4px solid #ff4444; }
+        .log {
+            background: #0d1b2a;
+            padding: 15px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry { margin: 4px 0; }
+        .log-error { color: #ff6b6b; }
+        .log-success { color: #51cf66; }
+        .log-info { color: #74c0fc; }
+        .log-warn { color: #fcc419; }
+        .status-box {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .status-untested { background: #333; }
+        .status-success { background: #2f9e44; }
+        .status-failed { background: #e03131; }
+        .status-blocked { background: #f59f00; }
+        input {
+            background: #0d1b2a;
+            border: 1px solid #333;
+            color: #eee;
+            padding: 8px;
+            border-radius: 4px;
+            width: 200px;
+        }
+        label { margin-right: 10px; }
+        code {
+            background: #0d1b2a;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td, th {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>DAW Engine - LNA Test</h1>
+    <p>Test page for Chrome Local Network Access (LNA) behavior.</p>
+    <p><strong>Current origin:</strong> <code id="origin"></code></p>
+
+    <div class="panel">
+        <h2>Configuration</h2>
+        <div>
+            <label>Port:</label>
+            <input type="number" id="port" value="47821" min="1" max="65535">
+        </div>
+        <div style="margin-top: 10px">
+            <label>Token:</label>
+            <input type="text" id="token" placeholder="From token file" style="width: 400px">
+        </div>
+        <p style="font-size: 12px; color: #888;">
+            Token file location: <code>/tmp/daw-engine-token</code> or custom path
+        </p>
+    </div>
+
+    <div class="result-grid">
+        <div class="panel">
+            <h2>1. Fetch Test (HTTP)</h2>
+            <p>Tests if <code>fetch()</code> to local engine triggers LNA.</p>
+            <button onclick="testFetch()">Test Fetch</button>
+            <div class="status-box status-untested" id="fetch-status">Not tested</div>
+            <div class="log" id="fetch-log"></div>
+        </div>
+
+        <div class="panel">
+            <h2>2. WebSocket Test</h2>
+            <p>Tests if WebSocket to local engine triggers LNA.</p>
+            <button onclick="testWebSocket()">Test WebSocket</button>
+            <div class="status-box status-untested" id="ws-status">Not tested</div>
+            <div class="log" id="ws-log"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>LNA Observation Report</h2>
+        <p>Fill in what you observe during testing:</p>
+        <table>
+            <tr>
+                <th>Question</th>
+                <th>Fetch</th>
+                <th>WebSocket</th>
+            </tr>
+            <tr>
+                <td>Prompt appeared?</td>
+                <td><input type="text" id="obs-fetch-prompt" placeholder="Yes/No/When"></td>
+                <td><input type="text" id="obs-ws-prompt" placeholder="Yes/No/When"></td>
+            </tr>
+            <tr>
+                <td>Prompt text (exact)</td>
+                <td><input type="text" id="obs-fetch-text" placeholder="Copy exact text"></td>
+                <td><input type="text" id="obs-ws-text" placeholder="Copy exact text"></td>
+            </tr>
+            <tr>
+                <td>Behavior on Block</td>
+                <td><input type="text" id="obs-fetch-block" placeholder="Error type?"></td>
+                <td><input type="text" id="obs-ws-block" placeholder="Error type?"></td>
+            </tr>
+            <tr>
+                <td>Decision remembered?</td>
+                <td><input type="text" id="obs-fetch-remember" placeholder="After reload?"></td>
+                <td><input type="text" id="obs-ws-remember" placeholder="After reload?"></td>
+            </tr>
+            <tr>
+                <td>Browser version</td>
+                <td colspan="2"><input type="text" id="obs-browser" placeholder="e.g., Chrome 142.0.6514.0" style="width: 100%"></td>
+            </tr>
+        </table>
+        <button onclick="copyReport()" style="margin-top: 15px">Copy Report as Markdown</button>
+    </div>
+
+    <div class="panel">
+        <h2>Test Instructions</h2>
+        <ol>
+            <li>Start the DAW engine:
+                <code>./daw_engine --doc project.am --play</code>
+            </li>
+            <li>Copy the token from <code>/tmp/daw-engine-token</code></li>
+            <li>Serve this page from a <strong>public HTTPS origin</strong>:
+                <ul>
+                    <li><strong>Option A - cloudflared (no account needed):</strong><br>
+                        <code>cloudflared tunnel --url http://localhost:8080</code><br>
+                        <small>Download: <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/">cloudflare.com/downloads</a></small>
+                    </li>
+                    <li><strong>Option B - GitHub Pages (3 minutes):</strong><br>
+                        Push this file to a repo, enable Pages in Settings, use the resulting URL.
+                    </li>
+                </ul>
+            </li>
+            <li>Open the HTTPS URL in Chrome >= 142, Firefox, and Safari</li>
+            <li>Click both "Test Fetch" and "Test WebSocket"</li>
+            <li>Fill in the observation report for each browser</li>
+        </ol>
+        <p><strong>CRITICAL:</strong> Testing from <code>localhost</code> or <code>file://</code> will NOT trigger LNA!</p>
+        <p><strong>ATTENTION FAUX POSITIF:</strong> Si WebSocket passe sans invite mais Fetch est bloque, c'est probablement que LNA n'est pas encore applique aux WebSockets. Le test Fetch est le canari.</p>
+    </div>
+
+    <script>
+        // Display origin info
+        document.getElementById('origin').textContent = window.location.origin;
+
+        function logTo(logId, msg, type = 'info') {
+            const log = document.getElementById(logId);
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toISOString().substr(11, 12)}] ${msg}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function setStatus(statusId, status, text) {
+            const el = document.getElementById(statusId);
+            el.className = `status-box status-${status}`;
+            el.textContent = text;
+        }
+
+        async function testFetch() {
+            const port = document.getElementById('port').value;
+            const token = document.getElementById('token').value;
+            const url = `http://127.0.0.1:${port}/?token=${token}`;
+
+            logTo('fetch-log', `Testing fetch to ${url}...`, 'info');
+            setStatus('fetch-status', 'untested', 'Testing...');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+
+                if (response.ok) {
+                    const text = await response.text();
+                    logTo('fetch-log', `Success! Response: ${text.substring(0, 100)}`, 'success');
+                    setStatus('fetch-status', 'success', 'Connected');
+                } else {
+                    logTo('fetch-log', `HTTP error: ${response.status} ${response.statusText}`, 'error');
+                    setStatus('fetch-status', 'failed', `HTTP ${response.status}`);
+                }
+            } catch (e) {
+                logTo('fetch-log', `Error: ${e.name}: ${e.message}`, 'error');
+                console.error('Fetch error:', e);
+
+                // Check if it looks like LNA block
+                if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+                    logTo('fetch-log', 'This may be LNA blocking the request', 'warn');
+                    setStatus('fetch-status', 'blocked', 'Blocked (LNA?)');
+                } else {
+                    setStatus('fetch-status', 'failed', 'Error');
+                }
+            }
+        }
+
+        function testWebSocket() {
+            const port = document.getElementById('port').value;
+            const token = document.getElementById('token').value;
+            const url = `ws://127.0.0.1:${port}/?token=${token}`;
+
+            logTo('ws-log', `Testing WebSocket to ${url}...`, 'info');
+            setStatus('ws-status', 'untested', 'Testing...');
+
+            try {
+                const ws = new WebSocket(url);
+                ws.binaryType = 'arraybuffer';
+
+                ws.onopen = () => {
+                    logTo('ws-log', 'Connected!', 'success');
+                    setStatus('ws-status', 'success', 'Connected');
+                    ws.close();
+                };
+
+                ws.onerror = (e) => {
+                    logTo('ws-log', 'WebSocket error occurred', 'error');
+                    console.error('WebSocket error:', e);
+                };
+
+                ws.onclose = (e) => {
+                    if (e.code === 1006) {
+                        logTo('ws-log', `Connection failed (code 1006) - may be LNA block`, 'warn');
+                        setStatus('ws-status', 'blocked', 'Blocked (LNA?)');
+                    } else if (e.code === 4001) {
+                        logTo('ws-log', `Rejected: Unauthorized (invalid token)`, 'error');
+                        setStatus('ws-status', 'failed', 'Unauthorized');
+                    } else {
+                        logTo('ws-log', `Closed: code=${e.code}, reason=${e.reason}`, 'info');
+                    }
+                };
+
+            } catch (e) {
+                logTo('ws-log', `Error: ${e.name}: ${e.message}`, 'error');
+                setStatus('ws-status', 'failed', 'Error');
+            }
+        }
+
+        function copyReport() {
+            const getValue = (id) => document.getElementById(id).value || '(not filled)';
+
+            const report = `## LNA Test Report
+
+**Origin:** ${window.location.origin}
+**Browser:** ${getValue('obs-browser')}
+**Date:** ${new Date().toISOString()}
+
+### Fetch (HTTP)
+| Question | Observation |
+|----------|-------------|
+| Prompt appeared? | ${getValue('obs-fetch-prompt')} |
+| Prompt text | ${getValue('obs-fetch-text')} |
+| Behavior on Block | ${getValue('obs-fetch-block')} |
+| Decision remembered? | ${getValue('obs-fetch-remember')} |
+
+### WebSocket
+| Question | Observation |
+|----------|-------------|
+| Prompt appeared? | ${getValue('obs-ws-prompt')} |
+| Prompt text | ${getValue('obs-ws-text')} |
+| Behavior on Block | ${getValue('obs-ws-block')} |
+| Decision remembered? | ${getValue('obs-ws-remember')} |
+`;
+
+            navigator.clipboard.writeText(report).then(() => {
+                alert('Report copied to clipboard!');
+            }).catch(e => {
+                console.error('Copy failed:', e);
+                prompt('Copy this report:', report);
+            });
+        }
+
+        // Check if running from public HTTPS
+        if (window.location.protocol === 'https:' &&
+            !window.location.hostname.match(/^(localhost|127\.0\.0\.1)$/)) {
+            logTo('fetch-log', 'Running from PUBLIC HTTPS - LNA should be active', 'success');
+            logTo('ws-log', 'Running from PUBLIC HTTPS - LNA should be active', 'success');
+        } else if (window.location.protocol === 'file:') {
+            logTo('fetch-log', 'Running from file:// - LNA behavior may vary', 'warn');
+            logTo('ws-log', 'Running from file:// - LNA behavior may vary', 'warn');
+        } else {
+            logTo('fetch-log', 'Running from LOCAL origin - LNA will NOT trigger!', 'warn');
+            logTo('ws-log', 'Running from LOCAL origin - LNA will NOT trigger!', 'warn');
+        }
+    </script>
+</body>
+</html>

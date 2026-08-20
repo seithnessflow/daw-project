@@ -1,0 +1,145 @@
+#pragma once
+
+/**
+ * @file websocket_server.h
+ * @brief WebSocket server for browser communication.
+ *
+ * Exposes transport control and telemetry on 127.0.0.1.
+ * Handles Chrome Local Network Access (LNA) preflight.
+ */
+
+#include "../audio/audio_device.h"
+#include "../graph/audio_graph.h"
+#include "messages.pb.h"
+
+#include <ixwebsocket/IXWebSocketServer.h>
+#include <ixwebsocket/IXHttpServer.h>
+
+#include <atomic>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <random>
+#include <set>
+#include <string>
+#include <thread>
+
+namespace daw::websocket {
+
+/**
+ * WebSocket server configuration.
+ */
+struct WebSocketConfig {
+    uint16_t port = 9000;
+    std::string bind_address = "127.0.0.1";
+    uint32_t telemetry_hz = 30;  // Telemetry send rate
+
+    // Security
+    std::string token_file_path;  // Where to write the auth token (empty = temp dir)
+    std::vector<std::string> allowed_origins;  // Empty = allow all (INSECURE!)
+};
+
+/**
+ * WebSocket server for browser <-> engine communication.
+ *
+ * Features:
+ * - Transport commands (play/stop/seek)
+ * - Monitor commands (solo/mute per track)
+ * - Telemetry broadcast (position, meters at 30 Hz)
+ * - LNA preflight handling for Chrome >= 142
+ */
+class WebSocketServer {
+public:
+    WebSocketServer();
+    ~WebSocketServer();
+
+    // Non-copyable
+    WebSocketServer(const WebSocketServer&) = delete;
+    WebSocketServer& operator=(const WebSocketServer&) = delete;
+
+    /**
+     * Start the server.
+     *
+     * @param config Server configuration
+     * @param device Audio device for transport commands
+     * @param graph Audio graph for monitor commands and meters
+     * @return true on success
+     */
+    bool start(
+        const WebSocketConfig& config,
+        audio::AudioDevice* device,
+        graph::AudioGraph* graph
+    );
+
+    /**
+     * Stop the server.
+     */
+    void stop();
+
+    /**
+     * Check if server is running.
+     */
+    bool isRunning() const { return running_.load(); }
+
+    /**
+     * Get the port the server is listening on.
+     */
+    uint16_t getPort() const { return port_; }
+
+    /**
+     * Broadcast telemetry to all connected clients.
+     * Called from the main loop at telemetry_hz rate.
+     */
+    void broadcastTelemetry();
+
+private:
+    // Message handlers
+    void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
+                       ix::WebSocket& webSocket,
+                       const ix::WebSocketMessagePtr& msg);
+    void handleTransportCommand(const protocol::TransportCommand& cmd);
+    void handleSetMonitor(const protocol::SetMonitor& cmd);
+
+    // Send helpers
+    void sendToAll(const protocol::Message& msg);
+
+    // Serialize message with length prefix (4 bytes big-endian)
+    std::string serializeWithLength(const protocol::Message& msg);
+
+    // Parse message from length-prefixed data
+    bool parseWithLength(const std::string& data, protocol::Message& msg);
+
+    // Server
+    std::unique_ptr<ix::WebSocketServer> server_;
+    std::atomic<bool> running_{false};
+    uint16_t port_ = 0;
+
+    // Connections tracking
+    std::set<ix::WebSocket*> connections_;
+    std::mutex connections_mutex_;
+
+    // References (not owned)
+    audio::AudioDevice* device_ = nullptr;
+    graph::AudioGraph* graph_ = nullptr;
+
+    // Telemetry
+    uint32_t telemetry_hz_ = 30;
+
+    // Security
+    std::string auth_token_;
+    std::string token_file_path_;
+    std::vector<std::string> allowed_origins_;
+
+    // Generate cryptographically secure random token
+    static std::string generateToken();
+
+    // Validate connection based on Origin header and token
+    bool validateConnection(const std::string& origin, const std::string& token) const;
+
+    // Write token to file for local clients
+    bool writeTokenFile();
+};
+
+}  // namespace daw::websocket

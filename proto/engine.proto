@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package daw.engine;
+
+// =============================================================================
+// COMMANDS (Browser → Engine)
+// =============================================================================
+
+// Load a complete Automerge document
+message LoadDocument {
+  bytes document = 1;  // Complete Automerge binary
+}
+
+// Apply an Automerge change/patch
+message ApplyChange {
+  bytes change = 1;  // Automerge change binary
+}
+
+// Transport control
+message Transport {
+  TransportAction action = 1;
+  int64 seek_position = 2;  // Only used when action = SEEK, in samples
+}
+
+enum TransportAction {
+  TRANSPORT_ACTION_UNSPECIFIED = 0;
+  TRANSPORT_ACTION_PLAY = 1;
+  TRANSPORT_ACTION_STOP = 2;
+  TRANSPORT_ACTION_SEEK = 3;
+}
+
+// Personal monitoring state (never persisted to document)
+message SetMonitor {
+  string track_id = 1;
+  bool solo = 2;
+  bool mute = 3;
+}
+
+// Wrapper for all commands
+message Command {
+  uint32 sequence = 1;  // For request-response correlation
+  oneof payload {
+    LoadDocument load_document = 10;
+    ApplyChange apply_change = 11;
+    Transport transport = 12;
+    SetMonitor set_monitor = 13;
+  }
+}
+
+// =============================================================================
+// EVENTS (Engine → Browser)
+// =============================================================================
+
+// Current playback position (sent at 30Hz during playback)
+message TransportPosition {
+  int64 position_samples = 1;
+  bool is_playing = 2;
+}
+
+// Peak meters for all tracks (sent at 30Hz)
+message Meters {
+  repeated TrackMeter tracks = 1;
+}
+
+message TrackMeter {
+  string track_id = 1;
+  float peak_left = 2;   // 0.0 to 1.0+ (can exceed 1.0 for clipping)
+  float peak_right = 3;  // 0.0 to 1.0+
+}
+
+// Engine state information
+message EngineState {
+  EngineStatus status = 1;
+  uint32 sample_rate = 2;
+  uint32 buffer_size = 3;
+  uint64 buffer_underruns = 4;  // Counter for acceptance criterion 5
+  string device_name = 5;
+}
+
+enum EngineStatus {
+  ENGINE_STATUS_UNSPECIFIED = 0;
+  ENGINE_STATUS_INITIALIZING = 1;
+  ENGINE_STATUS_READY = 2;
+  ENGINE_STATUS_PLAYING = 3;
+  ENGINE_STATUS_ERROR = 4;
+}
+
+// Error notification
+message Error {
+  uint32 sequence = 1;  // Correlates with Command.sequence if applicable
+  ErrorCode code = 2;
+  string message = 3;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_DOCUMENT = 1;
+  ERROR_CODE_ASSET_NOT_FOUND = 2;
+  ERROR_CODE_AUDIO_DEVICE_ERROR = 3;
+  ERROR_CODE_INTERNAL = 4;
+}
+
+// Wrapper for all events
+message Event {
+  oneof payload {
+    TransportPosition transport_position = 10;
+    Meters meters = 11;
+    EngineState engine_state = 12;
+    Error error = 13;
+  }
+}

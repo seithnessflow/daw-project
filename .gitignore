@@ -1,0 +1,46 @@
+# Build directories
+build/
+build-*/
+target/
+dist/
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.tmp
+*-stdout.txt
+*-stderr.txt
+*-out.txt
+*-err.txt
+engine_out.txt
+run_engine.bat
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+
+# Generated files
+generated/
+*.pb.cc
+*.pb.h
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Credentials/tokens
+*-token
+*.pem
+*.key

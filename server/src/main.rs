@@ -1,0 +1,70 @@
+//! DAW Sync Server
+//!
+//! Provides Automerge CRDT synchronization between browser clients and the local engine.
+
+mod api;
+mod document;
+mod sync;
+
+use anyhow::Result;
+use axum::{
+    routing::get,
+    Router,
+};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tower_http::cors::{Any, CorsLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::document::ProjectStore;
+use crate::sync::SyncState;
+
+/// Application state shared across handlers.
+pub struct AppState {
+    /// Project document store.
+    pub store: Box<dyn ProjectStore + Send + Sync>,
+    /// Active sync sessions.
+    pub sync_state: RwLock<SyncState>,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Initialize logging
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "daw_server=debug,tower_http=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    // Initialize state
+    let state = Arc::new(AppState {
+        store: Box::new(document::FileStore::new("./projects")?),
+        sync_state: RwLock::new(SyncState::new()),
+    });
+
+    // CORS layer for browser access
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        // Required for Chrome Local Network Access
+        .allow_private_network(true);
+
+    // Build router
+    let app = Router::new()
+        .route("/health", get(|| async { "OK" }))
+        .route("/ws/:project_id", get(api::websocket::ws_handler))
+        .layer(cors)
+        .with_state(state);
+
+    // Start server
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    tracing::info!("Server listening on {}", addr);
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}

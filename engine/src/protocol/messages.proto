@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package daw.protocol;
+
+// =============================================================================
+// Client -> Engine Messages
+// =============================================================================
+
+// Transport control
+message TransportCommand {
+    enum Action {
+        PLAY = 0;
+        STOP = 1;
+        SEEK = 2;
+    }
+    Action action = 1;
+    int64 seek_position = 2;  // Only used when action == SEEK (in samples)
+}
+
+// Monitor control (solo/mute per track - local to this client)
+message SetMonitor {
+    string track_id = 1;
+    bool solo = 2;
+    bool mute = 3;
+}
+
+// =============================================================================
+// Engine -> Client Messages
+// =============================================================================
+
+// Transport position (sent at 30 Hz)
+message TransportPosition {
+    int64 position_samples = 1;
+    bool is_playing = 2;
+}
+
+// Per-track meter levels
+message TrackMeter {
+    string track_id = 1;
+    float peak_left = 2;
+    float peak_right = 3;
+}
+
+// All meters (sent at 30 Hz)
+message Meters {
+    repeated TrackMeter tracks = 1;
+}
+
+// Engine state (sent at 30 Hz with telemetry)
+message EngineState {
+    uint64 buffer_underruns = 1;       // Cumulative underrun count
+    uint32 cpu_percent = 2;            // Audio thread CPU usage (0-100)
+    uint32 latency_samples = 3;        // Current output latency
+}
+
+// Error from engine
+message Error {
+    enum Severity {
+        WARNING = 0;
+        ERROR = 1;
+        FATAL = 2;
+    }
+    Severity severity = 1;
+    string code = 2;                   // Machine-readable error code
+    string message = 3;                // Human-readable message
+}
+
+// =============================================================================
+// Wrapper Message (discriminated union)
+// =============================================================================
+
+message Message {
+    oneof payload {
+        // Client -> Engine
+        TransportCommand transport = 1;
+        SetMonitor set_monitor = 2;
+
+        // Engine -> Client
+        TransportPosition position = 3;
+        Meters meters = 4;
+        EngineState engine_state = 5;
+        Error error = 6;
+    }
+}

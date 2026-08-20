@@ -1,0 +1,466 @@
+/**
+ * @file cli_integration_test.cpp
+ * @brief Integration tests for DAW engine.
+ *
+ * These tests verify the engine produces correct output without a GUI.
+ */
+
+#include "../src/document/automerge_document.h"
+#include "../src/document/schema.h"
+#include "../src/graph/audio_graph.h"
+#include "../src/graph/clip_player.h"
+#include "../src/render/offline_render.h"
+#include "../src/audio/ring_buffer.h"
+
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+// Test utilities
+namespace {
+
+bool fileExists(const std::string& path) {
+    return fs::exists(path);
+}
+
+size_t fileSize(const std::string& path) {
+    return fs::file_size(path);
+}
+
+std::string computeFileHash(const std::string& path) {
+    // Simple FNV-1a hash for testing
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return "";
+
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    constexpr uint64_t prime = 0x100000001b3ULL;
+
+    char buffer[4096];
+    while (file.read(buffer, sizeof(buffer))) {
+        for (size_t i = 0; i < sizeof(buffer); ++i) {
+            hash ^= static_cast<uint8_t>(buffer[i]);
+            hash *= prime;
+        }
+    }
+    for (std::streamsize i = 0; i < file.gcount(); ++i) {
+        hash ^= static_cast<uint8_t>(buffer[i]);
+        hash *= prime;
+    }
+
+    char hex[17];
+    snprintf(hex, sizeof(hex), "%016llx", static_cast<unsigned long long>(hash));
+    return hex;
+}
+
+// Read WAV file and return samples as float
+std::vector<float> readWavSamples(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return {};
+
+    // Skip header (44 bytes for standard WAV)
+    file.seekg(44);
+
+    std::vector<float> samples;
+    int16_t sample;
+    while (file.read(reinterpret_cast<char*>(&sample), sizeof(sample))) {
+        samples.push_back(static_cast<float>(sample) / 32768.0f);
+    }
+
+    return samples;
+}
+
+}  // namespace
+
+// Test 1: Document creation
+bool testDocumentCreation() {
+    std::cout << "Test: Document creation... ";
+
+    daw::document::AutomergeDocument doc;
+
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: " << doc.getLastError() << "\n";
+        return false;
+    }
+
+    const auto& project = doc.getDocument();
+    if (project.schema_version != daw::document::SCHEMA_VERSION ||
+        project.sample_rate != 48000) {
+        std::cout << "FAILED: Incorrect data\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 2: Track management
+bool testTrackManagement() {
+    std::cout << "Test: Track management... ";
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: Create failed\n";
+        return false;
+    }
+
+    // Add a track
+    daw::document::TrackDef track;
+    track.id = "track-1";
+    track.name = "Test Track";
+    track.gain = 1.0f;
+
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: Add track failed\n";
+        return false;
+    }
+
+    const auto& project = doc.getDocument();
+    if (project.tracks.size() != 1 ||
+        project.tracks[0].name != "Test Track") {
+        std::cout << "FAILED: Track not added correctly\n";
+        return false;
+    }
+
+    // Modify gain
+    if (!doc.setTrackGain("track-1", 0.5f)) {
+        std::cout << "FAILED: Set gain failed\n";
+        return false;
+    }
+
+    const auto& project2 = doc.getDocument();
+    if (std::fabs(project2.tracks[0].gain - 0.5f) > 0.01f) {
+        std::cout << "FAILED: Gain not set correctly\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 3: Audio graph construction
+bool testAudioGraphConstruction() {
+    std::cout << "Test: Audio graph construction... ";
+
+    daw::graph::AudioGraph graph;
+    graph.setSampleRate(48000);
+
+    daw::graph::AudioTrack track;
+    track.id = "track-1";
+    track.name = "Test Track";
+    track.gain = 1.0f;
+
+    auto gain_node = std::make_unique<daw::graph::GainNode>("gain-1", 0.5f);
+    track.chain.push_back(std::move(gain_node));
+
+    graph.addTrack(std::move(track));
+    graph.prepare(48000, 512);
+
+    if (graph.getTrackCount() != 1) {
+        std::cout << "FAILED: Wrong track count\n";
+        return false;
+    }
+
+    auto* retrieved = graph.getTrackById("track-1");
+    if (!retrieved || retrieved->name != "Test Track") {
+        std::cout << "FAILED: Track lookup failed\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 4: Gain node processing
+bool testGainNodeProcessing() {
+    std::cout << "Test: Gain node processing... ";
+
+    daw::graph::GainNode node("gain-1", 0.5f);
+    node.prepare(48000, 512);
+
+    // Input: all 1.0
+    std::vector<float> buffer(512 * 2, 1.0f);
+    node.process(buffer.data(), buffer.data(), 512, 0);
+
+    // After a few samples, smoothed gain should approach 0.5
+    // The final samples should be close to 0.5
+    float final_sample = buffer[buffer.size() - 2];
+    if (std::fabs(final_sample - 0.5f) > 0.01f) {
+        std::cout << "FAILED: Expected ~0.5, got " << final_sample << "\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 5: SPSC ring buffer
+bool testRingBuffer() {
+    std::cout << "Test: SPSC ring buffer... ";
+
+    daw::audio::RingBuffer<int, 16> buffer;
+
+    // Push 10 items
+    for (int i = 0; i < 10; ++i) {
+        if (!buffer.push(i)) {
+            std::cout << "FAILED: Push failed at " << i << "\n";
+            return false;
+        }
+    }
+
+    if (buffer.size() != 10) {
+        std::cout << "FAILED: Size wrong\n";
+        return false;
+    }
+
+    // Pop 5 items
+    for (int i = 0; i < 5; ++i) {
+        auto val = buffer.pop();
+        if (!val || *val != i) {
+            std::cout << "FAILED: Pop wrong value\n";
+            return false;
+        }
+    }
+
+    if (buffer.size() != 5) {
+        std::cout << "FAILED: Size after pop wrong\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 6: Document serialization
+bool testDocumentSerialization() {
+    std::cout << "Test: Document serialization... ";
+
+    daw::document::AutomergeDocument doc1;
+    if (!doc1.create(48000)) {
+        std::cout << "FAILED: Create failed\n";
+        return false;
+    }
+
+    // Add a track
+    daw::document::TrackDef track;
+    track.id = "track-1";
+    track.name = "Test Track";
+    track.gain = 0.75f;
+    doc1.addTrack(track);
+
+    // Serialize
+    std::vector<uint8_t> bytes = doc1.toBytes();
+    if (bytes.empty()) {
+        std::cout << "FAILED: Serialization failed\n";
+        return false;
+    }
+
+    // Deserialize
+    daw::document::AutomergeDocument doc2;
+    if (!doc2.loadFromBytes(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: Deserialization failed: " << doc2.getLastError() << "\n";
+        return false;
+    }
+
+    const auto& project = doc2.getDocument();
+    if (project.tracks.size() != 1 ||
+        project.tracks[0].name != "Test Track" ||
+        std::fabs(project.tracks[0].gain - 0.75f) > 0.01f) {
+        std::cout << "FAILED: Data mismatch after deserialization\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 7: Document clips round-trip
+bool testDocumentClipsRoundTrip() {
+    std::cout << "Test: Document clips round-trip... ";
+
+    daw::document::AutomergeDocument doc1;
+    if (!doc1.create(48000)) {
+        std::cout << "FAILED: Create failed\n";
+        return false;
+    }
+
+    // Create track with clips
+    daw::document::TrackDef track;
+    track.id = "track-1";
+    track.name = "Track with Clips";
+    track.gain = 0.8f;
+
+    daw::document::ClipDef clip1;
+    clip1.id = "clip-1";
+    clip1.asset_hash = "abc123def456";
+    clip1.start_sample = 0;
+    clip1.length_samples = 48000;  // 1 second
+    clip1.offset_samples = 0;
+    track.clips.push_back(clip1);
+
+    daw::document::ClipDef clip2;
+    clip2.id = "clip-2";
+    clip2.asset_hash = "xyz789";
+    clip2.start_sample = 48000;
+    clip2.length_samples = 96000;  // 2 seconds
+    clip2.offset_samples = 24000;
+    track.clips.push_back(clip2);
+
+    if (!doc1.addTrack(track)) {
+        std::cout << "FAILED: addTrack failed: " << doc1.getLastError() << "\n";
+        return false;
+    }
+
+    // Serialize
+    std::vector<uint8_t> bytes = doc1.toBytes();
+    if (bytes.empty()) {
+        std::cout << "FAILED: Serialization failed\n";
+        return false;
+    }
+
+    // Deserialize
+    daw::document::AutomergeDocument doc2;
+    if (!doc2.loadFromBytes(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: Deserialization failed: " << doc2.getLastError() << "\n";
+        return false;
+    }
+
+    // Verify clips
+    const auto& project = doc2.getDocument();
+    if (project.tracks.size() != 1) {
+        std::cout << "FAILED: Expected 1 track, got " << project.tracks.size() << "\n";
+        return false;
+    }
+
+    const auto& loaded_track = project.tracks[0];
+    if (loaded_track.clips.size() != 2) {
+        std::cout << "FAILED: Expected 2 clips, got " << loaded_track.clips.size() << "\n";
+        return false;
+    }
+
+    // Check clip 1
+    const auto& c1 = loaded_track.clips[0];
+    if (c1.id != "clip-1" || c1.asset_hash != "abc123def456" ||
+        c1.start_sample != 0 || c1.length_samples != 48000 || c1.offset_samples != 0) {
+        std::cout << "FAILED: Clip 1 data mismatch\n";
+        std::cout << "  id: " << c1.id << " (expected clip-1)\n";
+        std::cout << "  hash: " << c1.asset_hash << " (expected abc123def456)\n";
+        std::cout << "  start: " << c1.start_sample << " (expected 0)\n";
+        std::cout << "  length: " << c1.length_samples << " (expected 48000)\n";
+        std::cout << "  offset: " << c1.offset_samples << " (expected 0)\n";
+        return false;
+    }
+
+    // Check clip 2
+    const auto& c2 = loaded_track.clips[1];
+    if (c2.id != "clip-2" || c2.asset_hash != "xyz789" ||
+        c2.start_sample != 48000 || c2.length_samples != 96000 || c2.offset_samples != 24000) {
+        std::cout << "FAILED: Clip 2 data mismatch\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Test 8: Offline render determinism
+bool testRenderDeterminism(const std::string& fixtures_dir) {
+    std::cout << "Test: Render determinism... ";
+
+    // Create a simple document for testing
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: Document creation failed\n";
+        return false;
+    }
+
+    // Add a track
+    daw::document::TrackDef track;
+    track.id = "track-1";
+    track.name = "Test Track";
+    track.gain = 1.0f;
+    doc.addTrack(track);
+
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+    config.end_sample = 48000;  // 1 second
+
+    daw::render::OfflineRenderer renderer;
+
+    // Render twice
+    std::string out1 = "/tmp/daw_test_render_1.wav";
+    std::string out2 = "/tmp/daw_test_render_2.wav";
+
+    auto result1 = renderer.render(doc, out1, fixtures_dir, config);
+    auto result2 = renderer.render(doc, out2, fixtures_dir, config);
+
+    if (!result1.success || !result2.success) {
+        std::cout << "FAILED: Render failed: " << result1.error << " / " << result2.error << "\n";
+        // Cleanup
+        fs::remove(out1);
+        fs::remove(out2);
+        return false;
+    }
+
+    // Compare hashes
+    std::string hash1 = computeFileHash(out1);
+    std::string hash2 = computeFileHash(out2);
+
+    // Cleanup
+    fs::remove(out1);
+    fs::remove(out2);
+
+    if (hash1 != hash2) {
+        std::cout << "FAILED: Hashes differ\n";
+        std::cout << "  Hash 1: " << hash1 << "\n";
+        std::cout << "  Hash 2: " << hash2 << "\n";
+        return false;
+    }
+
+    std::cout << "OK (hash: " << hash1 << ")\n";
+    return true;
+}
+
+// Main
+int main(int argc, char* argv[]) {
+    std::cout << "=== DAW Engine Integration Tests ===\n\n";
+
+    std::string fixtures_dir = ".";
+    if (argc > 1) {
+        fixtures_dir = argv[1];
+    }
+
+    int passed = 0;
+    int failed = 0;
+
+    auto run = [&](bool (*test)()) {
+        if (test()) ++passed;
+        else ++failed;
+    };
+
+    auto runWithArg = [&](bool (*test)(const std::string&), const std::string& arg) {
+        if (test(arg)) ++passed;
+        else ++failed;
+    };
+
+    run(testDocumentCreation);
+    run(testTrackManagement);
+    run(testAudioGraphConstruction);
+    run(testGainNodeProcessing);
+    run(testRingBuffer);
+    run(testDocumentSerialization);
+    run(testDocumentClipsRoundTrip);
+    runWithArg(testRenderDeterminism, fixtures_dir);
+
+    std::cout << "\n=== Results ===\n";
+    std::cout << "Passed: " << passed << "\n";
+    std::cout << "Failed: " << failed << "\n";
+
+    return failed > 0 ? 1 : 0;
+}
