@@ -17,11 +17,13 @@ Rien de temps reel ne traverse le serveur distant.
 |-----------|---------|---------------------------|-------|
 | Engine C++ (WSL/GCC) | ✅ | ✅ | `./daw_engine_test` 8/8 |
 | Engine C++ (MSVC) | ✅ | ✅ | Hash identique GCC |
-| Server Rust | ✅ | ❌ | Compile, non teste |
-| Web TypeScript | ✅ | ❌ | Compile mais ecrit avant Protobuf/token/.am |
+| Server Rust | ✅ | ❌ | Ecoute sur 127.0.0.1:3000, non teste |
+| Web TypeScript | ✅ | ❌ | **INCOMPATIBLE** - voir note |
 
-**Attention**: Le web compile (`tsc` content) mais n'a jamais communique avec le moteur.
-Il utilise probablement une API obsolete.
+**Attention critique**: Le web n'utilise PAS Automerge.
+- `project.ts` ligne 6: "For slice 1, we use simple JSON-based approach"
+- Web envoie du JSON, serveur attend du binaire Automerge
+- Ils ne peuvent pas communiquer en l'etat
 
 ## Criteres d'acceptation
 
@@ -29,7 +31,7 @@ Il utilise probablement une API obsolete.
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `f40af882097b704a` identique GCC/MSVC |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
-| 3 | Convergence 2 onglets | ⛔ NON TESTE | Server compile, web non verifie |
+| 3 | Convergence 2 onglets | ⛔ BLOQUE | Web=JSON, Server=Automerge binaire |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
 
@@ -73,7 +75,7 @@ npm run build  # Compile mais non verifie
 ### Server
 ```bash
 cd server
-cargo build  # ECHOUE - voir fix ci-dessous
+cargo run  # Ecoute sur 127.0.0.1:3000
 ```
 
 ---
@@ -153,11 +155,14 @@ Observations a noter:
 
 ## Problemes ouverts
 
-1. **Critere 3 non teste**
-   - Server compile maintenant
-   - Web compile mais utilise probablement API obsolete
-   - Test convergence requiert clients fonctionnels
+1. **Critere 3 BLOQUE - incompatibilite Web/Server**
+   - Server Rust utilise `automerge` 0.5 (binaire)
+   - Web TypeScript utilise JSON pur (jamais migre vers Automerge)
+   - `project.ts` lignes 22-29: decode JSON, pas Automerge
+   - `file_store.rs` ligne 64: `Automerge::load(&data)` attend binaire
+   - **Solution**: Reecrire web avec `@automerge/automerge` reel
 
-2. **Web non verifie**
-   - Ecrit avant protocole Protobuf, token, format .am fige
-   - A revalider ou reecrire
+2. **Web incompatible avec moteur**
+   - `engine_client.ts` envoie JSON, moteur attend Protobuf
+   - Pas de gestion du token d'authentification
+   - Port code en dur: 9000, moteur utilise 47821
