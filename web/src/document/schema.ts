@@ -32,6 +32,7 @@ export interface ProjectDef {
   schemaVersion: number;
   sampleRate: number;
   tracks: TrackDef[];
+  [key: string]: unknown;  // Index signature for Automerge compatibility
 }
 
 /**

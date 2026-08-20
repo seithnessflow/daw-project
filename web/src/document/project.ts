@@ -1,71 +1,84 @@
 /**
- * Project document wrapper.
+ * Project document wrapper using Automerge CRDT.
  *
- * In a full implementation, this would use Automerge.
- * For slice 1, we use a simple JSON-based approach.
+ * Uses @automerge/automerge 2.x with WASM backend.
+ * The WASM is bundled in the "fullfat" entrypoint and loads automatically.
  */
 
-import { ProjectDef, TrackDef, createEmptyDocument, migrateDocument } from './schema';
+import * as Automerge from '@automerge/automerge';
+import { ProjectDef, TrackDef, SCHEMA_VERSION } from './schema';
 
 export class Project {
-  private doc: ProjectDef;
+  private doc: Automerge.Doc<ProjectDef>;
   private lastChange: Uint8Array | null = null;
 
   constructor() {
-    this.doc = createEmptyDocument();
+    // Create empty document with schema
+    this.doc = Automerge.from<ProjectDef>({
+      schemaVersion: SCHEMA_VERSION,
+      sampleRate: 48000,
+      tracks: [],
+    });
   }
 
   /**
-   * Load a document from bytes.
+   * Load a document from Automerge binary bytes.
    */
   load(data: Uint8Array): void {
     try {
-      const json = new TextDecoder().decode(data);
-      const parsed = JSON.parse(json) as ProjectDef;
-      this.doc = migrateDocument(parsed);
+      this.doc = Automerge.load<ProjectDef>(data);
     } catch (e) {
-      console.error('Failed to load document:', e);
-      this.doc = createEmptyDocument();
+      console.error('Failed to load Automerge document:', e);
+      // Fallback to empty document
+      this.doc = Automerge.from<ProjectDef>({
+        schemaVersion: SCHEMA_VERSION,
+        sampleRate: 48000,
+        tracks: [],
+      });
     }
   }
 
   /**
-   * Apply a change to the document.
+   * Apply an incremental change from another peer.
    */
   applyChange(change: Uint8Array): void {
-    // In a real implementation, this would use Automerge.applyChanges
-    // For now, treat it as a full document replacement
-    this.load(change);
+    try {
+      const [newDoc] = Automerge.applyChanges(this.doc, [change]);
+      this.doc = newDoc;
+    } catch (e) {
+      console.error('Failed to apply change:', e);
+    }
   }
 
   /**
-   * Get the document data.
+   * Get the current document state.
    */
   getDocument(): ProjectDef {
     return this.doc;
   }
 
   /**
-   * Serialize the document to bytes.
+   * Serialize the document to Automerge binary format.
    */
   toBytes(): Uint8Array {
-    const json = JSON.stringify(this.doc);
-    return new TextEncoder().encode(json);
+    return Automerge.save(this.doc);
   }
 
   /**
-   * Set track gain.
+   * Set track gain and generate a change.
    */
   setTrackGain(trackId: string, gain: number): void {
-    const track = this.doc.tracks.find((t) => t.id === trackId);
-    if (track) {
-      track.gain = Math.max(0, Math.min(2, gain));
-      this.lastChange = this.toBytes();
-    }
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      if (track) {
+        track.gain = Math.max(0, Math.min(2, gain));
+      }
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }
 
   /**
-   * Get the last change (for sending to server).
+   * Get the last change for sending to the server.
    */
   getLastChange(): Uint8Array | null {
     const change = this.lastChange;
@@ -74,10 +87,33 @@ export class Project {
   }
 
   /**
-   * Add a track.
+   * Add a track and generate a change.
    */
   addTrack(track: TrackDef): void {
-    this.doc.tracks.push(track);
-    this.lastChange = this.toBytes();
+    this.doc = Automerge.change(this.doc, (d) => {
+      d.tracks.push(track);
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * Get current document heads (for sync protocol).
+   */
+  getHeads(): Automerge.Heads {
+    return Automerge.getHeads(this.doc);
+  }
+
+  /**
+   * Clone the document (for testing/comparison).
+   */
+  clone(): Automerge.Doc<ProjectDef> {
+    return Automerge.clone(this.doc);
+  }
+
+  /**
+   * Merge with another document.
+   */
+  merge(other: Automerge.Doc<ProjectDef>): void {
+    this.doc = Automerge.merge(this.doc, other);
   }
 }
