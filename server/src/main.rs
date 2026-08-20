@@ -2,10 +2,6 @@
 //!
 //! Provides Automerge CRDT synchronization between browser clients and the local engine.
 
-mod api;
-mod document;
-mod sync;
-
 use anyhow::Result;
 use axum::{
     routing::get,
@@ -17,16 +13,7 @@ use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::document::ProjectStore;
-use crate::sync::SyncState;
-
-/// Application state shared across handlers.
-pub struct AppState {
-    /// Project document store.
-    pub store: Box<dyn ProjectStore + Send + Sync>,
-    /// Active sync sessions.
-    pub sync_state: RwLock<SyncState>,
-}
+use daw_server::{api, document, AppState, SyncState};
 
 #[tokio::main]
 async fn main() -> Result<()> {

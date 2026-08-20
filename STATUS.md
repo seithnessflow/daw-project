@@ -11,41 +11,38 @@ Triangle Browser ↔ Engine ↔ Server :
 
 Rien de temps reel ne traverse le serveur distant.
 
-## Ce qui fonctionne (prouve)
+## Etat des composants
 
-| Composant | Commande de verification |
-|-----------|--------------------------|
-| Engine WSL/GCC build | `cd engine && cmake -B build && make -j4` |
-| Engine MSVC build | `engine/build-msvc/daw_engine.exe` existe |
-| Rendu deterministe | `./daw_engine_test` → hash `f40af882097b704a` |
-| Tests integration CLI | `./daw_engine_test` → 8/8 passes |
-| WebSocket server | Ecoute sur port 47821 (apres fix WSAStartup) |
-| Web TypeScript build | `cd web && npm run build` → OK |
+| Composant | Compile | Verifie fonctionnellement | Notes |
+|-----------|---------|---------------------------|-------|
+| Engine C++ (WSL/GCC) | ✅ | ✅ | `./daw_engine_test` 8/8 |
+| Engine C++ (MSVC) | ✅ | ✅ | Hash identique GCC |
+| Server Rust | ✅ | ❌ | Compile, non teste |
+| Web TypeScript | ✅ | ❌ | Compile mais ecrit avant Protobuf/token/.am |
 
-## Ce qui existe mais ne fonctionne pas
-
-| Composant | Probleme |
-|-----------|----------|
-| Server Rust | Ne compile pas : `error[E0432]: unresolved import 'crate::AppState'` |
-| Rendu audio (test CLI) | Peak L/R = 0 — assets non charges correctement |
-
-## Ce qui n'existe pas
-
-| Manque | Impact |
-|--------|--------|
-| Depot git | Pas de .git/, pas de .gitignore, pas de versioning |
-| Test convergence 2 onglets | Server ne compile pas, critere 3 non testable |
-| Test LNA documente | Critere 4 jamais execute dans Chrome |
+**Attention**: Le web compile (`tsc` content) mais n'a jamais communique avec le moteur.
+Il utilise probablement une API obsolete.
 
 ## Criteres d'acceptation
 
-| # | Critere | Statut | Preuve |
+| # | Critere | Statut | Detail |
 |---|---------|--------|--------|
-| 1 | Rendu deterministe | ✅ | `./daw_engine_test` hash `f40af882097b704a` |
-| 2 | Test CLI sans navigateur | ✅ | `./daw_engine_test` 8/8 |
-| 3 | Convergence 2 onglets | ⛔ | Server ne compile pas |
-| 4 | LNA HTTPS→WS local | ⛔ | Test manuel jamais documente |
-| 5 | 10 min WASAPI sans underrun | ⚠️ | `wasapi_test.log` 0 underruns, mais sans charge CPU |
+| 1 | Rendu deterministe | ✅ VALIDE | Hash `f40af882097b704a` identique GCC/MSVC |
+| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
+| 3 | Convergence 2 onglets | ⛔ NON TESTE | Server compile, web non verifie |
+| 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
+| 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
+
+### Detail critere 5
+
+Test effectue 2026-08-20:
+- Device: ZenGo SC, 48kHz, 512 frames (~10.7ms)
+- Duree: 599.5s / 600s
+- Underruns: 0
+- **Charge CPU: ABSENTE**
+
+Le critere n'est pas valide tant qu'un test avec charge (recompilation parallele) n'est pas fait.
+Voir DECISIONS.md pour procedure.
 
 ## Commandes utiles
 
@@ -55,7 +52,7 @@ cd engine
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j4
 ./build/daw_engine_test
-./build/daw_engine --doc fixtures/test.am --play
+./build/daw_engine --doc ../fixtures/test.am --play
 ```
 
 ### Engine (Windows MSVC)
@@ -63,42 +60,104 @@ cmake --build build -j4
 cd engine\build-msvc
 ..\rebuild_msvc.bat
 .\daw_engine_test.exe
-.\daw_engine.exe --doc ..\fixtures\test.am --play --ws-port 47821
+.\daw_engine.exe --doc ..\test-assets\test_10min.am --assets ..\test-assets --play --ws-port 47821
 ```
 
 ### Web
 ```bash
 cd web
 npm install
-npm run build
+npm run build  # Compile mais non verifie
 ```
 
-### Server (BROKEN)
+### Server
 ```bash
 cd server
-cargo build  # ECHOUE
+cargo build  # ECHOUE - voir fix ci-dessous
 ```
 
-## Problemes connus non resolus
+---
 
-1. **Server Rust ne compile pas**
-   - Cause: `AppState` defini dans main.rs mais pas exporte vers lib.rs
-   - Impact: Critere 3 non testable
-   - Fix: Ajouter `pub use crate::AppState;` dans lib.rs (non fait, instruction de ne pas reparer)
+## Procedure de test manuel Windows
 
-2. **Assets non charges dans test CLI**
-   - Observation: Peak L/R = 0 lors du rendu avec fichier test cree dynamiquement
-   - Tests formels passent (fichier test interne avec asset integre)
-   - Impact: Incertain
+A executer par l'utilisateur dans des terminaux PowerShell separes.
 
-3. **Fichiers temporaires a la racine**
-   - `wasapi_test.log` (8.6 MB), `engine-*.txt`, `wasapi-*.txt`, `run_engine.bat`
-   - A nettoyer ou archiver
+### Test 1: Diagnostic port
 
-4. **Pas de depot git**
-   - Aucun versioning
-   - Pas de .gitignore pour exclure build/, target/, node_modules/
+```powershell
+netstat -ano | findstr :9000
+netsh int ipv4 show dynamicport tcp
+```
 
-5. **ADR-015 obsolete**
-   - Mentionne WebSocket issue comme non resolu (corrige depuis)
-   - Nombre de tests incorrect (7 → 8)
+Observations a noter:
+- [ ] Port 9000 occupe? Par quel PID?
+- [ ] Plage dynamique TCP?
+
+### Test 2: Critere 5 avec charge CPU
+
+```powershell
+# Terminal 1: Lancer la lecture AVANT la charge
+cd C:\Users\mb668\daw-project\engine\build-msvc
+.\daw_engine.exe --doc ..\test-assets\test_10min.am --assets ..\test-assets --play --ws-port 47821
+
+# Terminal 2: Charge CPU (recompilation)
+cd C:\Users\mb668\daw-project\engine\build-msvc
+ninja clean && ninja -j8
+```
+
+Observations a noter:
+- [ ] Underruns pendant compilation?
+- [ ] Underruns total apres 10 min?
+- [ ] Buffer size negocie?
+
+### Test 3: Critere 4 (LNA Chrome)
+
+```powershell
+# Terminal 1: Serveur HTTP
+cd C:\Users\mb668\daw-project\engine\test-page
+python -m http.server 8080
+
+# Terminal 2: Tunnel cloudflared (depuis WSL)
+~/.local/bin/cloudflared tunnel --url http://localhost:8080
+
+# Terminal 3: Moteur (deja lance pour critere 5, ou relancer)
+cd C:\Users\mb668\daw-project\engine\build-msvc
+.\daw_engine.exe --doc ..\test-assets\test_10min.am --assets ..\test-assets --play --ws-port 47821
+```
+
+1. Copier token de `%TEMP%\daw-engine-token`
+2. Ouvrir URL cloudflared dans Chrome >= 142
+3. Coller token et port 47821
+
+Observations a noter:
+
+**Fetch (canari LNA):**
+- [ ] Invite LNA apparait?
+- [ ] Texte exact de l'invite?
+- [ ] Comportement si refuse?
+- [ ] Refus memorise apres reload?
+- [ ] Comment annuler un refus?
+
+**WebSocket:**
+- [ ] Invite LNA apparait?
+- [ ] Connexion reussie?
+- [ ] Si pas d'invite mais Fetch bloqué → LNA ne couvre pas encore WS
+
+---
+
+## Problemes resolus
+
+1. ✅ **Depot git** — Initialise, premier commit `d2c5015`
+2. ✅ **Fichiers temporaires** — Supprimes, .gitignore en place
+3. ✅ **WebSocket Windows** — `ix::initNetSystem()` + port 47821
+
+## Problemes ouverts
+
+1. **Critere 3 non teste**
+   - Server compile maintenant
+   - Web compile mais utilise probablement API obsolete
+   - Test convergence requiert clients fonctionnels
+
+2. **Web non verifie**
+   - Ecrit avant protocole Protobuf, token, format .am fige
+   - A revalider ou reecrire
