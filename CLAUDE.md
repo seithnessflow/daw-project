@@ -182,14 +182,32 @@ en attente ni en remplissage. Ces règles priment sur le confort.
 ### Périmètre
 - Une tâche par session. Tâche > ~30 min estimées → découpe, propose l'ordre,
   fais UNIQUEMENT la première partie.
-- Aucun refactor, nettoyage ou amélioration non demandés — une ligne de signalement
-  en fin de session suffit.
+- Aucun refactor ni amélioration spontanés EN COURS DE SESSION — une ligne de
+  signalement suffit. Les refontes passent par le circuit critique ci-dessous.
 - Escalade au lieu de bricoler : « ESCALADE PROPOSÉE : <raison> » puis stop, pour
   toute décision d'architecture, dépendance immature, ou incohérence STATUS.md/réel.
 - Thread audio, auth, format du document : jamais d'économie de vérification.
   Tests de non-régression obligatoires, quel que soit le coût.
 
-### Exécution — jamais d'attente à vide
+### Critique et refonte — le compromis
+
+La critique est illimitée ; l'action reste bornée. On ne construit pas
+par-dessus un morceau identifié comme mal conçu.
+
+- Critique sans plafond : tout défaut de conception constaté se signale,
+  technos et dépendances comprises. Le scan complet du projet est légitime,
+  mais en session d'audit dédiée (regard neuf, lecture seule, rapport).
+- Chaque trouvaille passe la grille, jamais l'inverse :
+  1. Le chantier en cours s'appuie dessus → PRÉALABLE, session bornée avant.
+  2. Mal conçu, même isolé → REFONTE PLANIFIÉE : session(s) bornée(s) dédiée(s),
+     avec test de non-régression, AVANT que quoi que ce soit ne s'y adosse.
+  3. Défaut cosmétique ou spéculatif → dette datée avec déclencheur mesurable.
+- Remplacement de techno : jamais en direct. Dossier en 5 lignes d'abord
+  (défaut prouvé, remplaçant, coût de migration, risque, critère de succès),
+  décision explicite, puis sessions bornées. Précédent : samod (escaladé,
+  décision B, veille avec critère de sortie).
+- Le cap (VST3) reprend dès que les items 1 et 2 issus du dernier audit sont
+  soldés — il peut être retardé par la qualité, jamais dilué par elle.
 - Toute commande > 30 s part en arrière-plan IMMÉDIATEMENT, et tu enchaînes sur
   du travail d'édition : écrire le test suivant, préparer le diff, STATUS.md.
   Récolte du résultat une seule fois, à un point de synchronisation. Pas de sondage.
