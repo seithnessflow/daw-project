@@ -81,6 +81,24 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       par echantillons EXACTE (identite a 1.0, moitie a 0.5). 14/14.
       CI : les deux jobs vendorent le SDK epingle + deps VSTGUI Linux —
       plus de code hote hors du filet (verif du run CI post-push).
+- [ ] 2.4c-1 LE PONT SEUL, HORS DOCUMENT (temps reel d'abord) :
+      memoire partagee (ring audio + changements de parametres), cadence
+      callback<->enfant, ProxyNode instancie EN DUR (--debug-proxy-again,
+      pas encore le chain). DECISION PRISE EN ENTREE : pipeline a une
+      trame — le callback depose le bloc N et recupere le N-1 deja pret ;
+      l'enfant a 5,3 ms pleines pour 256 echantillons ; cout = 1 bloc de
+      latence, declare dans getLatencySamples() en 2.4d. Depassement
+      malgre tout = bypass du bloc + compteur d'incidents dans
+      EngineState, JAMAIS d'attente non bornee.
+      Preuve : le WAV de reference 2.4b rejoue EN CONTINU a travers le
+      pont, echantillons identiques au rendu hors ligne — le pont est
+      transparent, prouve au bit pres.
+- [ ] 2.4c-2 LE CRASH ET LE DOCUMENT : enfant tue en plein traitement ->
+      bypass propre + signalement + compteur, relance a froid, PUIS
+      lecture du chain (M3 solde), ProxyNode construit depuis le document
+      (UID du noeud, plus le flag de test). Preuve : chain avec AGain ->
+      son traite ; enfant tue -> son sec sans glitch, moteur vivant et
+      signalant.
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
       tout : UN plugin de gain VST3 connu s'instancie dans un processus
       isole, traite de l'audio, et son bypass s'entend. Un plugin, un
