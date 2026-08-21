@@ -29,6 +29,14 @@ impl FileStore {
     }
 }
 
+/// Write via temp file + atomic rename: fs::write truncates in place, so a
+/// crash mid-write would leave a truncated, unloadable project file.
+async fn write_atomic(path: &std::path::Path, data: &[u8]) -> std::io::Result<()> {
+    let tmp = path.with_extension("am.tmp");
+    fs::write(&tmp, data).await?;
+    fs::rename(&tmp, path).await
+}
+
 #[async_trait]
 impl ProjectStore for FileStore {
     async fn load(&self, project_id: &str) -> Result<Option<Vec<u8>>> {
@@ -48,7 +56,7 @@ impl ProjectStore for FileStore {
     async fn save(&self, project_id: &str, data: &[u8]) -> Result<()> {
         let path = self.project_path(project_id);
 
-        fs::write(&path, data)
+        write_atomic(&path, data)
             .await
             .with_context(|| format!("Failed to write project: {}", project_id))?;
 
@@ -69,9 +77,9 @@ impl ProjectStore for FileStore {
         // Apply the change
         doc.load_incremental(change)?;
 
-        // Save back
+        // Save back (atomic: same guarantee as save())
         let data = doc.save();
-        fs::write(&path, data).await?;
+        write_atomic(&path, &data).await?;
 
         Ok(())
     }
