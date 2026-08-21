@@ -62,7 +62,15 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          aux rebuilds (=> R2 devient un transfert de handles), spin borne
          + bypass cote callback, crash enfant = bypass + signalement.
       3. R1+R2 : coalescing des rebuilds (hors thread reseau) + transfert
-         d'etat des noeuds au swap, dans le cadre fixe par l'ADR.
+         d'etat des noeuds au swap, dans le cadre fixe par l'ADR-017.
+         POLITIQUE TRANCHEE EN ENTREE : dernier etat gagne — dix changes
+         pendant un rebuild = UN rebuild vers l'etat le plus recent du
+         document, intermediaires jetes (jamais audibles, assume).
+         Corollaire test : « chaque change = un Graph updated » devient
+         faux PAR CONSTRUCTION ; le test du jalon evolue vers « l'etat
+         final du graphe correspond a l'etat final du document » —
+         propriete plus forte, evolution a signaler explicitement
+         (discipline de test), PAS un affaiblissement en douce.
       4. Elagage docs (session courte) : les 7 ecarts docs/reel de
          AUDIT-2.md — le chantier demarre sur des documents qui disent vrai.
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
