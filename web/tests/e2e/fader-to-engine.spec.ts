@@ -1,204 +1,233 @@
 /**
  * Milestone Test: Fader to Engine
  *
- * Tests the complete chain: Browser gain change → Server sync → Engine graph rebuild
+ * Verifies the real outcome of the milestone "a fader move in the browser
+ * changes the sound":
  *
- * This test validates that:
- * 1. Gain changes in the browser propagate through Automerge sync
- * 2. The engine receives the document change
- * 3. The engine rebuilds its audio graph with the new gain
+ * 1. Live chain: this spec SPAWNS the engine (fresh log per run, unique
+ *    project id), drives gain changes from the browser through the Automerge
+ *    sync server, and requires one "Graph updated" per change in the
+ *    engine's own log. It fails if the engine process dies (the historical
+ *    failure mode: use-after-free crash after the first patch).
+ *
+ * 2. Audible result: renders the same document twice (gain 1.0 vs 0.25)
+ *    through the engine CLI and compares WAV samples: the quieter render
+ *    must be exactly 0.25x the reference, sample by sample. Fails if the
+ *    engine dies (non-zero exit) or if the audio does not change.
  *
  * Prerequisites:
- * - Server running on localhost:3000
- * - Engine running with --server ws://localhost:3000 --play
- * - Web running on localhost:5173
+ * - Sync server running on localhost:3000
+ * - Web dev server on the Playwright baseURL
+ * - An engine build (or ENGINE_EXE / CREATE_TEST_DOC env overrides)
  */
 
-import { test, expect, Page } from '@playwright/test';
-import { execSync, spawn, ChildProcess } from 'child_process';
+import { test, expect } from '@playwright/test';
+import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import {
   waitForServerConnection,
-  getTrackGain,
-  setTrackGain,
   getTrackIds,
-  setupConsoleCollection,
+  setTrackGain,
 } from './helpers';
 
-// Path to engine log file
-const ENGINE_LOG = path.join(process.env.TEMP || '/tmp', 'daw-engine.log');
+const specDir = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(specDir, '..', '..', '..');
+const require = createRequire(import.meta.url);
 
-/**
- * Read recent lines from engine log.
- */
-function getEngineLog(lastN: number = 50): string {
-  try {
-    const content = fs.readFileSync(ENGINE_LOG, 'utf-8');
-    const lines = content.trim().split('\n');
-    return lines.slice(-lastN).join('\n');
-  } catch {
-    return '';
+function resolveBinary(envVar: string, name: string): string {
+  const fromEnv = process.env[envVar];
+  if (fromEnv) {
+    if (!fs.existsSync(fromEnv)) {
+      throw new Error(`${envVar}=${fromEnv} does not exist`);
+    }
+    return fromEnv;
   }
+  const exe = process.platform === 'win32' ? `${name}.exe` : name;
+  const candidates = [
+    path.join(REPO_ROOT, 'engine', 'build-msvc', exe),
+    path.join(REPO_ROOT, 'engine', 'build', exe),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  throw new Error(
+    `${name} binary not found (looked at: ${candidates.join(', ')}). ` +
+    `Build the engine or set ${envVar}.`
+  );
 }
 
-/**
- * Count occurrences of a pattern in engine log.
- */
-function countEngineLogOccurrences(pattern: string): number {
+/** Poll a predicate until it holds or the timeout expires. */
+async function waitUntil(
+  pred: () => boolean,
+  timeoutMs: number,
+  stepMs = 100
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (pred()) return true;
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+  return pred();
+}
+
+/** Count occurrences of a literal string in a file (0 if unreadable). */
+function countInFile(file: string, needle: string): number {
   try {
-    const content = fs.readFileSync(ENGINE_LOG, 'utf-8');
-    return (content.match(new RegExp(pattern, 'g')) || []).length;
+    const content = fs.readFileSync(file, 'utf-8');
+    let count = 0;
+    let pos = 0;
+    while ((pos = content.indexOf(needle, pos)) !== -1) {
+      count++;
+      pos += needle.length;
+    }
+    return count;
   } catch {
     return 0;
   }
 }
 
-/**
- * Wait for a specific message in engine log.
- */
-async function waitForEngineLog(
-  pattern: string | RegExp,
-  timeout: number = 5000
-): Promise<boolean> {
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeout) {
-    const log = getEngineLog();
-    if (typeof pattern === 'string' ? log.includes(pattern) : pattern.test(log)) {
-      return true;
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
+/** Read 16-bit PCM samples from a WAV file (proper RIFF chunk walk). */
+function readWav16(file: string): Float32Array {
+  const buf = fs.readFileSync(file);
+  if (buf.length < 12 || buf.toString('ascii', 0, 4) !== 'RIFF') {
+    throw new Error(`${file} is not a RIFF/WAV file`);
   }
-  return false;
+  let offset = 12;
+  while (offset + 8 <= buf.length) {
+    const id = buf.toString('ascii', offset, offset + 4);
+    const size = buf.readUInt32LE(offset + 4);
+    if (id === 'data') {
+      const count = Math.floor(size / 2);
+      const samples = new Float32Array(count);
+      for (let i = 0; i < count; i++) {
+        samples[i] = buf.readInt16LE(offset + 8 + i * 2) / 32768;
+      }
+      return samples;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  throw new Error(`${file}: no data chunk found`);
 }
 
 test.describe('Milestone: Fader to Engine', () => {
-  test('gain change propagates from browser to engine', async ({ page }) => {
-    const logs: string[] = [];
-    setupConsoleCollection(page, logs);
+  test('fader moves rebuild the live engine graph and the engine survives', async ({ page }) => {
+    const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    const projectId = `e2e-fader-${Date.now()}`;
+    const logPath = path.join(os.tmpdir(), `daw-e2e-engine-${Date.now()}.log`);
 
-    // Navigate to app
-    await page.goto('/');
+    const logFd = fs.openSync(logPath, 'w');
+    const engine: ChildProcess = spawn(
+      engineExe,
+      [
+        '--server', 'ws://localhost:3000',
+        '--project', projectId,
+        '--play', '--mute',
+        '--ws-port', '47901',
+      ],
+      { stdio: ['ignore', logFd, logFd] }
+    );
+    fs.closeSync(logFd);
 
-    // Wait for server connection (Automerge sync)
-    await waitForServerConnection(page);
+    try {
+      // The engine must connect to the server and load the initial document
+      expect(
+        await waitUntil(() => countInFile(logPath, 'Document loaded') >= 1, 15000),
+        `engine did not load the initial document (log: ${logPath})`
+      ).toBe(true);
 
-    // Wait for tracks to render
-    await page.waitForSelector('[data-track-id]', { timeout: 10000 });
+      await page.goto(`/?project=${projectId}`);
+      await waitForServerConnection(page);
+      await page.waitForSelector('[data-track-id]', { timeout: 10000 });
 
-    // Get track IDs
-    const trackIds = await getTrackIds(page);
-    expect(trackIds.length).toBeGreaterThan(0);
+      const trackIds = await getTrackIds(page);
+      expect(trackIds.length).toBeGreaterThan(0);
 
-    const testTrackId = trackIds[0];
+      // Three consecutive fader moves; each one must produce a graph
+      // rebuild in the engine's own, fresh log (delta counting: the log
+      // file belongs to this run only)
+      const values = [0.25, 0.75, 0.5];
+      for (let i = 0; i < values.length; i++) {
+        await setTrackGain(page, trackIds[0], values[i]);
+        expect(
+          await waitUntil(() => countInFile(logPath, 'Graph updated') >= i + 1, 5000),
+          `engine did not apply change ${i + 1}/${values.length} (log: ${logPath})`
+        ).toBe(true);
+      }
 
-    // Get initial gain
-    const initialGain = await getTrackGain(page, testTrackId);
-    console.log(`Initial gain: ${initialGain}`);
+      expect(countInFile(logPath, 'Graph updated')).toBeGreaterThanOrEqual(values.length);
 
-    // Change gain to a new value
-    const newGain = initialGain === 0.5 ? 0.75 : 0.5;
-    console.log(`Setting gain to: ${newGain}`);
-
-    await setTrackGain(page, testTrackId, newGain);
-
-    // Wait a moment for sync
-    await page.waitForTimeout(500);
-
-    // Verify the UI shows the new gain
-    const uiGain = await getTrackGain(page, testTrackId);
-    expect(uiGain).toBeCloseTo(newGain, 2);
-
-    // Check if engine received the change
-    // The engine logs "Graph updated (document change)" when it rebuilds
-    const engineReceivedChange = await waitForEngineLog('Graph updated', 3000);
-
-    if (!engineReceivedChange) {
-      console.log('=== ENGINE LOG ===');
-      console.log(getEngineLog());
-      console.log('=== BROWSER CONSOLE ===');
-      logs.slice(-20).forEach(log => console.log(log));
-      console.log('==================');
+      // The historical bug: the engine crashed (0xC0000005) right after the
+      // first change. A dead engine must fail this test.
+      expect(engine.exitCode, 'engine process died during the test').toBeNull();
+    } finally {
+      engine.kill();
     }
-
-    expect(engineReceivedChange).toBe(true);
   });
 
-  test('multiple gain changes are all applied', async ({ page }) => {
-    const logs: string[] = [];
-    setupConsoleCollection(page, logs);
+  test('gain change is audible: rendered WAV samples scale with gain', () => {
+    const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    const createTestDoc = resolveBinary('CREATE_TEST_DOC', 'create_test_doc');
 
-    await page.goto('/');
-    await waitForServerConnection(page);
-    await page.waitForSelector('[data-track-id]', { timeout: 10000 });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'daw-e2e-render-'));
 
-    const trackIds = await getTrackIds(page);
-    expect(trackIds.length).toBeGreaterThan(0);
+    // Base document + 2s tone asset from the engine's own fixture generator
+    execFileSync(createTestDoc, [path.join(dir, 'base.am'), dir, '2'], { stdio: 'pipe' });
 
-    const testTrackId = trackIds[0];
+    // Two variants via Automerge (the same library the web client uses):
+    // 1 second long, gain 1.0 vs 0.25
+    const Automerge = require('@automerge/automerge');
+    const base = Automerge.load(new Uint8Array(fs.readFileSync(path.join(dir, 'base.am'))));
 
-    // Count existing occurrences before changes
-    const initialCount = countEngineLogOccurrences('Graph updated');
+    // The engine resolves assets as <assetHash>.wav, but create_test_doc
+    // writes test_tone.wav: expose the asset under the name the engine loads
+    const assetHash: string = base.tracks[0].clips[0].assetHash;
+    fs.copyFileSync(path.join(dir, 'test_tone.wav'), path.join(dir, `${assetHash}.wav`));
+    const variant = (gain: number) =>
+      Automerge.change(Automerge.clone(base), (d: any) => {
+        for (const t of d.tracks) {
+          t.gain = gain;
+          for (const c of t.clips) {
+            c.lengthSamples = 48000;
+          }
+        }
+      });
+    fs.writeFileSync(path.join(dir, 'ref.am'), Buffer.from(Automerge.save(variant(1.0))));
+    fs.writeFileSync(path.join(dir, 'quarter.am'), Buffer.from(Automerge.save(variant(0.25))));
 
-    // Make 3 consecutive changes
-    const values = [0.25, 0.75, 0.5];
-    for (const value of values) {
-      await setTrackGain(page, testTrackId, value);
-      await page.waitForTimeout(400);
+    // Render both. execFileSync throws if the engine exits non-zero or
+    // crashes: a dead engine fails the test.
+    const render = (doc: string, wav: string) =>
+      execFileSync(
+        engineExe,
+        ['--doc', path.join(dir, doc), '--render', path.join(dir, wav),
+         '--assets', dir, '--bit-depth', '16'],
+        { stdio: 'pipe' }
+      );
+    render('ref.am', 'ref.wav');
+    render('quarter.am', 'quarter.wav');
+
+    const ref = readWav16(path.join(dir, 'ref.wav'));
+    const quarter = readWav16(path.join(dir, 'quarter.wav'));
+
+    expect(ref.length).toBeGreaterThan(0);
+    expect(quarter.length).toBe(ref.length);
+
+    // The reference must not be silence, and every sample of the quieter
+    // render must be 0.25x the reference (16-bit quantization tolerance)
+    let peak = 0;
+    let maxError = 0;
+    for (let i = 0; i < ref.length; i++) {
+      const abs = Math.abs(ref[i]);
+      if (abs > peak) peak = abs;
+      const err = Math.abs(quarter[i] - 0.25 * ref[i]);
+      if (err > maxError) maxError = err;
     }
-
-    // Wait for all changes to propagate
-    await page.waitForTimeout(1000);
-
-    // Count final occurrences
-    const finalCount = countEngineLogOccurrences('Graph updated');
-    const updateCount = finalCount - initialCount;
-
-    console.log(`Engine received ${updateCount}/${values.length} updates (${initialCount} -> ${finalCount})`);
-
-    // At least 2 out of 3 should succeed (network timing may coalesce)
-    expect(updateCount).toBeGreaterThanOrEqual(2);
-  });
-
-  test('gain affects peak meters (audio verification)', async ({ page }) => {
-    // This test verifies that gain changes actually affect the audio output
-    // by observing the peak meter values in the telemetry
-
-    const logs: string[] = [];
-    setupConsoleCollection(page, logs);
-
-    await page.goto('/');
-    await waitForServerConnection(page);
-    await page.waitForSelector('[data-track-id]', { timeout: 10000 });
-
-    const trackIds = await getTrackIds(page);
-    expect(trackIds.length).toBeGreaterThan(0);
-
-    const testTrackId = trackIds[0];
-
-    // Count occurrences before
-    const countBefore = countEngineLogOccurrences('Graph updated');
-
-    // Set gain to minimum (0)
-    await setTrackGain(page, testTrackId, 0);
-    await page.waitForTimeout(500);
-
-    // Set gain to maximum (1)
-    await setTrackGain(page, testTrackId, 1);
-    await page.waitForTimeout(1000);
-
-    // Count occurrences after
-    const countAfter = countEngineLogOccurrences('Graph updated');
-
-    // The test passes if:
-    // 1. The engine rebuilt the graph (count increased)
-    // 2. The peak levels are different (would need meter parsing)
-
-    // For now, just verify the graph was rebuilt at least once
-    const updates = countAfter - countBefore;
-    console.log(`Graph updated ${updates} times (${countBefore} -> ${countAfter})`);
-
-    expect(updates).toBeGreaterThanOrEqual(1);
+    expect(peak).toBeGreaterThan(0.05);
+    expect(maxError).toBeLessThan(4 / 32768);
   });
 });
 
@@ -206,11 +235,9 @@ test.describe('Engine connection status', () => {
   test('page shows engine connection status', async ({ page }) => {
     await page.goto('/');
 
-    // Check for connection status indicators
     const serverStatus = await page.locator('#server-status').isVisible().catch(() => false);
     const engineStatus = await page.locator('#engine-status').isVisible().catch(() => false);
 
-    // At minimum, server status should be visible
     expect(serverStatus).toBe(true);
 
     console.log(`Server status visible: ${serverStatus}`);

@@ -13,7 +13,10 @@ import { formatTime } from './ui/transport';
 // Configuration
 const SERVER_URL = 'ws://localhost:3000';
 const ENGINE_PORT = 47821;
-const PROJECT_ID = 'default';
+// Project id can be overridden via ?project=<id> (used by E2E tests to get
+// an isolated project per run)
+const PROJECT_ID =
+  new URLSearchParams(window.location.search).get('project') ?? 'default';
 
 // State
 let project: Project | null = null;

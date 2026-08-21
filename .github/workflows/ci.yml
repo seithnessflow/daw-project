@@ -57,9 +57,17 @@ jobs:
       - name: Generate test fixture
         run: |
           cd engine
-          ./build/create_test_doc test-assets/test.am test-assets
+          # Short fixture (10s) with the tone asset exposed under the hash
+          # name the engine resolves (<assetHash>.wav)
+          ASSET_HASH=$(./build/create_test_doc test-assets/test.am test-assets 10 \
+            | grep 'Asset hash' | awk '{print $3}')
+          cp test-assets/test_tone.wav "test-assets/${ASSET_HASH}.wav"
+          echo "Asset exposed as ${ASSET_HASH}.wav"
 
       - name: Verify render determinism
+        # Cross-run determinism of a REAL (non-silent) render. The reference
+        # hash ($EXPECTED_HASH) is asserted by daw_engine_test above: a
+        # rendering regression fails the "Run engine tests" step.
         run: |
           cd engine
           ./build/daw_engine --doc test-assets/test.am --render /tmp/render1.wav --assets test-assets
@@ -74,11 +82,6 @@ jobs:
           if [ "$HASH1" != "$HASH2" ]; then
             echo "ERROR: Non-deterministic render!"
             exit 1
-          fi
-
-          if [ "$HASH1" != "$EXPECTED_HASH" ]; then
-            echo "WARNING: Hash differs from reference ($EXPECTED_HASH)"
-            echo "This may indicate a change in rendering behavior"
           fi
 
           echo "Determinism verified: $HASH1"
@@ -107,6 +110,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -114,6 +122,26 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
+
+      - name: Clone and build automerge-c
+        run: |
+          rustup toolchain install nightly
+          rustup component add rust-src --toolchain nightly
+
+          mkdir -p build/_deps
+          git clone --depth 1 --branch main https://github.com/automerge/automerge.git build/_deps/automerge-src
+
+          cd build/_deps/automerge-src/rust/automerge-c
+          cmake -B build -DBUILD_TESTING=OFF
+          cmake --build build -j$(nproc)
+
+      - name: Build engine
+        # The fader-to-engine E2E tests spawn the engine and its fixture
+        # generator (engine/build/daw_engine, engine/build/create_test_doc)
+        run: |
+          cd engine
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
 
       - name: Build server
         run: |

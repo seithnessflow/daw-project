@@ -496,6 +496,17 @@ bool testRenderDeterminism(const std::string& fixtures_dir) {
         return false;
     }
 
+    // Criterion 1 reference hash (STATUS.md / DECISIONS.md). A deviation is
+    // a rendering regression and must FAIL, in CI included. Update this
+    // constant only for a deliberate, documented rendering change.
+    const std::string expected_hash = "f40af882097b704a";
+    if (hash1 != expected_hash) {
+        std::cout << "FAILED: Hash deviates from reference\n";
+        std::cout << "  Got:      " << hash1 << "\n";
+        std::cout << "  Expected: " << expected_hash << "\n";
+        return false;
+    }
+
     std::cout << "OK (hash: " << hash1 << ")\n";
     return true;
 }

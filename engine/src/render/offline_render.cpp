@@ -1,5 +1,7 @@
 #include "offline_render.h"
 
+#include "../audio/audio_callback.h"  // audio::INTERNAL_BLOCK_SIZE
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -33,7 +35,9 @@ RenderResult OfflineRenderer::render(
         return result;
     }
 
-    graph->prepare(config.sample_rate, config.block_size);
+    // The graph's scratch buffers are sized for INTERNAL_BLOCK_SIZE frames:
+    // the render loop below must never feed process() more than that.
+    graph->prepare(config.sample_rate, audio::INTERNAL_BLOCK_SIZE);
 
     // Calculate render range
     int64_t start = config.start_sample;
@@ -68,23 +72,30 @@ RenderResult OfflineRenderer::render(
     }
 
     // Allocate buffers
-    std::vector<float> float_buffer(config.block_size * channels);
-    std::vector<uint8_t> int_buffer(config.block_size * channels * bytes_per_sample);
+    std::vector<float> float_buffer(audio::INTERNAL_BLOCK_SIZE * channels);
+    std::vector<uint8_t> int_buffer(audio::INTERNAL_BLOCK_SIZE * channels * bytes_per_sample);
 
-    // Render loop
+    // Render loop. Fixed sub-blocks of INTERNAL_BLOCK_SIZE, exactly like the
+    // audio callback: AudioGraph::process rejects larger blocks (its scratch
+    // buffers hold INTERNAL_BLOCK_SIZE frames). Driving it with
+    // config.block_size used to silently render silence for every full-size
+    // block: process() returned false and the result was never checked.
     int64_t position = start;
     while (position < end) {
         // Calculate block size for this iteration
         const int64_t remaining = end - position;
         const uint32_t block_frames = static_cast<uint32_t>(
-            std::min(remaining, static_cast<int64_t>(config.block_size))
+            std::min(remaining, static_cast<int64_t>(audio::INTERNAL_BLOCK_SIZE))
         );
 
         // Clear buffer
         std::fill(float_buffer.begin(), float_buffer.end(), 0.0f);
 
-        // Process
-        graph->process(float_buffer.data(), block_frames, position);
+        // Process. Offline, a failure is a bug, not an underrun: abort.
+        if (!graph->process(float_buffer.data(), block_frames, position)) {
+            result.error = "Graph processing failed at sample " + std::to_string(position);
+            return result;
+        }
 
         // Convert and accumulate peaks
         bool block_clipped = false;
