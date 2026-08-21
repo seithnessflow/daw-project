@@ -189,6 +189,8 @@ add_library(daw_engine_lib STATIC
     src/transport/transport_state.cpp
     src/render/offline_render.h
     src/render/offline_render.cpp
+    src/network/server_client.h
+    src/network/server_client.cpp
     src/websocket/websocket_server.h
     src/websocket/websocket_server.cpp
 )

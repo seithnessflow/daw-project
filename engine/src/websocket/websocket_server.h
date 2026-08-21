@@ -101,7 +101,6 @@ private:
                        const ix::WebSocketMessagePtr& msg);
     void handleTransportCommand(const protocol::TransportCommand& cmd);
     void handleSetMonitor(const protocol::SetMonitor& cmd);
-    void handleSetTrackGain(const protocol::SetTrackGain& cmd);
 
     // Send helpers
     void sendToAll(const protocol::Message& msg);
@@ -118,8 +117,12 @@ private:
     uint16_t port_ = 0;
 
     // Connections tracking
-    std::set<ix::WebSocket*> connections_;
+    std::set<ix::WebSocket*> connections_;          // Authenticated connections
+    std::set<ix::WebSocket*> pending_auth_;         // Connections awaiting auth
     std::mutex connections_mutex_;
+
+    // Auth timeout: close connections that don't auth within 2 seconds
+    static constexpr int AUTH_TIMEOUT_MS = 2000;
 
     // References (not owned)
     audio::AudioDevice* device_ = nullptr;

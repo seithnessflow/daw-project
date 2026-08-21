@@ -13,6 +13,7 @@ node_modules/
 
 # Logs and temp files
 *.log
+*.err
 *.tmp
 *-stdout.txt
 *-stderr.txt
@@ -48,4 +49,5 @@ engine/test-assets/*.wav
 fixtures/*.wav
 *.wav
 server/projects/
+web/projects/
 web/test-results/

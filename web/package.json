@@ -8,16 +8,20 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write src/**/*.ts",
+    "proto:gen": "cp ../engine/src/protocol/messages.proto src/proto/ && npx protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/proto --ts_proto_opt=esModuleInterop=true,outputEncodeMethods=true src/proto/messages.proto && mv src/proto/src/proto/messages.ts src/proto/messages.ts && rm -rf src/proto/src",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@automerge/automerge": "2.2.9"
+    "@automerge/automerge": "2.2.9",
+    "@bufbuild/protobuf": "^2.14.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "@types/node": "^20.10.0",
     "prettier": "^3.1.0",
+    "protobufjs": "^8.7.2",
+    "ts-proto": "^2.12.1",
     "typescript": "^5.3.0",
     "vite": "^5.0.0",
     "vite-plugin-top-level-await": "^1.6.0",

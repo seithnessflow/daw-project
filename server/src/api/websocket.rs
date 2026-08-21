@@ -92,45 +92,108 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
     }
 
     // Spawn task to forward broadcasts to this client
+    let session_id_clone = session_id;
     let mut send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            if sender.send(Message::Binary(msg)).await.is_err() {
-                break;
+        let mut msg_count = 0u64;
+        loop {
+            match rx.recv().await {
+                Ok(msg) => {
+                    let msg_len = msg.len();
+                    match sender.send(Message::Binary(msg)).await {
+                        Ok(_) => {
+                            msg_count += 1;
+                            tracing::info!("Session {}: Forwarded {} bytes to client (total: {})", session_id_clone, msg_len, msg_count);
+                        }
+                        Err(e) => {
+                            tracing::info!("Session {}: WebSocket send failed: {}, closing", session_id_clone, e);
+                            break;
+                        }
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    // Receiver fell behind, skip missed messages and continue
+                    tracing::warn!("Session {}: Broadcast receiver lagged by {} messages", session_id_clone, n);
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    // Channel closed (project removed)
+                    tracing::info!("Session {}: Broadcast channel closed (project removed?)", session_id_clone);
+                    break;
+                }
             }
         }
+        tracing::info!("Session {}: send_task exiting after {} messages", session_id_clone, msg_count);
     });
 
     // Handle incoming messages
     let state_clone = state.clone();
     let project_id_clone = project_id.clone();
+    let session_id_recv = session_id;
     let mut recv_task = tokio::spawn(async move {
-        while let Some(Ok(msg)) = receiver.next().await {
-            match msg {
-                Message::Binary(data) => {
-                    // Apply change and broadcast to other clients
-                    let sync_state = state_clone.sync_state.read().await;
-                    if let Some(tx) = sync_state.get_broadcast(&project_id_clone) {
-                        // Broadcast to all clients (including sender for consistency)
-                        let _ = tx.send(data.clone());
-                    }
-                    drop(sync_state);
+        loop {
+            match receiver.next().await {
+                Some(Ok(msg)) => {
+                    match msg {
+                        Message::Binary(data) => {
+                            tracing::info!("Session {}: Received binary message: {} bytes", session_id_recv, data.len());
 
-                    // Persist change
-                    if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
-                        tracing::error!("Failed to persist change: {}", e);
+                            // Apply change and broadcast to other clients
+                            let sync_state = state_clone.sync_state.read().await;
+                            if let Some(tx) = sync_state.get_broadcast(&project_id_clone) {
+                                // Broadcast to all clients (including sender for consistency)
+                                let receiver_count = tx.receiver_count();
+                                tracing::info!("Session {}: Broadcasting to {} receivers", session_id_recv, receiver_count);
+                                match tx.send(data.clone()) {
+                                    Ok(n) => tracing::info!("Session {}: Broadcast sent to {} receivers", session_id_recv, n),
+                                    Err(e) => tracing::error!("Session {}: Broadcast failed: {}", session_id_recv, e),
+                                }
+                            } else {
+                                tracing::warn!("Session {}: No broadcast channel for project {}", session_id_recv, project_id_clone);
+                            }
+                            drop(sync_state);
+
+                            // Persist change
+                            if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
+                                tracing::error!("Session {}: Failed to persist change: {}", session_id_recv, e);
+                            }
+                        }
+                        Message::Close(frame) => {
+                            tracing::info!("Session {}: Received Close frame: {:?}", session_id_recv, frame);
+                            break;
+                        }
+                        Message::Ping(_) => {}
+                        Message::Pong(_) => {}
+                        Message::Text(t) => {
+                            tracing::warn!("Session {}: Received unexpected text message: {}", session_id_recv, t);
+                        }
                     }
                 }
-                Message::Close(_) => break,
-                _ => {}
+                Some(Err(e)) => {
+                    tracing::error!("Session {}: WebSocket error: {}", session_id_recv, e);
+                    break;
+                }
+                None => {
+                    tracing::info!("Session {}: WebSocket stream ended (client disconnected)", session_id_recv);
+                    break;
+                }
             }
         }
+        tracing::info!("Session {}: recv_task exiting", session_id_recv);
     });
 
     // Wait for either task to finish
-    tokio::select! {
-        _ = &mut send_task => recv_task.abort(),
-        _ = &mut recv_task => send_task.abort(),
-    }
+    let exit_reason = tokio::select! {
+        result = &mut send_task => {
+            recv_task.abort();
+            format!("send_task finished: {:?}", result)
+        }
+        result = &mut recv_task => {
+            send_task.abort();
+            format!("recv_task finished: {:?}", result)
+        }
+    };
+
+    tracing::info!("Session {}: {} ", session_id, exit_reason);
 
     // Cleanup session
     {
@@ -138,5 +201,5 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
         sync_state.remove_session(&project_id, session_id);
     }
 
-    tracing::info!("Session {} disconnected", session_id);
+    tracing::info!("Session {} disconnected and cleaned up", session_id);
 }

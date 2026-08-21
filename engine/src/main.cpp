@@ -15,6 +15,7 @@
 #include "document/automerge_document.h"
 #include "graph/audio_graph.h"
 #include "graph/clip_player.h"
+#include "network/server_client.h"
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
 
@@ -22,6 +23,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <csignal>
@@ -41,12 +43,15 @@ void printUsage(const char* program) {
     std::cout << "DAW Engine CLI\n"
               << "\n"
               << "Usage:\n"
+              << "  " << program << " --server <url> --play [--project <id>] [--assets <dir>]\n"
               << "  " << program << " --doc <file.am> --play [--assets <dir>] [--ws-port <port>]\n"
               << "  " << program << " --doc <file.am> --render <output.wav> [--assets <dir>]\n"
               << "  " << program << " --doc <file.am> --info\n"
               << "  " << program << " --help\n"
               << "\n"
               << "Options:\n"
+              << "  --server <url>     Sync server URL (e.g., ws://localhost:3000)\n"
+              << "  --project <id>     Project ID for server sync (default: 'default')\n"
               << "  --doc <file>       Project document file (Automerge binary .am)\n"
               << "  --play             Play the project through audio device\n"
               << "  --render <file>    Render to WAV file\n"
@@ -55,7 +60,7 @@ void printUsage(const char* program) {
               << "  --mute             Use null audio backend (silent playback for testing)\n"
               << "  --sample-rate <n>  Sample rate for rendering (default: 48000)\n"
               << "  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)\n"
-              << "  --ws-port <n>      WebSocket server port (default: 9000)\n"
+              << "  --ws-port <n>      WebSocket server port (default: 47821)\n"
               << "  --solo <track-id>  Solo specified track (can be used multiple times)\n"
               << "  --mute-track <id>  Mute specified track (can be used multiple times)\n"
               << "  --list-devices     List available audio devices and exit\n"
@@ -63,11 +68,10 @@ void printUsage(const char* program) {
               << "  --help             Show this help\n"
               << "\n"
               << "Examples:\n"
+              << "  engine --server ws://localhost:3000 --play\n"
+              << "  engine --server ws://localhost:3000 --play --project my-song\n"
               << "  engine --doc project.am --play\n"
-              << "  engine --doc project.am --play --ws-port 9001\n"
-              << "  engine --doc project.am --play --solo track-1\n"
               << "  engine --doc project.am --render output.wav\n"
-              << "  engine --doc fixtures/two-tracks.am --render out.wav --assets fixtures\n"
               << std::endl;
 }
 
@@ -76,6 +80,8 @@ struct Options {
     std::string output_path;
     std::string assets_dir;
     std::string device_name;
+    std::string server_url;      // Server URL for live sync (e.g., ws://localhost:3000)
+    std::string project_id = "default";  // Project ID for server sync
     bool play = false;
     bool render = false;
     bool info = false;
@@ -83,7 +89,7 @@ struct Options {
     bool list_devices = false;
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
-    uint16_t ws_port = 9000;
+    uint16_t ws_port = 47821;    // Changed default to 47821
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
 };
@@ -138,6 +144,18 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.ws_port = static_cast<uint16_t>(std::stoul(argv[i]));
+        } else if (arg == "--server") {
+            if (++i >= argc) {
+                std::cerr << "Error: --server requires a URL\n";
+                return false;
+            }
+            opts.server_url = argv[i];
+        } else if (arg == "--project") {
+            if (++i >= argc) {
+                std::cerr << "Error: --project requires an ID\n";
+                return false;
+            }
+            opts.project_id = argv[i];
         } else if (arg == "--solo") {
             if (++i >= argc) {
                 std::cerr << "Error: --solo requires a track ID\n";
@@ -169,8 +187,14 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
         return true;
     }
 
-    if (opts.doc_path.empty()) {
-        std::cerr << "Error: --doc is required\n";
+    // Either --doc or --server is required
+    if (opts.doc_path.empty() && opts.server_url.empty()) {
+        std::cerr << "Error: --doc or --server is required\n";
+        return false;
+    }
+
+    if (!opts.doc_path.empty() && !opts.server_url.empty()) {
+        std::cerr << "Error: --doc and --server are mutually exclusive\n";
         return false;
     }
 
@@ -179,9 +203,17 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
         return false;
     }
 
-    // Default assets dir to document directory
+    // --render and --info require --doc (can't render from live server)
+    if ((opts.render || opts.info) && opts.doc_path.empty()) {
+        std::cerr << "Error: --render and --info require --doc\n";
+        return false;
+    }
+
+    // Default assets dir to document directory or current dir for server mode
     if (opts.assets_dir.empty()) {
-        opts.assets_dir = fs::path(opts.doc_path).parent_path().string();
+        if (!opts.doc_path.empty()) {
+            opts.assets_dir = fs::path(opts.doc_path).parent_path().string();
+        }
         if (opts.assets_dir.empty()) {
             opts.assets_dir = ".";
         }
@@ -245,6 +277,89 @@ int showInfo(const daw::document::AutomergeDocument& doc) {
     return 0;
 }
 
+/**
+ * Build audio graph from project definition.
+ *
+ * @param project Project definition
+ * @param sample_rate Sample rate
+ * @param assets_dir Assets directory
+ * @param asset_cache Asset cache (shared across rebuilds)
+ * @return Audio graph, or nullptr on failure
+ */
+std::unique_ptr<daw::graph::AudioGraph> buildGraph(
+    const daw::document::ProjectDef& project,
+    uint32_t sample_rate,
+    const std::string& assets_dir,
+    daw::graph::AssetCache& asset_cache
+) {
+    auto graph = std::make_unique<daw::graph::AudioGraph>();
+    graph->setSampleRate(sample_rate);
+
+    for (const auto& track_def : project.tracks) {
+        daw::graph::AudioTrack track;
+        track.id = track_def.id;
+        track.name = track_def.name;
+        track.gain.store(track_def.gain, std::memory_order_relaxed);
+
+        // Load clips
+        for (const auto& clip_def : track_def.clips) {
+            daw::graph::ClipPlayer player;
+
+            daw::graph::ClipInfo info;
+            info.id = clip_def.id;
+            info.asset_hash = clip_def.asset_hash;
+            info.start_sample = clip_def.start_sample;
+            info.length_samples = clip_def.length_samples;
+            info.offset_samples = clip_def.offset_samples;
+            player.setClip(info);
+
+            // Try to load asset
+            std::string asset_path = assets_dir + "/" + clip_def.asset_hash + ".wav";
+            const daw::graph::AudioAsset* asset = asset_cache.loadOrGet(asset_path);
+            if (asset) {
+                player.setAsset(asset);
+            }
+
+            track.clips.push_back(std::move(player));
+        }
+
+        // Create processors
+        for (const auto& proc_def : track_def.chain) {
+            if (proc_def.type == daw::graph::GainNode::TYPE) {
+                float gain = 1.0f;
+                auto it = proc_def.params.find("gain");
+                if (it != proc_def.params.end()) {
+                    gain = it->second;
+                }
+                auto node = std::make_unique<daw::graph::GainNode>(proc_def.id, gain);
+                track.chain.push_back(std::move(node));
+            }
+        }
+
+        graph->addTrack(std::move(track));
+    }
+
+    return graph;
+}
+
+/**
+ * Copy solo/mute state from old graph to new graph.
+ */
+void copyMonitorState(daw::graph::AudioGraph* from, daw::graph::AudioGraph* to) {
+    if (!from || !to) return;
+
+    for (size_t i = 0; i < from->getTrackCount(); ++i) {
+        auto* old_track = from->getTrack(i);
+        if (!old_track) continue;
+
+        auto* new_track = to->getTrackById(old_track->id);
+        if (new_track) {
+            new_track->solo = old_track->solo;
+            new_track->mute = old_track->mute;
+        }
+    }
+}
+
 int doRender(const daw::document::AutomergeDocument& doc, const Options& opts) {
     std::cout << "Rendering to: " << opts.output_path << "\n";
 
@@ -306,57 +421,14 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     daw::graph::AssetCache asset_cache;
     const auto& project = doc.getDocument();
 
-    auto graph = std::make_unique<daw::graph::AudioGraph>();
-    graph->setSampleRate(device.getSampleRate());
-
-    for (const auto& track_def : project.tracks) {
-        daw::graph::AudioTrack track;
-        track.id = track_def.id;
-        track.name = track_def.name;
-        track.gain = track_def.gain;
-
-        // Load clips
-        for (const auto& clip_def : track_def.clips) {
-            daw::graph::ClipPlayer player;
-
-            daw::graph::ClipInfo info;
-            info.id = clip_def.id;
-            info.asset_hash = clip_def.asset_hash;
-            info.start_sample = clip_def.start_sample;
-            info.length_samples = clip_def.length_samples;
-            info.offset_samples = clip_def.offset_samples;
-            player.setClip(info);
-
-            // Try to load asset
-            std::string asset_path = opts.assets_dir + "/" + clip_def.asset_hash + ".wav";
-            const daw::graph::AudioAsset* asset = asset_cache.loadOrGet(asset_path);
-            if (asset) {
-                player.setAsset(asset);
-                std::cout << "Loaded asset: " << asset_path << "\n";
-            } else {
-                std::cerr << "Warning: Could not load asset: " << asset_path << "\n";
-            }
-
-            track.clips.push_back(std::move(player));
-        }
-
-        // Create processors
-        for (const auto& proc_def : track_def.chain) {
-            if (proc_def.type == daw::graph::GainNode::TYPE) {
-                float gain = 1.0f;
-                auto it = proc_def.params.find("gain");
-                if (it != proc_def.params.end()) {
-                    gain = it->second;
-                }
-                auto node = std::make_unique<daw::graph::GainNode>(proc_def.id, gain);
-                track.chain.push_back(std::move(node));
-            }
-        }
-
-        graph->addTrack(std::move(track));
+    auto graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
+    if (!graph) {
+        std::cerr << "Failed to build audio graph\n";
+        return 1;
     }
 
     graph->prepare(device.getSampleRate(), device.getBufferSize());
+    std::cout << "Built graph with " << graph->getTrackCount() << " tracks\n";
 
     // Apply initial solo/mute from CLI
     for (const auto& track_id : opts.solo_tracks) {
@@ -455,18 +527,214 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     return 0;
 }
 
+int doPlayWithServer(const Options& opts) {
+    std::cout << "Connecting to server: " << opts.server_url << "\n";
+    std::cout << "Project: " << opts.project_id << "\n";
+    std::cout << "Press Ctrl+C to stop.\n\n";
+
+    // Set up signal handler
+    std::signal(SIGINT, signalHandler);
+
+    // Initialize audio device
+    daw::audio::AudioDevice device;
+    daw::audio::AudioDeviceConfig config;
+    config.sample_rate = opts.sample_rate;
+    config.buffer_size_frames = 512;
+    config.use_null_backend = opts.mute;
+    config.device_name = opts.device_name;
+
+    if (!device.initialize(config)) {
+        std::cerr << "Failed to initialize audio device\n";
+        return 1;
+    }
+
+    std::cout << "Audio Device: " << device.getDeviceName() << "\n"
+              << "Sample Rate: " << device.getSampleRate() << " Hz\n"
+              << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
+
+    // Shared state for document and graph
+    daw::document::AutomergeDocument doc;
+    daw::graph::AssetCache asset_cache;
+    std::unique_ptr<daw::graph::AudioGraph> current_graph;
+    std::mutex graph_mutex;
+
+    // Connect to sync server
+    daw::network::ServerClient server_client;
+    daw::network::ServerConfig server_config;
+    server_config.url = opts.server_url;
+    server_config.project_id = opts.project_id;
+
+    // Handle initial document
+    server_client.setDocumentCallback([&](const std::vector<uint8_t>& data) {
+        std::cout << "Received initial document (" << data.size() << " bytes)\n";
+
+        if (!doc.loadFromBytes(data.data(), data.size())) {
+            std::cerr << "Failed to load document: " << doc.getLastError() << "\n";
+            return;
+        }
+
+        const auto& project = doc.getDocument();
+        std::cout << "Document loaded: " << project.tracks.size() << " tracks\n";
+
+        // Build initial graph
+        auto graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
+        if (!graph) {
+            std::cerr << "Failed to build audio graph\n";
+            return;
+        }
+
+        graph->prepare(device.getSampleRate(), device.getBufferSize());
+
+        // Apply initial solo/mute from CLI
+        for (const auto& track_id : opts.solo_tracks) {
+            auto* track = graph->getTrackById(track_id);
+            if (track) {
+                track->solo = true;
+                std::cout << "Solo: " << track_id << "\n";
+            }
+        }
+        for (const auto& track_id : opts.mute_tracks) {
+            auto* track = graph->getTrackById(track_id);
+            if (track) {
+                track->mute = true;
+                std::cout << "Mute: " << track_id << "\n";
+            }
+        }
+
+        // Swap graph atomically
+        {
+            std::lock_guard<std::mutex> lock(graph_mutex);
+            current_graph = std::move(graph);
+            device.setActiveGraph(current_graph.get());
+        }
+
+        // Start playback
+        if (device.getState() != daw::audio::AudioDeviceState::Running) {
+            if (!device.start()) {
+                std::cerr << "Failed to start audio device\n";
+                return;
+            }
+            device.getTransport().play();
+            std::cout << "Playback started\n";
+        }
+    });
+
+    // Handle document changes
+    server_client.setChangeCallback([&](const std::vector<uint8_t>& change) {
+        if (!doc.applyChange(change.data(), change.size())) {
+            std::cerr << "Failed to apply change: " << doc.getLastError() << "\n";
+            return;
+        }
+
+        const auto& project = doc.getDocument();
+
+        // Build new graph
+        auto new_graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
+        if (!new_graph) {
+            std::cerr << "Failed to rebuild audio graph\n";
+            return;
+        }
+
+        new_graph->prepare(device.getSampleRate(), device.getBufferSize());
+
+        // Copy solo/mute state from current graph
+        {
+            std::lock_guard<std::mutex> lock(graph_mutex);
+            copyMonitorState(current_graph.get(), new_graph.get());
+            current_graph = std::move(new_graph);
+            device.setActiveGraph(current_graph.get());
+        }
+
+        std::cout << "Graph updated (document change)\n";
+    });
+
+    // Connect to server
+    if (!server_client.connect(server_config)) {
+        std::cerr << "Failed to connect to server\n";
+        return 1;
+    }
+
+    // Start WebSocket server for browser communication (telemetry)
+    daw::websocket::WebSocketServer ws_server;
+    daw::websocket::WebSocketConfig ws_config;
+    ws_config.port = opts.ws_port;
+    ws_config.bind_address = "127.0.0.1";
+    ws_config.telemetry_hz = 30;
+
+    // Telemetry timing
+    auto last_telemetry = std::chrono::steady_clock::now();
+    const auto telemetry_interval = std::chrono::milliseconds(1000 / ws_config.telemetry_hz);
+
+    // Main loop
+    while (g_running) {
+        auto now = std::chrono::steady_clock::now();
+
+        // Start WebSocket server once we have a graph
+        if (!ws_server.isRunning() && current_graph) {
+            std::lock_guard<std::mutex> lock(graph_mutex);
+            if (ws_server.start(ws_config, &device, current_graph.get())) {
+                std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n";
+            }
+        }
+
+        // Broadcast telemetry at configured rate
+        if (now - last_telemetry >= telemetry_interval) {
+            if (ws_server.isRunning()) {
+                ws_server.broadcastTelemetry();
+            }
+            last_telemetry = now;
+        }
+
+        // Poll telemetry for CLI display (reduced frequency to avoid buffer issues)
+        static auto last_cli_output = std::chrono::steady_clock::now();
+        const auto cli_interval = std::chrono::milliseconds(500);  // Output every 500ms
+
+        while (auto telemetry = device.pollTelemetry()) {
+            if (now - last_cli_output >= cli_interval) {
+                double position_sec = static_cast<double>(telemetry->position_samples) / device.getSampleRate();
+                std::cout << "\rPosition: " << position_sec << " s"
+                          << " | Peak L: " << telemetry->peak_left
+                          << " R: " << telemetry->peak_right
+                          << " | Underruns: " << telemetry->buffer_underruns
+                          << "    " << std::flush;
+                last_cli_output = now;
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    std::cout << "\n\nStopping...\n";
+
+    // Cleanup
+    ws_server.stop();
+    server_client.disconnect();
+    device.getTransport().stop();
+    device.stop();
+    device.shutdown();
+
+    std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
+
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     Options opts;
     if (!parseArgs(argc, argv, opts)) {
         return 1;
     }
 
-    // List devices mode (doesn't require document)
+    // List devices mode
     if (opts.list_devices) {
         return doListDevices();
     }
 
-    // Load document
+    // Server mode - connect to sync server
+    if (!opts.server_url.empty() && opts.play) {
+        return doPlayWithServer(opts);
+    }
+
+    // File mode - load document from file
     daw::document::AutomergeDocument doc;
     if (!doc.loadFromFile(opts.doc_path)) {
         std::cerr << "Failed to load document: " << doc.getLastError() << "\n";

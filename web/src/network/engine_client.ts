@@ -71,18 +71,25 @@ export class EngineClient {
 
   /**
    * Connect to the engine.
+   * Token is sent as the first message after connection (not in URL).
    */
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const url = `ws://${this.address}:${this.port}/?token=${encodeURIComponent(this.token)}`;
+        const url = `ws://${this.address}:${this.port}/`;
         console.log(`Connecting to engine at ${this.address}:${this.port}`);
 
         this.ws = new WebSocket(url);
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onopen = () => {
-          console.log('Engine WebSocket connected');
+          console.log('Engine WebSocket connected, sending auth token');
+          // Send token as first message (binary: 1 byte type + token string)
+          const tokenBytes = new TextEncoder().encode(this.token);
+          const authMessage = new Uint8Array(1 + tokenBytes.length);
+          authMessage[0] = 0x00; // Auth message type
+          authMessage.set(tokenBytes, 1);
+          this.ws!.send(authMessage);
           this.onConnect?.();
           resolve();
         };
@@ -141,14 +148,12 @@ export class EngineClient {
   }
 
   /**
-   * Set track gain.
+   * Set track monitoring state (solo/mute).
+   * Note: Gain is NOT set here - it goes through the Automerge document.
    */
-  setGain(trackId: string, gain: number): void {
-    const message = encodeMessage({
-      type: 'setTrackGain',
-      data: { trackId, gain },
-    });
-    this.sendBinary(message);
+  setMonitor(trackId: string, solo: boolean, mute: boolean): void {
+    // TODO: Implement when needed
+    console.log('setMonitor not yet implemented:', trackId, solo, mute);
   }
 
   /**

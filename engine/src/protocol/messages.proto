@@ -24,12 +24,6 @@ message SetMonitor {
     bool mute = 3;
 }
 
-// Track gain control (synced to document via CRDT, but engine applies immediately)
-message SetTrackGain {
-    string track_id = 1;
-    float gain = 2;  // Linear 0.0-2.0
-}
-
 // =============================================================================
 // Engine -> Client Messages
 // =============================================================================
@@ -80,7 +74,6 @@ message Message {
         // Client -> Engine
         TransportCommand transport = 1;
         SetMonitor set_monitor = 2;
-        SetTrackGain set_track_gain = 7;
 
         // Engine -> Client
         TransportPosition position = 3;

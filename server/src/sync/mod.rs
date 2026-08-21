@@ -44,10 +44,14 @@ impl SyncState {
     /// Remove a session from a project.
     pub fn remove_session(&mut self, project_id: &str, session_id: Uuid) {
         if let Some(project) = self.projects.get_mut(project_id) {
+            let before = project.sessions.len();
             project.sessions.retain(|id| *id != session_id);
+            let after = project.sessions.len();
+            tracing::info!("Removed session from {}: {} -> {} sessions", project_id, before, after);
 
             // Clean up empty projects
             if project.sessions.is_empty() {
+                tracing::info!("Removing empty project {} (and its broadcast channel)", project_id);
                 self.projects.remove(project_id);
             }
         }

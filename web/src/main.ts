@@ -150,17 +150,20 @@ function renderTracks() {
 
   for (const track of doc.tracks) {
     const element = createTrackUI(track, (gain) => {
+      console.log('onGainChange called:', track.id, gain);
       // Update local document
       project!.setTrackGain(track.id, gain);
 
-      // Send change to server
+      // Send change to server - engine will receive it via server subscription
       const change = project!.getLastChange();
+      console.log('Change generated:', change ? `${change.length} bytes` : 'null');
       if (change && serverClient) {
+        console.log('Sending change to server...');
         serverClient.sendChange(change);
+        console.log('Change sent');
+      } else {
+        console.log('Not sending - change:', !!change, 'serverClient:', !!serverClient);
       }
-
-      // Send to engine
-      engineClient?.setGain(track.id, gain);
     });
     tracksContainer.appendChild(element);
   }
