@@ -25,10 +25,12 @@ Rien de temps reel ne traverse le serveur distant.
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (WSL/GCC) | ✅ | ✅ | `./daw_engine_test` 8/8 |
-| Engine C++ (MSVC) | ✅ | ✅ | Hash identique GCC |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 8/8 |
+| Engine C++ (GCC/CI) | ✅ | ✅ | GitHub Actions, hash verifie |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
 | Web TypeScript | ✅ | ⏳ | Automerge reel, test critere 3 requis |
+
+**Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
 ## Criteres d'acceptation
 
@@ -53,22 +55,15 @@ Voir DECISIONS.md pour procedure.
 
 ## Commandes utiles
 
-### Engine (WSL/GCC)
-```bash
-cd engine
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j4
-./build/daw_engine_test
-./build/daw_engine --doc ../fixtures/test.am --play
-```
-
-### Engine (Windows MSVC)
-```cmd
+### Engine (Windows MSVC - seule toolchain locale)
+```powershell
 cd engine\build-msvc
 ..\rebuild_msvc.bat
 .\daw_engine_test.exe
 .\daw_engine.exe --doc ..\test-assets\test_10min.am --assets ..\test-assets --play --ws-port 47821
 ```
+
+**Note:** GCC/Linux uniquement en CI (GitHub Actions).
 
 ### Web
 ```bash

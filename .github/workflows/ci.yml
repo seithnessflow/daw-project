@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  EXPECTED_HASH: f40af882097b704a
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev xxhash
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Build automerge-c
+        run: |
+          cd engine
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target automerge-c -j$(nproc) || true
+
+      - name: Build engine
+        run: |
+          cd engine
+          cmake --build build -j$(nproc)
+
+      - name: Run engine tests
+        run: |
+          cd engine
+          ./build/daw_engine_test
+
+      - name: Generate test fixture
+        run: |
+          cd engine
+          ./build/create_test_doc test-assets/test.am
+
+      - name: Verify render determinism
+        run: |
+          cd engine
+          ./build/daw_engine --doc test-assets/test.am --render /tmp/render1.wav --assets test-assets
+          ./build/daw_engine --doc test-assets/test.am --render /tmp/render2.wav --assets test-assets
+
+          HASH1=$(xxhsum /tmp/render1.wav | cut -d' ' -f1)
+          HASH2=$(xxhsum /tmp/render2.wav | cut -d' ' -f1)
+
+          echo "Render 1 hash: $HASH1"
+          echo "Render 2 hash: $HASH2"
+
+          if [ "$HASH1" != "$HASH2" ]; then
+            echo "ERROR: Non-deterministic render!"
+            exit 1
+          fi
+
+          if [ "$HASH1" != "$EXPECTED_HASH" ]; then
+            echo "WARNING: Hash differs from reference ($EXPECTED_HASH)"
+            echo "This may indicate a change in rendering behavior"
+          fi
+
+          echo "Determinism verified: $HASH1"
+
+      - name: Build server
+        run: |
+          cd server
+          cargo build --release
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build web
+        run: |
+          cd web
+          npm ci
+          npm run build

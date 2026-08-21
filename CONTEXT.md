@@ -60,16 +60,22 @@ Rien de temps reel ne traverse le serveur distant.
 
 ## Commandes de demarrage rapide
 
-```bash
-# Moteur (WSL)
-cd engine && cmake -B build && cmake --build build && ./build/daw_engine_test
+```powershell
+# Moteur (Windows natif - PowerShell)
+cd engine\build-msvc
+..\rebuild_msvc.bat
+.\daw_engine_test.exe
 
 # Serveur
-cd server && cargo run  # → 127.0.0.1:3000
+cd server
+cargo run  # → 127.0.0.1:3000
 
 # Web
-cd web && npm run dev   # → localhost:5173
+cd web
+npm run dev   # → localhost:5173
 ```
+
+**Note:** Developpement 100% natif Windows. GCC uniquement en CI GitHub Actions.
 
 ## Problemes connus
 
