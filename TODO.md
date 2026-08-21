@@ -8,6 +8,17 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] 2.1 Migration serveur+web vers automerge-repo, a comportement
       identique. Critere de succes UNIQUE : les 9 tests existants verts,
       offline compris. (Session bornee suivante)
+      - La migration inclut la SUPPRESSION de l'ancien code de sync
+        (protocole artisanal, anti-entropie, file offline maison si
+        automerge-repo la remplace). Deux chemins de sync cohabitants =
+        echec de la session.
+      - Avant d'ecrire quoi que ce soit : verifier l'etat reel du support
+        automerge-repo cote Rust. S'il est immature, ESCALADE PROPOSEE
+        avec les options (ex: relais sync Node, Rust garde stockage +
+        assets) - ne pas bricoler un pont.
+      - Le moteur C++ ne migre PAS (il parle au serveur). Le jalon
+        fader->moteur doit rester vert SANS modification cote moteur ;
+        si ca casse, c'est le serveur qui s'adapte.
 - [ ] 2.2 Compaction du document — diagnostic d'abord : mesurer la
       croissance reelle pendant un drag de fader (dizaines de changes/s),
       puis proposer snapshot/prune. Implementation ensuite.
