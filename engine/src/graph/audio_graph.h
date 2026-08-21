@@ -29,7 +29,7 @@ namespace daw::graph {
 struct AudioTrack {
     std::string id;
     std::string name;
-    float gain = 1.0f;  // Track gain (separate from processors)
+    std::atomic<float> gain{1.0f};  // Track gain (atomic for real-time updates)
 
     std::vector<ClipPlayer> clips;
     std::vector<std::unique_ptr<ProcessorNode>> chain;
@@ -37,6 +37,37 @@ struct AudioTrack {
     // Per-track monitoring state (local, not in document)
     bool solo = false;
     bool mute = false;
+
+    // Default constructor
+    AudioTrack() = default;
+
+    // Move constructor (atomics not movable, so we copy value)
+    AudioTrack(AudioTrack&& other) noexcept
+        : id(std::move(other.id))
+        , name(std::move(other.name))
+        , gain(other.gain.load(std::memory_order_relaxed))
+        , clips(std::move(other.clips))
+        , chain(std::move(other.chain))
+        , solo(other.solo)
+        , mute(other.mute) {}
+
+    // Move assignment
+    AudioTrack& operator=(AudioTrack&& other) noexcept {
+        if (this != &other) {
+            id = std::move(other.id);
+            name = std::move(other.name);
+            gain.store(other.gain.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            clips = std::move(other.clips);
+            chain = std::move(other.chain);
+            solo = other.solo;
+            mute = other.mute;
+        }
+        return *this;
+    }
+
+    // Non-copyable (unique_ptr in chain)
+    AudioTrack(const AudioTrack&) = delete;
+    AudioTrack& operator=(const AudioTrack&) = delete;
 };
 
 /**

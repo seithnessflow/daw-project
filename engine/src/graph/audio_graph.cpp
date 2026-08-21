@@ -106,9 +106,10 @@ void AudioGraph::processTrack(
         }
     }
 
-    // Apply track gain
+    // Apply track gain (atomic load for thread-safe real-time updates)
+    const float gain_value = track.gain.load(std::memory_order_relaxed);
     for (uint32_t i = 0; i < frame_count * 2; ++i) {
-        output[i] *= track.gain;
+        output[i] *= gain_value;
     }
 
     // Process through chain
@@ -217,7 +218,7 @@ std::unique_ptr<AudioGraph> GraphBuilder::build(
         AudioTrack new_track;
         new_track.id = track.id;
         new_track.name = track.name;
-        new_track.gain = track.gain;
+        new_track.gain.store(track.gain.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
         // Copy clips (assets must be resolved separately)
         for (const auto& clip : track.clips) {

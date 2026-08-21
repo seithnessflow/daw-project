@@ -12,7 +12,7 @@ import { formatTime } from './ui/transport';
 
 // Configuration
 const SERVER_URL = 'ws://localhost:3000';
-const ENGINE_URL = 'ws://127.0.0.1:9000';
+const ENGINE_PORT = 47821;
 const PROJECT_ID = 'default';
 
 // State
@@ -67,7 +67,11 @@ async function init() {
   };
 
   // Connect to engine
-  engineClient = new EngineClient(ENGINE_URL);
+  // Token is read from URL query param or can be set via engineClient.setToken()
+  // Engine writes token to %TEMP%/daw-engine-token
+  const urlParams = new URLSearchParams(window.location.search);
+  const engineToken = urlParams.get('token') ?? '';
+  engineClient = new EngineClient({ port: ENGINE_PORT, token: engineToken });
   engineClient.onConnect = () => {
     engineStatus.classList.add('connected');
     playBtn.disabled = false;

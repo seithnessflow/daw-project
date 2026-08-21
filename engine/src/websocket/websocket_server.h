@@ -101,6 +101,7 @@ private:
                        const ix::WebSocketMessagePtr& msg);
     void handleTransportCommand(const protocol::TransportCommand& cmd);
     void handleSetMonitor(const protocol::SetMonitor& cmd);
+    void handleSetTrackGain(const protocol::SetTrackGain& cmd);
 
     // Send helpers
     void sendToAll(const protocol::Message& msg);

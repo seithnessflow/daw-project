@@ -1,6 +1,7 @@
 #include "websocket_server.h"
 #include <ixwebsocket/IXNetSystem.h>
 
+#include <algorithm>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -179,6 +180,9 @@ void WebSocketServer::handleMessage(
                     case protocol::Message::kSetMonitor:
                         handleSetMonitor(message.set_monitor());
                         break;
+                    case protocol::Message::kSetTrackGain:
+                        handleSetTrackGain(message.set_track_gain());
+                        break;
                     default:
                         break;
                 }
@@ -226,6 +230,17 @@ void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {
     if (track) {
         track->solo = cmd.solo();
         track->mute = cmd.mute();
+    }
+}
+
+void WebSocketServer::handleSetTrackGain(const protocol::SetTrackGain& cmd) {
+    if (!graph_) return;
+
+    auto* track = graph_->getTrackById(cmd.track_id());
+    if (track) {
+        // Clamp gain to valid range and store atomically
+        float gain = std::clamp(cmd.gain(), 0.0f, 2.0f);
+        track->gain.store(gain, std::memory_order_release);
     }
 }
 
