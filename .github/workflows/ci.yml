@@ -28,15 +28,21 @@ jobs:
         with:
           workspaces: server
 
-      - name: Build automerge-c
+      - name: Clone and build automerge-c
         run: |
-          cd engine
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target automerge-c -j$(nproc) || true
+          # Clone automerge monorepo to expected location
+          mkdir -p build/_deps
+          git clone --depth 1 --branch main https://github.com/automerge/automerge.git build/_deps/automerge-src
+
+          # Build automerge-c
+          cd build/_deps/automerge-src/rust/automerge-c
+          cmake -B build -DBUILD_TESTING=OFF
+          cmake --build build -j$(nproc)
 
       - name: Build engine
         run: |
           cd engine
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc)
 
       - name: Run engine tests

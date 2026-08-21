@@ -8,6 +8,23 @@ Instructions pour Claude Code.
 
 **Toolchain:** MSVC seule. GCC/Clang uniquement en CI GitHub Actions.
 
+## Architecture
+
+```
+Browser (TypeScript)          Server (Rust)           Engine (C++)
+      │                            │                       │
+      ├── WebSocket ───────────────┤                       │
+      │   (Automerge sync)         │                       │
+      │                            │                       │
+      ├── WebSocket ───────────────────────────────────────┤
+      │   (transport/telemetry)                            │
+      │                                                    │
+      └────────────────────────────┼── HTTP ───────────────┘
+                                   (assets)
+```
+
+Rien de temps reel ne traverse le serveur distant.
+
 ## Structure
 
 ```
@@ -18,6 +35,17 @@ daw-project/
   fixtures/         Assets de test
   docs/             ADRs et specifications
 ```
+
+## Fichiers cles
+
+| Fichier | Role |
+|---------|------|
+| `STATUS.md` | Etat des criteres, procedures de test |
+| `docs/SCHEMA.md` | Schema du document projet (v1) |
+| `engine/src/main.cpp` | Point d'entree moteur |
+| `server/src/main.rs` | Point d'entree serveur |
+| `web/src/main.ts` | Point d'entree web |
+| `web/src/document/project.ts` | Wrapper Automerge |
 
 ## Commandes de build
 
