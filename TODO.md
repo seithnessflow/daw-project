@@ -5,9 +5,13 @@
 La demo que ni Soundtrap ni BandLab ne peuvent copier : un plugin natif
 pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
-- [ ] 2.1 Migration serveur+web vers automerge-repo, a comportement
-      identique. Critere de succes UNIQUE : les 9 tests existants verts,
-      offline compris. (Session bornee suivante)
+- [ ] 2.1 ESCALADE 2026-08-21 : support Rust d'automerge-repo immature
+      (automerge-repo-rs = non compatible reseau avec le JS ; samod =
+      compatible mais "experimental, don't use anywhere serious").
+      Options rapportees : A relais Node officiel (mais 2 syncs cohabitants,
+      re-scoper le critere), B durcir le sync maison Rust (persister avant
+      de diffuser) et revisiter quand samod murit, C geler et passer a 2.2.
+      Recommandation session : B. DECISION EN ATTENTE.
       - La migration inclut la SUPPRESSION de l'ancien code de sync
         (protocole artisanal, anti-entropie, file offline maison si
         automerge-repo la remplace). Deux chemins de sync cohabitants =
