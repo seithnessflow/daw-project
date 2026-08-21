@@ -16,9 +16,11 @@
 #include <ixwebsocket/IXHttpServer.h>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -38,7 +40,14 @@ struct WebSocketConfig {
 
     // Security
     std::string token_file_path;  // Where to write the auth token (empty = temp dir)
-    std::vector<std::string> allowed_origins;  // Empty = allow all (INSECURE!)
+
+    // Origin allowlist for browser clients. Non-browser clients send no
+    // Origin header and are exempt from this check (they still need the
+    // token). "*" allows any origin. An empty list also allows any origin.
+    std::vector<std::string> allowed_origins = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    };
 };
 
 /**
@@ -121,12 +130,20 @@ private:
     uint16_t port_ = 0;
 
     // Connections tracking
+    struct PendingAuth {
+        std::string origin;
+        std::chrono::steady_clock::time_point deadline;
+    };
     std::set<ix::WebSocket*> connections_;          // Authenticated connections
-    std::set<ix::WebSocket*> pending_auth_;         // Connections awaiting auth
+    std::map<ix::WebSocket*, PendingAuth> pending_auth_;  // Awaiting auth
     std::mutex connections_mutex_;
 
     // Auth timeout: close connections that don't auth within 2 seconds
     static constexpr int AUTH_TIMEOUT_MS = 2000;
+
+    // Reaper thread: closes pending connections whose deadline expired
+    std::thread auth_reaper_;
+    void authReaperLoop();
 
     // References (not owned)
     audio::AudioDevice* device_ = nullptr;
@@ -145,6 +162,9 @@ private:
 
     // Validate connection based on Origin header and token
     bool validateConnection(const std::string& origin, const std::string& token) const;
+
+    // Check an Origin header value against the allowlist
+    bool originAllowed(const std::string& origin) const;
 
     // Write token to file for local clients
     bool writeTokenFile();

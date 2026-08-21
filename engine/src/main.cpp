@@ -63,6 +63,9 @@ void printUsage(const char* program) {
               << "  --sample-rate <n>  Sample rate for rendering (default: 48000)\n"
               << "  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)\n"
               << "  --ws-port <n>      WebSocket server port (default: 47821)\n"
+              << "  --allow-origin <o> Allow an extra browser Origin on the WebSocket\n"
+              << "                     server (can be used multiple times; defaults\n"
+              << "                     allow http://localhost:5173 and http://127.0.0.1:5173)\n"
               << "  --solo <track-id>  Solo specified track (can be used multiple times)\n"
               << "  --mute-track <id>  Mute specified track (can be used multiple times)\n"
               << "  --list-devices     List available audio devices and exit\n"
@@ -92,6 +95,7 @@ struct Options {
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
     uint16_t ws_port = 47821;    // Changed default to 47821
+    std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
 };
@@ -158,6 +162,12 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.project_id = argv[i];
+        } else if (arg == "--allow-origin") {
+            if (++i >= argc) {
+                std::cerr << "Error: --allow-origin requires an origin\n";
+                return false;
+            }
+            opts.allow_origins.push_back(argv[i]);
         } else if (arg == "--solo") {
             if (++i >= argc) {
                 std::cerr << "Error: --solo requires a track ID\n";
@@ -463,6 +473,8 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     ws_config.port = opts.ws_port;
     ws_config.bind_address = "127.0.0.1";
     ws_config.telemetry_hz = 30;
+    ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
+                                     opts.allow_origins.begin(), opts.allow_origins.end());
 
     if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
         std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n\n";
@@ -683,6 +695,8 @@ int doPlayWithServer(const Options& opts) {
     ws_config.port = opts.ws_port;
     ws_config.bind_address = "127.0.0.1";
     ws_config.telemetry_hz = 30;
+    ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
+                                     opts.allow_origins.begin(), opts.allow_origins.end());
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();

@@ -11,13 +11,22 @@
 #include "../src/graph/clip_player.h"
 #include "../src/render/offline_render.h"
 #include "../src/audio/ring_buffer.h"
+#include "../src/websocket/websocket_server.h"
 
+#include <ixwebsocket/IXNetSystem.h>
+#include <ixwebsocket/IXWebSocket.h>
+
+#include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
+#include <sstream>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -73,6 +82,70 @@ std::vector<float> readWavSamples(const std::string& path) {
     }
 
     return samples;
+}
+
+// Poll a predicate until it holds or the timeout expires
+bool waitFor(const std::function<bool()>& pred, int timeout_ms) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeout_ms);
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (pred()) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    return pred();
+}
+
+// Minimal WebSocket test client tracking open/close state
+struct TestWsClient {
+    ix::WebSocket ws;
+    std::atomic<bool> open{false};
+    std::atomic<bool> closed{false};
+    std::atomic<int> close_code{0};
+
+    // ixwebsocket only generates an Origin header if none is given, so the
+    // origin parameter fully controls what the server sees.
+    explicit TestWsClient(const std::string& url, const std::string& origin) {
+        ws.setUrl(url);
+        ws.setExtraHeaders({{"Origin", origin}});
+        ws.disableAutomaticReconnection();
+        ws.setOnMessageCallback([this](const ix::WebSocketMessagePtr& m) {
+            if (m->type == ix::WebSocketMessageType::Open) {
+                open = true;
+            } else if (m->type == ix::WebSocketMessageType::Close) {
+                close_code = static_cast<int>(m->closeInfo.code);
+                closed = true;
+            }
+        });
+        ws.start();
+    }
+
+    ~TestWsClient() {
+        ws.stop();
+    }
+
+    void sendAuth(const std::string& token) {
+        std::string msg;
+        msg.push_back('\x00');
+        msg += token;
+        ws.sendBinary(msg);
+    }
+};
+
+// Extract the token value from the JSON token file the server writes
+std::string readTokenFromFile(const std::string& path) {
+    std::ifstream f(path);
+    if (!f) return "";
+    std::stringstream ss;
+    ss << f.rdbuf();
+    const std::string content = ss.str();
+
+    const std::string key = "\"token\": \"";
+    const auto pos = content.find(key);
+    if (pos == std::string::npos) return "";
+    const auto start = pos + key.size();
+    const auto end = content.find('"', start);
+    if (end == std::string::npos) return "";
+    return content.substr(start, end - start);
 }
 
 }  // namespace
@@ -428,6 +501,117 @@ bool testRenderDeterminism(const std::string& fixtures_dir) {
 }
 
 // Main
+// Test 9: WebSocket authentication
+// A connection is accepted only if its FIRST message is [0x00][valid token].
+// Bad token -> close 4001. Silence -> close 4001 after the 2s deadline.
+bool testWebSocketAuth() {
+    std::cout << "Test: WebSocket auth... " << std::flush;
+
+    ix::initNetSystem();
+
+    daw::websocket::WebSocketServer server;
+    daw::websocket::WebSocketConfig cfg;
+    cfg.port = 47899;
+    cfg.bind_address = "127.0.0.1";
+    cfg.token_file_path =
+        (fs::temp_directory_path() / "daw-engine-test-token").string();
+
+    daw::audio::AudioDevice device;  // Not initialized: auth needs no audio
+    std::atomic<std::shared_ptr<daw::graph::AudioGraph>> graph_slot;
+
+    if (!server.start(cfg, &device, &graph_slot)) {
+        std::cout << "FAILED: server did not start\n";
+        return false;
+    }
+
+    const std::string url = "ws://127.0.0.1:47899/";
+    const std::string good_origin = "http://localhost:5173";  // In default allowlist
+    bool ok = true;
+    std::string reason;
+
+    // Case 1: wrong token must be rejected with 4001
+    {
+        TestWsClient client(url, good_origin);
+        if (!waitFor([&] { return client.open.load(); }, 3000)) {
+            ok = false;
+            reason = "could not connect (bad-token case)";
+        } else {
+            client.sendAuth("wrong-token");
+            if (!waitFor([&] { return client.closed.load(); }, 3000)) {
+                ok = false;
+                reason = "bad token was NOT rejected";
+            } else if (client.close_code != 4001) {
+                ok = false;
+                reason = "bad token closed with code " +
+                         std::to_string(client.close_code.load()) + " (expected 4001)";
+            }
+        }
+    }
+
+    // Case 2: valid token must be accepted (still open past the auth deadline)
+    if (ok) {
+        const std::string token = readTokenFromFile(cfg.token_file_path);
+        if (token.empty()) {
+            ok = false;
+            reason = "could not read token file";
+        } else {
+            TestWsClient client(url, good_origin);
+            if (!waitFor([&] { return client.open.load(); }, 3000)) {
+                ok = false;
+                reason = "could not connect (good-token case)";
+            } else {
+                client.sendAuth(token);
+                // Wait past the 2s auth deadline: an authenticated
+                // connection must survive it
+                std::this_thread::sleep_for(std::chrono::milliseconds(2600));
+                if (client.closed.load()) {
+                    ok = false;
+                    reason = "valid token was rejected (code " +
+                             std::to_string(client.close_code.load()) + ")";
+                }
+            }
+        }
+    }
+
+    // Case 3: silent connection must be closed 4001 after the deadline
+    if (ok) {
+        TestWsClient client(url, good_origin);
+        if (!waitFor([&] { return client.open.load(); }, 3000)) {
+            ok = false;
+            reason = "could not connect (timeout case)";
+        } else if (!waitFor([&] { return client.closed.load(); }, 4000)) {
+            ok = false;
+            reason = "silent connection was NOT closed";
+        } else if (client.close_code != 4001) {
+            ok = false;
+            reason = "timeout closed with code " +
+                     std::to_string(client.close_code.load()) + " (expected 4001)";
+        }
+    }
+
+    // Case 4: disallowed browser Origin must be rejected even before auth
+    if (ok) {
+        TestWsClient client(url, "http://evil.example");
+        if (!waitFor([&] { return client.closed.load(); }, 3000)) {
+            ok = false;
+            reason = "disallowed origin was NOT rejected";
+        } else if (client.close_code != 4001) {
+            ok = false;
+            reason = "disallowed origin closed with code " +
+                     std::to_string(client.close_code.load()) + " (expected 4001)";
+        }
+    }
+
+    server.stop();
+
+    if (!ok) {
+        std::cout << "FAILED: " << reason << "\n";
+        return false;
+    }
+    std::cout << "OK\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -457,6 +641,7 @@ int main(int argc, char* argv[]) {
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);
     runWithArg(testRenderDeterminism, fixtures_dir);
+    run(testWebSocketAuth);
 
     std::cout << "\n=== Results ===\n";
     std::cout << "Passed: " << passed << "\n";

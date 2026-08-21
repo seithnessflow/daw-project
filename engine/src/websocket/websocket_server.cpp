@@ -79,6 +79,9 @@ bool WebSocketServer::start(
     server_->start();
     running_ = true;
 
+    // Reaper: closes connections that stay unauthenticated past the deadline
+    auth_reaper_ = std::thread([this]() { authReaperLoop(); });
+
     std::cout << "WebSocket server listening on "
               << config.bind_address << ":" << config.port << std::endl;
 
@@ -91,6 +94,10 @@ void WebSocketServer::stop() {
     }
 
     running_ = false;
+
+    if (auth_reaper_.joinable()) {
+        auth_reaper_.join();
+    }
 
     if (server_) {
         server_->stop();
@@ -108,7 +115,7 @@ void WebSocketServer::handleMessage(
 ) {
     switch (msg->type) {
         case ix::WebSocketMessageType::Open: {
-            // Accept connection but require auth within 2 seconds
+            // Accept connection but require auth within AUTH_TIMEOUT_MS
             auto& headers = msg->openInfo.headers;
 
             // Get Origin header for validation
@@ -118,29 +125,25 @@ void WebSocketServer::handleMessage(
                 origin = origin_it->second;
             }
 
-            // Check origin allowlist first (if configured)
-            if (!allowed_origins_.empty()) {
-                bool origin_ok = false;
-                for (const auto& allowed : allowed_origins_) {
-                    if (origin == allowed || allowed == "*") {
-                        origin_ok = true;
-                        break;
-                    }
-                }
-                if (!origin_ok) {
-                    std::cerr << "WebSocket: Rejected connection (disallowed origin: " << origin << ")" << std::endl;
-                    webSocket.close(4001, "Origin not allowed");
-                    return;
-                }
+            // Browsers always send Origin: reject disallowed ones outright.
+            // Native clients send no Origin and pass this check, but still
+            // have to present the token.
+            if (!origin.empty() && !originAllowed(origin)) {
+                std::cerr << "WebSocket: Rejected connection (disallowed origin: " << origin << ")" << std::endl;
+                webSocket.close(4001, "Origin not allowed");
+                return;
             }
 
             {
                 std::lock_guard<std::mutex> lock(connections_mutex_);
-                pending_auth_.insert(&webSocket);
+                pending_auth_[&webSocket] = PendingAuth{
+                    origin,
+                    std::chrono::steady_clock::now() + std::chrono::milliseconds(AUTH_TIMEOUT_MS)
+                };
             }
-            std::cout << "WebSocket: Connection from " << origin << " (awaiting auth)" << std::endl;
-            // Note: Auth timeout removed - clients must send auth within reasonable time
-            // A full implementation would use a timer that safely captures the connection ID
+            std::cout << "WebSocket: Connection from "
+                      << (origin.empty() ? "(no origin)" : origin)
+                      << " (awaiting auth)" << std::endl;
             break;
         }
 
@@ -154,34 +157,48 @@ void WebSocketServer::handleMessage(
         case ix::WebSocketMessageType::Message: {
             if (!msg->binary) break;
 
-            // Check if this is a pending connection needing auth
+            // Authentication gate: the FIRST message on a connection must be
+            // [0x00][token] with a valid token. Anything else closes the
+            // connection with 4001.
+            std::string pending_origin;
+            bool was_pending = false;
             {
                 std::lock_guard<std::mutex> lock(connections_mutex_);
-                if (pending_auth_.count(&webSocket) > 0) {
-                    // For local-only server (127.0.0.1), auto-accept after first message
-                    // This is safe because we only bind to localhost
-                    // The first message might be auth or might be a protobuf command
-                    const std::string& data = msg->str;
+                auto it = pending_auth_.find(&webSocket);
+                if (it != pending_auth_.end()) {
+                    was_pending = true;
+                    pending_origin = it->second.origin;
+                    pending_auth_.erase(it);
+                }
+            }
 
-                    // Check if this looks like an auth message [0x00][token]
-                    if (data.size() >= 2 && data[0] == 0x00) {
-                        std::string token = data.substr(1);
-                        if (token == auth_token_) {
-                            std::cout << "WebSocket: Connection authenticated with token" << std::endl;
-                        } else {
-                            std::cout << "WebSocket: Auto-accepting local connection" << std::endl;
-                        }
-                    } else {
-                        // Not an auth message - auto-accept for localhost
-                        std::cout << "WebSocket: Auto-accepting local connection" << std::endl;
-                    }
+            if (was_pending) {
+                const std::string& data = msg->str;
+                if (data.size() < 2 || data[0] != '\x00') {
+                    std::cerr << "WebSocket: Rejected connection (first message is not auth)" << std::endl;
+                    webSocket.close(4001, "Authentication required");
+                    return;
+                }
 
-                    pending_auth_.erase(&webSocket);
+                const std::string token = data.substr(1);
+                if (!validateConnection(pending_origin, token)) {
+                    webSocket.close(4001, "Invalid token or origin");
+                    return;
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(connections_mutex_);
                     connections_.insert(&webSocket);
-                    // Don't return - fall through to process the message if it's not auth
-                    if (data.size() >= 2 && data[0] == 0x00) {
-                        return;  // It was an auth message, don't try to parse as protobuf
-                    }
+                }
+                std::cout << "WebSocket: Connection authenticated" << std::endl;
+                return;  // Auth message is consumed, never parsed as protobuf
+            }
+
+            // Only authenticated connections may issue commands
+            {
+                std::lock_guard<std::mutex> lock(connections_mutex_);
+                if (connections_.count(&webSocket) == 0) {
+                    return;
                 }
             }
 
@@ -352,24 +369,62 @@ std::string WebSocketServer::generateToken() {
 bool WebSocketServer::validateConnection(const std::string& origin, const std::string& token) const {
     // Token must match
     if (token != auth_token_) {
-        std::cerr << "WebSocket: Invalid token from origin: " << origin << std::endl;
+        std::cerr << "WebSocket: Invalid token from origin: "
+                  << (origin.empty() ? "(no origin)" : origin) << std::endl;
         return false;
     }
 
-    // If no allowed origins specified, allow all (but log warning)
+    // Browser clients must come from an allowed origin. Native clients
+    // (no Origin header) are exempt: the token is their credential.
+    if (!origin.empty() && !originAllowed(origin)) {
+        std::cerr << "WebSocket: Rejected origin: " << origin << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool WebSocketServer::originAllowed(const std::string& origin) const {
     if (allowed_origins_.empty()) {
         return true;
     }
-
-    // Check if origin is in allowed list
     for (const auto& allowed : allowed_origins_) {
-        if (origin == allowed) {
+        if (allowed == "*" || allowed == origin) {
             return true;
         }
     }
-
-    std::cerr << "WebSocket: Rejected origin: " << origin << std::endl;
     return false;
+}
+
+void WebSocketServer::authReaperLoop() {
+    while (running_.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        if (!running_.load() || !server_) {
+            break;
+        }
+
+        // getClients() hands out shared_ptrs, so a connection cannot be
+        // destroyed between our check and the close() call.
+        auto clients = server_->getClients();
+        const auto now = std::chrono::steady_clock::now();
+
+        std::vector<std::shared_ptr<ix::WebSocket>> expired;
+        {
+            std::lock_guard<std::mutex> lock(connections_mutex_);
+            for (const auto& client : clients) {
+                auto it = pending_auth_.find(client.get());
+                if (it != pending_auth_.end() && now >= it->second.deadline) {
+                    expired.push_back(client);
+                    pending_auth_.erase(it);
+                }
+            }
+        }
+
+        for (const auto& client : expired) {
+            std::cout << "WebSocket: Closing unauthenticated connection (timeout)" << std::endl;
+            client->close(4001, "Authentication timeout");
+        }
+    }
 }
 
 bool WebSocketServer::writeTokenFile() {
