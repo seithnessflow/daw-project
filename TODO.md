@@ -44,8 +44,17 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       coalescing des drags (optionnel, session web courte).
 - [ ] 2.3 SHA-256 des assets + cote moteur<->serveur du triangle (HTTP) —
       le rendu des pistes a plugins en dependra.
-- [ ] 2.4 Hote VST3 : chargement d'un plugin, parametres dans le document,
-      audio dans le graphe. (A scoper apres 2.1)
+- [ ] 2.3bis AUDIT A FROID avant d'ouvrir 2.4 — session neuve, lecture
+      seule, prompt pret : `docs/audit-2-prompt.md`. Question directrice :
+      qu'est-ce qui va ceder quand le VST3 va s'appuyer dessus ?
+      (cycle de vie du graphe sous rebuild lourd, chain ignore,
+      frontieres de processus + dettes audit 1 : solo/mute, assetHash)
+- [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
+      tout : UN plugin de gain VST3 connu s'instancie dans un processus
+      isole, traite de l'audio, et son bypass s'entend. Un plugin, un
+      parametre, une preuve. Fenetrage, etat, decouverte des plugins :
+      apres. (Regle dure : c'est le prochain morceau qui se CONSTRUIT,
+      dettes non vides ou pas.)
 
 ## Court terme (sessions economes)
 
