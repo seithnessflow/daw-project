@@ -30,6 +30,10 @@ jobs:
 
       - name: Clone and build automerge-c
         run: |
+          # Install nightly with rust-src (required by automerge-c)
+          rustup toolchain install nightly
+          rustup component add rust-src --toolchain nightly
+
           # Clone automerge monorepo to expected location
           mkdir -p build/_deps
           git clone --depth 1 --branch main https://github.com/automerge/automerge.git build/_deps/automerge-src
