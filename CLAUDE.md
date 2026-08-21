@@ -135,6 +135,17 @@ Tests automatises:
 
 **Pour l'audio:** privilegier rendu WAV + comparaison hash plutot que ecoute.
 
+### Discipline de test
+
+Un test ne se modifie jamais pour le faire passer. Si un test echoue, on corrige le code teste.
+
+Toute modification d'un test doit etre signalee explicitement avec sa justification.
+
+Interdit:
+- `waitForTimeout` pour masquer une race condition
+- Assertion affaiblie (ex: `toBeCloseTo` au lieu de `toBe` sans raison)
+- `test.skip` sans ticket de dette technique
+
 ## Conventions
 
 - Pas d'accents dans code/commits (clavier QWERTY)
