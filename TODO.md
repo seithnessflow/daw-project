@@ -49,6 +49,23 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       qu'est-ce qui va ceder quand le VST3 va s'appuyer dessus ?
       (cycle de vie du graphe sous rebuild lourd, chain ignore,
       frontieres de processus + dettes audit 1 : solo/mute, assetHash)
+- [ ] PREALABLES 2.4 (arbitrage audit 2, 2026-08-22) — quatre sessions
+      bornees, dans cet ordre, puis l'hote. Seuls prealables recevables :
+      ce sur quoi le plugin de gain isole s'appuie directement.
+      1. R4+S4 : sortir le spinlock du callback (atomic<shared_ptr> MSVC
+         non lock-free -> pointeur brut atomique cote audio + retention
+         cote controle) + solo/mute en atomic<bool> (meme fichiers, meme
+         geste). Livrable cache : static_assert is_always_lock_free sur
+         les types REELLEMENT utilises par le callback — la 3e trahison
+         silencieuse de la regle ecrite ne doit pas survivre a une
+         compilation.
+      2. ADR R3 : decision d'isolation par processus, AVANT R1+R2 —
+         elle determine ou vivent les noeuds, donc ce que « transferer
+         l'etat au swap » veut dire.
+      3. R1+R2 : coalescing des rebuilds (hors thread reseau) + transfert
+         d'etat des noeuds au swap, dans le cadre fixe par l'ADR.
+      4. Elagage docs (session courte) : les 7 ecarts docs/reel de
+         AUDIT-2.md — le chantier demarre sur des documents qui disent vrai.
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
       tout : UN plugin de gain VST3 connu s'instancie dans un processus
       isole, traite de l'audio, et son bypass s'entend. Un plugin, un
