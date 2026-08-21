@@ -38,7 +38,7 @@ Rien de temps reel ne traverse le serveur distant.
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
-| 3 | Convergence 2 onglets | ⚠️ PARTIEL | Online OK (Playwright), offline non teste |
+| 3 | Convergence 2 onglets | ⚠️ PARTIEL | Online OK (Playwright). Offline TESTE et EN ECHEC: le client ne reconcilie pas (voir detail) |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
 
@@ -49,10 +49,26 @@ Rien de temps reel ne traverse le serveur distant.
 - Sync bidirectionnelle: modifications simultanees convergent
 - Ajout de piste: nouvelle piste apparait dans les deux onglets
 
-**Non teste (DETTE):**
-- Reconciliation offline: deux modifications divergentes pendant deconnexion
-- C'est ce qui distingue un CRDT d'un simple broadcast WebSocket
-- A tester apres le jalon "fader → son"
+**Teste et EN ECHEC (DETTE, 2026-08-21):**
+
+Le test existe (`criterion3-offline.spec.ts`: arret/relance REELS du serveur via
+`start-stack.ps1 -Component server`, onglets vivants pendant la coupure, edits
+distincts + conflit sur la meme piste) et il est ROUGE: apres reconnexion,
+chaque onglet garde son etat local, rien ne converge (heads divergents).
+
+Deux defauts du client web (`server_client.ts` / `main.ts`), non corriges:
+1. `sendChange()` jette silencieusement les changements emis hors ligne
+   (pas de file d'attente/outbox) - ils n'atteignent jamais le serveur.
+2. A la reconnexion, le document complet renvoye par le serveur tombe dans
+   le handler de changements (`onDocument` est consomme a la premiere
+   connexion) ou `applyChange()` echoue a le parser - aucun chemin de fusion
+   (`Automerge.merge` jamais appele).
+
+Le test est annote `test.fail()` avec reference a cette entree: la CI reste
+verte, et le jour ou la reconciliation fonctionne, le run echoue
+(« passed unexpectedly ») et force le retrait de l'annotation et de cette
+dette. Detection d'ecrasement silencieux prouvee par panne injectee le
+2026-08-21 (echec sur « tab2 kept its own offline edit »).
 
 ### Detail critere 5
 

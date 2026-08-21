@@ -119,6 +119,54 @@ export async function setTrackGain(page: Page, trackId: string, gain: number): P
 }
 
 /**
+ * Wait until a track's gain reaches the expected value (condition-based,
+ * no blind sleep). Returns the last observed value so callers can assert it.
+ */
+export async function waitForGain(
+  page: Page,
+  trackId: string,
+  expected: number,
+  timeoutMs = 10000,
+  epsilon = 0.005
+): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let value = await getTrackGain(page, trackId);
+  while (Date.now() < deadline && Math.abs(value - expected) > epsilon) {
+    await new Promise((r) => setTimeout(r, 100));
+    value = await getTrackGain(page, trackId);
+  }
+  return value;
+}
+
+/**
+ * Wait until the page shows the expected number of tracks.
+ * Returns the last observed count so callers can assert it.
+ */
+export async function waitForTrackCount(
+  page: Page,
+  expected: number,
+  timeoutMs = 10000
+): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+  let count = (await getTrackIds(page)).length;
+  while (Date.now() < deadline && count !== expected) {
+    await new Promise((r) => setTimeout(r, 100));
+    count = (await getTrackIds(page)).length;
+  }
+  return count;
+}
+
+/**
+ * Wait until the server connection indicator reports DISCONNECTED.
+ */
+export async function waitForServerDisconnected(page: Page, timeout = 15000): Promise<void> {
+  await page.waitForFunction(
+    () => !document.querySelector('#server-status')?.classList.contains('connected'),
+    { timeout }
+  );
+}
+
+/**
  * Get all track IDs from the page.
  */
 export async function getTrackIds(page: Page): Promise<string[]> {

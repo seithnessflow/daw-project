@@ -13,6 +13,8 @@ import {
   getTrackGain,
   setTrackGain,
   getTrackIds,
+  waitForGain,
+  waitForTrackCount,
   setupConsoleCollection,
   CRDTDiagnostics,
 } from './helpers';
@@ -73,11 +75,8 @@ test.describe('Criterion 3: Two-tab convergence', () => {
       const newGain = 0.42;
       await setTrackGain(page1, testTrackId, newGain);
 
-      // Wait for sync (give time for WebSocket round-trip)
-      await page2.waitForTimeout(500);
-
-      // Verify tab 2 has the new value
-      const finalGain2 = await getTrackGain(page2, testTrackId);
+      // Wait for sync on a real condition (no blind sleep)
+      const finalGain2 = await waitForGain(page2, testTrackId, newGain);
 
       if (Math.abs(finalGain2 - newGain) > 0.01) {
         // Collect diagnostics on failure
@@ -127,9 +126,9 @@ test.describe('Criterion 3: Two-tab convergence', () => {
       // Tab 2 modifies track 2
       await setTrackGain(page2, trackIds[1], 0.7);
 
-      // Wait for bidirectional sync
-      await page1.waitForTimeout(1000);
-      await page2.waitForTimeout(500);
+      // Wait for bidirectional sync on real conditions (no blind sleep)
+      await waitForGain(page1, trackIds[1], 0.7);
+      await waitForGain(page2, trackIds[0], 0.3);
 
       // Both tabs should have both changes
       const gain1_tab1 = await getTrackGain(page1, trackIds[0]);
@@ -159,87 +158,10 @@ test.describe('Criterion 3: Two-tab convergence', () => {
     }
   });
 
-  test.skip('offline reconciliation - changes made offline converge on reconnect', async ({ browser }) => {
-    // This test requires server control - skip in basic CI
-    // To run: start server manually, run test, manually stop/start server
-    //
-    // The test flow:
-    // 1. Both tabs connect and sync
-    // 2. Server is stopped (simulated by blocking WebSocket)
-    // 3. Tab 1 makes changes offline
-    // 4. Tab 2 makes different changes offline
-    // 5. Server restarts
-    // 6. Both tabs reconnect and converge (CRDT merge)
-
-    const context1 = await browser.newContext();
-    const context2 = await browser.newContext();
-
-    const page1 = await context1.newPage();
-    const page2 = await context2.newPage();
-
-    const logs1: string[] = [];
-    const logs2: string[] = [];
-    setupConsoleCollection(page1, logs1);
-    setupConsoleCollection(page2, logs2);
-
-    try {
-      // Initial connection
-      await page1.goto('/');
-      await page2.goto('/');
-      await waitForServerConnection(page1);
-      await waitForServerConnection(page2);
-      await page1.waitForSelector('[data-track-id]', { timeout: 10000 });
-      await page2.waitForSelector('[data-track-id]', { timeout: 10000 });
-
-      const trackIds = await getTrackIds(page1);
-
-      // Simulate offline by blocking WebSocket
-      await page1.route('**/ws/**', route => route.abort());
-      await page2.route('**/ws/**', route => route.abort());
-
-      // Wait for disconnect
-      await page1.waitForTimeout(1000);
-
-      // Make offline changes
-      await setTrackGain(page1, trackIds[0], 0.2); // Tab 1: track 1 = 0.2
-      await setTrackGain(page2, trackIds[0], 0.8); // Tab 2: track 1 = 0.8 (conflict!)
-
-      // Restore connection
-      await page1.unroute('**/ws/**');
-      await page2.unroute('**/ws/**');
-
-      // Reload to reconnect
-      await page1.reload();
-      await page2.reload();
-
-      await waitForServerConnection(page1);
-      await waitForServerConnection(page2);
-      await page1.waitForSelector('[data-track-id]', { timeout: 10000 });
-      await page2.waitForSelector('[data-track-id]', { timeout: 10000 });
-
-      // Wait for CRDT merge
-      await page1.waitForTimeout(2000);
-
-      // Check convergence - both should have same value (CRDT picks a winner)
-      const finalGain1 = await getTrackGain(page1, trackIds[0]);
-      const finalGain2 = await getTrackGain(page2, trackIds[0]);
-
-      if (Math.abs(finalGain1 - finalGain2) > 0.01) {
-        const diag1 = await collectDiagnostics(page1, 'tab1');
-        const diag2 = await collectDiagnostics(page2, 'tab2');
-        diag1.consoleLogs = logs1;
-        diag2.consoleLogs = logs2;
-        printDiagnostics(diag1, diag2);
-      }
-
-      // The key CRDT property: eventual consistency
-      expect(finalGain1).toBeCloseTo(finalGain2, 2);
-
-    } finally {
-      await context1.close();
-      await context2.close();
-    }
-  });
+  // Offline reconciliation lives in criterion3-offline.spec.ts: it stops
+  // and restarts the real server (start-stack.ps1 -Component server)
+  // instead of simulating the outage, and keeps the tabs alive across the
+  // outage (no reload).
 });
 
 test.describe('Add track sync', () => {
@@ -267,11 +189,9 @@ test.describe('Add track sync', () => {
       // Add track in tab 1
       await page1.click('#add-track-btn');
 
-      // Wait for sync
-      await page2.waitForTimeout(1000);
-
+      // Wait for sync on a real condition (no blind sleep)
+      const finalCount2 = await waitForTrackCount(page2, initialCount1 + 1);
       const finalCount1 = (await getTrackIds(page1)).length;
-      const finalCount2 = (await getTrackIds(page2)).length;
 
       expect(finalCount1).toBe(initialCount1 + 1);
       expect(finalCount2).toBe(finalCount1);
