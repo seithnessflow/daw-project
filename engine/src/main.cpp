@@ -15,6 +15,7 @@
 #include "document/automerge_document.h"
 #include "graph/audio_graph.h"
 #include "graph/clip_player.h"
+#include "graph/plugin_registry.h"
 #include "network/server_client.h"
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
@@ -95,6 +96,7 @@ struct Options {
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
     uint16_t ws_port = 47821;    // Changed default to 47821
+    uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
     std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
@@ -162,6 +164,16 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.project_id = argv[i];
+        } else if (arg == "--debug-rebuild-delay-ms") {
+            // Test hook (burst/coalescing E2E): sleep inserted in the graph
+            // builder, off the audio thread, to simulate expensive builds
+            // (plugin instantiation). Without a cost, a 3-track build takes
+            // microseconds and coalescing would be unobservable.
+            if (++i >= argc) {
+                std::cerr << "Error: --debug-rebuild-delay-ms requires a value\n";
+                return false;
+            }
+            opts.debug_rebuild_delay_ms = static_cast<uint32_t>(std::stoul(argv[i]));
         } else if (arg == "--allow-origin") {
             if (++i >= argc) {
                 std::cerr << "Error: --allow-origin requires an origin\n";
@@ -302,8 +314,13 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
     const std::string& assets_dir,
-    daw::graph::AssetCache& asset_cache
+    daw::graph::AssetCache& asset_cache,
+    daw::graph::PluginInstanceRegistry& plugin_registry
 ) {
+    // ADR-017: plugin chain nodes will resolve their instance handles here
+    // instead of instantiating anything. Unused until the VST3 host (2.4).
+    (void)plugin_registry;
+
     auto graph = std::make_unique<daw::graph::AudioGraph>();
     graph->setSampleRate(sample_rate);
 
@@ -434,10 +451,12 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     // Build audio graph (shared ownership: audio thread and telemetry
     // readers acquire copies from the device's atomic slot)
     daw::graph::AssetCache asset_cache;
+    daw::graph::PluginInstanceRegistry plugin_registry;
     const auto& project = doc.getDocument();
 
     std::shared_ptr<daw::graph::AudioGraph> graph =
-        buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
+        buildGraph(project, device.getSampleRate(), opts.assets_dir,
+                   asset_cache, plugin_registry);
     if (!graph) {
         std::cerr << "Failed to build audio graph\n";
         return 1;
@@ -570,30 +589,27 @@ int doPlayWithServer(const Options& opts) {
               << "Sample Rate: " << device.getSampleRate() << " Hz\n"
               << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
 
-    // Shared state for document and graph
+    // Document: written by the network thread (load/apply under doc_mutex),
+    // snapshotted by the builder in the main loop. The builder NEVER reads
+    // the live document: it copies a ProjectDef under the lock and builds
+    // outside it - same mold as the server-side ordering fixes, engine side.
     daw::document::AutomergeDocument doc;
+    std::mutex doc_mutex;
+
+    // Monotonic document version: +1 per applied change or (re)load.
+    // LAST STATE WINS: the builder rebuilds once toward the newest version;
+    // intermediates arriving during a build coalesce and are never audible.
+    std::atomic<uint64_t> doc_version{0};
+
     daw::graph::AssetCache asset_cache;
+    daw::graph::PluginInstanceRegistry plugin_registry;  // ADR-017 (R2)
+
+    // Main-thread-only state: the builder lives in the main loop (R1 -
+    // construction is OFF the network thread), so no graph mutex is needed.
     std::shared_ptr<daw::graph::AudioGraph> current_graph;
-    std::mutex graph_mutex;
-
-    // Retirement queue: graphs swapped out of the active slot. A retired
-    // graph is destroyed by the main loop (control thread) only once the
-    // audio callback provably released it (generation gate, isRetireSafe)
-    // AND no control-side reader holds a copy (use_count() == 1). The audio
-    // thread never touches refcounts and never deallocates.
-    std::mutex retire_mutex;
     std::vector<daw::audio::AudioDevice::RetiredGraph> retired_graphs;
-
-    // Swap in a new graph and retire the previous one.
-    auto swapActiveGraph = [&](std::shared_ptr<daw::graph::AudioGraph> new_graph,
-                               daw::audio::AudioDevice& dev) {
-        auto retired = dev.setActiveGraph(new_graph);
-        current_graph = std::move(new_graph);
-        if (retired.graph) {
-            std::lock_guard<std::mutex> lock(retire_mutex);
-            retired_graphs.push_back(std::move(retired));
-        }
-    };
+    uint64_t last_built_version = 0;
+    bool playback_started = false;
 
     // Connect to sync server
     daw::network::ServerClient server_client;
@@ -601,88 +617,31 @@ int doPlayWithServer(const Options& opts) {
     server_config.url = opts.server_url;
     server_config.project_id = opts.project_id;
 
-    // Handle initial document
+    // Handle initial document. NETWORK THREAD: document work only, no
+    // graph construction here (R1) - bump the version, the builder follows.
     server_client.setDocumentCallback([&](const std::vector<uint8_t>& data) {
         std::cout << "Received initial document (" << data.size() << " bytes)\n";
-
-        if (!doc.loadFromBytes(data.data(), data.size())) {
-            std::cerr << "Failed to load document: " << doc.getLastError() << "\n";
-            return;
-        }
-
-        const auto& project = doc.getDocument();
-        std::cout << "Document loaded: " << project.tracks.size() << " tracks\n";
-
-        // Build initial graph
-        auto graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
-        if (!graph) {
-            std::cerr << "Failed to build audio graph\n";
-            return;
-        }
-
-        graph->prepare(device.getSampleRate(), device.getBufferSize());
-
-        // Apply initial solo/mute from CLI
-        for (const auto& track_id : opts.solo_tracks) {
-            auto* track = graph->getTrackById(track_id);
-            if (track) {
-                track->solo.store(true, std::memory_order_relaxed);
-                std::cout << "Solo: " << track_id << "\n";
-            }
-        }
-        for (const auto& track_id : opts.mute_tracks) {
-            auto* track = graph->getTrackById(track_id);
-            if (track) {
-                track->mute.store(true, std::memory_order_relaxed);
-                std::cout << "Mute: " << track_id << "\n";
-            }
-        }
-
-        // Swap graph atomically (previous graph, if any, goes to retirement)
         {
-            std::lock_guard<std::mutex> lock(graph_mutex);
-            swapActiveGraph(std::move(graph), device);
-        }
-
-        // Start playback
-        if (device.getState() != daw::audio::AudioDeviceState::Running) {
-            if (!device.start()) {
-                std::cerr << "Failed to start audio device\n";
+            std::lock_guard<std::mutex> lock(doc_mutex);
+            if (!doc.loadFromBytes(data.data(), data.size())) {
+                std::cerr << "Failed to load document: " << doc.getLastError() << "\n";
                 return;
             }
-            device.getTransport().play();
-            std::cout << "Playback started\n";
+            std::cout << "Document loaded: " << doc.getDocument().tracks.size() << " tracks\n";
         }
+        doc_version.fetch_add(1, std::memory_order_release);
     });
 
-    // Handle document changes
+    // Handle document changes. NETWORK THREAD: apply + version bump only.
     server_client.setChangeCallback([&](const std::vector<uint8_t>& change) {
-        if (!doc.applyChange(change.data(), change.size())) {
-            std::cerr << "Failed to apply change: " << doc.getLastError() << "\n";
-            return;
-        }
-
-        const auto& project = doc.getDocument();
-
-        // Build new graph
-        auto new_graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
-        if (!new_graph) {
-            std::cerr << "Failed to rebuild audio graph\n";
-            return;
-        }
-
-        new_graph->prepare(device.getSampleRate(), device.getBufferSize());
-
-        // Copy solo/mute state, then swap. The swap happens BEFORE any
-        // destruction: the old graph moves to the retirement queue and dies
-        // on the control thread once its last reader releases it.
         {
-            std::lock_guard<std::mutex> lock(graph_mutex);
-            copyMonitorState(current_graph.get(), new_graph.get());
-            swapActiveGraph(std::move(new_graph), device);
+            std::lock_guard<std::mutex> lock(doc_mutex);
+            if (!doc.applyChange(change.data(), change.size())) {
+                std::cerr << "Failed to apply change: " << doc.getLastError() << "\n";
+                return;
+            }
         }
-
-        std::cout << "Graph updated (document change)\n";
+        doc_version.fetch_add(1, std::memory_order_release);
     });
 
     // Connect to server
@@ -708,9 +667,72 @@ int doPlayWithServer(const Options& opts) {
     while (g_running) {
         auto now = std::chrono::steady_clock::now();
 
+        // ---- Graph builder (R1). Runs here, never on the network thread.
+        // Last state wins: one rebuild toward the newest document version;
+        // anything that arrived during the build is caught by the next tick.
+        const uint64_t target_version = doc_version.load(std::memory_order_acquire);
+        if (target_version != 0 && target_version != last_built_version) {
+            daw::document::ProjectDef snapshot;
+            {
+                // The snapshot IS the deep copy; the build below never
+                // touches the live document
+                std::lock_guard<std::mutex> lock(doc_mutex);
+                snapshot = doc.getDocument();
+            }
+
+            auto graph = buildGraph(snapshot, device.getSampleRate(),
+                                    opts.assets_dir, asset_cache, plugin_registry);
+            if (graph) {
+                if (opts.debug_rebuild_delay_ms > 0) {
+                    // Test hook: simulate an expensive (plugin) build
+                    std::this_thread::sleep_for(
+                        std::chrono::milliseconds(opts.debug_rebuild_delay_ms));
+                }
+                graph->prepare(device.getSampleRate(), device.getBufferSize());
+
+                if (!playback_started) {
+                    // First graph: apply CLI solo/mute
+                    for (const auto& track_id : opts.solo_tracks) {
+                        auto* track = graph->getTrackById(track_id);
+                        if (track) track->solo.store(true, std::memory_order_relaxed);
+                    }
+                    for (const auto& track_id : opts.mute_tracks) {
+                        auto* track = graph->getTrackById(track_id);
+                        if (track) track->mute.store(true, std::memory_order_relaxed);
+                    }
+                } else {
+                    copyMonitorState(current_graph.get(), graph.get());
+                }
+
+                std::shared_ptr<daw::graph::AudioGraph> shared_graph = std::move(graph);
+                auto retired = device.setActiveGraph(shared_graph);
+                current_graph = std::move(shared_graph);
+                if (retired.graph) {
+                    retired_graphs.push_back(std::move(retired));
+                }
+                last_built_version = target_version;
+
+                if (!playback_started) {
+                    playback_started = true;
+                    if (device.getState() != daw::audio::AudioDeviceState::Running) {
+                        if (device.start()) {
+                            device.getTransport().play();
+                            std::cout << "Playback started\n";
+                        } else {
+                            std::cerr << "Failed to start audio device\n";
+                        }
+                    }
+                }
+
+                std::cout << "Graph updated (document change, v=" << target_version << ")\n";
+            } else {
+                std::cerr << "Failed to build audio graph\n";
+                last_built_version = target_version;  // don't spin on a broken doc
+            }
+        }
+
         // Start WebSocket server once we have a graph
         if (!ws_server.isRunning() && current_graph) {
-            std::lock_guard<std::mutex> lock(graph_mutex);
             if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
                 std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n";
             }
@@ -719,15 +741,12 @@ int doPlayWithServer(const Options& opts) {
         // Destroy retired graphs the audio callback provably released
         // (generation gate) and that no control-side reader still holds
         // (use_count()==1: only the retirement queue references it).
-        {
-            std::lock_guard<std::mutex> lock(retire_mutex);
-            retired_graphs.erase(
-                std::remove_if(retired_graphs.begin(), retired_graphs.end(),
-                               [&device](const daw::audio::AudioDevice::RetiredGraph& r) {
-                                   return device.isRetireSafe(r) && r.graph.use_count() == 1;
-                               }),
-                retired_graphs.end());
-        }
+        retired_graphs.erase(
+            std::remove_if(retired_graphs.begin(), retired_graphs.end(),
+                           [&device](const daw::audio::AudioDevice::RetiredGraph& r) {
+                               return device.isRetireSafe(r) && r.graph.use_count() == 1;
+                           }),
+            retired_graphs.end());
 
         // Broadcast telemetry at configured rate
         if (now - last_telemetry >= telemetry_interval) {
@@ -766,10 +785,7 @@ int doPlayWithServer(const Options& opts) {
     device.shutdown();
 
     // All readers are stopped: retired graphs can be destroyed unconditionally.
-    {
-        std::lock_guard<std::mutex> lock(retire_mutex);
-        retired_graphs.clear();
-    }
+    retired_graphs.clear();
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
 

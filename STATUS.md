@@ -32,6 +32,11 @@ Rien de temps reel ne traverse le serveur distant.
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
+**2026-08-22 (R1+R2):** construction du graphe sortie du thread reseau
+(boucle principale, snapshot sous verrou, dernier etat gagne, version
+loggee) ; registre d'instances plugins (ADR-017) en place ; test de
+rafale = la preuve de coalescing dont le chantier VST3 dependra.
+
 **2026-08-22 (R4+S4):** le thread sacre est desormais verifie par le
 compilateur (static_assert lock-free sur tous les types partages avec le
 callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback

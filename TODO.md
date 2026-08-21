@@ -61,16 +61,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          instance, proxys dans le graphe, registre d'instances survivant
          aux rebuilds (=> R2 devient un transfert de handles), spin borne
          + bypass cote callback, crash enfant = bypass + signalement.
-      3. R1+R2 : coalescing des rebuilds (hors thread reseau) + transfert
-         d'etat des noeuds au swap, dans le cadre fixe par l'ADR-017.
-         POLITIQUE TRANCHEE EN ENTREE : dernier etat gagne — dix changes
-         pendant un rebuild = UN rebuild vers l'etat le plus recent du
-         document, intermediaires jetes (jamais audibles, assume).
-         Corollaire test : « chaque change = un Graph updated » devient
-         faux PAR CONSTRUCTION ; le test du jalon evolue vers « l'etat
-         final du graphe correspond a l'etat final du document » —
-         propriete plus forte, evolution a signaler explicitement
-         (discipline de test), PAS un affaiblissement en douce.
+      3. [x] R1+R2 FAIT 2026-08-22 : constructeur dans la boucle
+         principale (thread reseau = apply + version seulement), snapshot
+         ProjectDef sous verrou / build hors verrou, dernier etat gagne.
+         Registre d'instances ADR-017 en structure. Test de rafale : 51
+         changes non espaces + --debug-rebuild-delay-ms 100 -> rebuilds
+         tres < 51, version finale construite (v=changes+1), 0 underrun.
+         Jalon renforce, pas affaibli (ancien test intact et vert).
       4. Elagage docs (session courte) : les 7 ecarts docs/reel de
          AUDIT-2.md — le chantier demarre sur des documents qui disent vrai.
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse

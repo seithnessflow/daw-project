@@ -168,6 +168,74 @@ test.describe('Milestone: Fader to Engine', () => {
     }
   });
 
+  test('burst of fader changes coalesces rebuilds and converges to the final state', async ({ page }) => {
+    test.setTimeout(90000);
+    const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    const projectId = `e2e-burst-${Date.now()}`;
+    const logPath = path.join(os.tmpdir(), `daw-e2e-burst-${Date.now()}.log`);
+
+    const logFd = fs.openSync(logPath, 'w');
+    // --debug-rebuild-delay-ms simulates the expensive builds the VST3 host
+    // will have (DLL instantiation): without a cost, a 3-track build takes
+    // microseconds and coalescing would be unobservable
+    const engine: ChildProcess = spawn(
+      engineExe,
+      [
+        '--server', 'ws://localhost:3000',
+        '--project', projectId,
+        '--play', '--mute',
+        '--ws-port', '47902',
+        '--debug-rebuild-delay-ms', '100',
+      ],
+      { stdio: ['ignore', logFd, logFd] }
+    );
+    fs.closeSync(logFd);
+
+    try {
+      expect(
+        await waitUntil(() => countInFile(logPath, 'Document loaded') >= 1, 15000),
+        `engine did not load the initial document (log: ${logPath})`
+      ).toBe(true);
+
+      await page.goto(`/?project=${projectId}`);
+      await waitForServerConnection(page);
+      await page.waitForSelector('[data-track-id]', { timeout: 10000 });
+      const trackIds = await getTrackIds(page);
+
+      const before = countInFile(logPath, 'Graph updated');
+
+      // The burst: 51 changes, no pacing - a simulated fader drag
+      const CHANGES = 51;
+      for (let i = 0; i < CHANGES; i++) {
+        await setTrackGain(page, trackIds[0], (10 + i) / 100);
+      }
+
+      // Final state must be built: initial load is v=1, so the newest
+      // version after the burst is v = 1 + CHANGES. This is the "final
+      // graph state == final document state" property.
+      const finalMarker = `Graph updated (document change, v=${1 + CHANGES})`;
+      expect(
+        await waitUntil(() => countInFile(logPath, finalMarker) >= 1, 20000),
+        `graph never reached the final document version (log: ${logPath})`
+      ).toBe(true);
+
+      // Coalescing: FAR fewer rebuilds than changes (in-flight + final +
+      // margin, not a queue of 51)
+      const rebuilds = countInFile(logPath, 'Graph updated') - before;
+      expect(rebuilds, 'no rebuild happened').toBeGreaterThanOrEqual(1);
+      expect(rebuilds, `rebuilds not coalesced: ${rebuilds} for ${CHANGES} changes`).toBeLessThan(15);
+
+      // Audio never interrupted during the burst
+      const log = fs.readFileSync(logPath, 'utf-8');
+      expect(/Underruns: [1-9]/.test(log), 'underruns during the burst').toBe(false);
+
+      // And the engine is alive
+      expect(engine.exitCode, 'engine process died during the burst').toBeNull();
+    } finally {
+      engine.kill();
+    }
+  });
+
   test('gain change is audible: rendered WAV samples scale with gain', () => {
     const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
     const createTestDoc = resolveBinary('CREATE_TEST_DOC', 'create_test_doc');
