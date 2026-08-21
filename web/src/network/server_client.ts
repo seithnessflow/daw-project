@@ -8,8 +8,22 @@ export class ServerClient {
   private projectId: string = '';
   private reconnectTimer: number | null = null;
 
+  // Per-connection protocol state: the server always sends the full stored
+  // document as the FIRST message of every connection, then incremental
+  // changes. Re-armed on every open, so reconnects are unambiguous without
+  // any message-type prefix.
+  private awaitingInitialDoc = true;
+
+  // Outbox: changes emitted while disconnected (or before the initial
+  // document arrives) accumulate here and are sent, in order, once the
+  // initial document of the (re)connection has been delivered.
+  // In-memory only: a closed tab loses its queue (known, separate debt).
+  private outbox: Uint8Array[] = [];
+  private resyncTimer: number | null = null;
+
   onConnect: (() => void) | null = null;
   onDisconnect: (() => void) | null = null;
+  /** Called with the full document at the start of EVERY connection. */
   onDocument: ((data: Uint8Array) => void) | null = null;
   onChange: ((change: Uint8Array) => void) | null = null;
 
@@ -31,6 +45,7 @@ export class ServerClient {
 
         this.ws.onopen = () => {
           console.log('Server WebSocket connected');
+          this.awaitingInitialDoc = true;
           this.onConnect?.();
           resolve();
         };
@@ -49,11 +64,14 @@ export class ServerClient {
         this.ws.onmessage = (event) => {
           if (event.data instanceof ArrayBuffer) {
             const data = new Uint8Array(event.data);
-            // First message is the full document, subsequent are changes
-            if (this.onDocument) {
-              this.onDocument(data);
-              // Switch to change handler after first message
-              this.onDocument = null;
+            // First message of each connection is the full document,
+            // subsequent ones are incremental changes
+            if (this.awaitingInitialDoc) {
+              this.awaitingInitialDoc = false;
+              this.onDocument?.(data);
+              // The app has merged the server document: local offline
+              // changes can now be delivered, in emission order
+              this.flushOutbox();
             } else {
               this.onChange?.(data);
             }
@@ -73,17 +91,66 @@ export class ServerClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.resyncTimer !== null) {
+      clearTimeout(this.resyncTimer);
+      this.resyncTimer = null;
+    }
     this.ws?.close();
     this.ws = null;
   }
 
   /**
    * Send a change to the server.
+   *
+   * While disconnected (or before the connection's initial document has
+   * arrived), the change is queued and delivered after reconnection, in
+   * order. Nothing is silently dropped.
    */
   sendChange(change: Uint8Array): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN && !this.awaitingInitialDoc) {
+      this.ws.send(change);
+    } else {
+      this.outbox.push(change);
+      console.log(`Server offline: change queued (${this.outbox.length} pending)`);
+    }
+  }
+
+  private flushOutbox(): void {
+    if (this.ws?.readyState !== WebSocket.OPEN || this.outbox.length === 0) {
+      return;
+    }
+    console.log(`Flushing ${this.outbox.length} queued change(s) to server`);
+    while (this.outbox.length > 0) {
+      const change = this.outbox.shift()!;
       this.ws.send(change);
     }
+  }
+
+  /**
+   * Number of changes waiting to be delivered.
+   */
+  pendingCount(): number {
+    return this.outbox.length;
+  }
+
+  /**
+   * Anti-entropy: schedule one resync cycle (close + auto-reconnect, which
+   * makes the server send its current full document again for merging).
+   *
+   * Needed because the server broadcasts a change BEFORE persisting it: a
+   * peer reconnecting in that window can both miss the broadcast and read
+   * a stale stored document. The app requests a resync after any
+   * reconnection that brought novelty or delivered queued changes, and
+   * stops as soon as an exchange is a no-op.
+   */
+  requestResync(delayMs = 1000): void {
+    if (this.resyncTimer !== null) return;
+    this.resyncTimer = window.setTimeout(() => {
+      this.resyncTimer = null;
+      console.log('Resync: refreshing server document');
+      // close() triggers onclose, which schedules the reconnection
+      this.ws?.close();
+    }, delayMs);
   }
 
   /**

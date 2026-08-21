@@ -59,18 +59,6 @@ test.describe('Criterion 3: offline reconciliation', () => {
   test('offline edits from both tabs merge after a server restart', async ({ browser }) => {
     test.setTimeout(120000);
 
-    // KNOWN FAILURE (2026-08-21): the web client cannot reconcile offline
-    // edits. ServerClient.sendChange() silently DROPS changes while
-    // disconnected (no outbox), and after reconnect the server's full
-    // document lands in the change handler (onDocument was consumed by the
-    // first connect) where applyChange() cannot parse it - no merge path
-    // exists. Verified by this test's diagnostics: divergent heads, no
-    // cross-tab propagation. See STATUS.md, criterion 3.
-    // test.fail() documents the defect without hiding it: the day
-    // reconciliation works, this run fails loudly ("passed unexpectedly")
-    // and forces the annotation - and the STATUS entry - to be removed.
-    test.fail(true, 'Offline reconciliation not implemented in the web client (STATUS.md, critere 3)');
-
     // Run against a script-managed server so the mid-test restart reuses
     // the same file store (CWD server/)
     serverControl('stop');

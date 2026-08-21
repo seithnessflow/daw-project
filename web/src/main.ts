@@ -60,8 +60,36 @@ async function init() {
     serverStatus.classList.remove('connected');
     console.log('Disconnected from server');
   };
+  let hasLoadedInitialDoc = false;
+  // Anti-entropy cycles still owed after a reconnection (see below)
+  let resyncCycles = 0;
   serverClient.onDocument = (data) => {
-    project!.load(data);
+    if (!hasLoadedInitialDoc) {
+      // Very first document: adopt the server state wholesale (the local
+      // document is a pristine placeholder with no user edits)
+      project!.load(data);
+      hasLoadedInitialDoc = true;
+    } else {
+      // Reconnection: MERGE the server document into the local one -
+      // never replace it, so offline edits survive and reconcile
+      console.log('Reconnected: merging server document into local state');
+      const hadPending = serverClient!.pendingCount() > 0;
+      const mergedNovelty = project!.mergeRemote(data);
+      // Anti-entropy: the server broadcasts changes BEFORE persisting them,
+      // so a reconnection can both miss a peer's live flush and read a
+      // stale stored document. Whenever an exchange moved anything
+      // (novelty received or queued changes flushed), demand TWO
+      // consecutive no-op exchanges before stopping the verification
+      // cycles: a peer's late flush can land while we are mid-cycle.
+      if (mergedNovelty || hadPending) {
+        resyncCycles = 2;
+      } else if (resyncCycles > 0) {
+        resyncCycles--;
+      }
+      if (resyncCycles > 0) {
+        serverClient!.requestResync();
+      }
+    }
     renderTracks();
   };
   serverClient.onChange = (change) => {

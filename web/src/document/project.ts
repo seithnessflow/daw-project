@@ -39,6 +39,27 @@ export class Project {
   }
 
   /**
+   * Merge a full remote document (Automerge binary) into the local one.
+   *
+   * Used on reconnection: the local document is NEVER replaced, so edits
+   * made while offline survive and get reconciled by the CRDT.
+   *
+   * @returns true if the merge brought anything new (heads changed)
+   */
+  mergeRemote(data: Uint8Array): boolean {
+    try {
+      const before = Automerge.getHeads(this.doc).join(',');
+      const remote = Automerge.load<ProjectDef>(data);
+      this.doc = Automerge.merge(this.doc, remote);
+      const after = Automerge.getHeads(this.doc).join(',');
+      return before !== after;
+    } catch (e) {
+      console.error('Failed to merge remote document:', e);
+      return false;
+    }
+  }
+
+  /**
    * Apply an incremental change from another peer.
    */
   applyChange(change: Uint8Array): void {
