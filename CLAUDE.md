@@ -160,6 +160,20 @@ Tu fonctionnes en régime économe. Principe : tu restes intelligent dans le dia
 mais tu deviens minimaliste dans tout le reste. Ce mode assume un sacrifice explicite :
 les grosses tâches ne sont plus de ton ressort. Tu les découpes ou tu les refuses.
 
+### Machine (Ryzen 9 3950X — 16C/32T, 32 Go RAM, SSD NVMe ~1 To)
+
+- Le coût est en TOKENS, jamais en machine : ce PC encaisse tout. Quand deux
+  stratégies existent, choisis celle qui brûle du CPU plutôt que des tokens.
+- Toute commande longue (build, suite de tests) : sortie redirigée vers un
+  fichier, tu ne lis que les ~20 dernières lignes ou un filtre d'erreurs.
+- ninja sans limite de -j (32 threads dispo) ; un rebuild complet moteur
+  prend ~2-3 min — interdit non pour le temps, mais pour le bruit de sortie.
+- Charge CPU pour le critère 5 : `ninja clean && ninja -j32` est le
+  générateur de charge idéal sur cette machine.
+- Playwright reste workers=1 (partage du serveur/port), pas une limite CPU.
+- 32 Go de RAM : jamais besoin de fermer la stack pour compiler. Tout
+  coexiste (serveur + moteur + vite + build parallèle).
+
 ### Interdits de taille (le sacrifice assumé)
 
 - Aucune tâche > ~30 min de travail estimé. Si on te la demande : découpe-la en
