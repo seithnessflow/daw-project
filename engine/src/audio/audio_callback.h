@@ -47,6 +47,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 namespace daw::audio {
 
@@ -80,8 +81,11 @@ struct AudioCallbackContext {
     CommandRingBuffer* command_buffer = nullptr;
     TelemetryRingBuffer* telemetry_buffer = nullptr;
 
-    // Atomic pointer to current audio graph (swapped by control thread)
-    std::atomic<graph::AudioGraph*>* active_graph = nullptr;
+    // Atomic slot holding the current audio graph (swapped by control thread).
+    // The callback loads a shared_ptr copy per invocation. Its release never
+    // deallocates: the control thread's retirement queue keeps every retired
+    // graph alive until no reader references it.
+    const std::atomic<std::shared_ptr<graph::AudioGraph>>* active_graph = nullptr;
 
     // Transport state (atomics for lock-free access)
     transport::TransportState* transport = nullptr;

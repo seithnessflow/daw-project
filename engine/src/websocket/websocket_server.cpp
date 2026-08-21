@@ -22,7 +22,7 @@ WebSocketServer::~WebSocketServer() {
 bool WebSocketServer::start(
     const WebSocketConfig& config,
     audio::AudioDevice* device,
-    graph::AudioGraph* graph
+    const std::atomic<std::shared_ptr<graph::AudioGraph>>* graph_slot
 ) {
     if (running_.load()) {
         return false;
@@ -38,7 +38,7 @@ bool WebSocketServer::start(
     }
 
     device_ = device;
-    graph_ = graph;
+    graph_slot_ = graph_slot;
     port_ = config.port;
     telemetry_hz_ = config.telemetry_hz;
     allowed_origins_ = config.allowed_origins;
@@ -240,9 +240,14 @@ void WebSocketServer::handleTransportCommand(const protocol::TransportCommand& c
 }
 
 void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {
-    if (!graph_) return;
+    if (!graph_slot_) return;
 
-    auto* track = graph_->getTrackById(cmd.track_id());
+    // Acquire a shared_ptr copy: keeps the graph alive for the duration of
+    // this call even if the control thread swaps it concurrently.
+    auto graph = graph_slot_->load(std::memory_order_acquire);
+    if (!graph) return;
+
+    auto* track = graph->getTrackById(cmd.track_id());
     if (track) {
         track->solo = cmd.solo();
         track->mute = cmd.mute();
@@ -250,7 +255,11 @@ void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {
 }
 
 void WebSocketServer::broadcastTelemetry() {
-    if (!device_ || !graph_) return;
+    if (!device_ || !graph_slot_) return;
+
+    // Acquire a shared_ptr copy for this broadcast (see handleSetMonitor).
+    auto graph = graph_slot_->load(std::memory_order_acquire);
+    if (!graph) return;
 
     // Build position message
     protocol::Message pos_msg;
@@ -261,7 +270,7 @@ void WebSocketServer::broadcastTelemetry() {
     // Build meters message
     protocol::Message meters_msg;
     auto* meters = meters_msg.mutable_meters();
-    for (const auto& [id, left, right] : graph_->getMeters()) {
+    for (const auto& [id, left, right] : graph->getMeters()) {
         auto* track = meters->add_tracks();
         track->set_track_id(id);
         track->set_peak_left(left);

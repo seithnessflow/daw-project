@@ -64,13 +64,17 @@ public:
      *
      * @param config Server configuration
      * @param device Audio device for transport commands
-     * @param graph Audio graph for monitor commands and meters
+     * @param graph_slot Atomic slot holding the current audio graph. The
+     *        server loads a shared_ptr copy before each use, so graph
+     *        rebuilds are picked up automatically and retired graphs are
+     *        never dereferenced. The slot must outlive the server (it lives
+     *        in the AudioDevice).
      * @return true on success
      */
     bool start(
         const WebSocketConfig& config,
         audio::AudioDevice* device,
-        graph::AudioGraph* graph
+        const std::atomic<std::shared_ptr<graph::AudioGraph>>* graph_slot
     );
 
     /**
@@ -126,7 +130,7 @@ private:
 
     // References (not owned)
     audio::AudioDevice* device_ = nullptr;
-    graph::AudioGraph* graph_ = nullptr;
+    const std::atomic<std::shared_ptr<graph::AudioGraph>>* graph_slot_ = nullptr;
 
     // Telemetry
     uint32_t telemetry_hz_ = 30;

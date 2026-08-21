@@ -19,10 +19,12 @@
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -417,11 +419,13 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
               << "Sample Rate: " << device.getSampleRate() << " Hz\n"
               << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
 
-    // Build audio graph
+    // Build audio graph (shared ownership: audio thread and telemetry
+    // readers acquire copies from the device's atomic slot)
     daw::graph::AssetCache asset_cache;
     const auto& project = doc.getDocument();
 
-    auto graph = buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
+    std::shared_ptr<daw::graph::AudioGraph> graph =
+        buildGraph(project, device.getSampleRate(), opts.assets_dir, asset_cache);
     if (!graph) {
         std::cerr << "Failed to build audio graph\n";
         return 1;
@@ -451,7 +455,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     }
 
     // Set active graph and start playback
-    device.setActiveGraph(graph.get());
+    device.setActiveGraph(graph);
 
     // Start WebSocket server
     daw::websocket::WebSocketServer ws_server;
@@ -460,7 +464,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     ws_config.bind_address = "127.0.0.1";
     ws_config.telemetry_hz = 30;
 
-    if (ws_server.start(ws_config, &device, graph.get())) {
+    if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
         std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n\n";
     } else {
         std::cerr << "Warning: Failed to start WebSocket server\n";
@@ -555,8 +559,27 @@ int doPlayWithServer(const Options& opts) {
     // Shared state for document and graph
     daw::document::AutomergeDocument doc;
     daw::graph::AssetCache asset_cache;
-    std::unique_ptr<daw::graph::AudioGraph> current_graph;
+    std::shared_ptr<daw::graph::AudioGraph> current_graph;
     std::mutex graph_mutex;
+
+    // Retirement queue: graphs swapped out of the active slot. A retired
+    // graph is destroyed by the main loop (control thread) only once no
+    // reader holds a reference (use_count() == 1). This guarantees the
+    // audio thread never runs a deallocation: its transient shared_ptr copy
+    // is never the last one.
+    std::mutex retire_mutex;
+    std::vector<std::shared_ptr<daw::graph::AudioGraph>> retired_graphs;
+
+    // Swap in a new graph and retire the previous one.
+    auto swapActiveGraph = [&](std::shared_ptr<daw::graph::AudioGraph> new_graph,
+                               daw::audio::AudioDevice& dev) {
+        auto old_graph = dev.setActiveGraph(new_graph);
+        current_graph = std::move(new_graph);
+        if (old_graph) {
+            std::lock_guard<std::mutex> lock(retire_mutex);
+            retired_graphs.push_back(std::move(old_graph));
+        }
+    };
 
     // Connect to sync server
     daw::network::ServerClient server_client;
@@ -601,11 +624,10 @@ int doPlayWithServer(const Options& opts) {
             }
         }
 
-        // Swap graph atomically
+        // Swap graph atomically (previous graph, if any, goes to retirement)
         {
             std::lock_guard<std::mutex> lock(graph_mutex);
-            current_graph = std::move(graph);
-            device.setActiveGraph(current_graph.get());
+            swapActiveGraph(std::move(graph), device);
         }
 
         // Start playback
@@ -637,12 +659,13 @@ int doPlayWithServer(const Options& opts) {
 
         new_graph->prepare(device.getSampleRate(), device.getBufferSize());
 
-        // Copy solo/mute state from current graph
+        // Copy solo/mute state, then swap. The swap happens BEFORE any
+        // destruction: the old graph moves to the retirement queue and dies
+        // on the control thread once its last reader releases it.
         {
             std::lock_guard<std::mutex> lock(graph_mutex);
             copyMonitorState(current_graph.get(), new_graph.get());
-            current_graph = std::move(new_graph);
-            device.setActiveGraph(current_graph.get());
+            swapActiveGraph(std::move(new_graph), device);
         }
 
         std::cout << "Graph updated (document change)\n";
@@ -672,9 +695,23 @@ int doPlayWithServer(const Options& opts) {
         // Start WebSocket server once we have a graph
         if (!ws_server.isRunning() && current_graph) {
             std::lock_guard<std::mutex> lock(graph_mutex);
-            if (ws_server.start(ws_config, &device, current_graph.get())) {
+            if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
                 std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n";
             }
+        }
+
+        // Destroy retired graphs whose last reader is gone. use_count()==1
+        // means only the retirement queue still references the graph: no new
+        // reader can appear (the active slot no longer points to it), so
+        // destroying it here, on the control thread, is safe.
+        {
+            std::lock_guard<std::mutex> lock(retire_mutex);
+            retired_graphs.erase(
+                std::remove_if(retired_graphs.begin(), retired_graphs.end(),
+                               [](const std::shared_ptr<daw::graph::AudioGraph>& g) {
+                                   return g.use_count() == 1;
+                               }),
+                retired_graphs.end());
         }
 
         // Broadcast telemetry at configured rate
@@ -712,6 +749,12 @@ int doPlayWithServer(const Options& opts) {
     device.getTransport().stop();
     device.stop();
     device.shutdown();
+
+    // All readers are stopped: retired graphs can be destroyed unconditionally.
+    {
+        std::lock_guard<std::mutex> lock(retire_mutex);
+        retired_graphs.clear();
+    }
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
 

@@ -210,8 +210,8 @@ std::optional<AudioTelemetry> AudioDevice::pollTelemetry() {
     return telemetry_buffer_.pop();
 }
 
-graph::AudioGraph* AudioDevice::setActiveGraph(graph::AudioGraph* graph) {
-    return active_graph_.exchange(graph, std::memory_order_acq_rel);
+std::shared_ptr<graph::AudioGraph> AudioDevice::setActiveGraph(std::shared_ptr<graph::AudioGraph> graph) {
+    return active_graph_.exchange(std::move(graph), std::memory_order_acq_rel);
 }
 
 }  // namespace daw::audio

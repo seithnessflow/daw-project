@@ -146,12 +146,29 @@ public:
     std::optional<AudioTelemetry> pollTelemetry();
 
     /**
-     * Set the active audio graph (atomic swap).
+     * Set the active audio graph (atomic swap of shared ownership).
      *
-     * @param graph New graph to use (must remain valid until replaced)
-     * @return Previous graph (caller must manage its lifetime)
+     * The audio thread and telemetry readers each acquire their own
+     * shared_ptr copy before use, so the previous graph stays alive until
+     * its last reader releases it.
+     *
+     * @param graph New graph (shared ownership)
+     * @return Previous graph. The caller (control thread) must keep it in a
+     *         retirement queue and destroy it only once no reader holds a
+     *         reference (use_count() == 1). Never let the audio thread hold
+     *         the last reference: deallocation must happen on the control
+     *         thread.
      */
-    graph::AudioGraph* setActiveGraph(graph::AudioGraph* graph);
+    std::shared_ptr<graph::AudioGraph> setActiveGraph(std::shared_ptr<graph::AudioGraph> graph);
+
+    /**
+     * Slot readers (e.g. WebSocketServer telemetry) load a shared_ptr copy
+     * from this atomic slot before each use. The slot outlives all readers:
+     * it lives as long as the AudioDevice.
+     */
+    const std::atomic<std::shared_ptr<graph::AudioGraph>>* getActiveGraphSlot() const {
+        return &active_graph_;
+    }
 
     /**
      * Get the transport state.
@@ -174,8 +191,9 @@ private:
     CommandRingBuffer command_buffer_;
     TelemetryRingBuffer telemetry_buffer_;
 
-    // Active audio graph (atomic for lock-free swap)
-    std::atomic<graph::AudioGraph*> active_graph_{nullptr};
+    // Active audio graph. Readers (audio thread, telemetry) take shared_ptr
+    // copies via atomic load; the control thread swaps via exchange.
+    std::atomic<std::shared_ptr<graph::AudioGraph>> active_graph_;
 
     // Transport state
     transport::TransportState transport_;

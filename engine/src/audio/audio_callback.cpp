@@ -37,8 +37,13 @@ void audioCallback(
     // Process any pending commands from control thread
     processCommands(*ctx);
 
-    // Get the current graph (atomic load)
-    graph::AudioGraph* graph = ctx->active_graph->load(std::memory_order_acquire);
+    // Acquire a shared_ptr copy of the current graph. Releasing this copy at
+    // the end of the callback only decrements the refcount: the control
+    // thread's retirement queue always holds a reference until no reader is
+    // left, so deallocation never happens on this thread.
+    const std::shared_ptr<graph::AudioGraph> graph_ref =
+        ctx->active_graph->load(std::memory_order_acquire);
+    graph::AudioGraph* graph = graph_ref.get();
 
     // Get transport state
     const bool is_playing = ctx->transport->isPlaying();
