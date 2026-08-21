@@ -65,6 +65,15 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] Serveur : persister AVANT de diffuser (`server/src/api/websocket.rs`) — corrige la course, permet d'alleger l'anti-entropie cliente
 - [ ] `solo`/`mute` en `std::atomic<bool>` — domaine thread audio, tests non-regression obligatoires
 
+## Candidats grille (constats de lecture 2026-08-22, arbitrage a l'audit 2)
+
+- [ ] Transport a deux chemins d'ecriture : file de commandes (ring buffer)
+      ET appels directs `getTransport().play()` depuis main.cpp. Un seul
+      proprietaire a choisir. + Atomiques de loop "for future use" morts.
+- [ ] ProcessorNode trop mince pour un hote VST3 (latence, bypass, etat,
+      bus ; params string->float insuffisants ; contrat in-place non ecrit).
+      A traiter DANS le chantier 2.4, pas avant.
+
 ## Moyen terme
 
 - [ ] Moteur : lire `chain` (processeurs) du document — TODO `automerge_document.cpp:419`

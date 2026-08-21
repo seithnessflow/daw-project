@@ -7,7 +7,7 @@
 import { Project } from './document/project';
 import { ServerClient } from './network/server_client';
 import { EngineClient } from './network/engine_client';
-import { createTrackUI, updateMeter } from './ui/track';
+import { createTrackUI, updateMeter, updateTrackGainUI } from './ui/track';
 import { formatTime } from './ui/transport';
 
 // Configuration
@@ -177,6 +177,24 @@ function renderTracks() {
   if (!project) return;
 
   const doc = project.getDocument();
+
+  // Same track structure -> update gains in place. A full innerHTML rebuild
+  // on every received change (30/s during a remote drag) thrashes the DOM
+  // and would yank the slider out of the local user's hand.
+  const existing = Array.from(
+    tracksContainer.querySelectorAll('[data-track-id]')
+  ).map((e) => e.getAttribute('data-track-id'));
+  const sameStructure =
+    existing.length === doc.tracks.length &&
+    doc.tracks.every((t, i) => existing[i] === t.id);
+
+  if (sameStructure) {
+    for (const track of doc.tracks) {
+      updateTrackGainUI(track.id, track.gain);
+    }
+    return;
+  }
+
   tracksContainer.innerHTML = '';
 
   for (const track of doc.tracks) {

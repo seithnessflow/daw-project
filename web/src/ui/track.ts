@@ -76,6 +76,27 @@ export function updateMeter(trackId: string, peak: number): void {
 }
 
 /**
+ * Update an existing track's gain UI in place (no DOM rebuild).
+ *
+ * Skips the slider if the user is currently holding it: a remote peer's
+ * concurrent drag must not fight the local hand.
+ */
+export function updateTrackGainUI(trackId: string, gain: number): void {
+  const el = document.querySelector(`[data-track-id="${trackId}"]`);
+  if (!el) return;
+
+  const input = el.querySelector('input[type="range"]') as HTMLInputElement | null;
+  if (input && document.activeElement !== input) {
+    input.value = gain.toString();
+  }
+
+  const display = el.querySelector('.track-gain') as HTMLElement | null;
+  if (display) {
+    display.textContent = formatGain(gain);
+  }
+}
+
+/**
  * Format gain value for display.
  */
 function formatGain(gain: number): string {
