@@ -44,3 +44,4 @@ Thumbs.db
 *-token
 *.pem
 *.key
+engine/test-assets/*.wav
