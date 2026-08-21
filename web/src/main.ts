@@ -27,6 +27,7 @@ const positionEl = document.getElementById('position')!;
 const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement;
 const tracksContainer = document.getElementById('tracks')!;
+const addTrackBtn = document.getElementById('add-track-btn') as HTMLButtonElement;
 
 /**
  * Initialize the application.
@@ -85,6 +86,30 @@ async function init() {
   });
   stopBtn.addEventListener('click', () => {
     engineClient?.stop();
+  });
+
+  // Add track button
+  addTrackBtn.addEventListener('click', () => {
+    if (!project) return;
+
+    const trackCount = project.getDocument().tracks.length;
+    const newTrack = {
+      id: `track-${Date.now()}`,
+      name: `Track ${trackCount + 1}`,
+      gain: 1.0,
+      clips: [],
+      chain: [],
+    };
+
+    project.addTrack(newTrack);
+
+    // Send change to server
+    const change = project.getLastChange();
+    if (change && serverClient) {
+      serverClient.sendChange(change);
+    }
+
+    renderTracks();
   });
 
   // Start connections
