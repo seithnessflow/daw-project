@@ -154,11 +154,10 @@ Interdit:
 
 ---
 
-## MODE ÉCONOME — régime permanent
+## RÉGIME DE SESSION — économe, fluide, sans temps mort
 
-Tu fonctionnes en régime économe. Principe : tu restes intelligent dans le diagnostic,
-mais tu deviens minimaliste dans tout le reste. Ce mode assume un sacrifice explicite :
-les grosses tâches ne sont plus de ton ressort. Tu les découpes ou tu les refuses.
+Objectif : dépenser les tokens en raisonnement et en code, jamais en friction,
+en attente ni en remplissage. Ces règles priment sur le confort.
 
 ### Machine (Ryzen 9 3950X — 16C/32T, 32 Go RAM, SSD NVMe ~1 To)
 
@@ -174,73 +173,46 @@ les grosses tâches ne sont plus de ton ressort. Tu les découpes ou tu les refu
 - 32 Go de RAM : jamais besoin de fermer la stack pour compiler. Tout
   coexiste (serveur + moteur + vite + build parallèle).
 
-### Interdits de taille (le sacrifice assumé)
+### Démarrage
+- Lis STATUS.md et l'entrée TODO.md de la tâche. Rien d'autre. Pas de scan du projet.
+- Plan en 3 lignes max : hypothèse, actions, critère de succès. Puis agis.
+- Si la session est de l'exécution cadrée (causes connues, plan écrit), dis-le en
+  première ligne : Sonnet suffit pour cette session.
 
-- Aucune tâche > ~30 min de travail estimé. Si on te la demande : découpe-la en
-  sous-tâches de session, propose l'ordre, et fais UNIQUEMENT la première.
-- Aucune implémentation multi-fichiers d'un coup. Un fichier central par session ;
-  les fichiers satellites uniquement si la compilation l'exige.
-- Aucun audit global, aucune revue de projet, aucun « scan pour comprendre ».
-  Ces tâches se font sur demande explicite, dans une session dédiée, annoncée chère.
-- Aucune réécriture. Tu édites l'existant. Si une réécriture semble nécessaire,
-  tu la proposes en 3 lignes et tu t'arrêtes.
+### Périmètre
+- Une tâche par session. Tâche > ~30 min estimées → découpe, propose l'ordre,
+  fais UNIQUEMENT la première partie.
+- Aucun refactor, nettoyage ou amélioration non demandés — une ligne de signalement
+  en fin de session suffit.
+- Escalade au lieu de bricoler : « ESCALADE PROPOSÉE : <raison> » puis stop, pour
+  toute décision d'architecture, dépendance immature, ou incohérence STATUS.md/réel.
+- Thread audio, auth, format du document : jamais d'économie de vérification.
+  Tests de non-régression obligatoires, quel que soit le coût.
 
-### Régime de lecture
+### Exécution — jamais d'attente à vide
+- Toute commande > 30 s part en arrière-plan IMMÉDIATEMENT, et tu enchaînes sur
+  du travail d'édition : écrire le test suivant, préparer le diff, STATUS.md.
+  Récolte du résultat une seule fois, à un point de synchronisation. Pas de sondage.
+- Rien à entrelacer pendant une attente → rends la main : « <tâche> tourne en fond,
+  je peux faire X ou Y pendant ce temps — je continue sur quoi ? »
+- JAMAIS deux exécutions concurrentes sur la même stack (ports, stores, binaires
+  partagés). On entrelace de l'édition pendant une exécution, pas deux exécutions.
+- Compile UNE fois en arrière-plan après tes modifications (cargo test --no-run,
+  build incrémental cmake), puis lance les binaires de test directement. Pas de
+  build implicite caché dans une commande de test au premier plan.
+- Rebuild complet interdit sans justification d'une ligne.
+- Tests ciblés (--gtest_filter, playwright <fichier>, cargo test <nom>). La suite
+  complète : une fois, en fin de session.
+- Une commande = une action. Pas de chaînes kill+cd+test+filtre.
+- Une hypothèse instrumentée par exécution. « Lancer pour voir » est interdit.
+- 3 échecs sur le même problème → STOP : état, hypothèses restantes, attends.
 
-- Au démarrage : STATUS.md seul. Pas CLAUDE.md en entier, pas l'arborescence.
-- Tu n'ouvres un fichier que si la tâche courante l'exige, et tu lis la section
-  utile (view avec plage de lignes), pas le fichier entier.
-- Tu ne relis JAMAIS un fichier déjà lu dans la session. Ta mémoire de session fait foi.
-- Interdiction des recherches larges (grep sur tout le repo) sauf si la tâche est
-  littéralement « trouver où X ». Une recherche ciblée par hypothèse, maximum.
-
-### Régime de réflexion
-
-- Réfléchis à fond UNE fois, au début : hypothèse, plan en 3 lignes, critère de succès.
-  Ensuite exécute sans re-délibérer à chaque étape.
-- Pas de raisonnement exploratoire à rallonge en cours d'exécution. Si le plan
-  s'effondre, tu t'arrêtes et tu rapportes — tu ne repars pas en exploration.
-- Une hypothèse à la fois. Tu n'instrumentes pas trois pistes en parallèle.
-
-### Régime d'exécution
-
-- Builds incrémentaux uniquement. Un rebuild complet exige une justification d'une ligne.
-- Une compilation par hypothèse. « Compiler pour voir » est interdit.
-- Tests ciblés (--gtest_filter, playwright <fichier>, cargo test <nom>).
-  La suite complète : une fois, en toute fin de session, jamais en cours.
-- Réutilise la stack lancée. Tu ne relances pas serveur/moteur/web si déjà vivants.
-- 3 échecs sur le même problème → STOP. État, hypothèses restantes, et tu attends.
-- Toute commande estimée > 60 s part en arrière-plan immédiatement (ctrl+b / &) ;
-  tu continues autre chose ou tu rends la main, tu ne bloques jamais le tour dessus.
-  Une seule vérification du résultat, pas de sondage.
-- cargo/cmake : compile UNE fois en arrière-plan après tes modifications, puis
-  lance les tests sur le binaire compilé. Jamais de build implicite caché dans
-  une commande de test au premier plan.
-- Une commande = une action. Pas de chaînes kill+cd+test+filtre : quand ça
-  échoue, on ne sait pas quoi relancer.
-
-### Régime de sortie
-
-- Sorties de commandes : les lignes utiles seulement (~20 max). Jamais de dump.
+### Sorties
+- Sorties de commandes : les lignes utiles (~20 max), jamais le dump.
 - Diffs, jamais de fichiers recollés. Aucun code déjà affiché n'est réaffiché.
-- Pas de tableaux intermédiaires, pas de résumés d'étape. UN résumé final, ≤ 10 lignes.
-- Pas de préambules (« Je vais maintenant... ») ni de post-ambles explicatifs.
-  Tu agis, puis tu rapportes le résultat.
-
-### Escalade (la soupape)
-
-Certaines choses justifient de sortir du mode économe. Tu ne le fais jamais toi-même :
-tu écris « ESCALADE PROPOSÉE : <raison en 1 ligne> » et tu t'arrêtes. Cas légitimes :
-- bug dont le diagnostic exige une lecture large (type use-after-free transverse)
-- incohérence entre STATUS.md et la réalité constatée
-- correction qui toucherait le thread audio, l'auth, ou le format du document
-Sur ces trois derniers domaines (thread audio, auth, format), le mode économe ne
-réduit JAMAIS la vérification : tests de non-régression obligatoires, quel que soit le coût.
+- Pas de préambules ni de tableaux d'étape. UN résumé final, ≤ 10 lignes,
+  avec le non-fait en une ligne par item, sans excuse.
 
 ### Fin de session
-
-STATUS.md (3 lignes max de delta), commit, push, résumé ≤ 10 lignes.
-Vérifier qu'aucune tâche d'arrière-plan ne survit à la session (processus
-lancés, jobs, suites de tests) — une tâche survivante peut corrompre un
-store ou fausser la session suivante.
-Ce qui n'a pas été fait est listé en une ligne chacun, sans excuse ni développement.
+- Aucune tâche d'arrière-plan ne survit à la session. Vérifie et tue.
+- STATUS.md (delta 3 lignes max), commit, push.
