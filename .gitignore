@@ -7,6 +7,8 @@ node_modules/
 
 # Vendored automerge monorepo checkout (cloned/built locally, see engine/CMakeLists.txt)
 third_party/automerge/
+# Vendored VST3 SDK (pinned clone, see docs/cadrage-2.4.md)
+third_party/vst3sdk/
 
 # IDE
 .vscode/

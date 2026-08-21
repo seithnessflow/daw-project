@@ -17,6 +17,10 @@ memoire partagee, spin borne, crash = bypass).
   PlugProvider) suffit pour la tranche fine. C++, CMake, builds Linux OK
   pour la CI. Vendore comme automerge : `third_party/vst3sdk`, cle sur un
   tag, JAMAIS commite dans le depot.
+  **Pin effectif (2.4a, 2026-08-22) : tag `v3.8.1_build_84`, clone
+  recursif.** VSTGUI est active malgre le cadrage initial : AGain l'exige
+  (son CMakeLists `return()` sans lui) — cout de build one-shot assume ;
+  hosting examples et plugin-link (admin) restent coupes.
 - Solution de repli si le SDK bloque (licence ou integration) : escalade —
   option a documenter alors : CLAP (API C, licence MIT, plugins de gain
   d'exemple maintenus). Ce n'est PAS la cible (le cap est VST3, c'est lui

@@ -70,6 +70,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          Jalon renforce, pas affaibli (ancien test intact et vert).
       4. Elagage docs (session courte) : les 7 ecarts docs/reel de
          AUDIT-2.md — le chantier demarre sur des documents qui disent vrai.
+- [x] 2.4a FAIT 2026-08-22 : SDK vendore (v3.8.1_build_84, recursif,
+      gitignore), protocole moteur<->hote en protobuf des le premier
+      message (host_messages.proto), plugin_host --enumerate liste AGain
+      (uid 84E8DE5F92554F5396FAE4133C935A18) ; module corrompu/absent =
+      erreur propre exit 1, jamais de crash (tests 11-12, 12/12).
+      SIGNALE : la CI ne vendore pas encore le SDK (tests 11-12 compiles
+      out sous Linux, note console explicite).
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
       tout : UN plugin de gain VST3 connu s'instancie dans un processus
       isole, traite de l'audio, et son bypass s'entend. Un plugin, un

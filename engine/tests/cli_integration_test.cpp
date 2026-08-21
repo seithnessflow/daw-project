@@ -626,6 +626,135 @@ bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
 }
 
 // Main
+#ifdef DAW_PLUGIN_HOST_EXE
+#include "host_messages.pb.h"
+
+#ifdef _WIN32
+#define DAW_POPEN _popen
+#define DAW_PCLOSE _pclose
+static const char* kPopenMode = "rb";
+#else
+#define DAW_POPEN popen
+#define DAW_PCLOSE pclose
+static const char* kPopenMode = "r";
+#endif
+
+namespace {
+
+// Run plugin_host --enumerate <path>; returns exit code, fills the parsed
+// response (length-prefixed HostResponse on stdout)
+int runPluginHost(const std::string& module_path, daw::host::HostResponse& resp, bool& parsed) {
+    parsed = false;
+    std::string cmd =
+        std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --enumerate \"" + module_path + "\"";
+#ifdef _WIN32
+    // _popen goes through `cmd /c`, which strips the OUTER quote pair when
+    // the command starts with a quoted path: wrap the whole thing once more
+    cmd = "\"" + cmd + "\"";
+#endif
+    FILE* pipe = DAW_POPEN(cmd.c_str(), kPopenMode);
+    if (!pipe) return -1;
+
+    std::string out;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0) {
+        out.append(buf, n);
+    }
+    const int exit_code = DAW_PCLOSE(pipe);
+
+    if (out.size() >= 4) {
+        const uint32_t len = (static_cast<uint8_t>(out[0]) << 24) |
+                             (static_cast<uint8_t>(out[1]) << 16) |
+                             (static_cast<uint8_t>(out[2]) << 8) |
+                             static_cast<uint8_t>(out[3]);
+        if (out.size() >= 4 + len) {
+            parsed = resp.ParseFromArray(out.data() + 4, static_cast<int>(len));
+        }
+    }
+    return exit_code;
+}
+
+}  // namespace
+
+// Test 11: plugin_host enumerates AGain (2.4a positive path)
+bool testPluginHostEnumeration() {
+    std::cout << "Test: Plugin host enumeration... ";
+
+    daw::host::HostResponse resp;
+    bool parsed = false;
+    const int code = runPluginHost(DAW_AGAIN_VST3, resp, parsed);
+
+    if (code != 0) {
+        std::cout << "FAILED: exit code " << code << "\n";
+        return false;
+    }
+    if (!parsed || !resp.has_enumerate() || !resp.enumerate().ok()) {
+        std::cout << "FAILED: no valid ok-response\n";
+        return false;
+    }
+
+    bool found = false;
+    for (const auto& c : resp.enumerate().classes()) {
+        if (c.name().find("AGain") != std::string::npos &&
+            c.category() == "Audio Module Class" &&
+            c.class_id().size() == 32) {
+            found = true;
+            std::cout << "OK (" << c.name() << " uid=" << c.class_id() << ")\n";
+            break;
+        }
+    }
+    if (!found) {
+        std::cout << "FAILED: AGain audio class not found among "
+                  << resp.enumerate().classes_size() << " classes\n";
+        return false;
+    }
+    return true;
+}
+
+// Test 12: a corrupt module produces a CLEAN error - never a host crash.
+// This is the whole point of process isolation (2.4a negative path).
+bool testPluginHostBadModule() {
+    std::cout << "Test: Plugin host bad module... ";
+
+    // A garbage file wearing a .vst3 extension
+    const fs::path bad = fs::temp_directory_path() / "daw-corrupt-test.vst3";
+    {
+        std::ofstream f(bad, std::ios::binary);
+        f << "this is not a plugin";
+    }
+
+    daw::host::HostResponse resp;
+    bool parsed = false;
+    const int code = runPluginHost(bad.string(), resp, parsed);
+    fs::remove(bad);
+
+    // Clean failure = exit code 1 (a crash would surface as a large/negative
+    // status), with an explanatory error in the response
+    if (code != 1) {
+        std::cout << "FAILED: expected clean exit 1, got " << code << "\n";
+        return false;
+    }
+    if (!parsed || !resp.has_enumerate() || resp.enumerate().ok() ||
+        resp.enumerate().error().empty()) {
+        std::cout << "FAILED: no clean error response\n";
+        return false;
+    }
+
+    // Nonexistent path: same contract
+    daw::host::HostResponse resp2;
+    bool parsed2 = false;
+    const int code2 = runPluginHost("Z:/does/not/exist.vst3", resp2, parsed2);
+    if (code2 != 1 || !parsed2 || resp2.enumerate().ok()) {
+        std::cout << "FAILED: nonexistent path not cleanly rejected (exit " << code2 << ")\n";
+        return false;
+    }
+
+    std::cout << "OK (corrupt + missing modules rejected cleanly)\n";
+    return true;
+}
+#endif  // DAW_PLUGIN_HOST_EXE
+
 // Test 9b: Sacred-thread lock-freedom, verified at RUNTIME on this exact
 // toolchain (the compile-time is_always_lock_free asserts live in
 // audio_callback.h). Guards against the AUDIT-2 R4 family: a type shared
@@ -797,6 +926,12 @@ int main(int argc, char* argv[]) {
     runWithArg(testRenderDeterminism, fixtures_dir);
     run(testAudioThreadLockFreedom);
     run(testWebSocketAuth);
+#ifdef DAW_PLUGIN_HOST_EXE
+    run(testPluginHostEnumeration);
+    run(testPluginHostBadModule);
+#else
+    std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
+#endif
 
     std::cout << "\n=== Results ===\n";
     std::cout << "Passed: " << passed << "\n";

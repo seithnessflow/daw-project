@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package daw.host;
+
+// =============================================================================
+// Engine <-> plugin host (child process) protocol.
+//
+// First exchange of the process boundary (ADR-017): the enumeration
+// response. Protobuf from the very first message - transport is
+// stdin/stdout (length-prefixed, 4-byte big-endian like the browser
+// protocol) until shared memory arrives with audio (2.4c).
+// =============================================================================
+
+// One class exported by a VST3 module factory
+message PluginClassInfo {
+    string name = 1;
+    string category = 2;        // e.g. "Audio Module Class"
+    string class_id = 3;        // 32-hex VST3 class UID
+    string vendor = 4;
+    string version = 5;
+    string sub_categories = 6;  // e.g. "Fx"
+}
+
+// Result of `plugin_host --enumerate <path>`
+message EnumerateResult {
+    bool ok = 1;
+    string error = 2;           // Set when ok == false
+    string module_path = 3;
+    repeated PluginClassInfo classes = 4;
+}
+
+// Wrapper: every host -> engine message (room for 2.4b+)
+message HostResponse {
+    oneof payload {
+        EnumerateResult enumerate = 1;
+    }
+}
