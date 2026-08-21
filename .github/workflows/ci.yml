@@ -34,12 +34,18 @@ jobs:
           rustup toolchain install nightly
           rustup component add rust-src --toolchain nightly
 
-          # Clone automerge monorepo to expected location
-          mkdir -p build/_deps
-          git clone --depth 1 --branch main https://github.com/automerge/automerge.git build/_deps/automerge-src
+          # Clone automerge monorepo, pinned to the ADR-016 commit, into
+          # third_party/ (outside any build tree)
+          mkdir -p third_party/automerge
+          cd third_party/automerge
+          git init -q
+          git remote add origin https://github.com/automerge/automerge.git
+          git fetch --depth 1 origin 47908d6c04a0ce3fea0fa1d6b7f5ce6ba3e5792e
+          git checkout -q FETCH_HEAD
+          cd ../..
 
           # Build automerge-c
-          cd build/_deps/automerge-src/rust/automerge-c
+          cd third_party/automerge/rust/automerge-c
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
 
@@ -128,10 +134,15 @@ jobs:
           rustup toolchain install nightly
           rustup component add rust-src --toolchain nightly
 
-          mkdir -p build/_deps
-          git clone --depth 1 --branch main https://github.com/automerge/automerge.git build/_deps/automerge-src
+          mkdir -p third_party/automerge
+          cd third_party/automerge
+          git init -q
+          git remote add origin https://github.com/automerge/automerge.git
+          git fetch --depth 1 origin 47908d6c04a0ce3fea0fa1d6b7f5ce6ba3e5792e
+          git checkout -q FETCH_HEAD
+          cd ../..
 
-          cd build/_deps/automerge-src/rust/automerge-c
+          cd third_party/automerge/rust/automerge-c
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
 

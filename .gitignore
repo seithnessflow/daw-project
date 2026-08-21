@@ -5,6 +5,9 @@ target/
 dist/
 node_modules/
 
+# Vendored automerge monorepo checkout (cloned/built locally, see engine/CMakeLists.txt)
+third_party/automerge/
+
 # IDE
 .vscode/
 .idea/

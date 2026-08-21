@@ -71,11 +71,16 @@ FetchContent_MakeAvailable(protobuf)
 # Automerge-C (from monorepo, pre-built)
 # =============================================================================
 
-# automerge-c is now part of the automerge monorepo at rust/automerge-c/
-# Linux: build/_deps/automerge-src/rust/automerge-c/build/libautomerge.a
-# Windows: build/_deps/automerge-src/rust/target/x86_64-pc-windows-msvc/release/automerge_core.lib
+# automerge-c is part of the automerge monorepo at rust/automerge-c/
+# The monorepo checkout lives OUTSIDE any build tree (third_party/) so that
+# deleting build directories never breaks the toolchain.
+# Linux: third_party/automerge/rust/automerge-c/build/libautomerge.a
+# Windows: third_party/automerge/rust/target/x86_64-pc-windows-msvc/release/automerge_core.lib
+# Override with -DAUTOMERGE_MONOREPO_DIR=<path> if needed.
 
-set(AUTOMERGE_MONOREPO_DIR "${CMAKE_SOURCE_DIR}/../build/_deps/automerge-src")
+if(NOT DEFINED AUTOMERGE_MONOREPO_DIR)
+    set(AUTOMERGE_MONOREPO_DIR "${CMAKE_SOURCE_DIR}/../third_party/automerge")
+endif()
 set(AUTOMERGE_C_DIR "${AUTOMERGE_MONOREPO_DIR}/rust/automerge-c")
 
 if(WIN32)
