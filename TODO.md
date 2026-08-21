@@ -57,9 +57,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          static_assert compile + test runtime is_lock_free (10/10) ;
          repro use-after-free verte. atomic<shared_ptr>.is_lock_free()=0
          prouve sur MSVC, banni du callback.
-      2. ADR R3 : decision d'isolation par processus, AVANT R1+R2 —
-         elle determine ou vivent les noeuds, donc ce que « transferer
-         l'etat au swap » veut dire.
+      2. [x] ADR R3 FAIT 2026-08-22 : ADR-017 — un processus enfant par
+         instance, proxys dans le graphe, registre d'instances survivant
+         aux rebuilds (=> R2 devient un transfert de handles), spin borne
+         + bypass cote callback, crash enfant = bypass + signalement.
       3. R1+R2 : coalescing des rebuilds (hors thread reseau) + transfert
          d'etat des noeuds au swap, dans le cadre fixe par l'ADR.
       4. Elagage docs (session courte) : les 7 ecarts docs/reel de
