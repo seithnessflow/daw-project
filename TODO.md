@@ -11,7 +11,21 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       Options rapportees : A relais Node officiel (mais 2 syncs cohabitants,
       re-scoper le critere), B durcir le sync maison Rust (persister avant
       de diffuser) et revisiter quand samod murit, C geler et passer a 2.2.
-      Recommandation session : B. DECISION EN ATTENTE.
+      Recommandation session : B. DECISION : B, FAIT 2026-08-21 —
+      persist-avant-broadcast corrige dans websocket.rs, test kill brutal
+      (`cargo test --test persist_before_broadcast`) 5/5.
+      Regle du sync maison : code condamne a terme — on n'y ajoute que ce
+      qui corrige un defaut prouve par un test, jamais de la structure.
+- [ ] 2.1bis VEILLE : reevaluer automerge-repo/samod. Critere de sortie
+      d'experimental : le README de samod retire son avertissement
+      ("don't use anywhere serious"), release taguee, et au moins un
+      projet reel l'utilise en production. Verifier a chaque debut de
+      tranche, pas avant.
+- [ ] 2.1ter Course du store decouverte par le test : deux PREMIERES
+      connexions simultanees sur un projet vide peuvent toutes deux creer
+      le doc par defaut, et la sauvegarde tardive ECRASE un change deja
+      persiste. Session dediee : serialiser la creation (ou verrou par
+      projet) + test propre.
       - La migration inclut la SUPPRESSION de l'ancien code de sync
         (protocole artisanal, anti-entropie, file offline maison si
         automerge-repo la remplace). Deux chemins de sync cohabitants =

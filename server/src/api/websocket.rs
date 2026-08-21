@@ -137,7 +137,16 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
                         Message::Binary(data) => {
                             tracing::info!("Session {}: Received binary message: {} bytes", session_id_recv, data.len());
 
-                            // Apply change and broadcast to other clients
+                            // Persist FIRST: a change may only be broadcast
+                            // once it is durable. Broadcasting before
+                            // persisting used to lose changes on a crash in
+                            // between, while peers had already applied them.
+                            if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
+                                tracing::error!("Session {}: Failed to persist change, NOT broadcasting: {}", session_id_recv, e);
+                                continue;
+                            }
+
+                            // Broadcast to other clients
                             let sync_state = state_clone.sync_state.read().await;
                             if let Some(tx) = sync_state.get_broadcast(&project_id_clone) {
                                 // Broadcast to all clients (including sender for consistency)
@@ -151,11 +160,6 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
                                 tracing::warn!("Session {}: No broadcast channel for project {}", session_id_recv, project_id_clone);
                             }
                             drop(sync_state);
-
-                            // Persist change
-                            if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
-                                tracing::error!("Session {}: Failed to persist change: {}", session_id_recv, e);
-                            }
                         }
                         Message::Close(frame) => {
                             tracing::info!("Session {}: Received Close frame: {:?}", session_id_recv, frame);

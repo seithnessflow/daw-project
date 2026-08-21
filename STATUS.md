@@ -65,13 +65,13 @@ edits distincts + conflit sur la meme piste) est VERT, annotation
 **Dettes residuelles distinctes:**
 - L'outbox est en memoire seulement: un onglet ferme pendant la coupure
   perd sa file. Persistance locale (IndexedDB/localStorage) a faire.
-- Le serveur diffuse un change AVANT de le persister: deux reconnexions
-  simultanees peuvent se rater mutuellement (broadcast manque + store lu
-  avant persistance). Mitige cote client par des cycles d'anti-entropie
-  (reconnexions de verification jusqu'a deux echanges a vide consecutifs),
-  ce qui coute quelques reconnexions apres une coupure. Le vrai correctif
-  est cote serveur (persister avant de diffuser, ou protocole de sync
-  Automerge) - session serveur.
+- ~~Le serveur diffuse un change AVANT de le persister~~ CORRIGE
+  2026-08-21: persist-avant-broadcast dans websocket.rs, garde par
+  `cargo test --test persist_before_broadcast` (kill brutal du process a
+  l'instant ou un pair voit la diffusion). L'anti-entropie cliente reste
+  en place (couvre d'autres pertes de broadcast).
+- NOUVEAU (decouvert par ce test): course a la creation du doc par defaut
+  quand deux premieres connexions arrivent ensemble - voir TODO 2.1ter.
 
 ### Detail critere 5
 
