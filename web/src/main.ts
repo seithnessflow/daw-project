@@ -17,6 +17,14 @@ const PROJECT_ID = 'default';
 
 // State
 let project: Project | null = null;
+
+// Expose for E2E testing diagnostics
+declare global {
+  interface Window {
+    __dawProject: Project | null;
+  }
+}
+window.__dawProject = null;
 let serverClient: ServerClient | null = null;
 let engineClient: EngineClient | null = null;
 
@@ -37,6 +45,7 @@ async function init() {
 
   // Create project document
   project = new Project();
+  window.__dawProject = project; // Expose for E2E diagnostics
 
   // Connect to server
   serverClient = new ServerClient(SERVER_URL);

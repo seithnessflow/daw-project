@@ -99,10 +99,41 @@ npm run dev
 
 ## CI
 
-GitHub Actions (`ci.yml`) build Linux/GCC et verifie:
+GitHub Actions (`ci.yml`) :
+
+**Job build-linux:**
 - Compilation engine/server/web
 - Tests unitaires engine
 - Hash de rendu deterministe
+
+**Job test-e2e:**
+- Tests Playwright (Chromium)
+- Critere 3: convergence CRDT 2 onglets
+- Diagnostics automatiques sur echec (actorId, heads, logs)
+
+## Tests
+
+### Web E2E (Playwright)
+
+```powershell
+cd web
+npm run test:e2e        # Run tests headless
+npm run test:e2e:ui     # Run with UI
+```
+
+Tests automatises:
+- Convergence online (gain sync entre 2 onglets)
+- Sync bidirectionnelle (modifications simultanees)
+- Ajout de piste sync
+
+### Tests manuels requis
+
+| Test | Raison |
+|------|--------|
+| Critere 4 (LNA Chrome) | Invite de permission non scriptable |
+| Ecoute audio reelle | Verification subjective |
+
+**Pour l'audio:** privilegier rendu WAV + comparaison hash plutot que ecoute.
 
 ## Conventions
 
