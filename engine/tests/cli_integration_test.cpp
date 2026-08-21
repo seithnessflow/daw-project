@@ -637,7 +637,21 @@ static const char* kPopenMode = "rb";
 #define DAW_POPEN popen
 #define DAW_PCLOSE pclose
 static const char* kPopenMode = "r";
+#include <sys/wait.h>
 #endif
+
+// PORTABLE EXIT CODE family utility: on POSIX, pclose() returns the raw
+// wait STATUS (exit 1 -> 256), not the exit code. Every Windows-hardwired
+// assumption of this harness goes through a named utility like this one,
+// never through an inline assumption.
+static int normalizeExitCode(int raw) {
+#ifdef _WIN32
+    return raw;
+#else
+    if (WIFEXITED(raw)) return WEXITSTATUS(raw);
+    return raw == 0 ? 0 : -1;  // killed by signal etc.
+#endif
+}
 
 namespace {
 
@@ -659,7 +673,7 @@ int runHostCommand(std::string cmd, daw::host::HostResponse& resp, bool& parsed)
     while ((n = fread(buf, 1, sizeof(buf), pipe)) > 0) {
         out.append(buf, n);
     }
-    const int exit_code = DAW_PCLOSE(pipe);
+    const int exit_code = normalizeExitCode(DAW_PCLOSE(pipe));
 
     if (out.size() >= 4) {
         const uint32_t len = (static_cast<uint8_t>(out[0]) << 24) |
@@ -673,6 +687,8 @@ int runHostCommand(std::string cmd, daw::host::HostResponse& resp, bool& parsed)
     return exit_code;
 }
 
+static std::string fixtureModulePath();
+
 int runPluginHost(const std::string& module_path, daw::host::HostResponse& resp, bool& parsed) {
     return runHostCommand(
         std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --enumerate \"" + module_path + "\"",
@@ -683,12 +699,28 @@ int runPluginHostProcess(const std::string& uid, const std::string& in_wav,
                          const std::string& out_wav, const std::string& param,
                          daw::host::HostResponse& resp, bool& parsed) {
     std::string cmd = std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --process \"" +
-                      DAW_AGAIN_VST3 + "\" --uid " + uid + " --in \"" + in_wav +
+                      fixtureModulePath() + "\" --uid " + uid + " --in \"" + in_wav +
                       "\" --out \"" + out_wav + "\"";
     if (!param.empty()) {
         cmd += " --param " + param;
     }
     return runHostCommand(cmd, resp, parsed);
+}
+
+// PORTABLE FIXTURE PATH family utility: on Windows, $<TARGET_FILE:again>
+// is the single module file named again.vst3; on Linux it is the .so
+// INSIDE the bundle (.../again.vst3/Contents/x86_64-linux/again.so) and
+// the SDK's module loader wants the BUNDLE root. Walk up to it.
+static std::string fixtureModulePath() {
+    // ONE convention on both OSes: the BUNDLE ROOT DIRECTORY (again.vst3/).
+    // $<TARGET_FILE:again> is the module file INSIDE the bundle (which can
+    // itself be named .vst3 on Windows): walk up to the ancestor DIRECTORY
+    // ending in .vst3 - Linux requires it, Windows accepts it.
+    const fs::path p = DAW_AGAIN_VST3;
+    for (fs::path q = p.parent_path(); !q.empty() && q != q.root_path(); q = q.parent_path()) {
+        if (q.extension() == ".vst3" && fs::is_directory(q)) return q.string();
+    }
+    return p.string();
 }
 
 // AGain sample constants (stable per SDK release, verified by test 11)
@@ -704,7 +736,7 @@ bool testPluginHostEnumeration() {
 
     daw::host::HostResponse resp;
     bool parsed = false;
-    const int code = runPluginHost(DAW_AGAIN_VST3, resp, parsed);
+    const int code = runPluginHost(fixtureModulePath(), resp, parsed);
 
     if (code != 0) {
         std::cout << "FAILED: exit code " << code << "\n";

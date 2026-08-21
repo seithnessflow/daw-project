@@ -253,3 +253,7 @@ contre des allers-retours en moins.
 ### Fin de session
 - Aucune tâche d'arrière-plan ne survit à la session. Vérifie et tue.
 - STATUS.md (delta 3 lignes max), commit, push.
+- AUCUNE session ne se clôt sur un push dont la sentinelle CI n'a pas rendu
+  verdict, OU dont le verdict attendu n'est pas explicitement transmis à la
+  session suivante comme PREMIER point de synchronisation. Le rituel exige
+  le verdict, pas la surveillance. (Leçon : 47 runs rouges jamais regardés.)

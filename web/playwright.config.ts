@@ -23,12 +23,9 @@ export default defineConfig({
     },
   ],
 
-  // Web server managed externally for flexibility
-  // Run: npm run dev (terminal 1), cargo run (terminal 2)
-  // Or use webServer config below for CI
-  webServer: process.env.CI ? {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
-  } : undefined,
+  // Servers are managed EXTERNALLY everywhere - locally by the developer
+  // (npm run dev + start-stack.ps1), in CI by explicit workflow steps.
+  // The old CI-only webServer block started `npm run preview` (port 4173)
+  // without any dist/ build in that job: Playwright waited 60s for a
+  // stillborn server and every CI e2e run died there.
 });

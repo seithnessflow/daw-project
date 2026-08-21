@@ -121,6 +121,16 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
 ## Court terme (sessions economes)
 
+- [ ] HYGIENE CI (20 min, entre c-1 et c-2, deux lignes de yaml chacune) :
+      1. `paths-ignore: ['**.md']` — avec en commentaire de commit le piege
+         connu : le jour des branches protegees a checks obligatoires, un
+         push markdown-only ne produira AUCUN run et un check requis absent
+         bloque le merge — la ligne devra evoluer a ce moment-la.
+      2. `actions/cache` sur le BUILD TREE du SDK vst3 (pas seulement les
+         sources), cle = pin du SDK + hash du CMakeLists qui le configure ;
+         le SDK etant epingle, le cache tiendra des mois et chaque session
+         du chantier hote cessera de payer 30-45 min de runner 2 coeurs.
+
 - [ ] Verifier le hash GCC en CI (`89f1a1105dc09e92`) — regarder GitHub Actions
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)
 - [ ] Critere 4 LNA Chrome (manuel, `--allow-origin` pret)
