@@ -57,7 +57,7 @@ jobs:
       - name: Generate test fixture
         run: |
           cd engine
-          ./build/create_test_doc test-assets/test.am
+          ./build/create_test_doc test-assets/test.am test-assets
 
       - name: Verify render determinism
         run: |
