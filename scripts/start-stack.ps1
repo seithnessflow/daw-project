@@ -13,16 +13,28 @@
 .PARAMETER Document
     Document path for file mode (default: fixtures/two-tracks.am)
 
+.PARAMETER Component
+    "all"    - The whole stack (default)
+    "server" - The sync server only. Works with -Stop and start, and stops
+               any running daw-server even if this script did not start it.
+               Used by the criterion-3 offline E2E test to stop/restart the
+               server mid-test.
+
 .EXAMPLE
     .\start-stack.ps1
     .\start-stack.ps1 -Mode file -Document fixtures/two-tracks.am
     .\start-stack.ps1 -Stop
+    .\start-stack.ps1 -Stop -Component server
+    .\start-stack.ps1 -Component server
 #>
 param(
     [ValidateSet("server", "file")]
     [string]$Mode = "server",
 
     [string]$Document = "fixtures\two-tracks.am",
+
+    [ValidateSet("all", "server")]
+    [string]$Component = "all",
 
     [switch]$Stop,
 
@@ -32,7 +44,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$pidFile = Join-Path $env:TEMP "daw-stack-pids.json"
+# GetTempPath works on Windows PowerShell 5.1 and on pwsh/Linux (CI)
+$tempDir = [System.IO.Path]::GetTempPath()
+$pidFile = Join-Path $tempDir "daw-stack-pids.json"
+$isWindowsHost = ($env:OS -eq "Windows_NT")
 
 function Write-Status($msg) {
     Write-Host "[DAW] $msg" -ForegroundColor Cyan
@@ -62,6 +77,97 @@ function Stop-Stack {
     } else {
         Write-Host "No running stack found" -ForegroundColor Yellow
     }
+}
+
+function Get-ServerBinary {
+    # Newest built daw-server binary (debug or release), or $null
+    $candidates = @(
+        (Join-Path $projectRoot "server/target/debug/daw-server.exe"),
+        (Join-Path $projectRoot "server/target/release/daw-server.exe"),
+        (Join-Path $projectRoot "server/target/debug/daw-server"),
+        (Join-Path $projectRoot "server/target/release/daw-server")
+    ) | Where-Object { Test-Path $_ }
+    if (-not $candidates) { return $null }
+    return ($candidates | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1)
+}
+
+function Remove-ServerPid {
+    if (-not (Test-Path $pidFile)) { return }
+    try {
+        $pids = Get-Content $pidFile | ConvertFrom-Json
+        $kept = @{}
+        foreach ($prop in $pids.PSObject.Properties) {
+            if ($prop.Name -ne "server") { $kept[$prop.Name] = $prop.Value }
+        }
+        $kept | ConvertTo-Json | Set-Content $pidFile
+    } catch {}
+}
+
+function Stop-Server {
+    # Stops ANY running daw-server (by process name), including one this
+    # script did not start (dev server, CI-started server)
+    $procs = Get-Process -Name "daw-server" -ErrorAction SilentlyContinue
+    if ($procs) {
+        foreach ($p in $procs) {
+            Write-Status "Stopping server (PID $($p.Id))"
+            Stop-Process -Id $p.Id -Force
+        }
+    } else {
+        Write-Host "No running server found" -ForegroundColor Yellow
+    }
+    Remove-ServerPid
+}
+
+function Start-Server {
+    Write-Status "Starting server..."
+    # WorkingDirectory is ALWAYS server/: the file store is relative to the
+    # CWD (./projects), so a stop/restart cycle must reuse the same one.
+    $serverDir = Join-Path $projectRoot "server"
+
+    $startArgs = @{
+        PassThru               = $true
+        WorkingDirectory       = $serverDir
+        RedirectStandardOutput = (Join-Path $tempDir "daw-server.log")
+        RedirectStandardError  = (Join-Path $tempDir "daw-server-err.log")
+    }
+    if ($isWindowsHost) { $startArgs.WindowStyle = "Hidden" }
+
+    $bin = Get-ServerBinary
+    if ($bin) {
+        $proc = Start-Process -FilePath $bin @startArgs
+    } else {
+        $proc = Start-Process -FilePath "cargo" -ArgumentList "run" @startArgs
+    }
+
+    # Record the PID (merge into the existing pid file if any)
+    $pids = @{}
+    if (Test-Path $pidFile) {
+        try {
+            $existing = Get-Content $pidFile | ConvertFrom-Json
+            foreach ($prop in $existing.PSObject.Properties) { $pids[$prop.Name] = $prop.Value }
+        } catch {}
+    }
+    $pids.server = $proc.Id
+    $pids | ConvertTo-Json | Set-Content $pidFile
+
+    # Condition-based readiness: wait until port 3000 accepts connections
+    $deadline = (Get-Date).AddSeconds(20)
+    $ready = $false
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $client = New-Object System.Net.Sockets.TcpClient
+            $client.Connect("127.0.0.1", 3000)
+            $client.Close()
+            $ready = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds 200
+        }
+    }
+    if (-not $ready) {
+        Write-Error "Server did not accept connections on 127.0.0.1:3000 within 20s"
+    }
+    Write-Status "Server ready on 127.0.0.1:3000 (PID $($proc.Id))"
 }
 
 function Start-Stack {
@@ -161,7 +267,15 @@ function Start-Stack {
 
 # Main
 if ($Stop) {
-    Stop-Stack
+    if ($Component -eq "server") {
+        Stop-Server
+    } else {
+        Stop-Stack
+    }
 } else {
-    Start-Stack
+    if ($Component -eq "server") {
+        Start-Server
+    } else {
+        Start-Stack
+    }
 }
