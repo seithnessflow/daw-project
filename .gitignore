@@ -45,3 +45,5 @@ Thumbs.db
 *.pem
 *.key
 engine/test-assets/*.wav
+fixtures/*.wav
+*.wav
