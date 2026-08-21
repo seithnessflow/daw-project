@@ -151,3 +151,71 @@ Interdit:
 - Pas d'accents dans code/commits (clavier QWERTY)
 - Commits: emoji robot + Co-Authored-By Claude
 - ADR pour decisions architecturales
+
+---
+
+## MODE ÉCONOME — régime permanent
+
+Tu fonctionnes en régime économe. Principe : tu restes intelligent dans le diagnostic,
+mais tu deviens minimaliste dans tout le reste. Ce mode assume un sacrifice explicite :
+les grosses tâches ne sont plus de ton ressort. Tu les découpes ou tu les refuses.
+
+### Interdits de taille (le sacrifice assumé)
+
+- Aucune tâche > ~30 min de travail estimé. Si on te la demande : découpe-la en
+  sous-tâches de session, propose l'ordre, et fais UNIQUEMENT la première.
+- Aucune implémentation multi-fichiers d'un coup. Un fichier central par session ;
+  les fichiers satellites uniquement si la compilation l'exige.
+- Aucun audit global, aucune revue de projet, aucun « scan pour comprendre ».
+  Ces tâches se font sur demande explicite, dans une session dédiée, annoncée chère.
+- Aucune réécriture. Tu édites l'existant. Si une réécriture semble nécessaire,
+  tu la proposes en 3 lignes et tu t'arrêtes.
+
+### Régime de lecture
+
+- Au démarrage : STATUS.md seul. Pas CLAUDE.md en entier, pas l'arborescence.
+- Tu n'ouvres un fichier que si la tâche courante l'exige, et tu lis la section
+  utile (view avec plage de lignes), pas le fichier entier.
+- Tu ne relis JAMAIS un fichier déjà lu dans la session. Ta mémoire de session fait foi.
+- Interdiction des recherches larges (grep sur tout le repo) sauf si la tâche est
+  littéralement « trouver où X ». Une recherche ciblée par hypothèse, maximum.
+
+### Régime de réflexion
+
+- Réfléchis à fond UNE fois, au début : hypothèse, plan en 3 lignes, critère de succès.
+  Ensuite exécute sans re-délibérer à chaque étape.
+- Pas de raisonnement exploratoire à rallonge en cours d'exécution. Si le plan
+  s'effondre, tu t'arrêtes et tu rapportes — tu ne repars pas en exploration.
+- Une hypothèse à la fois. Tu n'instrumentes pas trois pistes en parallèle.
+
+### Régime d'exécution
+
+- Builds incrémentaux uniquement. Un rebuild complet exige une justification d'une ligne.
+- Une compilation par hypothèse. « Compiler pour voir » est interdit.
+- Tests ciblés (--gtest_filter, playwright <fichier>, cargo test <nom>).
+  La suite complète : une fois, en toute fin de session, jamais en cours.
+- Réutilise la stack lancée. Tu ne relances pas serveur/moteur/web si déjà vivants.
+- 3 échecs sur le même problème → STOP. État, hypothèses restantes, et tu attends.
+
+### Régime de sortie
+
+- Sorties de commandes : les lignes utiles seulement (~20 max). Jamais de dump.
+- Diffs, jamais de fichiers recollés. Aucun code déjà affiché n'est réaffiché.
+- Pas de tableaux intermédiaires, pas de résumés d'étape. UN résumé final, ≤ 10 lignes.
+- Pas de préambules (« Je vais maintenant... ») ni de post-ambles explicatifs.
+  Tu agis, puis tu rapportes le résultat.
+
+### Escalade (la soupape)
+
+Certaines choses justifient de sortir du mode économe. Tu ne le fais jamais toi-même :
+tu écris « ESCALADE PROPOSÉE : <raison en 1 ligne> » et tu t'arrêtes. Cas légitimes :
+- bug dont le diagnostic exige une lecture large (type use-after-free transverse)
+- incohérence entre STATUS.md et la réalité constatée
+- correction qui toucherait le thread audio, l'auth, ou le format du document
+Sur ces trois derniers domaines (thread audio, auth, format), le mode économe ne
+réduit JAMAIS la vérification : tests de non-régression obligatoires, quel que soit le coût.
+
+### Fin de session
+
+STATUS.md (3 lignes max de delta), commit, push, résumé ≤ 10 lignes.
+Ce qui n'a pas été fait est listé en une ligne chacun, sans excuse ni développement.
