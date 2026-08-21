@@ -30,9 +30,19 @@ message EnumerateResult {
     repeated PluginClassInfo classes = 4;
 }
 
-// Wrapper: every host -> engine message (room for 2.4b+)
+// Result of `plugin_host --process ...` (2.4b: offline WAV through a
+// plugin instance, fixed 256-sample blocks, params via IParameterChanges)
+message ProcessResult {
+    bool ok = 1;
+    string error = 2;           // Set when ok == false (which setup step refused)
+    uint64 frames_processed = 3;
+    uint32 blocks = 4;          // Number of process() calls (max 256 frames each)
+}
+
+// Wrapper: every host -> engine message
 message HostResponse {
     oneof payload {
         EnumerateResult enumerate = 1;
+        ProcessResult process = 2;
     }
 }

@@ -75,8 +75,12 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       message (host_messages.proto), plugin_host --enumerate liste AGain
       (uid 84E8DE5F92554F5396FAE4133C935A18) ; module corrompu/absent =
       erreur propre exit 1, jamais de crash (tests 11-12, 12/12).
-      SIGNALE : la CI ne vendore pas encore le SDK (tests 11-12 compiles
-      out sous Linux, note console explicite).
+- [x] 2.4b FAIT 2026-08-22 : AGain instancie (ceremonie complete, chaque
+      refus = erreur propre), gain via IParameterChanges (le canal de
+      2.4c), bloc 256 contractuel (blocks==frames/256 asserte), preuve
+      par echantillons EXACTE (identite a 1.0, moitie a 0.5). 14/14.
+      CI : les deux jobs vendorent le SDK epingle + deps VSTGUI Linux —
+      plus de code hote hors du filet (verif du run CI post-push).
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
       tout : UN plugin de gain VST3 connu s'instancie dans un processus
       isole, traite de l'audio, et son bypass s'entend. Un plugin, un

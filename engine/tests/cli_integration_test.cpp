@@ -641,12 +641,10 @@ static const char* kPopenMode = "r";
 
 namespace {
 
-// Run plugin_host --enumerate <path>; returns exit code, fills the parsed
+// Run a plugin_host command line; returns exit code, fills the parsed
 // response (length-prefixed HostResponse on stdout)
-int runPluginHost(const std::string& module_path, daw::host::HostResponse& resp, bool& parsed) {
+int runHostCommand(std::string cmd, daw::host::HostResponse& resp, bool& parsed) {
     parsed = false;
-    std::string cmd =
-        std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --enumerate \"" + module_path + "\"";
 #ifdef _WIN32
     // _popen goes through `cmd /c`, which strips the OUTER quote pair when
     // the command starts with a quoted path: wrap the whole thing once more
@@ -674,6 +672,29 @@ int runPluginHost(const std::string& module_path, daw::host::HostResponse& resp,
     }
     return exit_code;
 }
+
+int runPluginHost(const std::string& module_path, daw::host::HostResponse& resp, bool& parsed) {
+    return runHostCommand(
+        std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --enumerate \"" + module_path + "\"",
+        resp, parsed);
+}
+
+int runPluginHostProcess(const std::string& uid, const std::string& in_wav,
+                         const std::string& out_wav, const std::string& param,
+                         daw::host::HostResponse& resp, bool& parsed) {
+    std::string cmd = std::string("\"") + DAW_PLUGIN_HOST_EXE + "\" --process \"" +
+                      DAW_AGAIN_VST3 + "\" --uid " + uid + " --in \"" + in_wav +
+                      "\" --out \"" + out_wav + "\"";
+    if (!param.empty()) {
+        cmd += " --param " + param;
+    }
+    return runHostCommand(cmd, resp, parsed);
+}
+
+// AGain sample constants (stable per SDK release, verified by test 11)
+constexpr const char* kAGainAudioUid = "84E8DE5F92554F5396FAE4133C935A18";
+constexpr const char* kAGainControllerUid = "D39D5B65D7AF42FA843F4AC841EB04F0";
+constexpr int kAGainGainParamId = 0;  // kGainId in the AGain sample
 
 }  // namespace
 
@@ -751,6 +772,138 @@ bool testPluginHostBadModule() {
     }
 
     std::cout << "OK (corrupt + missing modules rejected cleanly)\n";
+    return true;
+}
+// Test 13: AGain processes a WAV; output samples scale with the gain
+// parameter, delivered through IParameterChanges - the same channel the
+// document's chain will drive in 2.4c. Fixed 256-frame blocks are a formal
+// contract (blocks count asserted). The WAV scale is symmetric (1/32768
+// both ways), so gain 1.0 is a bit-exact identity and 0.5 is exact too.
+bool testPluginHostProcessGain() {
+    std::cout << "Test: Plugin host gain processing... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-host-process-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Deterministic stereo input: 4096 frames, +/-16000 sawtooth, R = -L
+    std::vector<int16_t> in(4096 * 2);
+    for (size_t i = 0; i < 4096; ++i) {
+        const int16_t v = static_cast<int16_t>(((i * 37) % 32000) - 16000);
+        in[i * 2] = v;
+        in[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    const std::string in_path = (dir / "in.wav").string();
+    if (!writeWav16(in_path, 2, 48000, in)) {
+        std::cout << "FAILED: cannot write input\n";
+        return false;
+    }
+
+    auto runCase = [&](const char* out_name, double gain,
+                       daw::host::HostResponse& resp) -> bool {
+        bool parsed = false;
+        const std::string param = std::to_string(kAGainGainParamId) + ":" +
+                                  (gain == 1.0 ? std::string("1.0") : std::string("0.5"));
+        const int code = runPluginHostProcess(kAGainAudioUid, in_path,
+                                              (dir / out_name).string(), param,
+                                              resp, parsed);
+        return code == 0 && parsed && resp.has_process() && resp.process().ok();
+    };
+
+    daw::host::HostResponse r1, r05;
+    if (!runCase("out1.wav", 1.0, r1)) {
+        std::cout << "FAILED: gain=1.0 run failed ("
+                  << (r1.has_process() ? r1.process().error() : "no response") << ")\n";
+        return false;
+    }
+    if (!runCase("out05.wav", 0.5, r05)) {
+        std::cout << "FAILED: gain=0.5 run failed\n";
+        return false;
+    }
+
+    // The block contract: 4096 frames / 256 = exactly 16 process() calls
+    if (r1.process().blocks() != 16 || r1.process().frames_processed() != 4096) {
+        std::cout << "FAILED: block contract broken (blocks="
+                  << r1.process().blocks() << ")\n";
+        return false;
+    }
+
+    const auto in_f = readWavSamples(in_path);
+    const auto out1 = readWavSamples((dir / "out1.wav").string());
+    const auto out05 = readWavSamples((dir / "out05.wav").string());
+    if (out1.size() != in_f.size() || out05.size() != in_f.size() || in_f.empty()) {
+        std::cout << "FAILED: size mismatch\n";
+        return false;
+    }
+
+    // Steady-state comparison from frame 256 (sample 512): if AGain ever
+    // ramps the gain, it may only affect the first block. (Current AGain
+    // applies the block's last point directly - no ramp observed.)
+    for (size_t i = 512; i < in_f.size(); ++i) {
+        if (out1[i] != in_f[i]) {
+            std::cout << "FAILED: gain=1.0 not identity at sample " << i
+                      << " (" << out1[i] << " vs " << in_f[i] << ")\n";
+            return false;
+        }
+        const float expected =
+            static_cast<float>(static_cast<int16_t>(in_f[i] * 0.5f * 32768.0f)) / 32768.0f;
+        if (out05[i] != expected) {
+            std::cout << "FAILED: gain=0.5 mismatch at sample " << i
+                      << " (" << out05[i] << " vs " << expected << ")\n";
+            return false;
+        }
+    }
+
+    // And the input was not silence
+    float peak = 0.0f;
+    for (const float s : in_f) peak = (std::max)(peak, std::fabs(s));
+    if (peak < 0.4f) {
+        std::cout << "FAILED: input fixture near-silent\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (identity at 1.0, exact halving at 0.5, 16 blocks)\n";
+    return true;
+}
+
+// Test 14: the ceremony refuses cleanly. A controller class is not an
+// audio component; an unknown uid is not instantiable - both must produce
+// a clean error response and exit 1, never a crash.
+bool testPluginHostSetupRefusal() {
+    std::cout << "Test: Plugin host setup refusal... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-host-refusal-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    std::vector<int16_t> in(512 * 2, 1000);
+    const std::string in_path = (dir / "in.wav").string();
+    writeWav16(in_path, 2, 48000, in);
+
+    daw::host::HostResponse resp;
+    bool parsed = false;
+    int code = runPluginHostProcess(kAGainControllerUid, in_path,
+                                    (dir / "out.wav").string(), "0:1.0", resp, parsed);
+    if (code != 1 || !parsed || !resp.has_process() || resp.process().ok() ||
+        resp.process().error().empty()) {
+        std::cout << "FAILED: controller class not cleanly refused (exit " << code << ")\n";
+        return false;
+    }
+
+    daw::host::HostResponse resp2;
+    bool parsed2 = false;
+    code = runPluginHostProcess("00000000000000000000000000000000", in_path,
+                                (dir / "out.wav").string(), "0:1.0", resp2, parsed2);
+    if (code != 1 || !parsed2 || resp2.process().ok()) {
+        std::cout << "FAILED: unknown uid not cleanly refused (exit " << code << ")\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (controller class + unknown uid refused cleanly)\n";
     return true;
 }
 #endif  // DAW_PLUGIN_HOST_EXE
@@ -929,6 +1082,8 @@ int main(int argc, char* argv[]) {
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);
+    run(testPluginHostProcessGain);
+    run(testPluginHostSetupRefusal);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
 #endif

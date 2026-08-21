@@ -19,7 +19,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev xxhash
+          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev xxhash \
+            libx11-dev libx11-xcb-dev libxcb-util-dev libxcb-cursor-dev \
+            libxcb-keysyms1-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libcairo2-dev libfreetype6-dev libexpat1-dev \
+            libgtkmm-3.0-dev libsqlite3-dev
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -49,6 +53,11 @@ jobs:
           cd third_party/automerge/rust/automerge-c
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
+
+      - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
+        run: |
+          git clone --recursive --depth 1 --branch v3.8.1_build_84 \
+            https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
 
       - name: Build engine
         run: |
@@ -120,7 +129,11 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev
+          sudo apt-get install -y cmake ninja-build protobuf-compiler libprotobuf-dev \
+            libx11-dev libx11-xcb-dev libxcb-util-dev libxcb-cursor-dev \
+            libxcb-keysyms1-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libcairo2-dev libfreetype6-dev libexpat1-dev \
+            libgtkmm-3.0-dev libsqlite3-dev
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -146,6 +159,11 @@ jobs:
           cd third_party/automerge/rust/automerge-c
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
+
+      - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
+        run: |
+          git clone --recursive --depth 1 --branch v3.8.1_build_84 \
+            https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
 
       - name: Build engine
         # The fader-to-engine E2E tests spawn the engine and its fixture
