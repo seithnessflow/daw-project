@@ -225,6 +225,25 @@ par-dessus un morceau identifié comme mal conçu.
 - Une hypothèse instrumentée par exécution. « Lancer pour voir » est interdit.
 - 3 échecs sur le même problème → STOP : état, hypothèses restantes, attends.
 
+### Modification = vérifier le rayon de couplage
+
+Corriger à la volée ce que la modification touche, pour ne pas y revenir
+en session N+2. Coût assumé : quelques vérifications de plus par session
+contre des allers-retours en moins.
+
+- Avant le commit, vérifie les trois couplages du code modifié :
+  1. APPELANTS — qui consomme ce que je viens de changer (une recherche ciblée) ;
+  2. JUMEAUX — le même comportement implémenté ailleurs (buildGraph×2, protos
+     dupliqués, helpers de test copiés : c'est là que naissent les régressions
+     à retardement) — si un jumeau existe, corrige les deux OU signale-le en
+     candidat refonte (grille, sortie 2) ;
+  3. CONTRAT — schéma, protocole, constante partagée entre étages : si le
+     contrat bouge, chaque étage consommateur se vérifie dans la MÊME session.
+- Zones sensibles (thread audio, auth, format, sync) : relis l'invariant écrit
+  en tête du fichier avant de toucher, pas le fichier entier.
+- Le commit n'est posé qu'une fois le point modifié ET ses consommateurs
+  directs couverts par un test qui tourne.
+
 ### Sorties
 - Sorties de commandes : les lignes utiles (~20 max), jamais le dump.
 - Diffs, jamais de fichiers recollés. Aucun code déjà affiché n'est réaffiché.
