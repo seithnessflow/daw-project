@@ -36,7 +36,7 @@ Rien de temps reel ne traverse le serveur distant.
 
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
-| 1 | Rendu deterministe | ✅ VALIDE | Hash `f40af882097b704a` identique GCC/MSVC |
+| 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
 | 3 | Convergence 2 onglets | ⚠️ PARTIEL | Online OK (Playwright), offline non teste |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |

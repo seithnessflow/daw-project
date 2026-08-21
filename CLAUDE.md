@@ -83,7 +83,7 @@ npm run dev
 
 | # | Critere | Statut |
 |---|---------|--------|
-| 1 | Rendu deterministe | Hash `f40af882097b704a` |
+| 1 | Rendu deterministe | Hash `89f1a1105dc09e92` |
 | 2 | Tests CLI | 8/8 |
 | 3 | Convergence 2 onglets | En attente de test |
 | 4 | LNA Chrome | Non teste |

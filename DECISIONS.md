@@ -1,13 +1,39 @@
 # Decisions and Test Results
 
+## Critere 1: nouveau hash de reference - 2026-08-21
+
+**L'ancien hash `f40af882097b704a` etait un hash de SILENCE. Ne plus s'y referer.**
+
+Le fixture de `testRenderDeterminism` etait un document sans clip: le rendu
+etait 1 seconde de silence, et l'egalite GCC/MSVC ne prouvait rien du chemin
+audio. (Ce meme fixture silencieux a masque pendant des semaines un bug du
+renderer hors-ligne qui rendait du silence pour tout document reel - corrige
+le 2026-08-21, commit `4cb1491`.)
+
+Nouveau fixture (genere par le test, deterministe inter-compilateurs car sans
+`sin()` de libm): deux pistes a gains differents (0.8 / 0.3), onde carree
+stereo + dent-de-scie mono, clips chevauchants, un offset non nul. Le test
+verifie que le rendu n'est PAS silencieux (peaks > 0.05) puis compare au
+hash de reference.
+
+```
+Hash de reference: 89f1a1105dc09e92
+```
+
+- MSVC (Windows natif): `89f1a1105dc09e92` (verifie 2026-08-21)
+- GCC (CI Linux): a confirmer au premier run CI apres le commit
+
+Toute deviation fait echouer `daw_engine_test` (CI comprise). Mise a jour du
+hash uniquement pour un changement de rendu delibere et documente ici.
+
 ## Build Natif Windows - 2026-08-20
 
 ### Critère 1: Hash Identique
-**REUSSI**
+**REUSSI** *(hash invalide depuis 2026-08-21: c'etait un hash de silence, voir ci-dessus)*
 
 Le build MSVC produit le même hash de rendu que le build GCC:
 ```
-Hash: f40af882097b704a
+Hash: f40af882097b704a   (OBSOLETE - rendu silencieux)
 ```
 
 Vérification:
@@ -15,9 +41,8 @@ Vérification:
 - MSVC (Windows): `f40af882097b704a`
 
 Cela confirme:
-- Pas de comportement indéfini (mémoire non initialisée)
-- Calculs flottants cohérents entre compilateurs
 - Sérialisation Automerge déterministe
+- (La coherence des calculs flottants n'etait PAS prouvee: le rendu etait silencieux)
 
 ### Critère 5: WASAPI Temps Réel
 **PARTIELLEMENT VÉRIFIÉ**

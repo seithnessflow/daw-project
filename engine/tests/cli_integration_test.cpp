@@ -442,36 +442,146 @@ bool testDocumentClipsRoundTrip() {
 }
 
 // Test 8: Offline render determinism
-bool testRenderDeterminism(const std::string& fixtures_dir) {
+// Write a 16-bit PCM WAV file from interleaved samples
+bool writeWav16(const std::string& path,
+                uint16_t channels,
+                uint32_t sample_rate,
+                const std::vector<int16_t>& samples) {
+    std::ofstream file(path, std::ios::binary);
+    if (!file) return false;
+
+    const uint32_t data_size = static_cast<uint32_t>(samples.size() * 2);
+    const uint16_t block_align = channels * 2;
+    const uint32_t byte_rate = sample_rate * block_align;
+    const uint32_t chunk_size = 36 + data_size;
+    const uint32_t fmt_size = 16;
+    const uint16_t pcm = 1;
+    const uint16_t bits = 16;
+
+    file.write("RIFF", 4);
+    file.write(reinterpret_cast<const char*>(&chunk_size), 4);
+    file.write("WAVE", 4);
+    file.write("fmt ", 4);
+    file.write(reinterpret_cast<const char*>(&fmt_size), 4);
+    file.write(reinterpret_cast<const char*>(&pcm), 2);
+    file.write(reinterpret_cast<const char*>(&channels), 2);
+    file.write(reinterpret_cast<const char*>(&sample_rate), 4);
+    file.write(reinterpret_cast<const char*>(&byte_rate), 4);
+    file.write(reinterpret_cast<const char*>(&block_align), 2);
+    file.write(reinterpret_cast<const char*>(&bits), 2);
+    file.write("data", 4);
+    file.write(reinterpret_cast<const char*>(&data_size), 4);
+    file.write(reinterpret_cast<const char*>(samples.data()),
+               static_cast<std::streamsize>(data_size));
+    return file.good();
+}
+
+// Write a WAV asset and expose it under the <hash>.wav name the engine
+// resolves. Returns the hash ("" on failure).
+std::string writeHashedAsset(const fs::path& dir,
+                             uint16_t channels,
+                             const std::vector<int16_t>& samples) {
+    const fs::path tmp = dir / "asset.tmp.wav";
+    if (!writeWav16(tmp.string(), channels, 48000, samples)) return "";
+    const std::string hash = computeFileHash(tmp.string());
+    if (hash.empty()) return "";
+    std::error_code ec;
+    fs::rename(tmp, dir / (hash + ".wav"), ec);
+    if (ec) return "";
+    return hash;
+}
+
+bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
     std::cout << "Test: Render determinism... ";
 
-    // Create a simple document for testing
+    // Self-contained fixture with REAL audio content. The waveforms use
+    // exact integer arithmetic only (no libm sin(): its last-ulp results
+    // differ between toolchains and would break the MSVC/GCC hash match).
+    const fs::path dir = fs::temp_directory_path() / "daw-determinism-fixture";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Asset A: stereo square wave, period 96 samples (500 Hz), 24000 frames.
+    // Right channel inverted so the channels are distinguishable.
+    std::vector<int16_t> square(24000 * 2);
+    for (size_t i = 0; i < 24000; ++i) {
+        const int16_t v = (i % 96 < 48) ? int16_t{8192} : int16_t{-8192};
+        square[i * 2] = v;
+        square[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+
+    // Asset B: mono sawtooth, period 150 samples (320 Hz), 30000 frames.
+    // Mono exercises the mono-to-stereo path.
+    std::vector<int16_t> saw(30000);
+    for (size_t i = 0; i < 30000; ++i) {
+        saw[i] = static_cast<int16_t>(-16350 + static_cast<int>(i % 150) * 218);
+    }
+
+    const std::string hashA = writeHashedAsset(dir, 2, square);
+    const std::string hashB = writeHashedAsset(dir, 1, saw);
+    if (hashA.empty() || hashB.empty()) {
+        std::cout << "FAILED: Could not write fixture assets\n";
+        return false;
+    }
+
+    // Two tracks, different gains, overlapping clips, one nonzero offset:
+    // exercises clip playback, offsets, mixing and per-track gain.
     daw::document::AutomergeDocument doc;
     if (!doc.create(48000)) {
         std::cout << "FAILED: Document creation failed\n";
         return false;
     }
 
-    // Add a track
-    daw::document::TrackDef track;
-    track.id = "track-1";
-    track.name = "Test Track";
-    track.gain = 1.0f;
-    doc.addTrack(track);
+    daw::document::TrackDef track1;
+    track1.id = "track-1";
+    track1.name = "Square";
+    track1.gain = 0.8f;
+    daw::document::ClipDef clip1;
+    clip1.id = "clip-1";
+    clip1.asset_hash = hashA;
+    clip1.start_sample = 0;
+    clip1.length_samples = 24000;
+    clip1.offset_samples = 0;
+    track1.clips.push_back(clip1);
+    doc.addTrack(track1);
+
+    daw::document::TrackDef track2;
+    track2.id = "track-2";
+    track2.name = "Saw";
+    track2.gain = 0.3f;
+    daw::document::ClipDef clip2;
+    clip2.id = "clip-2";
+    clip2.asset_hash = hashB;
+    clip2.start_sample = 12000;
+    clip2.length_samples = 24000;
+    clip2.offset_samples = 2000;
+    track2.clips.push_back(clip2);
+    doc.addTrack(track2);
 
     daw::render::RenderConfig config;
     config.sample_rate = 48000;
     config.bit_depth = 16;
-    config.end_sample = 48000;  // 1 second
+    config.end_sample = -1;  // Project length: 36000 samples
 
     daw::render::OfflineRenderer renderer;
 
     // Render twice
-    std::string out1 = "/tmp/daw_test_render_1.wav";
-    std::string out2 = "/tmp/daw_test_render_2.wav";
+    std::string out1 = (dir / "render_1.wav").string();
+    std::string out2 = (dir / "render_2.wav").string();
 
-    auto result1 = renderer.render(doc, out1, fixtures_dir, config);
-    auto result2 = renderer.render(doc, out2, fixtures_dir, config);
+    auto result1 = renderer.render(doc, out1, dir.string(), config);
+    auto result2 = renderer.render(doc, out2, dir.string(), config);
+
+    // The fixture must actually produce audio: a silent render would prove
+    // nothing about the audio path (the pre-2026-08-21 reference hash was
+    // exactly that - a hash of silence; see DECISIONS.md).
+    if (result1.success &&
+        (result1.peak_left <= 0.05 || result1.peak_right <= 0.05)) {
+        std::cout << "FAILED: Fixture rendered (near-)silence, peaks L="
+                  << result1.peak_left << " R=" << result1.peak_right << "\n";
+        return false;
+    }
 
     if (!result1.success || !result2.success) {
         std::cout << "FAILED: Render failed: " << result1.error << " / " << result2.error << "\n";
@@ -499,7 +609,10 @@ bool testRenderDeterminism(const std::string& fixtures_dir) {
     // Criterion 1 reference hash (STATUS.md / DECISIONS.md). A deviation is
     // a rendering regression and must FAIL, in CI included. Update this
     // constant only for a deliberate, documented rendering change.
-    const std::string expected_hash = "f40af882097b704a";
+    // 2026-08-21: reference recomputed on a REAL fixture (two tracks, square
+    // + sawtooth, gains 0.8/0.3). The previous value f40af882097b704a was a
+    // hash of silence (clipless document) and proved nothing.
+    const std::string expected_hash = "89f1a1105dc09e92";
     if (hash1 != expected_hash) {
         std::cout << "FAILED: Hash deviates from reference\n";
         std::cout << "  Got:      " << hash1 << "\n";

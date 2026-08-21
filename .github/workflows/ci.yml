@@ -7,7 +7,8 @@ on:
     branches: [master, main]
 
 env:
-  EXPECTED_HASH: f40af882097b704a
+  # Criterion 1 reference (asserted inside daw_engine_test; see DECISIONS.md)
+  EXPECTED_HASH: 89f1a1105dc09e92
 
 jobs:
   build-linux:
