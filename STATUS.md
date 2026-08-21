@@ -25,10 +25,10 @@ Rien de temps reel ne traverse le serveur distant.
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 8/8 |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 10/10 |
 | Engine C++ (GCC/CI) | ✅ | ✅ | GitHub Actions, hash verifie |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
-| Web TypeScript | ✅ | ⏳ | Automerge reel, test critere 3 requis |
+| Web TypeScript | ✅ | ✅ | Automerge reel, critere 3 valide |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
@@ -47,7 +47,7 @@ callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
-| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
+| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 10/10 |
 | 3 | Convergence 2 onglets | ✅ VALIDE | Online ET offline (Playwright, coupure reelle du serveur). Voir detail pour les dettes residuelles |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
@@ -225,8 +225,7 @@ Observations a noter:
 
 ## Problemes ouverts
 
-1. **Web incompatible avec moteur (hors critere 3)**
-   - `engine_client.ts` envoie JSON, moteur attend Protobuf
-   - Pas de gestion du token d'authentification
-   - Port code en dur: 9000, moteur utilise 47821
-   - **Note:** N'affecte pas critere 3 (server sync seulement)
+1. ~~**Web incompatible avec moteur (hors critere 3)**~~ CORRIGE : `engine_client.ts`
+   utilise Protobuf (pas JSON), gere le token d'authentification (premier message
+   binaire), et utilise le port 47821 (pas 9000 en dur). Voir
+   `engine_client.ts:24,47,86-91`.
