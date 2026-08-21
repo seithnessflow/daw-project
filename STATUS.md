@@ -157,8 +157,8 @@ Observations a noter:
 cd C:\Users\mb668\daw-project\engine\test-page
 python -m http.server 8080
 
-# Terminal 2: Tunnel cloudflared (depuis WSL)
-~/.local/bin/cloudflared tunnel --url http://localhost:8080
+# Terminal 2: Tunnel cloudflared (natif Windows: winget install Cloudflare.cloudflared)
+cloudflared.exe tunnel --url http://localhost:8080
 
 # Terminal 3: Moteur (deja lance pour critere 5, ou relancer)
 cd C:\Users\mb668\daw-project\engine\build-msvc
