@@ -93,6 +93,19 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       Preuve : le WAV de reference 2.4b rejoue EN CONTINU a travers le
       pont, echantillons identiques au rendu hors ligne — le pont est
       transparent, prouve au bit pres.
+      TROIS PIEGES CONNUS D'AVANCE :
+      1. Pas d'atomiques inter-processus gratuits : les std::atomic du
+         ring DOIVENT etre dans le segment et lock-free — etendre le
+         static_assert is_always_lock_free aux types inter-processus.
+         AUCUN mutex STL dans le segment (UB deguise) ; SPSC a indices
+         atomiques, meme moule que les peaks.
+      2. Le layout du segment = contrat binaire entre deux executables :
+         header commun aux deux cibles avec static_assert(sizeof) +
+         offsetof sur chaque champ — le SCHEMA.md du monde binaire.
+      3. La mort de l'enfant se detecte au thread de CONTROLE (handle de
+         processus, timeout zero), jamais dans le callback — lui ne
+         connait que « bloc pret ou pas » (absent = bypass comptabilise).
+         Cette separation posee en c-1 rend c-2 presque deja ecrit.
 - [ ] 2.4c-2 LE CRASH ET LE DOCUMENT : enfant tue en plein traitement ->
       bypass propre + signalement + compteur, relance a froid, PUIS
       lecture du chain (M3 solde), ProxyNode construit depuis le document
