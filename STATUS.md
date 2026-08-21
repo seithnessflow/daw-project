@@ -26,11 +26,16 @@ Rien de temps reel ne traverse le serveur distant.
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
 | Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 10/10 |
-| Engine C++ (GCC/CI) | ✅ | ✅ | GitHub Actions, hash verifie |
+| Engine C++ (GCC/CI) | ✅ | ✅ | PREMIER RUN VERT 2026-08-22 (run #48, a91d57b) : 14 tests moteur sous Linux dont hash + plugin_host/AGain, E2E complet. Avant lui : 47 runs rouges jamais regardes (lecon inscrite au regime) |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
 | Web TypeScript | ✅ | ✅ | Automerge reel, critere 3 valide |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
+
+**2026-08-22 (CI-verite):** premier run CI vert de l'histoire du projet —
+https://github.com/seithnessflow/daw-project/actions/runs/32531658552 —
+moteur + SDK VST3 + determinisme valides sur un second OS jamais utilise
+pour developper. STATUS ne contient plus de phrase que le reel contredit.
 
 **2026-08-22 (R1+R2):** construction du graphe sortie du thread reseau
 (boucle principale, snapshot sous verrou, dernier etat gagne, version
