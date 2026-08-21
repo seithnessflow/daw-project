@@ -236,6 +236,19 @@ Le serveur persiste en fichiers sur disque, derrière un trait `ProjectStore`.
 
 ## ADR-010: Double-Buffer for Graph Swap
 
+> **Note 2026-08-22 (correctif AUDIT-2 R4).** L'implementation
+> intermediaire (atomic<shared_ptr>) n'etait PAS lock-free sur MSVC :
+> spinlock STL dans le callback, en contradiction avec cet ADR.
+> Mecanisme en place desormais : le callback lit un POINTEUR BRUT atomique
+> (lock-free, static_assert dans audio_callback.h) et publie un compteur
+> de generation (+1 a l'entree, +1 a la sortie ; impair = dans le
+> callback, entree en seq_cst). Le thread de controle ne libere un graphe
+> retire que si : generation paire au snapshot du swap (aucun callback en
+> vol), OU generation observee > snapshot (le callback en vol est sorti),
+> OU device arrete - ET plus aucun lecteur cote controle (use_count==1).
+> Jamais sur delai, jamais immediatement : c'est ce qui empeche de
+> reintroduire le use-after-free d'origine en corrigeant le spinlock.
+
 **Statut:** Accepté
 **Date:** 2026-08-20
 

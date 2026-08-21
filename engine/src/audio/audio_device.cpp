@@ -135,7 +135,8 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     // Set up callback context
     callback_context_.command_buffer = &command_buffer_;
     callback_context_.telemetry_buffer = &telemetry_buffer_;
-    callback_context_.active_graph = &active_graph_;
+    callback_context_.active_graph = &active_graph_raw_;
+    callback_context_.callback_generation = &callback_generation_;
     callback_context_.transport = &transport_;
     callback_context_.buffer_underrun_count = &buffer_underrun_count_;
     callback_context_.sample_rate = config.sample_rate;
@@ -210,8 +211,28 @@ std::optional<AudioTelemetry> AudioDevice::pollTelemetry() {
     return telemetry_buffer_.pop();
 }
 
-std::shared_ptr<graph::AudioGraph> AudioDevice::setActiveGraph(std::shared_ptr<graph::AudioGraph> graph) {
-    return active_graph_.exchange(std::move(graph), std::memory_order_acq_rel);
+AudioDevice::RetiredGraph AudioDevice::setActiveGraph(std::shared_ptr<graph::AudioGraph> graph) {
+    graph::AudioGraph* raw = graph.get();
+
+    // Control-side readers first, then the audio slot; the generation
+    // snapshot MUST be taken after the raw exchange (seq_cst, paired with
+    // the callback's seq_cst entry increment - see GenGuard).
+    auto old_sp = active_graph_.exchange(std::move(graph), std::memory_order_acq_rel);
+    active_graph_raw_.exchange(raw, std::memory_order_seq_cst);
+    const uint64_t gen = callback_generation_.load(std::memory_order_seq_cst);
+
+    return RetiredGraph{std::move(old_sp), gen};
+}
+
+bool AudioDevice::isRetireSafe(const RetiredGraph& r) const {
+    if (state_ != AudioDeviceState::Running) {
+        return true;  // No callback can be running
+    }
+    if (r.gen_at_swap % 2 == 0) {
+        return true;  // No callback was in flight at the swap
+    }
+    // A callback was in flight: wait until it has exited
+    return callback_generation_.load(std::memory_order_acquire) > r.gen_at_swap;
 }
 
 }  // namespace daw::audio

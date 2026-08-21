@@ -146,20 +146,34 @@ public:
     std::optional<AudioTelemetry> pollTelemetry();
 
     /**
-     * Set the active audio graph (atomic swap of shared ownership).
+     * A retired graph plus the callback-generation snapshot taken at its
+     * swap. Free it only when isRetireSafe() says so AND use_count()==1
+     * (control-side readers may still hold transient copies).
+     */
+    struct RetiredGraph {
+        std::shared_ptr<graph::AudioGraph> graph;
+        uint64_t gen_at_swap = 0;
+    };
+
+    /**
+     * Set the active audio graph.
      *
-     * The audio thread and telemetry readers each acquire their own
-     * shared_ptr copy before use, so the previous graph stays alive until
-     * its last reader releases it.
+     * Publishes the raw pointer to the audio callback (lock-free slot) and
+     * the shared_ptr to control-side readers. The audio callback never
+     * touches refcounts: reclamation is generation-gated on the control
+     * side (see isRetireSafe).
      *
      * @param graph New graph (shared ownership)
-     * @return Previous graph. The caller (control thread) must keep it in a
-     *         retirement queue and destroy it only once no reader holds a
-     *         reference (use_count() == 1). Never let the audio thread hold
-     *         the last reference: deallocation must happen on the control
-     *         thread.
+     * @return The previous graph with its swap generation snapshot
      */
-    std::shared_ptr<graph::AudioGraph> setActiveGraph(std::shared_ptr<graph::AudioGraph> graph);
+    RetiredGraph setActiveGraph(std::shared_ptr<graph::AudioGraph> graph);
+
+    /**
+     * True once the audio callback can no longer be reading r.graph:
+     * generation even at swap (no callback in flight), generation advanced
+     * past the snapshot (that callback exited), or device not running.
+     */
+    bool isRetireSafe(const RetiredGraph& r) const;
 
     /**
      * Slot readers (e.g. WebSocketServer telemetry) load a shared_ptr copy
@@ -191,9 +205,16 @@ private:
     CommandRingBuffer command_buffer_;
     TelemetryRingBuffer telemetry_buffer_;
 
-    // Active audio graph. Readers (audio thread, telemetry) take shared_ptr
-    // copies via atomic load; the control thread swaps via exchange.
+    // Control-side slot: WebSocketServer & co. take shared_ptr copies via
+    // atomic load. NOT read by the audio callback (not lock-free on MSVC).
     std::atomic<std::shared_ptr<graph::AudioGraph>> active_graph_;
+
+    // Audio-side slot: raw pointer, lock-free (static_assert in
+    // audio_callback.h). The ONLY graph access the callback performs.
+    std::atomic<graph::AudioGraph*> active_graph_raw_{nullptr};
+
+    // Callback generation counter (odd = inside a callback). See GenGuard.
+    std::atomic<uint64_t> callback_generation_{0};
 
     // Transport state
     transport::TransportState transport_;

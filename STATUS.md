@@ -32,6 +32,11 @@ Rien de temps reel ne traverse le serveur distant.
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
+**2026-08-22 (R4+S4):** le thread sacre est desormais verifie par le
+compilateur (static_assert lock-free sur tous les types partages avec le
+callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback
+(retention par generation, ADR-010 annote) ; solo/mute atomiques (S4 solde).
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |

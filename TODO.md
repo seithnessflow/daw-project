@@ -52,13 +52,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] PREALABLES 2.4 (arbitrage audit 2, 2026-08-22) — quatre sessions
       bornees, dans cet ordre, puis l'hote. Seuls prealables recevables :
       ce sur quoi le plugin de gain isole s'appuie directement.
-      1. R4+S4 : sortir le spinlock du callback (atomic<shared_ptr> MSVC
-         non lock-free -> pointeur brut atomique cote audio + retention
-         cote controle) + solo/mute en atomic<bool> (meme fichiers, meme
-         geste). Livrable cache : static_assert is_always_lock_free sur
-         les types REELLEMENT utilises par le callback — la 3e trahison
-         silencieuse de la regle ecrite ne doit pas survivre a une
-         compilation.
+      1. [x] R4+S4 FAIT 2026-08-22 : pointeur brut atomique + retention
+         par generation (ADR-010 annote) ; solo/mute atomic<bool> ;
+         static_assert compile + test runtime is_lock_free (10/10) ;
+         repro use-after-free verte. atomic<shared_ptr>.is_lock_free()=0
+         prouve sur MSVC, banni du callback.
       2. ADR R3 : decision d'isolation par processus, AVANT R1+R2 —
          elle determine ou vivent les noeuds, donc ce que « transferer
          l'etat au swap » veut dire.

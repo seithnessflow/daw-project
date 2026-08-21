@@ -34,9 +34,11 @@ struct AudioTrack {
     std::vector<ClipPlayer> clips;
     std::vector<std::unique_ptr<ProcessorNode>> chain;
 
-    // Per-track monitoring state (local, not in document)
-    bool solo = false;
-    bool mute = false;
+    // Per-track monitoring state (local, not in document). Atomic: written
+    // by the WebSocket thread (handleSetMonitor), read by the audio thread
+    // (S4 - same mold as gain/peaks, relaxed is sufficient).
+    std::atomic<bool> solo{false};
+    std::atomic<bool> mute{false};
 
     // Default constructor
     AudioTrack() = default;
@@ -48,8 +50,8 @@ struct AudioTrack {
         , gain(other.gain.load(std::memory_order_relaxed))
         , clips(std::move(other.clips))
         , chain(std::move(other.chain))
-        , solo(other.solo)
-        , mute(other.mute) {}
+        , solo(other.solo.load(std::memory_order_relaxed))
+        , mute(other.mute.load(std::memory_order_relaxed)) {}
 
     // Move assignment
     AudioTrack& operator=(AudioTrack&& other) noexcept {
@@ -59,8 +61,8 @@ struct AudioTrack {
             gain.store(other.gain.load(std::memory_order_relaxed), std::memory_order_relaxed);
             clips = std::move(other.clips);
             chain = std::move(other.chain);
-            solo = other.solo;
-            mute = other.mute;
+            solo.store(other.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            mute.store(other.mute.load(std::memory_order_relaxed), std::memory_order_relaxed);
         }
         return *this;
     }

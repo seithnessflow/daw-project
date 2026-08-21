@@ -9,6 +9,29 @@ namespace daw::audio {
 // Thread-local context pointer (set by AudioDevice before starting)
 thread_local AudioCallbackContext* g_callback_context = nullptr;
 
+namespace {
+
+// Publishes the callback generation: odd while inside, even once out.
+// Entry uses seq_cst: it closes the race where the control thread swaps the
+// graph, snapshots an even generation and frees the old graph while a
+// callback that entered concurrently still loaded the OLD pointer. With a
+// seq_cst total order, a callback whose pointer-load preceded the swap has
+// its entry increment visible to the control thread's snapshot (odd), so
+// the control thread waits. RAII: every exit path publishes the exit.
+struct GenGuard {
+    std::atomic<uint64_t>* gen;
+
+    explicit GenGuard(std::atomic<uint64_t>* g) noexcept : gen(g) {
+        gen->fetch_add(1, std::memory_order_seq_cst);
+    }
+
+    ~GenGuard() noexcept {
+        gen->fetch_add(1, std::memory_order_release);
+    }
+};
+
+}  // namespace
+
 void audioCallback(
     void* /*device*/,
     void* output,
@@ -34,16 +57,17 @@ void audioCallback(
 
     float* out = static_cast<float*>(output);
 
+    // Inside-the-callback marker: the control thread will not free a
+    // retired graph while the generation is odd (see GenGuard above)
+    GenGuard gen_guard(ctx->callback_generation);
+
     // Process any pending commands from control thread
     processCommands(*ctx);
 
-    // Acquire a shared_ptr copy of the current graph. Releasing this copy at
-    // the end of the callback only decrements the refcount: the control
-    // thread's retirement queue always holds a reference until no reader is
-    // left, so deallocation never happens on this thread.
-    const std::shared_ptr<graph::AudioGraph> graph_ref =
-        ctx->active_graph->load(std::memory_order_acquire);
-    graph::AudioGraph* graph = graph_ref.get();
+    // Raw pointer load: lock-free by static_assert. The pointed-to graph
+    // cannot be freed while this callback runs (generation-gated retirement
+    // on the control side).
+    graph::AudioGraph* graph = ctx->active_graph->load(std::memory_order_acquire);
 
     // Get transport state
     const bool is_playing = ctx->transport->isPlaying();

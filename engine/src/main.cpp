@@ -366,8 +366,10 @@ void copyMonitorState(daw::graph::AudioGraph* from, daw::graph::AudioGraph* to) 
 
         auto* new_track = to->getTrackById(old_track->id);
         if (new_track) {
-            new_track->solo = old_track->solo;
-            new_track->mute = old_track->mute;
+            new_track->solo.store(old_track->solo.load(std::memory_order_relaxed),
+                                  std::memory_order_relaxed);
+            new_track->mute.store(old_track->mute.load(std::memory_order_relaxed),
+                                  std::memory_order_relaxed);
         }
     }
 }
@@ -448,7 +450,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     for (const auto& track_id : opts.solo_tracks) {
         auto* track = graph->getTrackById(track_id);
         if (track) {
-            track->solo = true;
+            track->solo.store(true, std::memory_order_relaxed);
             std::cout << "Solo: " << track_id << "\n";
         } else {
             std::cerr << "Warning: Track not found for solo: " << track_id << "\n";
@@ -457,7 +459,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     for (const auto& track_id : opts.mute_tracks) {
         auto* track = graph->getTrackById(track_id);
         if (track) {
-            track->mute = true;
+            track->mute.store(true, std::memory_order_relaxed);
             std::cout << "Mute: " << track_id << "\n";
         } else {
             std::cerr << "Warning: Track not found for mute: " << track_id << "\n";
@@ -575,21 +577,21 @@ int doPlayWithServer(const Options& opts) {
     std::mutex graph_mutex;
 
     // Retirement queue: graphs swapped out of the active slot. A retired
-    // graph is destroyed by the main loop (control thread) only once no
-    // reader holds a reference (use_count() == 1). This guarantees the
-    // audio thread never runs a deallocation: its transient shared_ptr copy
-    // is never the last one.
+    // graph is destroyed by the main loop (control thread) only once the
+    // audio callback provably released it (generation gate, isRetireSafe)
+    // AND no control-side reader holds a copy (use_count() == 1). The audio
+    // thread never touches refcounts and never deallocates.
     std::mutex retire_mutex;
-    std::vector<std::shared_ptr<daw::graph::AudioGraph>> retired_graphs;
+    std::vector<daw::audio::AudioDevice::RetiredGraph> retired_graphs;
 
     // Swap in a new graph and retire the previous one.
     auto swapActiveGraph = [&](std::shared_ptr<daw::graph::AudioGraph> new_graph,
                                daw::audio::AudioDevice& dev) {
-        auto old_graph = dev.setActiveGraph(new_graph);
+        auto retired = dev.setActiveGraph(new_graph);
         current_graph = std::move(new_graph);
-        if (old_graph) {
+        if (retired.graph) {
             std::lock_guard<std::mutex> lock(retire_mutex);
-            retired_graphs.push_back(std::move(old_graph));
+            retired_graphs.push_back(std::move(retired));
         }
     };
 
@@ -624,14 +626,14 @@ int doPlayWithServer(const Options& opts) {
         for (const auto& track_id : opts.solo_tracks) {
             auto* track = graph->getTrackById(track_id);
             if (track) {
-                track->solo = true;
+                track->solo.store(true, std::memory_order_relaxed);
                 std::cout << "Solo: " << track_id << "\n";
             }
         }
         for (const auto& track_id : opts.mute_tracks) {
             auto* track = graph->getTrackById(track_id);
             if (track) {
-                track->mute = true;
+                track->mute.store(true, std::memory_order_relaxed);
                 std::cout << "Mute: " << track_id << "\n";
             }
         }
@@ -714,16 +716,15 @@ int doPlayWithServer(const Options& opts) {
             }
         }
 
-        // Destroy retired graphs whose last reader is gone. use_count()==1
-        // means only the retirement queue still references the graph: no new
-        // reader can appear (the active slot no longer points to it), so
-        // destroying it here, on the control thread, is safe.
+        // Destroy retired graphs the audio callback provably released
+        // (generation gate) and that no control-side reader still holds
+        // (use_count()==1: only the retirement queue references it).
         {
             std::lock_guard<std::mutex> lock(retire_mutex);
             retired_graphs.erase(
                 std::remove_if(retired_graphs.begin(), retired_graphs.end(),
-                               [](const std::shared_ptr<daw::graph::AudioGraph>& g) {
-                                   return g.use_count() == 1;
+                               [&device](const daw::audio::AudioDevice::RetiredGraph& r) {
+                                   return device.isRetireSafe(r) && r.graph.use_count() == 1;
                                }),
                 retired_graphs.end());
         }

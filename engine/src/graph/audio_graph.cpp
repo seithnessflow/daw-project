@@ -47,7 +47,7 @@ bool AudioGraph::process(
     // Check if any track is soloed
     bool has_solo = false;
     for (const auto& track : tracks_) {
-        if (track.solo) {
+        if (track.solo.load(std::memory_order_relaxed)) {
             has_solo = true;
             break;
         }
@@ -58,14 +58,14 @@ bool AudioGraph::process(
         auto& track = tracks_[i];
 
         // Skip muted tracks
-        if (track.mute) {
+        if (track.mute.load(std::memory_order_relaxed)) {
             peak_left_[i] = 0.0f;
             peak_right_[i] = 0.0f;
             continue;
         }
 
         // If any track is soloed, skip non-soloed tracks
-        if (has_solo && !track.solo) {
+        if (has_solo && !track.solo.load(std::memory_order_relaxed)) {
             peak_left_[i] = 0.0f;
             peak_right_[i] = 0.0f;
             continue;

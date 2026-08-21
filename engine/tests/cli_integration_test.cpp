@@ -625,6 +625,35 @@ bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
 }
 
 // Main
+// Test 9b: Sacred-thread lock-freedom, verified at RUNTIME on this exact
+// toolchain (the compile-time is_always_lock_free asserts live in
+// audio_callback.h). Guards against the AUDIT-2 R4 family: a type shared
+// with the audio callback whose atomic silently takes a lock.
+bool testAudioThreadLockFreedom() {
+    std::cout << "Test: Audio-thread lock-freedom... ";
+
+    std::atomic<daw::graph::AudioGraph*> graph_ptr{nullptr};
+    std::atomic<uint64_t> gen{0};
+    std::atomic<int64_t> pos{0};
+    std::atomic<bool> flag{false};
+    std::atomic<float> gain{1.0f};
+
+    const bool ok = graph_ptr.is_lock_free() && gen.is_lock_free() &&
+                    pos.is_lock_free() && flag.is_lock_free() &&
+                    gain.is_lock_free();
+    if (!ok) {
+        std::cout << "FAILED: an audio-shared atomic is NOT lock-free on this toolchain\n";
+        return false;
+    }
+
+    // The type that betrayed us once - informational, banned from the
+    // callback regardless of what this prints
+    std::atomic<std::shared_ptr<daw::graph::AudioGraph>> sp;
+    std::cout << "OK (atomic<shared_ptr>.is_lock_free()="
+              << (sp.is_lock_free() ? 1 : 0) << ", banned from callback)\n";
+    return true;
+}
+
 // Test 9: WebSocket authentication
 // A connection is accepted only if its FIRST message is [0x00][valid token].
 // Bad token -> close 4001. Silence -> close 4001 after the 2s deadline.
@@ -765,6 +794,7 @@ int main(int argc, char* argv[]) {
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);
     runWithArg(testRenderDeterminism, fixtures_dir);
+    run(testAudioThreadLockFreedom);
     run(testWebSocketAuth);
 
     std::cout << "\n=== Results ===\n";

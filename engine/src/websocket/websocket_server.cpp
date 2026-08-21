@@ -266,8 +266,8 @@ void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {
 
     auto* track = graph->getTrackById(cmd.track_id());
     if (track) {
-        track->solo = cmd.solo();
-        track->mute = cmd.mute();
+        track->solo.store(cmd.solo(), std::memory_order_relaxed);
+        track->mute.store(cmd.mute(), std::memory_order_relaxed);
     }
 }
 

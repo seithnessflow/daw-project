@@ -72,6 +72,25 @@ constexpr uint32_t INTERNAL_BLOCK_SIZE = 256;
 // Forward declarations
 class AudioDevice;
 
+// ============================================================================
+// COMPILER-ENFORCED SACRED-THREAD GUARANTEE
+// Every atomic type shared with the audio callback must be lock-free, and is
+// asserted here so a silent betrayal of the written rule cannot survive a
+// compilation. std::atomic<std::shared_ptr<T>> is deliberately ABSENT: it is
+// NOT lock-free on MSVC and once put a hidden spinlock in this callback
+// (AUDIT-2 R4). Sharing a new type with the callback? Assert it here first.
+// ============================================================================
+static_assert(std::atomic<graph::AudioGraph*>::is_always_lock_free,
+              "graph pointer slot must be lock-free");
+static_assert(std::atomic<uint64_t>::is_always_lock_free,
+              "generation/underrun counters must be lock-free");
+static_assert(std::atomic<int64_t>::is_always_lock_free,
+              "transport position must be lock-free");
+static_assert(std::atomic<bool>::is_always_lock_free,
+              "playing/solo/mute flags must be lock-free");
+static_assert(std::atomic<float>::is_always_lock_free,
+              "gain/peak values must be lock-free");
+
 /**
  * Context passed to the audio callback.
  * All pointers must remain valid for the lifetime of audio processing.
@@ -81,11 +100,18 @@ struct AudioCallbackContext {
     CommandRingBuffer* command_buffer = nullptr;
     TelemetryRingBuffer* telemetry_buffer = nullptr;
 
-    // Atomic slot holding the current audio graph (swapped by control thread).
-    // The callback loads a shared_ptr copy per invocation. Its release never
-    // deallocates: the control thread's retirement queue keeps every retired
-    // graph alive until no reader references it.
-    const std::atomic<std::shared_ptr<graph::AudioGraph>>* active_graph = nullptr;
+    // Atomic slot holding the current audio graph, RAW pointer. The callback
+    // must stay lock-free and std::atomic<std::shared_ptr> is NOT lock-free
+    // on MSVC (a hidden STL spinlock ran in this callback once - AUDIT-2 R4).
+    // Ownership and reclamation live on the control side: generation-gated
+    // retirement (see callback_generation below and AudioDevice::isRetireSafe).
+    const std::atomic<graph::AudioGraph*>* active_graph = nullptr;
+
+    // Callback generation: +1 at entry (odd = inside the callback),
+    // +1 at exit (even = outside). The control thread frees a retired graph
+    // only once the generation is even or has advanced past its swap
+    // snapshot - never on a timer, never immediately.
+    std::atomic<uint64_t>* callback_generation = nullptr;
 
     // Transport state (atomics for lock-free access)
     transport::TransportState* transport = nullptr;

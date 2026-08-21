@@ -120,6 +120,11 @@ function Stop-Server {
 
 function Start-Server {
     Write-Status "Starting server..."
+
+    $emptyStdin = Join-Path $tempDir "daw-empty-stdin"
+    if (-not (Test-Path $emptyStdin)) {
+        New-Item -ItemType File -Path $emptyStdin | Out-Null
+    }
     # WorkingDirectory is ALWAYS server/: the file store is relative to the
     # CWD (./projects), so a stop/restart cycle must reuse the same one.
     $serverDir = Join-Path $projectRoot "server"
@@ -129,6 +134,11 @@ function Start-Server {
         WorkingDirectory       = $serverDir
         RedirectStandardOutput = (Join-Path $tempDir "daw-server.log")
         RedirectStandardError  = (Join-Path $tempDir "daw-server-err.log")
+        # Detach stdin: without this the server inherits the caller's stdin
+        # pipe and keeps wrapper processes (Node spawnSync, outer powershell)
+        # blocked long after this script exits. Start-Process validates the
+        # path, so the NUL device is not accepted: use an empty file.
+        RedirectStandardInput  = $emptyStdin
     }
     if ($isWindowsHost) { $startArgs.WindowStyle = "Hidden" }
 
