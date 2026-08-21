@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file create_test_doc.cpp
  * @brief Creates a test document and audio file for WASAPI testing.

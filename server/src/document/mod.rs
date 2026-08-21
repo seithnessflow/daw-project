@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! Document storage and Automerge handling.
 
 mod file_store;

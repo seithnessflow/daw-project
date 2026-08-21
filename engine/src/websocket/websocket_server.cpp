@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "websocket_server.h"
 #include <ixwebsocket/IXNetSystem.h>
 

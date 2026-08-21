@@ -1,5 +1,20 @@
 # Decisions and Test Results
 
+## Licence du projet - 2026-08-22
+
+**GPL-3.0-or-later.** Raisons : emboitement direct avec le SDK VST3
+(branche GPLv3, zero analyse de compatibilite), ecosysteme audio libre
+majoritairement GPL (Ardour, Audacity... - echanges de code triviaux dans
+les deux sens), lisibilite instantanee pour les contributeurs.
+Structure : copyright integralement a l'auteur ; CLA a mettre en place au
+PREMIER contributeur externe (c'est le CLA qui garde les options ouvertes,
+pas la licence) ; si des morceaux du serveur sont publies separement un
+jour, leur licence prevue est AGPLv3 ; l'accord proprietaire Steinberg
+sera signe en parallele comme option d'avenir, pas comme prerequis.
+Mise en oeuvre : LICENSE (texte canonique GPLv3), en-tete SPDX
+`GPL-3.0-or-later` sur les 57 sources suivies (generes exclus), section
+Licence du README.
+
 ## Diagnostic compaction (2.2) - 2026-08-22
 
 **Seuils fixes AVANT mesure** (modele: drag = 30 changes/s, 20% du temps

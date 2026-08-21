@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Criterion 3 (offline part): CRDT reconciliation across a REAL server outage.
  *

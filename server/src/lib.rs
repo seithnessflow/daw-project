@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! DAW Server Library
 //!
 //! Provides Automerge CRDT synchronization for the DAW project.

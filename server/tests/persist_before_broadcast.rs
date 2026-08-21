@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! A change a peer has SEEN broadcast must survive a brutal server kill.
 //!
 //! Guards the persist-before-broadcast ordering in the ws recv path: the

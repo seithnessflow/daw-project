@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! WebSocket handler for Automerge sync.
 
 use automerge::{transaction::Transactable, AutoCommit, ObjType, ROOT};

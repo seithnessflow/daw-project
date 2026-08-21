@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "offline_render.h"
 
 #include "../audio/audio_callback.h"  // audio::INTERNAL_BLOCK_SIZE

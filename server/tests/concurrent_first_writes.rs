@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! Two SIMULTANEOUS first connections on a fresh project: the default
 //! document must be created exactly once, and a change written immediately
 //! by each client must both survive.

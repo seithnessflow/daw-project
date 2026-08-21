@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 //! DAW Sync Server
 //!
 //! Provides Automerge CRDT synchronization between browser clients and the local engine.

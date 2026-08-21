@@ -241,3 +241,7 @@ cd web && npm run format
 ## License
 
 [To be determined]
+
+## Licence
+
+GPL-3.0-or-later — voir [LICENSE](LICENSE). Le SDK VST3 (double licence GPLv3/Steinberg) est consomme sous sa branche GPLv3 ; il reste hors depot (third_party/, non commite).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "transport_state.h"
 
 // Implementation is all inline in the header for lock-free atomics.

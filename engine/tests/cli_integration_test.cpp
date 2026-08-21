@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file cli_integration_test.cpp
  * @brief Integration tests for DAW engine.
