@@ -47,3 +47,5 @@ Thumbs.db
 engine/test-assets/*.wav
 fixtures/*.wav
 *.wav
+server/projects/
+web/test-results/

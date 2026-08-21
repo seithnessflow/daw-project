@@ -38,9 +38,21 @@ Rien de temps reel ne traverse le serveur distant.
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `f40af882097b704a` identique GCC/MSVC |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 8/8 |
-| 3 | Convergence 2 onglets | ⏳ PRET | Web migre vers Automerge reel, test requis |
+| 3 | Convergence 2 onglets | ⚠️ PARTIEL | Online OK (Playwright), offline non teste |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
+
+### Detail critere 3
+
+**Valide (Playwright):**
+- Sync online: gain modifie dans onglet 1 apparait dans onglet 2
+- Sync bidirectionnelle: modifications simultanees convergent
+- Ajout de piste: nouvelle piste apparait dans les deux onglets
+
+**Non teste (DETTE):**
+- Reconciliation offline: deux modifications divergentes pendant deconnexion
+- C'est ce qui distingue un CRDT d'un simple broadcast WebSocket
+- A tester apres le jalon "fader → son"
 
 ### Detail critere 5
 
