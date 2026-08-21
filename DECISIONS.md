@@ -1,5 +1,41 @@
 # Decisions and Test Results
 
+## Diagnostic compaction (2.2) - 2026-08-22
+
+**Seuils fixes AVANT mesure** (modele: drag = 30 changes/s, 20% du temps
+actif -> 21 600 changes/h ; 4 pistes):
+- A gerable: a 1h, taille < 5 Mo ET chargement moteur < 1 s ET web < 1 s
+- B sous condition: moteur 1-5 s OU 5-50 Mo a 1h, ET coalescing ramene 10h sous A
+- C intenable: au-dela -> samod urgent
+
+**Mesures** (drags simules Automerge JS 2.2.9 ; moteur = daw_engine --info
+release, demarrage du process compris):
+
+| changes | taille .am | load web | load moteur |
+|---------|-----------|----------|-------------|
+| 1 000   | 1 013 o   | 17 ms    | 30 ms       |
+| 50 000  | 2 616 o   | 244 ms   | 141 ms      |
+
+La TAILLE est un non-probleme: la compression colonnaire d'Automerge rend
+les re-ecritures de la meme cle quasi gratuites (~0,03 octet/change).
+L'axe reel est le TEMPS de chargement, lineaire en nombre de changes:
+~4,9 us/change (web), ~2,4 us/change (moteur).
+
+**Projections** (lineaires, linearite verifiee sur 1k-50k):
+- 1 h: ~1,7 Ko ; moteur ~75 ms ; web ~110 ms
+- 10 h: ~8 Ko ; moteur ~540 ms ; web ~1,1 s
+- Le mur reel: ~100 h cumulees d'un projet au long cours (moteur ~5 s,
+  web ~11 s) - l'historique ne se compacte jamais.
+
+**VERDICT: A - croissance gerable pour la tranche 2.**
+
+Recommandation (3 lignes):
+1. Le chantier VST3 demarre sans prealable de compaction.
+2. Compaction = dette datee, declencheur: quand un projet reel depasse
+   ~100 000 changes (mesurable: taille > 5 Ko ou load web > 500 ms).
+3. Coalescing des drags cote client (1 change a la relache, /50): assurance
+   bon marche, optionnelle, a prendre lors d'une future session web courte.
+
 ## Critere 1: nouveau hash de reference - 2026-08-21
 
 **L'ancien hash `f40af882097b704a` etait un hash de SILENCE. Ne plus s'y referer.**

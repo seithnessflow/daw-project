@@ -37,9 +37,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       - Le moteur C++ ne migre PAS (il parle au serveur). Le jalon
         fader->moteur doit rester vert SANS modification cote moteur ;
         si ca casse, c'est le serveur qui s'adapte.
-- [ ] 2.2 Compaction du document — diagnostic d'abord : mesurer la
-      croissance reelle pendant un drag de fader (dizaines de changes/s),
-      puis proposer snapshot/prune. Implementation ensuite.
+- [x] 2.2 FAIT 2026-08-22 — VERDICT A (voir DECISIONS.md): taille quasi
+      constante (compression colonnaire), seul le temps de chargement croit
+      (~2,4-4,9 us/change). Le VST3 demarre sans prealable. Dettes datees:
+      compaction (declencheur: > ~100k changes / load web > 500 ms),
+      coalescing des drags (optionnel, session web courte).
 - [ ] 2.3 SHA-256 des assets + cote moteur<->serveur du triangle (HTTP) —
       le rendu des pistes a plugins en dependra.
 - [ ] 2.4 Hote VST3 : chargement d'un plugin, parametres dans le document,
