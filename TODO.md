@@ -83,7 +83,7 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)
 - [ ] Critere 4 LNA Chrome (manuel, `--allow-origin` pret)
 - [ ] Persistance de l'outbox (localStorage) — `web/src/network/server_client.ts`
-- [ ] Serveur : persister AVANT de diffuser (`server/src/api/websocket.rs`) — corrige la course, permet d'alleger l'anti-entropie cliente
+- [x] Serveur : persister AVANT de diffuser — FAIT (voir 2.1 option B)
 - [ ] `solo`/`mute` en `std::atomic<bool>` — domaine thread audio, tests non-regression obligatoires
 
 ## Candidats grille (constats de lecture 2026-08-22, arbitrage a l'audit 2)
