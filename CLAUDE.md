@@ -210,6 +210,14 @@ les grosses tâches ne sont plus de ton ressort. Tu les découpes ou tu les refu
   La suite complète : une fois, en toute fin de session, jamais en cours.
 - Réutilise la stack lancée. Tu ne relances pas serveur/moteur/web si déjà vivants.
 - 3 échecs sur le même problème → STOP. État, hypothèses restantes, et tu attends.
+- Toute commande estimée > 60 s part en arrière-plan immédiatement (ctrl+b / &) ;
+  tu continues autre chose ou tu rends la main, tu ne bloques jamais le tour dessus.
+  Une seule vérification du résultat, pas de sondage.
+- cargo/cmake : compile UNE fois en arrière-plan après tes modifications, puis
+  lance les tests sur le binaire compilé. Jamais de build implicite caché dans
+  une commande de test au premier plan.
+- Une commande = une action. Pas de chaînes kill+cd+test+filtre : quand ça
+  échoue, on ne sait pas quoi relancer.
 
 ### Régime de sortie
 
@@ -232,4 +240,7 @@ réduit JAMAIS la vérification : tests de non-régression obligatoires, quel qu
 ### Fin de session
 
 STATUS.md (3 lignes max de delta), commit, push, résumé ≤ 10 lignes.
+Vérifier qu'aucune tâche d'arrière-plan ne survit à la session (processus
+lancés, jobs, suites de tests) — une tâche survivante peut corrompre un
+store ou fausser la session suivante.
 Ce qui n'a pas été fait est listé en une ligne chacun, sans excuse ni développement.
