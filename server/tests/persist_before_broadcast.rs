@@ -14,14 +14,33 @@ type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 const PORT: u16 = 3907;
 
-fn spawn_server(dir: &std::path::Path) -> Child {
-    Command::new(env!("CARGO_BIN_EXE_daw-server"))
-        .current_dir(dir)
-        .env("DAW_SERVER_PORT", PORT.to_string())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn server")
+// Kills the spawned server even if the test panics: a leaked server keeps
+// the port and poisons every later run
+struct ServerGuard(Child);
+
+impl ServerGuard {
+    fn kill_now(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+impl Drop for ServerGuard {
+    fn drop(&mut self) {
+        self.kill_now();
+    }
+}
+
+fn spawn_server(dir: &std::path::Path) -> ServerGuard {
+    ServerGuard(
+        Command::new(env!("CARGO_BIN_EXE_daw-server"))
+            .current_dir(dir)
+            .env("DAW_SERVER_PORT", PORT.to_string())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn server"),
+    )
 }
 
 async fn wait_ready() {
@@ -102,16 +121,14 @@ async fn change_seen_by_peer_survives_brutal_kill() {
     // THE invariant under test: the instant a peer SEES the broadcast,
     // the change must already be durable. Kill the server brutally now.
     let _echoed = recv_binary(&mut b).await;
-    server.kill().expect("kill server");
-    server.wait().ok();
+    server.kill_now();
 
     // Restart on the same store: a fresh client must see the change
     let mut server2 = spawn_server(&dir);
     wait_ready().await;
     let mut c = connect(project).await;
     let doc2_bytes = recv_binary(&mut c).await;
-    server2.kill().ok();
-    server2.wait().ok();
+    server2.kill_now();
 
     let gain = track0_gain(&doc2_bytes);
     assert!(

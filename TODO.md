@@ -21,11 +21,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       ("don't use anywhere serious"), release taguee, et au moins un
       projet reel l'utilise en production. Verifier a chaque debut de
       tranche, pas avant.
-- [ ] 2.1ter Course du store decouverte par le test : deux PREMIERES
-      connexions simultanees sur un projet vide peuvent toutes deux creer
-      le doc par defaut, et la sauvegarde tardive ECRASE un change deja
-      persiste. Session dediee : serialiser la creation (ou verrou par
-      projet) + test propre.
+- [x] 2.1ter FAIT 2026-08-22 : mutations du store serialisees (store_lock
+      dans AppState — creation du doc par defaut + apply_change), test
+      `concurrent_first_writes` rouge prouve puis vert. Les tests spawnes
+      tuent desormais leur serveur meme sur panic (ServerGuard/Drop).
+      Le sync maison n'a plus de defaut connu.
       - La migration inclut la SUPPRESSION de l'ancien code de sync
         (protocole artisanal, anti-entropie, file offline maison si
         automerge-repo la remplace). Deux chemins de sync cohabitants =

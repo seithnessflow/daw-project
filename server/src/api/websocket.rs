@@ -67,7 +67,11 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
         sync_state.add_session(&project_id, session_id)
     };
 
-    // Load initial document, or create default with 2 tracks
+    // Load initial document, or create default with 2 tracks.
+    // Under store_lock: only ONE task can create the default document;
+    // a simultaneous second connection waits, then loads what the first
+    // created (the late duplicate save used to clobber applied changes).
+    let _create_guard = state.store_lock.lock().await;
     let doc_data = match state.store.load(&project_id).await {
         Ok(Some(data)) => data,
         Ok(None) => {
@@ -85,6 +89,8 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
             return;
         }
     };
+
+    drop(_create_guard);
 
     if sender.send(Message::Binary(doc_data)).await.is_err() {
         tracing::warn!("Failed to send initial document");
@@ -141,9 +147,15 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
                             // once it is durable. Broadcasting before
                             // persisting used to lose changes on a crash in
                             // between, while peers had already applied them.
-                            if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
-                                tracing::error!("Session {}: Failed to persist change, NOT broadcasting: {}", session_id_recv, e);
-                                continue;
+                            {
+                                // store_lock: apply_change is an unlocked
+                                // load-modify-write; concurrent applies from
+                                // two sessions can lose one change
+                                let _guard = state_clone.store_lock.lock().await;
+                                if let Err(e) = state_clone.store.apply_change(&project_id_clone, &data).await {
+                                    tracing::error!("Session {}: Failed to persist change, NOT broadcasting: {}", session_id_recv, e);
+                                    continue;
+                                }
                             }
 
                             // Broadcast to other clients

@@ -70,8 +70,10 @@ edits distincts + conflit sur la meme piste) est VERT, annotation
   `cargo test --test persist_before_broadcast` (kill brutal du process a
   l'instant ou un pair voit la diffusion). L'anti-entropie cliente reste
   en place (couvre d'autres pertes de broadcast).
-- NOUVEAU (decouvert par ce test): course a la creation du doc par defaut
-  quand deux premieres connexions arrivent ensemble - voir TODO 2.1ter.
+- ~~Course a la creation du doc par defaut~~ CORRIGE 2026-08-22: toutes les
+  mutations du store sont serialisees (store_lock), garde par
+  `cargo test --test concurrent_first_writes` (2 premieres connexions
+  simultanees, chacune ecrit immediatement, aucune perte toleree).
 
 ### Detail critere 5
 

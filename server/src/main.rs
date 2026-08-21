@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState {
         store: Box::new(document::FileStore::new("./projects")?),
         sync_state: RwLock::new(SyncState::new()),
+        store_lock: tokio::sync::Mutex::new(()),
     });
 
     // CORS layer for browser access
