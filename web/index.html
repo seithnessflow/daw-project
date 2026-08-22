@@ -470,6 +470,7 @@
         flex: 1;
       }
       .track-meter {
+        position: relative; /* peak tick anchor (life layer) */
         width: 52px;
         height: 4px;
         background: #2a2a2a;
@@ -481,7 +482,40 @@
         background: linear-gradient(90deg,
           var(--green) 0 70%, #d9c341 70% 90%, var(--red) 90%);
         width: 0%;
-        transition: width 50ms;
+        /* no CSS transition: the life layer's ballistics own the motion */
+      }
+
+      /* ---- Life layer (aria-hidden, pointer-events:none, read-only) -- */
+      .meter-peak {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: rgba(255, 255, 255, 0.9);
+        pointer-events: none;
+        transition: opacity 300ms;
+      }
+      .life-hot {
+        box-shadow: inset 3px 0 0 var(--red);
+      }
+      .track.life-dim .track-lane,
+      .track.life-dim .track-head-body {
+        opacity: 0.4;
+        transition: opacity 180ms;
+      }
+      .track.life-muted .track-lane {
+        opacity: 0.55;
+      }
+      #life-status {
+        font-size: 10px;
+        color: var(--text-3);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        pointer-events: none;
+        min-width: 70px;
+      }
+      #life-status.life-warn {
+        color: var(--orange);
       }
 
       .track-empty .track-head-body {
@@ -613,6 +647,7 @@
       <div class="position">
         <span id="position">00:00.000</span>
       </div>
+      <span id="life-status" aria-hidden="true"></span>
       <div class="status">
         <div class="status-item">
           <div class="status-dot" id="server-status"></div>

@@ -171,6 +171,19 @@ public:
     [[nodiscard]] std::vector<std::tuple<std::string, float, float>> getMeters() const noexcept;
 
     /**
+     * Zero all peak meters. AUDIO THREAD SAFE (relaxed atomic stores,
+     * the processTrack mold). Called by the callback's silence path:
+     * a stopped transport must not report ghost peaks forever
+     * (found 2026-08-22 by the life layer's ballistics refusing to rest).
+     */
+    void clearMeters() noexcept {
+        for (size_t i = 0; i < num_tracks_; ++i) {
+            peak_left_[i].store(0.0f, std::memory_order_relaxed);
+            peak_right_[i].store(0.0f, std::memory_order_relaxed);
+        }
+    }
+
+    /**
      * Graph processing latency (2.4d): the worst track's chain latency sum.
      * Computed from the nodes' LIVE declarations - never a constant.
      * Control thread (telemetry); the graph is immutable once active.

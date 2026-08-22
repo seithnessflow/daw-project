@@ -75,8 +75,11 @@ void audioCallback(
     int64_t position = ctx->transport->getPosition();
 
     if (!is_playing || !graph) {
-        // Not playing or no graph - output silence
+        // Not playing or no graph - output silence, and the meters SAY
+        // silence (relaxed stores; stale peaks were ghost-reported by
+        // telemetry forever after a stop)
         std::memset(out, 0, frame_count * 2 * sizeof(float));
+        if (graph) graph->clearMeters();
 
         // Still send telemetry
         sendTelemetry(*ctx, 0.0f, 0.0f);

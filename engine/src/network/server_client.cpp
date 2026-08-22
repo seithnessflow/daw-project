@@ -81,8 +81,16 @@ bool ServerClient::connect(const ServerConfig& config) {
         }
     });
 
-    // Enable auto-reconnect
+    // Enable auto-reconnect - and HEARTBEAT, because reconnection is
+    // useless without dead-peer detection: a server killed under us
+    // (every offline-spec run does it) left a ZOMBIE socket - the engine
+    // played a frozen document indefinitely, receiving nothing, logging
+    // nothing (found 2026-08-22 by the life layer's meter probe: the
+    // telemetry showed 14 tracks while the document had 19). A 15 s ping
+    // turns that silence into a Close, and the reconnect brings the
+    // fresh document.
     ws_->enableAutomaticReconnection();
+    ws_->setPingInterval(15);
 
     // Start connection
     ws_->start();

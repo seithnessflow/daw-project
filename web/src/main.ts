@@ -15,11 +15,11 @@ import {
   createTrackUI,
   createRulerUI,
   createDeviceView,
-  updateMeter,
   updateTrackGainUI,
   updateDeviceViewUI,
   TIMELINE,
 } from './ui/track';
+import * as life from './ui/life';
 import { formatTime } from './ui/transport';
 import { Library, loadKit, type Kit } from './ui/library';
 import { fillWaveforms, decodeDurationSec, SERVER_HTTP } from './ui/waveform';
@@ -519,6 +519,7 @@ async function init() {
   engineClient.onPosition = (samples, sampleRate) => {
     positionEl.textContent = formatTime(samples, sampleRate);
     lastPlayheadSec = samples / sampleRate;
+    life.setPosition(lastPlayheadSec, engineClient!.isPlaying());
     refreshOverview();
     // Playhead on the shared scale, PARKED at the lane's end when the
     // engine plays past the content (its transport never stops on its
@@ -542,10 +543,14 @@ async function init() {
       }
     }
   };
+  // The life layer eats the telemetry (ballistic meters, clip pulse,
+  // ambient health) - raw values never hit the DOM directly anymore
   engineClient.onMeters = (meters) => {
-    for (const { trackId, peakLeft, peakRight } of meters) {
-      updateMeter(trackId, Math.max(peakLeft, peakRight));
-    }
+    life.setTrackLevels(meters.map(({ trackId, peakLeft, peakRight }) =>
+      ({ trackId, peak: Math.max(peakLeft, peakRight) })));
+  };
+  engineClient.onState = (state) => {
+    life.setEngineState(state.pluginBlocksMissed);
   };
 
   // Transport, Ableton semantics (potion A1): Play starts from the
@@ -874,9 +879,11 @@ function renderTracks(force = false) {
         sendLastChange();
       },
       (kind, on) => {
-        // Engine-local monitoring (not document state); wired in lot C
+        // Engine-local monitoring (not document state)
         engineClient?.setMonitor(track.id,
           kind === 'solo' ? on : undefined, kind === 'mute' ? on : undefined);
+        // Solo makes the view breathe: the rest dims (life layer)
+        if (engineClient) life.applyMonitorShade(engineClient.monitorSnapshot());
       },
     );
     tracksContainer.appendChild(element);
@@ -925,6 +932,7 @@ function renderTracks(force = false) {
   fillWaveforms(tracksContainer);
   refreshOverview();
   refreshPalette();
+  if (engineClient) life.applyMonitorShade(engineClient.monitorSnapshot());
 }
 
 // Start

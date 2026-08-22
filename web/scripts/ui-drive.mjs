@@ -296,6 +296,43 @@ for (let attempt = 0; attempt < 20 && !grew; attempt++) {
 }
 check(`track count grew (${nBefore} -> ${nBefore + 1})`, grew);
 
+console.log('Gesture 13 (life layer): meters breathe, then decay to rest');
+if (engineUp) {
+  // The lab is a living bench: clips move. GUARANTEE content at t=0 by
+  // placing a fresh kick there, then set the marker on it and play.
+  await page.locator('[data-role="sample"][data-sample-name="chord-Am"]').click();
+  await page.locator('[data-track-id="lab-sine440"] .track-lane')
+    .click({ position: { x: 2, y: 30 } });
+  await page.locator('[data-role="sample"][data-sample-name="chord-Am"]').click(); // disarm
+  await page.waitForTimeout(600); // engine rebuild + asset
+  await page.locator('[data-track-id="lab-sine440"] .track-lane')
+    .click({ position: { x: 2, y: 30 } });  // marker ~0
+  await page.locator('#play-btn').click();
+  // The chord's envelope decays fast (tau ~0.46s): read in its HOT
+  // window, not its tail (two honest zeros taught this gesture timing)
+  await page.waitForTimeout(350);
+  const widths = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.track-meter-fill'))
+      .map((f) => parseFloat(f.style.width || '0')));
+  check(`meters alive during play (max ${Math.max(...widths).toFixed(1)}%)`,
+    Math.max(...widths) > 1);
+  check('peak ticks exist (life layer DOM)',
+    await page.locator('.meter-peak').count() > 0);
+  const pulsing = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.clip'))
+      .some((c) => (c.style.filter || '').includes('brightness')));
+  check('a clip pulses under the playhead', pulsing);
+  await page.locator('#stop-btn').click();
+  await page.waitForTimeout(1600);
+  const after = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.track-meter-fill'))
+      .map((f) => parseFloat(f.style.width || '0')));
+  check(`ballistic decay to rest (max ${Math.max(...after).toFixed(1)}%)`,
+    Math.max(...after) < 2);
+} else {
+  console.log('  (skipped: engine not connected)');
+}
+
 console.log('Gesture 12 (Magic Potion): PRODUCT mode - drop MY file, no kit visible');
 {
   const p3 = await context.newPage();

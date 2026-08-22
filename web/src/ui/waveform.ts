@@ -91,6 +91,11 @@ function draw(canvas: HTMLCanvasElement, entry: PeaksEntry): void {
   canvas.dataset.drawn = '1';
 }
 
+/** Read-only access for the life layer (clip pulse): peaks + frames. */
+export function getPeaksEntry(hash: string): { peaks: Float32Array; frames: number } | null {
+  return peaksCache.get(hash) ?? null;
+}
+
 /**
  * Fill every clip waveform canvas under root that isn't drawn yet.
  * Safe to call after every render: cached hashes draw synchronously.

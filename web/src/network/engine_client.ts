@@ -183,6 +183,11 @@ export class EngineClient {
     return this.lastPlaying;
   }
 
+  /** Read-only snapshot of local monitor state (life layer shading). */
+  monitorSnapshot(): Map<string, { solo: boolean; mute: boolean }> {
+    return new Map(this.monitorState);
+  }
+
   private sendTransport(action: TransportAction, seekPosition?: number): void {
     const data = seekPosition !== undefined
       ? { action, seekPosition }

@@ -132,6 +132,20 @@ Preuve pilote (geste 12, mode produit) : zero chip embarque, hint d'etat
 vide, drop -> clip -> asset 200 au store -> chip 'my-note' dans la palette.
 Drive 12 gestes verts, suite 13/13.
 
+**2026-08-22 (Magic Potion, phase 2 — tout ce qui sonne se voit) :** la
+couche de vie (ui/life.ts) : une boucle rAF, mutations directes, aria-hidden
++ pointer-events:none (spec dedie), budget ~0 a l'arret, ZERO ecriture
+document (grep prouve). VU balistiques (montee instantanee, chute 300 ms,
+crete tenue 1 s), clips qui pulsent a l'energie du point de lecture (pics
+caches x position — croises pour la premiere fois), sante ambiante aux
+seuils de l'oreille (piste > -1 dBFS, silence en lecture, plugin late),
+solo qui tamise le reste. La boucle d'auto-test a debusque DEUX mensonges
+moteur en route : connexion serveur ZOMBIE (serveur redemarre sous le
+moteur = document gele a jamais, sans un mot -> heartbeat ping 15 s +
+l'auto-reconnect existant) ; peaks fantomes a l'arret (processTrack fige
+-> clearMeters au chemin silence du callback, stores relaxed). Moteur
+21/21 x2, drive 13 gestes verts, suite 14/14.
+
 **2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
 AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
 silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses
