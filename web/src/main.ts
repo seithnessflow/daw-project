@@ -130,11 +130,16 @@ async function init() {
   };
   engineClient.onPosition = (samples, sampleRate) => {
     positionEl.textContent = formatTime(samples, sampleRate);
-    // Playhead on the shared timeline scale
+    // Playhead on the shared timeline scale, PARKED at the lane's end when
+    // the engine plays past the content (its transport never stops on its
+    // own): an escaped playhead stretched the scroll width into nowhere
+    // (found by ui-drive, gesture 4).
     const playhead = document.getElementById('playhead');
     if (playhead) {
-      playhead.style.left =
-        `${TIMELINE.headWidth + (samples / sampleRate) * TIMELINE.pps}px`;
+      const lane = document.querySelector('.track-lane') as HTMLElement | null;
+      const laneW = lane ? lane.offsetWidth : Infinity;
+      const x = (samples / sampleRate) * TIMELINE.pps;
+      playhead.style.left = `${TIMELINE.headWidth + Math.min(x, laneW)}px`;
     }
   };
   engineClient.onMeters = (meters) => {

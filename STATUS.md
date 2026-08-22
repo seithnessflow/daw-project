@@ -110,6 +110,17 @@ fusionnes, zero pixel change) — suite e2e 12/12 en 1,7 min comme preuve,
 snap re-ancre sur le contrat. La refonte peut etre agressive : les tests
 tiennent la semantique, les pixels sont libres.
 
+**2026-08-22 (le labo — l'agent utilise le site et ecoute) :** projet 'lab'
+seede par make-signals.mjs (5 types de signaux etages, PUT verifiant) ;
+ui-drive.mjs = usage scripte du site (6 gestes, tous verts : faders, bypass
+via doc, playhead vivant, convergence 2 onglets, add track) ; batterie ear
+en solo par piste : la chaine geste UI -> document -> moteur -> enfant VST3
+-> rendu est EXACTE au centieme de dB (sine 0,25 x fader 0,9 x AGain 0,5 =
+-18,97 predit, -18,98 mesure ; RMS saw/noise/sweep exacts silence compte).
+Trouvailles : inter-sample peaks reels (~2 dB) sur fronts raides, lecture
+chaude (+5,6 dB) du true peak sur bruit (note calibration) ; playhead qui
+fuyait hors couloir (ui-drive) -> clamp pose. Moteur agent = --mute (regle).
+
 **2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
 AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
 silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses
