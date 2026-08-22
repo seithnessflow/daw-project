@@ -34,6 +34,72 @@ const PROJECT_ID =
 let project: Project | null = null;
 let selectedTrackId: string | null = null;
 
+// ---- Navigation state (potion phase A1) ------------------------------
+// pps lives in TIMELINE (mutable); zoom re-renders around an anchor.
+let insertMarkerSec = 0;     // Ableton insert marker: Play starts HERE
+let follow = true;           // view chases the playhead...
+let followPaused = false;    // ...until the user scrolls/zooms/edits
+let programmaticScroll = false;
+let zoomRaf = 0;
+
+const ZOOM_MIN = 4;
+const ZOOM_MAX = 200;
+
+function contentSeconds(): number {
+  const doc = project?.getDocument();
+  let end = 30;
+  if (doc) {
+    const sr = doc.sampleRate || 48000;
+    for (const t of doc.tracks) {
+      for (const c of t.clips) {
+        end = Math.max(end, (c.startSample + c.lengthSamples) / sr);
+      }
+    }
+  }
+  return Math.ceil(end) + 5;
+}
+
+/** Zoom to newPps keeping anchorSec at the same viewport x. */
+function setZoom(newPps: number, anchorSec: number, anchorViewportX: number): void {
+  const pps = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newPps));
+  if (pps === TIMELINE.pps) return;
+  TIMELINE.pps = pps;
+  followPaused = true;
+  if (zoomRaf) return;               // coalesce zoom ticks to one render
+  zoomRaf = requestAnimationFrame(() => {
+    zoomRaf = 0;
+    renderTracks(true);
+    programmaticScroll = true;
+    tracksContainer.scrollLeft =
+      Math.max(0, anchorSec * TIMELINE.pps - (anchorViewportX - TIMELINE.headWidth));
+  });
+}
+
+function updateInsertMarker(): void {
+  const marker = document.getElementById('insert-marker');
+  if (marker) {
+    marker.style.left = `${TIMELINE.headWidth + insertMarkerSec * TIMELINE.pps}px`;
+  }
+}
+
+function startPlayback(): void {
+  if (!engineClient?.isConnected()) return;
+  const sr = project?.getDocument().sampleRate || 48000;
+  engineClient.seek(Math.round(insertMarkerSec * sr));
+  engineClient.play();
+  followPaused = false;              // Follow resumes on restart (Ableton)
+}
+
+function stopPlayback(): void {
+  if (!engineClient?.isConnected()) return;
+  const sr = project?.getDocument().sampleRate || 48000;
+  if (engineClient.isPlaying()) {
+    engineClient.stop();             // 1st stop: halt where you are
+  } else {
+    engineClient.seek(Math.round(insertMarkerSec * sr));  // 2nd: come home
+  }
+}
+
 declare global {
   interface Window {
     __dawProject: Project | null;
@@ -143,6 +209,17 @@ async function init() {
       const laneW = lane ? lane.offsetWidth : Infinity;
       const x = (samples / sampleRate) * TIMELINE.pps;
       playhead.style.left = `${TIMELINE.headWidth + Math.min(x, laneW)}px`;
+
+      // Follow: keep the playhead in the comfort zone while playing
+      if (follow && !followPaused && engineClient?.isPlaying()) {
+        const viewW = tracksContainer.clientWidth;
+        const headX = TIMELINE.headWidth + Math.min(x, laneW) - tracksContainer.scrollLeft;
+        if (headX > viewW * 0.7 || headX < TIMELINE.headWidth) {
+          programmaticScroll = true;
+          tracksContainer.scrollLeft = Math.max(0,
+            TIMELINE.headWidth + Math.min(x, laneW) - viewW * 0.3);
+        }
+      }
     }
   };
   engineClient.onMeters = (meters) => {
@@ -151,14 +228,18 @@ async function init() {
     }
   };
 
-  // Transport. Stop REWINDS: a stopped DAW that cannot come home is a
-  // playhead you chase.
-  playBtn.addEventListener('click', () => {
-    engineClient?.play();
-  });
-  stopBtn.addEventListener('click', () => {
-    engineClient?.stop();
-    engineClient?.seek(0);
+  // Transport, Ableton semantics (potion A1): Play starts from the
+  // insert marker; Stop halts, Stop again returns to the marker.
+  playBtn.addEventListener('click', startPlayback);
+  stopBtn.addEventListener('click', stopPlayback);
+
+  // Follow toggle (view chases the playhead; pauses on user scroll/zoom)
+  const followBtn = document.getElementById('follow-btn') as HTMLButtonElement;
+  followBtn.setAttribute('aria-pressed', 'true');
+  followBtn.addEventListener('click', () => {
+    follow = !follow;
+    followPaused = false;
+    followBtn.setAttribute('aria-pressed', follow ? 'true' : 'false');
   });
 
   // The base kit's library strip (chips: arm, then click a lane to place)
@@ -204,26 +285,70 @@ async function init() {
       renderTracks();
       return;
     }
+    // Lane click (unarmed): select the track AND set the insert marker
+    // (Ableton: one click, two effects, zero conflict)
+    if (lane) {
+      const x = e.clientX - lane.getBoundingClientRect().left;
+      insertMarkerSec = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      updateInsertMarker();
+      followPaused = true;   // editing intent: stop chasing the playhead
+    }
     if (id !== selectedTrackId) {
       selectedTrackId = id;
       renderTracks(true);
     }
   });
 
-  // Space = play/stop, the first DAW ergonomic (ignored while typing in
-  // a control so it never fights a focused slider)
+  // Keyboard (potion A1). Space = play/stop; +/- = zoom around the
+  // viewport center; W = fit content width; H = compact tracks. All
+  // ignored while a control is focused.
   window.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || e.repeat) return;
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
-    e.preventDefault();
-    if (!engineClient?.isConnected()) return;
-    if (engineClient.isPlaying()) {
-      engineClient.stop();
-      engineClient.seek(0);
-    } else {
-      engineClient.play();
+    if (e.code === 'Space' && !e.repeat) {
+      e.preventDefault();
+      if (!engineClient?.isConnected()) return;
+      if (engineClient.isPlaying()) stopPlayback();
+      else startPlayback();
+      return;
     }
+    const rect = tracksContainer.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerSec = Math.max(0,
+      (tracksContainer.scrollLeft + rect.width / 2 - TIMELINE.headWidth) / TIMELINE.pps);
+    if (e.key === '+' || e.key === '=') {
+      setZoom(TIMELINE.pps * 1.25, centerSec, centerX - rect.left);
+    } else if (e.key === '-') {
+      setZoom(TIMELINE.pps / 1.25, centerSec, centerX - rect.left);
+    } else if (e.code === 'KeyW') {
+      const fit = (rect.width - TIMELINE.headWidth - 20) / contentSeconds();
+      setZoom(fit, 0, TIMELINE.headWidth);
+    } else if (e.code === 'KeyH') {
+      document.body.classList.toggle('compact-tracks');
+    }
+  });
+
+  // Ctrl+wheel = zoom around the cursor; plain wheel/scroll pauses Follow
+  tracksContainer.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) {
+      followPaused = true;
+      return;
+    }
+    e.preventDefault();
+    const rect = tracksContainer.getBoundingClientRect();
+    const viewportX = e.clientX - rect.left;
+    const anchorSec = Math.max(0,
+      (tracksContainer.scrollLeft + viewportX - TIMELINE.headWidth) / TIMELINE.pps);
+    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    setZoom(TIMELINE.pps * factor, anchorSec, viewportX);
+  }, { passive: false });
+
+  tracksContainer.addEventListener('scroll', () => {
+    if (programmaticScroll) {
+      programmaticScroll = false;
+      return;
+    }
+    followPaused = true;
   });
 
   addTrackBtn.addEventListener('click', () => {
@@ -324,6 +449,13 @@ function renderTracks(force = false) {
   playhead.id = 'playhead';
   playhead.style.left = `${TIMELINE.headWidth}px`;
   tracksContainer.appendChild(playhead);
+
+  // The insert marker (potion A1): where Play starts from
+  const marker = document.createElement('div');
+  marker.className = 'insert-marker';
+  marker.id = 'insert-marker';
+  tracksContainer.appendChild(marker);
+  updateInsertMarker();
 
   // Device View for the selected track (bypass and params are DOCUMENT
   // state: the display only settles when the change comes back)

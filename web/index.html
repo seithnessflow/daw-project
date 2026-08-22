@@ -298,6 +298,29 @@
         border-right: 4px solid transparent;
         border-top: 6px solid var(--amber);
       }
+      .insert-marker {
+        position: absolute;
+        top: 23px; /* below the ruler */
+        bottom: 0;
+        width: 1px;
+        background: rgba(255, 255, 255, 0.35);
+        z-index: 2;
+        pointer-events: none;
+      }
+      .follow-btn[aria-pressed='true'] {
+        background: #3c3524;
+        color: var(--amber);
+      }
+      /* H: compact all tracks (fit height) */
+      body.compact-tracks .track-head-body {
+        padding: 3px 10px 2px;
+      }
+      body.compact-tracks .track-fader {
+        margin-top: 1px;
+      }
+      body.compact-tracks .clip-name {
+        flex-basis: 11px;
+      }
 
       /* ---- Track head interior -------------------------------------- */
       .track-title-row {
@@ -521,6 +544,8 @@
       <div class="transport">
         <button id="play-btn" disabled title="Play (Space)">&#9654;</button>
         <button id="stop-btn" disabled title="Stop (Space)">&#9632;</button>
+        <button id="follow-btn" data-role="follow" class="follow-btn"
+                title="Follow playhead">&#8677;</button>
       </div>
       <div class="position">
         <span id="position">00:00.000</span>
