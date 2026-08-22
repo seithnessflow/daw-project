@@ -221,6 +221,22 @@ export function analyze(wav) {
   }
   const rmsOverall = dbfs(Math.sqrt(sumSqTotal / Math.max(1, frames * channels.length)));
 
+  // Structural view: RMS per SECOND, energy-averaged LINEARLY (averaging
+  // dB is the classic lie - windows at -120 between drum hits crush the
+  // mean and make a living groove read as silence; it slandered the
+  // first composed piece, 2026-08-22).
+  const perSec = [];
+  for (let s = 0; s * 10 < rmsWindows.length; s++) {
+    let energy = 0;
+    let count = 0;
+    for (let w = s * 10; w < Math.min((s + 1) * 10, rmsWindows.length); w++) {
+      const lin = Math.pow(10, rmsWindows[w] / 20);
+      energy += lin * lin;
+      count++;
+    }
+    perSec.push(Math.round(dbfs(Math.sqrt(energy / Math.max(1, count))) * 10) / 10);
+  }
+
   const truePeakDb = dbfs(truePeak);
   const reasons = [];
   if (truePeakDb > -1) reasons.push(`true peak ${truePeakDb.toFixed(1)} dBFS > -1 dBFS`);
@@ -235,6 +251,7 @@ export function analyze(wav) {
     true_peak_dbfs: Math.round(truePeakDb * 100) / 100,
     rms_dbfs_overall: Math.round(rmsOverall * 100) / 100,
     rms_dbfs_windows: rmsWindows,
+    rms_dbfs_seconds: perSec,
     dc_offset: Math.round(dcMax * 1e6) / 1e6,
     discontinuities,
     periodic_edges: periodicEdges,
