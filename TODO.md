@@ -359,9 +359,9 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       spectrale ; masquage inter-pistes ; suggestions IA (acteur Automerge).
 
 - [ ] COHERENCE (audit 2026-08-22) — split-rule et jumeaux restants :
-      a. buildGraph JUMEAU : offline_render.cpp reconstruit son propre
-         graphe (:196-302) — unifier avec main.cpp buildGraph (le jumeau
-         que CLAUDE.md cite deja) ;
+      a. [x] buildGraph : noyau partage (makeClipPlayer/makeGainNode dans
+         graph/graph_common) FAIT 2026-08-22 ; instanciation plugins
+         volontairement divergente (live/offline). Hash inchange 89f1a1.
       b. splitter main.cpp (1155), automerge_document.cpp (829),
          plugin_host_main.cpp (663), websocket_server.cpp (481),
          app/wiring.ts (432), ui-drive.mjs, track.ts (regle module) ;

@@ -190,6 +190,8 @@ add_library(daw_engine_lib STATIC
     src/graph/clip_player.cpp
     src/graph/audio_graph.h
     src/graph/audio_graph.cpp
+    src/graph/graph_common.h
+    src/graph/graph_common.cpp
     src/document/schema.h
     src/document/schema.cpp
     src/document/automerge_document.h

@@ -2,6 +2,7 @@
 #include "offline_render.h"
 
 #include "../audio/audio_callback.h"  // audio::INTERNAL_BLOCK_SIZE
+#include "../graph/graph_common.h"    // makeClipPlayer / makeGainNode (S3)
 
 #include <algorithm>
 #include <cmath>
@@ -204,35 +205,10 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         track.name = track_def.name;
         track.gain = track_def.gain;
 
-        // Load clips
+        // Load clips (shared geometry+asset builder, S3)
         for (const auto& clip_def : track_def.clips) {
-            graph::ClipPlayer player;
-
-            graph::ClipInfo info;
-            info.id = clip_def.id;
-            info.asset_hash = clip_def.asset_hash;
-            info.start_sample = clip_def.start_sample;
-            info.length_samples = clip_def.length_samples;
-            info.offset_samples = clip_def.offset_samples;
-            player.setClip(info);
-
-            // Try to load asset by hash (look in asset_dir)
-            // For now, we look for files matching the hash
-            std::string asset_path = asset_dir + "/" + clip_def.asset_hash + ".wav";
-            const graph::AudioAsset* asset = asset_cache_.loadOrGet(asset_path);
-
-            // If not found by hash, try loading all wavs in the directory
-            // This is a fallback for testing
-            if (!asset) {
-                // Try with original filename if stored somewhere
-                // For slice 1, we'll require hash-named files
-            }
-
-            if (asset) {
-                player.setAsset(asset);
-            }
-
-            track.clips.push_back(std::move(player));
+            track.clips.push_back(
+                graph::makeClipPlayer(clip_def, asset_dir, asset_cache_));
         }
 
         // Create processors
@@ -246,13 +222,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                         proc_def.id, nullptr, true));
                     continue;
                 }
-                float gain = 1.0f;
-                auto it = proc_def.params.find("gain");
-                if (it != proc_def.params.end()) {
-                    gain = it->second;
-                }
-                auto node = std::make_unique<graph::GainNode>(proc_def.id, gain);
-                track.chain.push_back(std::move(node));
+                track.chain.push_back(graph::makeGainNode(proc_def));
             } else if (proc_def.type == "vst3") {
                 // c-2: out-of-process plugin, SYNC path (offline has no
                 // real-time constraint; zero latency, bit-exact). A missing

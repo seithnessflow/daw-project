@@ -269,10 +269,14 @@ contre des allers-retours en moins.
 
 - Avant le commit, vérifie les trois couplages du code modifié :
   1. APPELANTS — qui consomme ce que je viens de changer (une recherche ciblée) ;
-  2. JUMEAUX — le même comportement implémenté ailleurs (buildGraph×2, protos
-     dupliqués, helpers de test copiés : c'est là que naissent les régressions
-     à retardement) — si un jumeau existe, corrige les deux OU signale-le en
-     candidat refonte (grille, sortie 2) ;
+  2. JUMEAUX — le même comportement implémenté ailleurs (protos dupliqués,
+     helpers de test copiés : c'est là que naissent les régressions à
+     retardement) — si un jumeau existe, corrige les deux OU signale-le en
+     candidat refonte (grille, sortie 2). Precedent buildGraph : le noyau
+     partage (geometrie de clip + gain, les champs qui nourrissent le hash)
+     vit dans graph/graph_common.h ; l'instanciation des plugins reste
+     VOLONTAIREMENT divergente (live async ProxyNode vs offline sync
+     SyncProxyNode) — deux modeles d'execution, pas un jumeau ;
   3. CONTRAT — schéma, protocole, constante partagée entre étages : si le
      contrat bouge, chaque étage consommateur se vérifie dans la MÊME session.
 - Zones sensibles (thread audio, auth, format, sync) : relis l'invariant écrit

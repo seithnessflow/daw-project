@@ -16,6 +16,7 @@
 #include "document/automerge_document.h"
 #include "graph/audio_graph.h"
 #include "graph/clip_player.h"
+#include "graph/graph_common.h"
 #include "graph/plugin_registry.h"
 #include "host/plugin_bridge.h"
 #include "host/proxy_node.h"
@@ -570,44 +571,27 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         track.name = track_def.name;
         track.gain.store(track_def.gain, std::memory_order_relaxed);
 
-        // Load clips
+        // Load clips. Server mode: on a local miss, pull from the store
+        // (2.3b) so the file exists on disk BEFORE the shared builder
+        // runs - then both live and offline paths call the identical
+        // makeClipPlayer (S3: the clip-geometry twin lives in one place).
         for (const auto& clip_def : track_def.clips) {
-            daw::graph::ClipPlayer player;
-
-            daw::graph::ClipInfo info;
-            info.id = clip_def.id;
-            info.asset_hash = clip_def.asset_hash;
-            info.start_sample = clip_def.start_sample;
-            info.length_samples = clip_def.length_samples;
-            info.offset_samples = clip_def.offset_samples;
-            player.setClip(info);
-
-            // Try to load asset - and on a local miss in server mode,
-            // pull it from the server's store (2.3b), then retry
-            std::string asset_path = assets_dir + "/" + clip_def.asset_hash + ".wav";
-            const daw::graph::AudioAsset* asset = asset_cache.loadOrGet(asset_path);
-            if (!asset && !opts.server_url.empty() &&
-                fetchAssetFromServer(opts.server_url, clip_def.asset_hash, assets_dir)) {
-                asset = asset_cache.loadOrGet(asset_path);
+            if (!opts.server_url.empty()) {
+                const std::string asset_path =
+                    assets_dir + "/" + clip_def.asset_hash + ".wav";
+                if (!asset_cache.loadOrGet(asset_path)) {
+                    fetchAssetFromServer(opts.server_url, clip_def.asset_hash, assets_dir);
+                }
             }
-            if (asset) {
-                player.setAsset(asset);
-            }
-
-            track.clips.push_back(std::move(player));
+            track.clips.push_back(
+                daw::graph::makeClipPlayer(clip_def, assets_dir, asset_cache));
         }
 
         // Create processors
         for (const auto& proc_def : track_def.chain) {
             if (proc_def.type == daw::graph::GainNode::TYPE) {
                 if (proc_def.bypass) continue;  // zero-latency node: bypass = omission
-                float gain = 1.0f;
-                auto it = proc_def.params.find("gain");
-                if (it != proc_def.params.end()) {
-                    gain = it->second;
-                }
-                auto node = std::make_unique<daw::graph::GainNode>(proc_def.id, gain);
-                track.chain.push_back(std::move(node));
+                track.chain.push_back(daw::graph::makeGainNode(proc_def));  // S3 shared
             } else if (proc_def.type == "vst3") {
                 // c-2: ProxyNode from the DOCUMENT (uid on the node). The
                 // registry hands the same ring to every rebuild.
