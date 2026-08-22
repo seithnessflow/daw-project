@@ -20,6 +20,9 @@
 #include "host/plugin_bridge.h"
 #include "host/proxy_node.h"
 #include "network/server_client.h"
+#include "util/sha256.h"
+
+#include <ixwebsocket/IXHttpClient.h>
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
 
@@ -478,6 +481,77 @@ void wirePluginTelemetry(daw::websocket::WebSocketServer& ws_server,
     }
 }
 
+/**
+ * 2.3b: fetch a missing asset from the server's content-addressed store
+ * (the HTTP side of the triangle). Control thread, during buildGraph.
+ * A sha256-keyed body is VERIFIED before it touches the assets dir
+ * (legacy 16-char keys cannot be, accepted with a log). Failures are
+ * remembered for the session - a burst of rebuilds must not become a
+ * storm of GETs (dated debt: retry when the asset later appears).
+ */
+bool fetchAssetFromServer(const std::string& server_ws_url,
+                          const std::string& hash,
+                          const std::string& assets_dir) {
+    static std::set<std::string> failed_this_session;
+    if (server_ws_url.empty() || hash.empty() ||
+        failed_this_session.count(hash) > 0) {
+        return false;
+    }
+
+    // ws://host:port -> http://host:port (wss -> https)
+    std::string http_base = server_ws_url;
+    if (http_base.rfind("wss://", 0) == 0) {
+        http_base = "https://" + http_base.substr(6);
+    } else if (http_base.rfind("ws://", 0) == 0) {
+        http_base = "http://" + http_base.substr(5);
+    }
+    const std::string url = http_base + "/assets/" + hash;
+
+    ix::HttpClient http;
+    ix::HttpRequestArgsPtr args = http.createRequest();
+    args->connectTimeout = 10;
+    args->transferTimeout = 120;
+    ix::HttpResponsePtr response = http.get(url, args);
+    if (!response || response->statusCode != 200) {
+        std::cerr << "Asset " << hash << ": not on server ("
+                  << (response ? response->statusCode : 0) << ")\n";
+        failed_this_session.insert(hash);
+        return false;
+    }
+    if (hash.size() == 64 &&
+        daw::util::sha256Hex(response->body.data(), response->body.size()) != hash) {
+        std::cerr << "Asset " << hash << ": server body does not match its hash - REFUSED\n";
+        failed_this_session.insert(hash);
+        return false;
+    }
+
+    // Atomic write: temp + rename (the store mold)
+    std::error_code ec;
+    fs::create_directories(assets_dir, ec);
+    const fs::path final_path = fs::path(assets_dir) / (hash + ".wav");
+    const fs::path tmp_path = fs::path(assets_dir) / (hash + ".wav.tmp");
+    {
+        std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+        out.write(response->body.data(),
+                  static_cast<std::streamsize>(response->body.size()));
+        if (!out.good()) {
+            std::cerr << "Asset " << hash << ": local write failed\n";
+            fs::remove(tmp_path, ec);
+            failed_this_session.insert(hash);
+            return false;
+        }
+    }
+    fs::rename(tmp_path, final_path, ec);
+    if (ec) {
+        fs::remove(tmp_path, ec);
+        failed_this_session.insert(hash);
+        return false;
+    }
+    std::cout << "Asset fetched from server: " << hash << " ("
+              << response->body.size() << " bytes)\n";
+    return true;
+}
+
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
@@ -508,9 +582,14 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
             info.offset_samples = clip_def.offset_samples;
             player.setClip(info);
 
-            // Try to load asset
+            // Try to load asset - and on a local miss in server mode,
+            // pull it from the server's store (2.3b), then retry
             std::string asset_path = assets_dir + "/" + clip_def.asset_hash + ".wav";
             const daw::graph::AudioAsset* asset = asset_cache.loadOrGet(asset_path);
+            if (!asset && !opts.server_url.empty() &&
+                fetchAssetFromServer(opts.server_url, clip_def.asset_hash, assets_dir)) {
+                asset = asset_cache.loadOrGet(asset_path);
+            }
             if (asset) {
                 player.setAsset(asset);
             }

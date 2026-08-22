@@ -22,6 +22,9 @@ automerge = "=0.11.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Content-addressed asset store (2.3b): the server VERIFIES what it stores
+sha2 = "0.10"
+
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
@@ -32,3 +35,5 @@ async-trait = "0.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
+# Small blocking HTTP client for the asset-store integration test
+ureq = "2"

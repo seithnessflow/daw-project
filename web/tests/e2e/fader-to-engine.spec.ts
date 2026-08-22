@@ -27,39 +27,18 @@ import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import {
   waitForServerConnection,
   getTrackIds,
   setTrackGain,
+  REPO_ROOT,
+  resolveBinary,
+  waitUntil,
+  countInFile,
 } from './helpers';
 
-const specDir = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(specDir, '..', '..', '..');
 const require = createRequire(import.meta.url);
-
-function resolveBinary(envVar: string, name: string): string {
-  const fromEnv = process.env[envVar];
-  if (fromEnv) {
-    if (!fs.existsSync(fromEnv)) {
-      throw new Error(`${envVar}=${fromEnv} does not exist`);
-    }
-    return fromEnv;
-  }
-  const exe = process.platform === 'win32' ? `${name}.exe` : name;
-  const candidates = [
-    path.join(REPO_ROOT, 'engine', 'build-msvc', exe),
-    path.join(REPO_ROOT, 'engine', 'build', exe),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  throw new Error(
-    `${name} binary not found (looked at: ${candidates.join(', ')}). ` +
-    `Build the engine or set ${envVar}.`
-  );
-}
 
 /**
  * The built AGain bundle (2.4c-1), or null when the SDK is not vendored.
@@ -75,36 +54,6 @@ function resolveAgainBundle(): string | null {
     if (fs.existsSync(c)) return c;
   }
   return null;
-}
-
-/** Poll a predicate until it holds or the timeout expires. */
-async function waitUntil(
-  pred: () => boolean,
-  timeoutMs: number,
-  stepMs = 100
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (pred()) return true;
-    await new Promise((r) => setTimeout(r, stepMs));
-  }
-  return pred();
-}
-
-/** Count occurrences of a literal string in a file (0 if unreadable). */
-function countInFile(file: string, needle: string): number {
-  try {
-    const content = fs.readFileSync(file, 'utf-8');
-    let count = 0;
-    let pos = 0;
-    while ((pos = content.indexOf(needle, pos)) !== -1) {
-      count++;
-      pos += needle.length;
-    }
-    return count;
-  } catch {
-    return 0;
-  }
 }
 
 /** Read 16-bit PCM samples from a WAV file (proper RIFF chunk walk). */

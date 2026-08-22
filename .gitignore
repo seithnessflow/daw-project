@@ -56,3 +56,4 @@ fixtures/*.wav
 server/projects/
 web/projects/
 web/test-results/
+server/assets/

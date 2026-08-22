@@ -84,6 +84,13 @@ PROCHAINE ETAPE, dans l'ordre : 1. LE TEST DES MAINS (runbook pret,
 intrant obligatoire) ; 2. session 2.5 re-cadrage, qui OUVRE sur ces notes.
 Critere 5 sous charge : au backlog expres (exige du son reel sur le ZenGo).
 
+**Nuit du 2026-08-22, suite — 2.3 solde :** assetHash = SHA-256 reel
+(vecteurs FIPS, 21/21) ; store d'assets adresse par contenu sur le serveur
+(PUT VERIFIANT — il a debusque un jumeau FNV dans create_test_doc a sa
+premiere execution) ; le moteur tire les assets manquants du store en mode
+serveur (preuve E2E asset-fetch, 12/12). Le triangle de l'architecture est
+FERME sur ses trois cotes.
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |

@@ -45,6 +45,14 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
         .route("/ws/:project_id", get(api::websocket::ws_handler))
+        // 2.3b: content-addressed asset store (engine<->server HTTP side).
+        // 512 MB cap: a 10-minute 48k stereo 24-bit wav is ~170 MB.
+        .route(
+            "/assets/:hash",
+            get(api::assets::get_asset)
+                .put(api::assets::put_asset)
+                .layer(axum::extract::DefaultBodyLimit::max(512 * 1024 * 1024)),
+        )
         .layer(cors)
         .with_state(state);
 

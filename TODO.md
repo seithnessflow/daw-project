@@ -42,8 +42,22 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       (~2,4-4,9 us/change). Le VST3 demarre sans prealable. Dettes datees:
       compaction (declencheur: > ~100k changes / load web > 500 ms),
       coalescing des drags (optionnel, session web courte).
-- [ ] 2.3 SHA-256 des assets + cote moteur<->serveur du triangle (HTTP) —
-      le rendu des pistes a plugins en dependra.
+- [x] 2.3 FAIT 2026-08-22 (nuit post-jalon, en deux verdicts) :
+      a. SHA-256 reel (util/sha256 autonome, vecteurs FIPS, streaming) —
+         assetHash est enfin ce que SCHEMA.md pretendait ; le hash est une
+         CLE DE NOM (<hash>.wav), les documents historiques FNV restent
+         valides comme noms. 21/21.
+      b. Le cote HTTP du triangle : store adresse par contenu sur le
+         serveur (GET/PUT /assets/:hash, le PUT VERIFIE sha256(corps) ==
+         cle — et cette verification a debusque des sa premiere execution
+         un JUMEAU FNV oublie dans create_test_doc, soude depuis) ; le
+         moteur, au miss local en mode serveur, tire l'asset du store
+         (verifie, ecrit atomiquement, echecs memorises par session).
+         Tests : asset_store (Rust, refuse le mensonge), asset-fetch
+         (E2E : asset present SEULEMENT sur le serveur -> le moteur le
+         recupere et construit le graphe). E2E 12/12.
+      Le socle de « l'etat des plugins d'abord » (2.5) est pose : les
+      blobs hashes hors CRDT ont leur canal.
 - [ ] 2.3bis AUDIT A FROID avant d'ouvrir 2.4 — session neuve, lecture
       seule, prompt pret : `docs/audit-2-prompt.md`. Question directrice :
       qu'est-ce qui va ceder quand le VST3 va s'appuyer dessus ?

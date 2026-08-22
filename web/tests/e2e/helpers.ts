@@ -4,6 +4,70 @@
  */
 
 import { Page, BrowserContext } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// ---- Node-side harness utilities (shared by specs that spawn the engine;
+// extracted per the twins rule - copies of these once diverged) -------------
+
+export const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..', '..', '..'
+);
+
+/** Resolve an engine-side binary: env override, then known build trees. */
+export function resolveBinary(envVar: string, name: string): string {
+  const fromEnv = process.env[envVar];
+  if (fromEnv) {
+    if (!fs.existsSync(fromEnv)) {
+      throw new Error(`${envVar}=${fromEnv} does not exist`);
+    }
+    return fromEnv;
+  }
+  const exe = process.platform === 'win32' ? `${name}.exe` : name;
+  const candidates = [
+    path.join(REPO_ROOT, 'engine', 'build-msvc', exe),
+    path.join(REPO_ROOT, 'engine', 'build', exe),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  throw new Error(
+    `${name} binary not found (looked at: ${candidates.join(', ')}). ` +
+    `Build the engine or set ${envVar}.`
+  );
+}
+
+/** Poll a predicate until it holds or the timeout expires. */
+export async function waitUntil(
+  pred: () => boolean,
+  timeoutMs: number,
+  stepMs = 100
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (pred()) return true;
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+  return pred();
+}
+
+/** Count occurrences of a literal string in a file (0 if unreadable). */
+export function countInFile(file: string, needle: string): number {
+  try {
+    const content = fs.readFileSync(file, 'utf-8');
+    let count = 0;
+    let pos = 0;
+    while ((pos = content.indexOf(needle, pos)) !== -1) {
+      count++;
+      pos += needle.length;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
 
 export interface CRDTDiagnostics {
   actorId: string;

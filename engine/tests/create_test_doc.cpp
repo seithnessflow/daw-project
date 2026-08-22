@@ -6,6 +6,7 @@
 
 #include "../src/document/automerge_document.h"
 #include "../src/document/schema.h"
+#include "../src/util/sha256.h"
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -78,29 +79,12 @@ void createTestWav(const std::string& path, uint32_t sample_rate, uint32_t durat
     std::cout << "Created " << path << " (" << duration_seconds << " seconds, 440Hz)\n";
 }
 
-// Simple hash for asset identification
+// Asset identification = THE pipeline's hash (util/sha256), never a local
+// copy. The old FNV twin here survived 2.3a unnoticed because every flow
+// was internally consistent - it took the server's verifying PUT to catch
+// it (uploads demand a real sha256 key). Twins rule, learned again.
 std::string computeHash(const std::string& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return "";
-
-    uint64_t hash = 0xcbf29ce484222325ULL;
-    constexpr uint64_t prime = 0x100000001b3ULL;
-
-    char buffer[4096];
-    while (file.read(buffer, sizeof(buffer))) {
-        for (size_t i = 0; i < sizeof(buffer); ++i) {
-            hash ^= static_cast<uint8_t>(buffer[i]);
-            hash *= prime;
-        }
-    }
-    for (std::streamsize i = 0; i < file.gcount(); ++i) {
-        hash ^= static_cast<uint8_t>(buffer[i]);
-        hash *= prime;
-    }
-
-    char hex[17];
-    snprintf(hex, sizeof(hex), "%016llx", static_cast<unsigned long long>(hash));
-    return hex;
+    return daw::util::sha256HexFile(path);
 }
 
 int main(int argc, char* argv[]) {
