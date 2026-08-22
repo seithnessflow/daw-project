@@ -11,9 +11,13 @@
 // Metrics and their honest limits:
 // - true_peak_dbfs: 4x oversampled peak (windowed-sinc interpolation
 //   around candidate samples). sample_peak_dbfs is the raw sample max.
-// - discontinuities: |x[n]-x[n-1]| > 0.5 per channel. A CLICK HEURISTIC,
-//   not truth: legitimate square-wave fixtures trip it. The known-signal
-//   rule (CLAUDE.md) uses pure tones precisely so this stays meaningful.
+// - discontinuities: |x[n]-x[n-1]| > 0.5 per channel, a CLICK heuristic.
+//   PERIODIC edges are content, not clicks (hardened 2026-08-22 after a
+//   loud square in the lab tripped the gate): when the >0.5 jumps are
+//   numerous AND regularly spaced, they are reported as periodic_edges
+//   (informative) and do NOT redden the verdict. Honest residual limit:
+//   one real click buried among thousands of regular square edges is
+//   statistically invisible to this heuristic.
 // - rms_dbfs_windows: 100 ms windows, all channels pooled, rounded 0.1 dB.
 // - silence_ratio: fraction of windows below -60 dBFS RMS.
 
@@ -94,11 +98,13 @@ export function analyze(wav) {
   let samplePeak = 0;
   let clipped = 0;
   let discontinuities = 0;
+  let periodicEdges = 0;
   let maxJump = 0;
   let dcMax = 0;
 
   for (const x of channels) {
     let sum = 0;
+    const jumpAt = [];
     for (let n = 0; n < x.length; n++) {
       const a = Math.abs(x[n]);
       if (a > samplePeak) samplePeak = a;
@@ -107,10 +113,41 @@ export function analyze(wav) {
       if (n > 0) {
         const j = Math.abs(x[n] - x[n - 1]);
         if (j > maxJump) maxJump = j;
-        if (j > 0.5) discontinuities++;
+        if (j > 0.5) jumpAt.push([n, j]);
       }
     }
     dcMax = Math.max(dcMax, Math.abs(sum / Math.max(1, x.length)));
+
+    // Periodic edges are content (square/saw at high gain), not clicks:
+    // many jumps whose spacing clusters around a fundamental period.
+    // MEDIAN-based (outlier-immune): overlapping material can push a few
+    // edges under the threshold (double/triple intervals) and silence
+    // gaps create one huge interval - neither should reclassify content
+    // as clicks. Edges within [0.5, 4] x median are periodic; the REST
+    // are the actual click candidates.
+    if (jumpAt.length >= 32) {
+      const intervals = [];
+      for (let i = 1; i < jumpAt.length; i++) {
+        intervals.push(jumpAt[i][0] - jumpAt[i - 1][0]);
+      }
+      const sorted = [...intervals].sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const irregular = intervals.filter(
+        (iv) => iv < median * 0.5 || iv > median * 4).length;
+      if (irregular / intervals.length < 0.10) {
+        // A periodic field. Its edges share an amplitude scale; a
+        // residual is a CLICK only if it clearly exceeds that scale
+        // (interval outliers at field amplitude are the field itself,
+        // displaced by summation with other material).
+        const amps = jumpAt.map(([, j]) => j).sort((a, b) => a - b);
+        const ampP50 = amps[Math.floor(amps.length / 2)];
+        const clicks = jumpAt.filter(([, j]) => j > ampP50 * 1.5).length;
+        periodicEdges += jumpAt.length - clicks;
+        discontinuities += clicks;
+        continue;
+      }
+    }
+    discontinuities += jumpAt.length;
   }
 
   // True peak: 4x oversample only around candidates (samples whose
@@ -166,6 +203,7 @@ export function analyze(wav) {
     rms_dbfs_windows: rmsWindows,
     dc_offset: Math.round(dcMax * 1e6) / 1e6,
     discontinuities,
+    periodic_edges: periodicEdges,
     max_jump: Math.round(maxJump * 1000) / 1000,
     clipped_samples: clipped,
     silence_ratio: Math.round((silent / nWin) * 1000) / 1000,
