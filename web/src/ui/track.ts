@@ -142,7 +142,8 @@ export function createTrackUI(
     const nameStrip = document.createElement('div');
     nameStrip.className = 'clip-name';
     nameStrip.style.background = `hsl(${hue}, 45%, 26%)`;
-    nameStrip.textContent = clip.id;
+    // Human name, not the generated id: 'clip-kick-1787...' -> 'kick'
+    nameStrip.textContent = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
     clipEl.title = clip.assetHash;
     clipEl.appendChild(nameStrip);
     const wave = document.createElement('canvas');

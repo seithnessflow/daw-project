@@ -447,8 +447,13 @@ bool WebSocketServer::writeTokenFile() {
     try {
         std::string path = token_file_path_;
         if (path.empty()) {
-            // Default: temp directory
-            path = (fs::temp_directory_path() / "daw-engine-token").string();
+            // Default: temp directory, PER PORT - the global file was a
+            // collision farm: spec-spawned engines (ports 47901/47902)
+            // clobbered the interactive engine's token, killing every
+            // new page's engine connection (found twice in one day,
+            // 2026-08-22). Readers key on the port they dial.
+            path = (fs::temp_directory_path() /
+                    ("daw-engine-token-" + std::to_string(port_))).string();
         }
 
         std::ofstream file(path);

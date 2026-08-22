@@ -176,6 +176,13 @@ export class EngineClient {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
+  // Transport state as last reported by telemetry (for the Space toggle)
+  private lastPlaying = false;
+
+  isPlaying(): boolean {
+    return this.lastPlaying;
+  }
+
   private sendTransport(action: TransportAction, seekPosition?: number): void {
     const data = seekPosition !== undefined
       ? { action, seekPosition }
@@ -199,6 +206,7 @@ export class EngineClient {
 
     switch (msg.type) {
       case 'position':
+        this.lastPlaying = msg.data.isPlaying ?? false;
         this.onPosition?.(msg.data.positionSamples, this.sampleRate);
         break;
       case 'meters':

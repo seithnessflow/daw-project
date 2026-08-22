@@ -210,6 +210,22 @@ async function init() {
     }
   });
 
+  // Space = play/stop, the first DAW ergonomic (ignored while typing in
+  // a control so it never fights a focused slider)
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat) return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+    e.preventDefault();
+    if (!engineClient?.isConnected()) return;
+    if (engineClient.isPlaying()) {
+      engineClient.stop();
+      engineClient.seek(0);
+    } else {
+      engineClient.play();
+    }
+  });
+
   addTrackBtn.addEventListener('click', () => {
     if (!project) return;
     const trackCount = project.getDocument().tracks.length;

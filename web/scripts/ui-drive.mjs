@@ -23,9 +23,12 @@ const projectId = (() => {
 })();
 
 let token = '';
-try {
-  token = JSON.parse(readFileSync(join(tmpdir(), 'daw-engine-token'), 'utf8')).token ?? '';
-} catch { /* engine pill will just stay grey */ }
+for (const name of ['daw-engine-token-47821', 'daw-engine-token']) {
+  try {
+    token = JSON.parse(readFileSync(join(tmpdir(), name), 'utf8')).token ?? '';
+    if (token) break;
+  } catch { /* engine pill will just stay grey */ }
+}
 const url = `http://localhost:5173/?project=${projectId}${token ? `&token=${token}` : ''}`;
 
 let failures = 0;

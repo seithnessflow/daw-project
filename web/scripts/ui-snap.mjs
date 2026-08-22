@@ -34,12 +34,16 @@ const twoTabs = args.includes('--two-tabs');
 const baseUrl = argValue('--url', 'http://localhost:5173');
 
 function readToken() {
-  try {
-    const raw = readFileSync(join(tmpdir(), 'daw-engine-token'), 'utf8');
-    return JSON.parse(raw).token ?? '';
-  } catch {
-    return '';
+  // Per-port file first (engines stopped clobbering each other's tokens
+  // 2026-08-22); legacy global as fallback for older engine binaries.
+  for (const name of ['daw-engine-token-47821', 'daw-engine-token']) {
+    try {
+      const raw = readFileSync(join(tmpdir(), name), 'utf8');
+      const token = JSON.parse(raw).token;
+      if (token) return token;
+    } catch { /* try next */ }
   }
+  return '';
 }
 
 const token = readToken();
