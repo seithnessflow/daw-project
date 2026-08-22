@@ -1,0 +1,190 @@
+/* ---- Timeline ------------------------------------------------- */
+.tracks {
+  position: relative;
+  overflow: auto;
+  border-radius: var(--r);
+  background: var(--surface);
+  flex: 1;
+  min-height: 0;
+}
+.ruler-row,
+.track {
+  display: flex;
+  align-items: stretch;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+.track-head,
+.ruler-spacer {
+  flex: 0 0 260px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  display: flex;
+}
+.track:hover .track-head {
+  background: #252525;
+}
+.track-selected .track-head,
+.track-selected:hover .track-head {
+  background: #2c2e31;
+}
+.track-selected .track-name {
+  color: #fff;
+}
+.ruler-spacer {
+  padding: 0 10px;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-3);
+  align-items: center;
+}
+.track-color {
+  flex: 0 0 3px;
+}
+.track-head-body {
+  flex: 1;
+  padding: 7px 10px 6px;
+  min-width: 0;
+}
+
+/* Split ruler */
+.ruler {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ruler-cycle {
+  height: 7px;
+  background: #101010;
+}
+.ruler-seek {
+  position: relative;
+  height: 16px;
+  cursor: pointer;
+}
+.ruler-seek:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--hair);
+  font-size: 9px;
+  color: var(--text-3);
+  padding-left: 3px;
+  line-height: 16px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.track-lane {
+  position: relative;
+  flex: 0 0 auto;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.028) 0, rgba(255, 255, 255, 0.028) 1px,
+      transparent 1px, transparent 100px);
+}
+.clip {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: var(--r);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.clip-name {
+  flex: 0 0 13px;
+  font-size: 9px;
+  font-family: Consolas, monospace;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 1px 5px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: grab; /* the title bar drags; the waveform never does */
+  touch-action: none;
+}
+.clip.dragging {
+  opacity: 0.85;
+  z-index: 4;
+}
+.clip.dragging .clip-name {
+  cursor: grabbing;
+}
+.clip[aria-selected='true'] {
+  outline: 1px solid rgba(255, 255, 255, 0.8);
+  filter: brightness(1.18);
+}
+.clip-edge {
+  position: absolute;
+  top: 13px; /* NEVER over the title bar: tiny clips stay grabbable
+                (found by the beat-building session: a 12px kick was
+                swallowed whole by its own edge handles) */
+  bottom: 0;
+  width: 6px;
+  max-width: 30%;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.clip-edge-left {
+  left: 0;
+}
+.clip-edge-right {
+  right: 0;
+}
+.clip-edge:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.clip-wave {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--amber);
+  z-index: 3;
+  pointer-events: none;
+}
+.playhead::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: -4px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid var(--amber);
+}
+.insert-marker {
+  position: absolute;
+  top: 23px; /* below the ruler */
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.35);
+  z-index: 2;
+  pointer-events: none;
+}
+.follow-btn[aria-pressed='true'] {
+  background: #3c3524;
+  color: var(--amber);
+}
+/* H: compact all tracks (fit height) */
+body.compact-tracks .track-head-body {
+  padding: 3px 10px 2px;
+}
+body.compact-tracks .track-fader {
+  margin-top: 1px;
+}
+body.compact-tracks .clip-name {
+  flex-basis: 11px;
+}
+

@@ -1,0 +1,105 @@
+/* ---- Phase 3: the three touch prototypes (hot-switchable) ----- */
+.touch-modes {
+  display: flex;
+  gap: 2px;
+}
+.touch-modes button {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.touch-modes button[aria-pressed='true'] {
+  background: #3c3524;
+  color: var(--amber);
+}
+
+/* A — le poids: short transitions, values pop, drops land.
+   Durations: STYLE.md proposals, pending co-presence verdicts. */
+body.mode-a button,
+body.mode-a .sample-chip {
+  transition: background 80ms, color 80ms;
+}
+body.mode-a .clip {
+  transition: filter 60ms;
+}
+body.mode-a .track-gain.pop {
+  animation: value-pop 160ms ease-out;
+}
+@keyframes value-pop {
+  0% { transform: scale(1.25); color: #fff; }
+  100% { transform: scale(1); }
+}
+body.mode-a .clip.landed {
+  animation: clip-land 220ms ease-out;
+}
+@keyframes clip-land {
+  0% { transform: scale(1.06); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+body.mode-a input[type='range']:active::-webkit-slider-thumb {
+  transform: scaleY(1.25);
+}
+
+/* B — la pre-reponse: hover announces what a click would do */
+body.mode-b .clip:hover {
+  filter: brightness(1.12);
+}
+body.mode-b .clip:hover .clip-wave {
+  filter: contrast(1.6) brightness(1.35);
+}
+body.mode-b .clip:hover .clip-edge {
+  width: 10px;
+  background: rgba(255, 255, 255, 0.10);
+}
+body.mode-b .track:hover .track-color {
+  width: 5px;
+}
+body.mode-b .monitor-btn:hover,
+body.mode-b .sample-chip:hover {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+body.mode-b .track-lane.dropover {
+  background: rgba(88, 179, 104, 0.18);
+  box-shadow: inset 0 0 0 2px rgba(88, 179, 104, 0.7);
+}
+body.mode-b .ruler-seek:hover {
+  background: rgba(232, 193, 90, 0.06);
+}
+
+/* C — la couleur comme energie: saturation is driven live by the
+   life layer via --sat; clipping desaturates all but the red */
+body.mode-c.life-clipping .track-color,
+body.mode-c.life-clipping .clip {
+  filter: saturate(0.25);
+}
+body.mode-c.life-clipping .life-hot {
+  box-shadow: inset 3px 0 0 var(--red), 0 0 8px rgba(208, 85, 72, 0.35);
+}
+
+.track-empty .track-head-body {
+  padding: 3px 10px 2px;
+}
+.track-empty .track-name {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.track-empty .track-fader {
+  margin-top: 1px;
+}
+
+.addtrack {
+  margin: 6px 0;
+  align-self: flex-start;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.addtrack:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+

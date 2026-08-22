@@ -1,0 +1,98 @@
+/* ---- Track head interior -------------------------------------- */
+.track-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.track-name {
+  font-weight: 600;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.track-gain {
+  font-family: Consolas, monospace;
+  font-size: 10px;
+  color: var(--text-3);
+  min-width: 46px;
+  text-align: right;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.track-monitor {
+  display: flex;
+  gap: 2px;
+}
+.monitor-btn {
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.monitor-mute[aria-pressed='true'] {
+  background: var(--orange);
+  color: #241605;
+}
+.monitor-solo[aria-pressed='true'] {
+  background: var(--blue);
+  color: #0a1a29;
+}
+.track-fader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+}
+/* Faders: a slim track and a RECTANGULAR thumb - a fader, not a
+   web form control */
+input[type='range'] {
+  -webkit-appearance: none;
+  background: transparent;
+  height: 16px;
+  min-width: 40px;
+  margin: 0;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  background: #3a3a3a;
+  border-radius: 2px;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 5px;
+  height: 15px;
+  margin-top: -6px;
+  background: #b8b8b8;
+  border-radius: 1px;
+  cursor: ew-resize;
+}
+input[type='range']:hover::-webkit-slider-thumb {
+  background: #e8e8e8;
+}
+.track-fader input {
+  flex: 1;
+}
+.track-meter {
+  position: relative; /* peak tick anchor (life layer) */
+  width: 52px;
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.track-meter-fill {
+  height: 100%;
+  background: linear-gradient(90deg,
+    var(--green) 0 70%, #d9c341 70% 90%, var(--red) 90%);
+  width: 0%;
+  /* no CSS transition: the life layer's ballistics own the motion */
+}
+

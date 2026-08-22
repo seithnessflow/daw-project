@@ -151,6 +151,11 @@ Interdit:
 - Pas d'accents dans code/commits (clavier QWERTY)
 - Commits: emoji robot + Co-Authored-By Claude
 - ADR pour decisions architecturales
+- SPLITTER AU MAXIMUM (regle 2026-08-22) : toujours preferer plusieurs
+  petits fichiers a un gros — CSS en modules par zone (HMR par fichier,
+  jamais de <style> dans index.html), logique en modules par
+  responsabilite. Un fichier qui grossit se remanie sans hesiter ; le
+  harnais de contrats est la pour ca.
 
 ## Outillage UI/audio — les yeux et l'oreille (chantier UI)
 

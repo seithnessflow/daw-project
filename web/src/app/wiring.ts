@@ -1,0 +1,432 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * Wiring: clients, event listeners, keyboard - init() assembles the
+ * app from the split modules. No business logic lives here; each
+ * handler delegates to its module.
+ */
+
+import { Project } from '../document/project';
+import { ServerClient } from '../network/server_client';
+import { EngineClient } from '../network/engine_client';
+import { TIMELINE } from '../ui/track';
+import * as life from '../ui/life';
+import { formatTime } from '../ui/transport';
+import { Library, loadKit } from '../ui/library';
+import { Overview } from '../ui/overview';
+import {
+  ctx, els, sendLastChange,
+  SERVER_URL, ENGINE_PORT, PROJECT_ID, LAB_MODE,
+} from './context';
+import {
+  setZoom, fitAll, snapStep, contentSeconds,
+  updateInsertMarker, refreshOverview,
+} from './navigation';
+import { startPlayback, stopPlayback } from './transport';
+import { beginClipDrag, beginClipResize, markLanded } from './gestures';
+import { handleFileDrop } from './placement';
+import { renderTracks } from './render';
+
+declare global {
+  interface Window {
+    __dawProject: Project | null;
+  }
+}
+
+export async function init(): Promise<void> {
+  console.log('Magic Potion starting...');
+
+  ctx.project = new Project();
+  window.__dawProject = ctx.project;
+
+  // ---- Server (document) --------------------------------------------------
+  const serverClient = new ServerClient(SERVER_URL);
+  ctx.serverClient = serverClient;
+  serverClient.onConnect = () => {
+    els.serverStatus.classList.add('connected');
+    // Selection contract: tests read data-state, the class only styles
+    els.serverStatus.dataset.state = 'connected';
+    console.log('Connected to server');
+  };
+  serverClient.onDisconnect = () => {
+    els.serverStatus.classList.remove('connected');
+    els.serverStatus.dataset.state = 'disconnected';
+    console.log('Disconnected from server');
+  };
+  let hasLoadedInitialDoc = false;
+  // Anti-entropy cycles still owed after a reconnection (see below)
+  let resyncCycles = 0;
+  serverClient.onDocument = (data) => {
+    if (!hasLoadedInitialDoc) {
+      // Very first document: adopt the server state wholesale (the local
+      // document is a pristine placeholder with no user edits)
+      ctx.project!.load(data);
+      hasLoadedInitialDoc = true;
+    } else {
+      // Reconnection: MERGE the server document into the local one -
+      // never replace it, so offline edits survive and reconcile
+      console.log('Reconnected: merging server document into local state');
+      const hadPending = serverClient.pendingCount() > 0;
+      const mergedNovelty = ctx.project!.mergeRemote(data);
+      // A3-4, the push half of anti-entropy: local novelty the server
+      // LACKS (a dead-socket flush swallows changes silently) goes back
+      // up, in causal order, on EVERY reconnection.
+      const missing = ctx.project!.getMissingChanges(data);
+      if (missing.length > 0) {
+        console.log(`Pushing ${missing.length} change(s) the server lacks`);
+        for (const change of missing) {
+          serverClient.sendChange(change);
+        }
+      }
+      // Whenever an exchange moved anything, demand TWO consecutive
+      // no-op exchanges before stopping the verification cycles.
+      if (mergedNovelty || hadPending || missing.length > 0) {
+        resyncCycles = 2;
+      } else if (resyncCycles > 0) {
+        resyncCycles--;
+      }
+      if (resyncCycles > 0) {
+        serverClient.requestResync();
+      }
+    }
+    renderTracks();
+  };
+  serverClient.onChange = (change) => {
+    // A3-5: a change that fails to apply must trigger a resync
+    if (!ctx.project!.applyChange(change)) {
+      console.warn('Change failed to apply - requesting resync');
+      serverClient.requestResync(200);
+    }
+    renderTracks();
+  };
+
+  // ---- Engine (telemetry + transport) -------------------------------------
+  const engineToken =
+    new URLSearchParams(window.location.search).get('token') ?? '';
+  const engineClient = new EngineClient({ port: ENGINE_PORT, token: engineToken });
+  ctx.engineClient = engineClient;
+  engineClient.onConnect = () => {
+    els.engineStatus.classList.add('connected');
+    els.engineStatus.dataset.state = 'connected';
+    els.playBtn.disabled = false;
+    els.stopBtn.disabled = false;
+    console.log('Connected to engine');
+  };
+  engineClient.onDisconnect = () => {
+    els.engineStatus.classList.remove('connected');
+    els.engineStatus.dataset.state = 'disconnected';
+    els.playBtn.disabled = true;
+    els.stopBtn.disabled = true;
+    console.log('Disconnected from engine');
+  };
+  engineClient.onPosition = (samples, sampleRate) => {
+    els.position.textContent = formatTime(samples, sampleRate);
+    ctx.lastPlayheadSec = samples / sampleRate;
+    life.setPosition(ctx.lastPlayheadSec, engineClient.isPlaying());
+    refreshOverview();
+    // Playhead on the shared scale, PARKED at the lane's end when the
+    // engine plays past the content.
+    const playhead = document.getElementById('playhead');
+    if (playhead) {
+      const lane = document.querySelector('.track-lane') as HTMLElement | null;
+      const laneW = lane ? lane.offsetWidth : Infinity;
+      const x = (samples / sampleRate) * TIMELINE.pps;
+      playhead.style.left = `${TIMELINE.headWidth + Math.min(x, laneW)}px`;
+
+      // Follow: keep the playhead in the comfort zone while playing
+      if (ctx.follow && !ctx.followPaused && engineClient.isPlaying()) {
+        const viewW = els.tracks.clientWidth;
+        const headX =
+          TIMELINE.headWidth + Math.min(x, laneW) - els.tracks.scrollLeft;
+        if (headX > viewW * 0.7 || headX < TIMELINE.headWidth) {
+          ctx.programmaticScroll = true;
+          els.tracks.scrollLeft = Math.max(0,
+            TIMELINE.headWidth + Math.min(x, laneW) - viewW * 0.3);
+        }
+      }
+    }
+  };
+  // The life layer eats the telemetry - raw values never hit the DOM
+  engineClient.onMeters = (meters) => {
+    life.setTrackLevels(meters.map(({ trackId, peakLeft, peakRight }) =>
+      ({ trackId, peak: Math.max(peakLeft, peakRight) })));
+  };
+  engineClient.onState = (state) => {
+    life.setEngineState(state.pluginBlocksMissed);
+  };
+
+  // ---- Transport controls -------------------------------------------------
+  els.playBtn.addEventListener('click', startPlayback);
+  els.stopBtn.addEventListener('click', stopPlayback);
+
+  const followBtn = document.getElementById('follow-btn') as HTMLButtonElement;
+  followBtn.setAttribute('aria-pressed', 'true');
+  followBtn.addEventListener('click', () => {
+    ctx.follow = !ctx.follow;
+    ctx.followPaused = false;
+    followBtn.setAttribute('aria-pressed', ctx.follow ? 'true' : 'false');
+  });
+
+  // ---- Library / palette --------------------------------------------------
+  if (LAB_MODE) {
+    const kit = await loadKit();
+    if (kit) {
+      ctx.library = new Library(kit);
+      document.getElementById('library-slot')!.appendChild(ctx.library.element);
+    }
+  }
+
+  // ---- Drag & drop a WAV on a lane ---------------------------------------
+  els.tracks.addEventListener('dragover', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    if (!lane) return;
+    e.preventDefault();
+    lane.classList.add('dropover');
+  });
+  els.tracks.addEventListener('dragleave', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    lane?.classList.remove('dropover');
+  });
+  els.tracks.addEventListener('drop', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    if (!lane) return;
+    e.preventDefault();
+    lane.classList.remove('dropover');
+    const trackEl = lane.closest('[data-track-id]') as HTMLElement | null;
+    const trackId = trackEl?.getAttribute('data-track-id');
+    const file = e.dataTransfer?.files?.[0];
+    if (!trackId || !file) return;
+    const x = e.clientX - lane.getBoundingClientRect().left;
+    void handleFileDrop(file, trackId, x);
+  });
+
+  // ---- Overview (potion A2) ----------------------------------------------
+  ctx.overview = new Overview({
+    onScrollTo: (sec) => {
+      ctx.followPaused = true;
+      ctx.programmaticScroll = true;
+      els.tracks.scrollLeft = Math.max(0,
+        sec * TIMELINE.pps - (els.tracks.clientWidth - TIMELINE.headWidth) / 2);
+      refreshOverview();
+    },
+    onZoom: (factor, anchorSec) => {
+      const rect = els.tracks.getBoundingClientRect();
+      setZoom(TIMELINE.pps * factor, anchorSec,
+        TIMELINE.headWidth + (rect.width - TIMELINE.headWidth) / 2);
+    },
+    onFit: fitAll,
+  });
+  document.getElementById('overview-slot')!.appendChild(ctx.overview.element);
+
+  // ---- Pointer gestures on the timeline ----------------------------------
+  els.tracks.addEventListener('pointerdown', (e) => {
+    const target = e.target as HTMLElement;
+    const edge = target.closest('[data-role="clip-edge"]') as HTMLElement | null;
+    if (edge) {
+      beginClipResize(e, edge);
+      return;
+    }
+    const handle = target.closest('[data-role="clip-handle"]') as HTMLElement | null;
+    if (handle) beginClipDrag(e, handle);
+  });
+
+  els.tracks.addEventListener('click', (e) => {
+    if (ctx.justDragged) return;   // the pointerup already did the work
+    const target = e.target as HTMLElement;
+    const seekBand = target.closest('[data-role="seek"]') as HTMLElement | null;
+    if (seekBand) {
+      const x = e.clientX - seekBand.getBoundingClientRect().left;
+      const sr = ctx.project?.getDocument().sampleRate || 48000;
+      engineClient.seek(Math.round(Math.max(0, x / TIMELINE.pps) * sr));
+      return;
+    }
+    const trackEl = target.closest('[data-track-id]') as HTMLElement | null;
+    if (!trackEl) return;
+    const id = trackEl.getAttribute('data-track-id');
+    if (!id || !ctx.project) return;
+
+    const armed = ctx.library?.getArmed() ?? null;
+    const lane = target.closest('.track-lane') as HTMLElement | null;
+    if (armed && lane) {
+      // Place the armed sample, snapped to a 0.25 s grid
+      const sr = ctx.project.getDocument().sampleRate || 48000;
+      const x = e.clientX - lane.getBoundingClientRect().left;
+      const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      const placedId = `clip-${armed.name}-${Date.now()}`;
+      ctx.project.addClip(id, {
+        id: placedId,
+        assetHash: armed.hash,
+        startSample: Math.round(seconds * sr),
+        lengthSamples: Math.round(armed.seconds * sr),
+        offsetSamples: 0,
+      });
+      sendLastChange();
+      renderTracks();
+      markLanded(placedId);
+      return;
+    }
+    // Lane click (unarmed): select the track AND set the insert marker
+    // (Ableton: one click, two effects). Deselects any selected clip.
+    ctx.selectedClipId = null;
+    if (lane) {
+      const x = e.clientX - lane.getBoundingClientRect().left;
+      ctx.insertMarkerSec =
+        Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      updateInsertMarker();
+      ctx.followPaused = true;   // editing intent: stop chasing
+    }
+    if (id !== ctx.selectedTrackId) {
+      ctx.selectedTrackId = id;
+      renderTracks(true);
+    }
+  });
+
+  // ---- Keyboard -----------------------------------------------------------
+  window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+    // Delete: remove the selected clip; selection CLEARED (Ableton)
+    if ((e.code === 'Delete' || e.code === 'Backspace') &&
+        ctx.selectedClipId && ctx.project) {
+      e.preventDefault();
+      const doc = ctx.project.getDocument();
+      const track = doc.tracks.find((t) =>
+        t.clips.some((c) => c.id === ctx.selectedClipId));
+      if (track) {
+        ctx.project.deleteClip(track.id, ctx.selectedClipId!);
+        sendLastChange();
+        ctx.selectedClipId = null;
+        renderTracks(true);
+      }
+      return;
+    }
+    // Ctrl+D: duplicate onto the next grid slot, selection on the COPY
+    if (e.code === 'KeyD' && (e.ctrlKey || e.metaKey) &&
+        ctx.selectedClipId && ctx.project) {
+      e.preventDefault();
+      const doc = ctx.project.getDocument();
+      const sr = doc.sampleRate || 48000;
+      const track = doc.tracks.find((t) =>
+        t.clips.some((c) => c.id === ctx.selectedClipId));
+      const clip = track?.clips.find((c) => c.id === ctx.selectedClipId);
+      if (track && clip) {
+        const grid = snapStep() * sr;
+        const start =
+          Math.ceil((clip.startSample + clip.lengthSamples) / grid) * grid;
+        const name = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+        const copyId = `clip-${name}-${Date.now()}`;
+        ctx.project.addClip(track.id, {
+          id: copyId,
+          assetHash: clip.assetHash,
+          startSample: Math.round(start),
+          lengthSamples: clip.lengthSamples,
+          offsetSamples: clip.offsetSamples,
+        });
+        sendLastChange();
+        ctx.selectedClipId = copyId;
+        renderTracks(true);
+      }
+      return;
+    }
+    if (e.code === 'Space' && !e.repeat) {
+      e.preventDefault();
+      if (!engineClient.isConnected()) return;
+      if (engineClient.isPlaying()) stopPlayback();
+      else startPlayback();
+      return;
+    }
+    const rect = els.tracks.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerSec = Math.max(0,
+      (els.tracks.scrollLeft + rect.width / 2 - TIMELINE.headWidth) / TIMELINE.pps);
+    if (e.key === '+' || e.key === '=') {
+      setZoom(TIMELINE.pps * 1.25, centerSec, centerX - rect.left);
+    } else if (e.key === '-') {
+      setZoom(TIMELINE.pps / 1.25, centerSec, centerX - rect.left);
+    } else if (e.code === 'KeyW') {
+      fitAll();
+    } else if (e.code === 'KeyH') {
+      document.body.classList.toggle('compact-tracks');
+    } else if (e.code === 'KeyZ') {
+      // Zoom to the marker's neighborhood; X pops back (Ableton Z/X)
+      ctx.zoomStack.push({ pps: TIMELINE.pps, scrollLeft: els.tracks.scrollLeft });
+      const windowSec = 8;
+      const pps = (rect.width - TIMELINE.headWidth) / windowSec;
+      setZoom(pps, Math.max(0, ctx.insertMarkerSec - windowSec / 2),
+        TIMELINE.headWidth);
+    } else if (e.code === 'KeyX') {
+      const prev = ctx.zoomStack.pop();
+      if (prev) {
+        TIMELINE.pps = prev.pps;
+        renderTracks(true);
+        ctx.programmaticScroll = true;
+        els.tracks.scrollLeft = prev.scrollLeft;
+        refreshOverview();
+      }
+    }
+  });
+
+  // Ctrl+wheel = zoom around the cursor; plain wheel pauses Follow
+  els.tracks.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) {
+      ctx.followPaused = true;
+      return;
+    }
+    e.preventDefault();
+    const rect = els.tracks.getBoundingClientRect();
+    const viewportX = e.clientX - rect.left;
+    const anchorSec = Math.max(0,
+      (els.tracks.scrollLeft + viewportX - TIMELINE.headWidth) / TIMELINE.pps);
+    const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    setZoom(TIMELINE.pps * factor, anchorSec, viewportX);
+  }, { passive: false });
+
+  els.tracks.addEventListener('scroll', () => {
+    refreshOverview();
+    if (ctx.programmaticScroll) {
+      ctx.programmaticScroll = false;
+      return;
+    }
+    ctx.followPaused = true;
+  });
+
+  // ---- Phase 3: the touch prototypes (user arbitrates, never the agent) ---
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    '[data-role="touch-mode"]')) {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode!;
+      const on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      document.body.classList.toggle(`mode-${mode}`, on);
+      if (mode === 'c' && !on) document.body.classList.remove('life-clipping');
+      renderTracks(true);
+    });
+  }
+
+  els.addTrackBtn.addEventListener('click', () => {
+    if (!ctx.project) return;
+    const trackCount = ctx.project.getDocument().tracks.length;
+    ctx.project.addTrack({
+      id: `track-${Date.now()}`,
+      name: `Track ${trackCount + 1}`,
+      gain: 1.0,
+      clips: [],
+      chain: [],
+    });
+    sendLastChange();
+    renderTracks();
+  });
+
+  void contentSeconds;  // (exported for future callers; silence TS 6133)
+
+  // ---- Connect ------------------------------------------------------------
+  try {
+    await serverClient.connect(PROJECT_ID);
+  } catch (e) {
+    console.error('Failed to connect to server:', e);
+  }
+  try {
+    await engineClient.connect();
+  } catch (e) {
+    console.error('Failed to connect to engine:', e);
+  }
+}

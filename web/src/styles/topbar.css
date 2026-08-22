@@ -1,0 +1,58 @@
+/* ---- Control bar ---------------------------------------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+h1 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-2);
+}
+.transport {
+  display: flex;
+  gap: 2px;
+}
+.transport button {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 26px;
+}
+.position {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #b7d9a8;
+  background: #0d0f0c;
+  border-radius: var(--r);
+  padding: 4px 14px 3px;
+}
+.status {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  color: var(--text-3);
+}
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3d3d3d;
+}
+.status-dot.connected {
+  background: var(--green);
+}
+
