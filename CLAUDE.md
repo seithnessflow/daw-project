@@ -186,6 +186,11 @@ en attente ni en remplissage. Ces règles priment sur le confort.
   signalement suffit. Les refontes passent par le circuit critique ci-dessous.
 - Escalade au lieu de bricoler : « ESCALADE PROPOSÉE : <raison> » puis stop, pour
   toute décision d'architecture, dépendance immature, ou incohérence STATUS.md/réel.
+- Nuance (gravée après la révision de profondeur du pipeline, 2026-08-22) :
+  une décision d'ENTRÉE contredite par une MESURE peut être révisée en session
+  si le périmètre ne bouge pas ET que la révision est documentée partout
+  (TODO, STATUS, contrat/ADR concerné). Tout changement de MÉCANISME
+  (abandonner le ring, changer d'IPC…) reste une escalade, mesure ou pas.
 - Thread audio, auth, format du document : jamais d'économie de vérification.
   Tests de non-régression obligatoires, quel que soit le coût.
 

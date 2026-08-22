@@ -92,6 +92,10 @@ export interface EngineState {
   latencySamples: number;
   /** 2.4c-1: bridge blocks bypassed (child late/dead) */
   pluginBlocksMissed: number;
+  /** c-2: false during a death window / permanent bypass */
+  pluginChildAlive: boolean;
+  /** c-2: cold restart attempts (budget 3) */
+  pluginChildRestarts: number;
 }
 
 /** Error from engine */
@@ -625,7 +629,14 @@ export const Meters: MessageFns<Meters> = {
 };
 
 function createBaseEngineState(): EngineState {
-  return { bufferUnderruns: 0, cpuPercent: 0, latencySamples: 0, pluginBlocksMissed: 0 };
+  return {
+    bufferUnderruns: 0,
+    cpuPercent: 0,
+    latencySamples: 0,
+    pluginBlocksMissed: 0,
+    pluginChildAlive: false,
+    pluginChildRestarts: 0,
+  };
 }
 
 export const EngineState: MessageFns<EngineState> = {
@@ -641,6 +652,12 @@ export const EngineState: MessageFns<EngineState> = {
     }
     if (message.pluginBlocksMissed !== 0) {
       writer.uint32(32).uint64(message.pluginBlocksMissed);
+    }
+    if (message.pluginChildAlive !== false) {
+      writer.uint32(40).bool(message.pluginChildAlive);
+    }
+    if (message.pluginChildRestarts !== 0) {
+      writer.uint32(48).uint32(message.pluginChildRestarts);
     }
     return writer;
   },
@@ -690,6 +707,22 @@ export const EngineState: MessageFns<EngineState> = {
             message.pluginBlocksMissed = longToNumber(reader.uint64());
             continue;
           }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.pluginChildAlive = reader.bool();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.pluginChildRestarts = reader.uint32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -724,6 +757,16 @@ export const EngineState: MessageFns<EngineState> = {
         : isSet(object.plugin_blocks_missed)
         ? globalThis.Number(object.plugin_blocks_missed)
         : 0,
+      pluginChildAlive: isSet(object.pluginChildAlive)
+        ? globalThis.Boolean(object.pluginChildAlive)
+        : isSet(object.plugin_child_alive)
+        ? globalThis.Boolean(object.plugin_child_alive)
+        : false,
+      pluginChildRestarts: isSet(object.pluginChildRestarts)
+        ? globalThis.Number(object.pluginChildRestarts)
+        : isSet(object.plugin_child_restarts)
+        ? globalThis.Number(object.plugin_child_restarts)
+        : 0,
     };
   },
 
@@ -741,6 +784,12 @@ export const EngineState: MessageFns<EngineState> = {
     if (message.pluginBlocksMissed !== 0) {
       obj.pluginBlocksMissed = Math.round(message.pluginBlocksMissed);
     }
+    if (message.pluginChildAlive !== false) {
+      obj.pluginChildAlive = message.pluginChildAlive;
+    }
+    if (message.pluginChildRestarts !== 0) {
+      obj.pluginChildRestarts = Math.round(message.pluginChildRestarts);
+    }
     return obj;
   },
 
@@ -753,6 +802,8 @@ export const EngineState: MessageFns<EngineState> = {
     message.cpuPercent = object.cpuPercent ?? 0;
     message.latencySamples = object.latencySamples ?? 0;
     message.pluginBlocksMissed = object.pluginBlocksMissed ?? 0;
+    message.pluginChildAlive = object.pluginChildAlive ?? false;
+    message.pluginChildRestarts = object.pluginChildRestarts ?? 0;
     return message;
   },
 };

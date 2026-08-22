@@ -43,6 +43,8 @@
 #define NOMINMAX
 #include <windows.h>
 #else
+#include <cerrno>
+#include <csignal>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -399,8 +401,39 @@ daw::host::SharedAudioRing* mapSegment(const std::string& path) {
 }
 
 int runServe(const std::string& segment_path, const std::string& module_path,
-             const std::string& uid_str) {
+             const std::string& uid_str, long long parent_pid) {
     using namespace Steinberg;
+
+    // Engine-death watch (c-2): a hard-killed engine cannot raise the
+    // shutdown flag; without this the child spins forever (observed: an
+    // orphan held plugin_host.exe locked). A parent that cannot even be
+    // opened is treated as already dead.
+#ifdef _WIN32
+    HANDLE parent_handle = nullptr;
+    if (parent_pid > 0) {
+        parent_handle = OpenProcess(SYNCHRONIZE, FALSE,
+                                    static_cast<DWORD>(parent_pid));
+        if (!parent_handle) {
+            std::cerr << "plugin_host: parent " << parent_pid
+                      << " not reachable - exiting" << std::endl;
+            return 0;
+        }
+    }
+    auto parentDead = [&]() {
+        return parent_handle &&
+               WaitForSingleObject(parent_handle, 0) == WAIT_OBJECT_0;
+    };
+#else
+    auto parentDead = [&]() {
+        return parent_pid > 0 &&
+               kill(static_cast<pid_t>(parent_pid), 0) == -1 && errno == ESRCH;
+    };
+    if (parent_pid > 0 && parentDead()) {
+        std::cerr << "plugin_host: parent " << parent_pid
+                  << " not reachable - exiting" << std::endl;
+        return 0;
+    }
+#endif
 
     daw::host::SharedAudioRing* ring = mapSegment(segment_path);
     if (!ring) {
@@ -431,6 +464,7 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     uint64_t last_in = 0;
     uint64_t last_param = 0;
     uint64_t beats = 1;
+    uint64_t idle_spins = 0;
 
     while (ring->shutdown.load(std::memory_order_acquire) == 0) {
         const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);
@@ -440,6 +474,11 @@ int runServe(const std::string& segment_path, const std::string& module_path,
             // core on a 32-thread machine is the cheap side of that trade.
             // Dated debt: waitable event if this child ever shares a small
             // machine.
+            if ((++idle_spins & 0x3FF) == 0 && parentDead()) {
+                std::cerr << "plugin_host: engine gone - exiting" << std::endl;
+                inst.teardown();
+                return 0;
+            }
             std::this_thread::yield();
             continue;
         }
@@ -461,17 +500,30 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 
         Vst::ParameterChanges param_changes;
         param_changes.setMaxParameters(1);
-        const uint64_t pseq = ring->param_seq.load(std::memory_order_acquire);
-        if (pseq != last_param) {
-            last_param = pseq;
+        // Odd/even seqlock read (see shared_audio_ring.h): bounded retries,
+        // a torn or in-progress read is simply deferred to the next block -
+        // latest wins either way
+        for (int attempt = 0; attempt < 4; ++attempt) {
+            const uint64_t s1 = ring->param_seq.load(std::memory_order_acquire);
+            if (s1 == last_param) break;          // nothing new
+            if (s1 & 1) {                         // write in progress
+                std::this_thread::yield();
+                continue;
+            }
+            const uint32_t id = ring->param_id.load(std::memory_order_relaxed);
+            const double value = ring->param_value.load(std::memory_order_relaxed);
+            std::atomic_thread_fence(std::memory_order_acquire);
+            if (ring->param_seq.load(std::memory_order_relaxed) != s1) {
+                continue;                         // torn: pairing not trusted
+            }
+            last_param = s1;
             int32 queue_index = 0;
-            auto* queue = param_changes.addParameterData(
-                ring->param_id.load(std::memory_order_relaxed), queue_index);
+            auto* queue = param_changes.addParameterData(id, queue_index);
             if (queue) {
                 int32 point_index = 0;
-                queue->addPoint(0, ring->param_value.load(std::memory_order_relaxed),
-                                point_index);
+                queue->addPoint(0, value, point_index);
             }
+            break;
         }
 
         // Zero-copy: VST3 channel pointers aim straight into the segment
@@ -525,6 +577,7 @@ int main(int argc, char* argv[]) {
         // Calling convention fixed by PluginBridge::spawnChild - the two
         // sides of this command line live in two executables
         std::string segment_path, module_path, uid;
+        long long parent_pid = 0;
         bool args_ok = (argc >= 3);
         if (args_ok) segment_path = argv[2];
         for (int i = 3; i + 1 < argc && args_ok; i += 2) {
@@ -532,10 +585,11 @@ int main(int argc, char* argv[]) {
             const std::string v = argv[i + 1];
             if (a == "--module") module_path = v;
             else if (a == "--uid") uid = v;
+            else if (a == "--parent") parent_pid = std::stoll(v);
             else args_ok = false;
         }
         if (args_ok && !module_path.empty() && !uid.empty()) {
-            return runServe(segment_path, module_path, uid);
+            return runServe(segment_path, module_path, uid, parent_pid);
         }
     }
 
@@ -569,7 +623,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Usage:\n"
               << "  plugin_host --enumerate <path.vst3>\n"
               << "  plugin_host --process <path.vst3> --uid <hex32> --in <in.wav> --out <out.wav> [--param <id>:<norm>]\n"
-              << "  plugin_host --serve <segment.shm> --module <path.vst3> --uid <hex32>"
+              << "  plugin_host --serve <segment.shm> --module <path.vst3> --uid <hex32> [--parent <pid>]"
               << std::endl;
     return 2;
 }

@@ -117,6 +117,13 @@ public:
         plugin_blocks_missed_ = counter;
     }
 
+    /** c-2: child liveness + restart attempts, same ownership rules. */
+    void setPluginChildState(const std::atomic<bool>* alive,
+                             const std::atomic<uint32_t>* restarts) {
+        plugin_child_alive_ = alive;
+        plugin_child_restarts_ = restarts;
+    }
+
 private:
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
@@ -159,6 +166,8 @@ private:
     audio::AudioDevice* device_ = nullptr;
     const std::atomic<std::shared_ptr<graph::AudioGraph>>* graph_slot_ = nullptr;
     const std::atomic<uint64_t>* plugin_blocks_missed_ = nullptr;
+    const std::atomic<bool>* plugin_child_alive_ = nullptr;
+    const std::atomic<uint32_t>* plugin_child_restarts_ = nullptr;
 
     // Telemetry
     uint32_t telemetry_hz_ = 30;

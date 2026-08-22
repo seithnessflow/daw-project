@@ -28,7 +28,8 @@
         {
           "id": "string (UUID)",
           "type": "string",
-          "params": "{ [key: string]: float }"
+          "uid": "string (vst3 only: 32-hex VST3 class id)",
+          "params": "[ { key: string, value: float } ]"
         }
       ]
     }
@@ -72,13 +73,15 @@
 |-------|------|----------|-------------|
 | `id` | `string` | Yes | UUID v4. Immutable after creation. |
 | `type` | `string` | Yes | Processor type identifier. |
-| `params` | `object` | Yes | Parameter key-value pairs. All values are floats. |
+| `uid` | `string` | vst3 only | 32-hex VST3 class id. The document NEVER carries module paths - uid -> module resolution is host-side (`--vst3-module`). |
+| `params` | `list<{key, value}>` | Yes | Parameter pairs as a LIST of `{key: string, value: float}` maps (list-of-pairs, not a map: iterable by index across every consumer). |
 
-## Processor Types (Slice 1)
+## Processor Types
 
 | Type | Parameters | Description |
 |------|------------|-------------|
-| `builtin.gain` | `gain: float (0.0-2.0)` | Simple gain stage. |
+| `builtin.gain` | key `"gain"`: float (0.0-2.0) | Simple gain stage. |
+| `vst3` (c-2, 2026-08-22) | keys are VST3 param ids as DECIMAL STRINGS (e.g. `"0"`), values normalized 0.0-1.0 | Out-of-process VST3 plugin (ADR-017). An engine that cannot resolve the uid SIGNALS and skips the node (live) or FAILS the render (offline) - never a silent different sound. |
 
 ## Invariants
 
@@ -146,9 +149,17 @@ function migrate(doc: any): ProjectDocument {
         {
           "id": "550e8400-e29b-41d4-a716-446655440020",
           "type": "builtin.gain",
-          "params": {
-            "gain": 1.2
-          }
+          "params": [
+            { "key": "gain", "value": 1.2 }
+          ]
+        },
+        {
+          "id": "550e8400-e29b-41d4-a716-446655440021",
+          "type": "vst3",
+          "uid": "84E8DE5F92554F5396FAE4133C935A18",
+          "params": [
+            { "key": "0", "value": 0.5 }
+          ]
         }
       ]
     }

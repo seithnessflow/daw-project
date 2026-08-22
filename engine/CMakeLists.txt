@@ -207,6 +207,8 @@ add_library(daw_engine_lib STATIC
     src/host/plugin_bridge.cpp
     src/host/proxy_node.h
     src/host/proxy_node.cpp
+    src/host/sync_proxy_node.h
+    src/host/sync_proxy_node.cpp
 )
 
 target_include_directories(daw_engine_lib PUBLIC

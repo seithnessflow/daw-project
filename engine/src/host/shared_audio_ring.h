@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 2;       // v2: 4 slots (pipeline depth 2)
+inline constexpr uint32_t kLayoutVersion = 3;       // v3: param seqlock (v2: 4 slots)
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
 inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
@@ -62,14 +62,17 @@ struct SharedAudioRing {
     std::atomic<uint64_t> output_seq;
 
     // ---- Parameter channel: latest value wins (the graph policy, here) ----
-    // COLD-READ NOTE (2.4c-1): this trio is NOT a seqlock. Single writer
-    // bumps param_seq AFTER id/value, so a reader can transiently pair a
-    // fresh id with a stale value when SEVERAL params churn - it self-heals
-    // one block later. Harmless while exactly one param flows (AGain gain,
-    // constant id, the whole c-1 scope). The day the chain carries multiple
-    // params (c-2+), upgrade to an odd/even seqlock BEFORE widening use -
-    // that is a protocol change, not a layout change.
-    std::atomic<uint64_t> param_seq;    // bumped by engine after id/value
+    // ODD/EVEN SEQLOCK (v3, hardened as c-2's first gesture - c-2 puts
+    // MULTIPLE params through this channel and the previous trio allowed a
+    // fresh id to pair with a stale value):
+    //   writer (single, control thread): seq+1 (-> ODD, write in progress),
+    //     store id, store value, seq+1 (-> EVEN, published version).
+    //   reader (child, per block): s1 = seq; if odd or == last applied,
+    //     skip/retry (bounded - a torn read is simply deferred one block,
+    //     latest wins either way); load id+value; acquire fence; re-check
+    //     seq == s1 or discard.
+    // The individual atomics never tear; the seqlock protects the PAIRING.
+    std::atomic<uint64_t> param_seq;
     std::atomic<uint32_t> param_id;
     std::atomic<double> param_value;    // normalized 0..1
 

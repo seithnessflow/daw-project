@@ -53,6 +53,8 @@ message EngineState {
     uint32 cpu_percent = 2;            // Audio thread CPU usage (0-100)
     uint32 latency_samples = 3;        // Current output latency
     uint64 plugin_blocks_missed = 4;   // 2.4c-1: bridge blocks bypassed (child late/dead)
+    bool plugin_child_alive = 5;       // c-2: false during a death window / permanent bypass
+    uint32 plugin_child_restarts = 6;  // c-2: cold restart attempts (budget 3)
 }
 
 // Error from engine

@@ -48,6 +48,23 @@ public:
     /** Ask the child to exit (shutdown flag), then reap it. */
     void stop();
 
+    /**
+     * COLD RESTART after a detected death (c-2): reap the corpse, reset the
+     * heartbeat (the old life's beats would fake readiness), spawn a fresh
+     * child on the SAME segment and wait for its ceremony. The ring's param
+     * state survives, so the new child re-applies the latest value on its
+     * first block - the restart is cold plugin-side, seamless ring-side.
+     * Control thread only. Returns false (with error()) on failure.
+     */
+    bool restartChild(uint32_t timeout_ms = 10000);
+
+    /** TEST HOOK: kill the child mid-flight (no shutdown flag, segment
+     *  kept mapped) - the deterministic stand-in for a real crash. */
+    void terminateChildForTest();
+
+    /** Cold restarts performed so far (telemetry). */
+    [[nodiscard]] uint32_t restartCount() const noexcept { return restart_count_; }
+
     /** Latest-value parameter channel (last state wins). */
     void setParam(uint32_t param_id, double normalized);
 
@@ -78,6 +95,12 @@ private:
     std::string error_;
     uint64_t next_seq_ = 0;
 
+    // Spawn recipe, kept for cold restarts
+    std::string host_exe_;
+    std::string module_path_;
+    std::string class_uid_;
+    uint32_t restart_count_ = 0;
+
     // Opaque platform handles (Windows: HANDLE file/mapping/process;
     // POSIX: fd + pid)
     void* map_handle_ = nullptr;
@@ -88,6 +111,8 @@ private:
     bool createSegment();
     bool spawnChild(const std::string& host_exe, const std::string& module_path,
                     const std::string& class_uid);
+    bool waitChildReady(uint32_t timeout_ms);
+    void reapChildHandle();
     void unmapSegment();
 };
 

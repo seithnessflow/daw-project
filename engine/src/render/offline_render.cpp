@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 
 namespace daw::render {
 
@@ -29,11 +30,33 @@ RenderResult OfflineRenderer::render(
 
     const auto& doc = document.getDocument();
 
+    // Fresh plugin children per render (one producer per ring)
+    bridges_.clear();
+    sync_nodes_.clear();
+
     // Build audio graph
     auto graph = buildGraph(document, asset_dir, config.sample_rate);
     if (!graph) {
         result.error = "Failed to build audio graph";
         return result;
+    }
+
+    // AUDIT R5: an unknown node type or an unresolvable/unspawnable vst3
+    // node must FAIL the render, never silently change the sound
+    {
+        size_t doc_nodes = 0;
+        for (const auto& t : doc.tracks) doc_nodes += t.chain.size();
+        size_t built_nodes = 0;
+        for (size_t i = 0; i < graph->getTrackCount(); ++i) {
+            built_nodes += graph->getTrack(i)->chain.size();
+        }
+        if (built_nodes != doc_nodes) {
+            result.error = "Chain incomplete: document has " +
+                           std::to_string(doc_nodes) + " nodes, graph built " +
+                           std::to_string(built_nodes) +
+                           " (unknown type, missing --vst3-module mapping, or child failed)";
+            return result;
+        }
     }
 
     // The graph's scratch buffers are sized for INTERNAL_BLOCK_SIZE frames:
@@ -135,6 +158,17 @@ RenderResult OfflineRenderer::render(
         }
     }
 
+    // A bridge exchange that failed anywhere fails the WHOLE render -
+    // silence was written in its place and must not ship as a bounce
+    for (const auto* node : sync_nodes_) {
+        if (node->failed()) {
+            result.success = false;
+            result.error = "Plugin bridge failed during render (node " +
+                           node->getId() + ")";
+            return result;
+        }
+    }
+
     result.success = true;
     return result;
 }
@@ -211,6 +245,40 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                 }
                 auto node = std::make_unique<graph::GainNode>(proc_def.id, gain);
                 track.chain.push_back(std::move(node));
+            } else if (proc_def.type == "vst3") {
+                // c-2: out-of-process plugin, SYNC path (offline has no
+                // real-time constraint; zero latency, bit-exact). A missing
+                // mapping or failed spawn is a MISSING node - the render
+                // loop declares the whole render failed via failed().
+                auto module_it = vst3_modules_.find(proc_def.uid);
+                if (module_it == vst3_modules_.end()) {
+                    std::cerr << "Render: no --vst3-module mapping for uid "
+                              << proc_def.uid << " (node " << proc_def.id
+                              << ") - render will fail\n";
+                    continue;  // caught by chain-count check in render()
+                }
+                auto bridge = std::make_unique<host::PluginBridge>();
+                if (!bridge->start(host_exe_, module_it->second, proc_def.uid,
+                                   sample_rate)) {
+                    std::cerr << "Render: plugin child failed for node "
+                              << proc_def.id << ": " << bridge->error() << "\n";
+                    continue;
+                }
+                for (const auto& [key, value] : proc_def.params) {
+                    try {
+                        bridge->setParam(static_cast<uint32_t>(std::stoul(key)), value);
+                    } catch (const std::exception&) {
+                        std::cerr << "Render: bad vst3 param key '" << key
+                                  << "' on node " << proc_def.id << " (ignored)\n";
+                    }
+                }
+                auto node = std::make_unique<host::SyncProxyNode>(proc_def.id, bridge.get());
+                sync_nodes_.push_back(node.get());
+                bridges_.push_back(std::move(bridge));
+                track.chain.push_back(std::move(node));
+            } else {
+                std::cerr << "Render: unknown chain node type '" << proc_def.type
+                          << "' (node " << proc_def.id << ") - render will fail\n";
             }
         }
 

@@ -12,10 +12,15 @@
 #include "../document/automerge_document.h"
 #include "../graph/audio_graph.h"
 #include "../graph/clip_player.h"
+#include "../host/plugin_bridge.h"
+#include "../host/sync_proxy_node.h"
 
 #include <cstdint>
-#include <string>
 #include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace daw::render {
 
@@ -87,8 +92,24 @@ public:
      */
     static int64_t calculateProjectLength(const document::AutomergeDocument& document);
 
+    /**
+     * c-2: uid -> module resolution for "vst3" chain nodes (the document
+     * carries uids, never paths). host_exe = the plugin_host binary. The
+     * renderer spawns its OWN children (sync path, one producer per ring)
+     * and reaps them per render.
+     */
+    void setVst3Modules(std::map<std::string, std::string> modules,
+                        std::string host_exe) {
+        vst3_modules_ = std::move(modules);
+        host_exe_ = std::move(host_exe);
+    }
+
 private:
     graph::AssetCache asset_cache_;
+    std::map<std::string, std::string> vst3_modules_;
+    std::string host_exe_;
+    std::vector<std::unique_ptr<host::PluginBridge>> bridges_;
+    std::vector<host::SyncProxyNode*> sync_nodes_;  // owned by the graph
 
     /**
      * Build audio graph from document.

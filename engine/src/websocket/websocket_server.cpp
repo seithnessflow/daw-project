@@ -305,6 +305,14 @@ void WebSocketServer::broadcastTelemetry() {
         state->set_plugin_blocks_missed(
             plugin_blocks_missed_->load(std::memory_order_relaxed));
     }
+    if (plugin_child_alive_) {
+        state->set_plugin_child_alive(
+            plugin_child_alive_->load(std::memory_order_relaxed));
+    }
+    if (plugin_child_restarts_) {
+        state->set_plugin_child_restarts(
+            plugin_child_restarts_->load(std::memory_order_relaxed));
+    }
 
     // Broadcast all
     sendToAll(pos_msg);

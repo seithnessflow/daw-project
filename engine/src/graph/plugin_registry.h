@@ -35,6 +35,14 @@ struct PluginInstanceHandle {
     std::unique_ptr<daw::host::PluginBridge> bridge;
     std::atomic<uint64_t> blocks_missed{0};
 
+    // c-2 crash handling, maintained by the control loop's poll:
+    // child_alive mirrors the last observed state (false during a death
+    // window and permanently once the restart budget is exhausted);
+    // child_restarts counts restart ATTEMPTS (bounded by the control loop).
+    // Both feed EngineState telemetry.
+    std::atomic<bool> child_alive{true};
+    std::atomic<uint32_t> child_restarts{0};
+
     PluginInstanceHandle() = default;
     PluginInstanceHandle(const PluginInstanceHandle&) = delete;
     PluginInstanceHandle& operator=(const PluginInstanceHandle&) = delete;
@@ -54,6 +62,14 @@ public:
     }
 
     [[nodiscard]] std::size_t size() const { return instances_.size(); }
+
+    /** Visit every handle (control thread; used by the liveness poll). */
+    template <typename F>
+    void forEach(F&& fn) {
+        for (auto& [node_id, handle] : instances_) {
+            fn(node_id, handle);
+        }
+    }
 
 private:
     std::map<std::string, PluginInstanceHandle> instances_;

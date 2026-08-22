@@ -57,7 +57,14 @@ A chaud : 4,4 min (run #52) — critere atteint.
 16/16) ; rafale E2E verte a travers le proxy ; smoke WASAPI 10 s : 0
 underrun. Profondeur de pipeline revisee 1->2 sur preuve vivante (534/1875
 blocs sec en depth 1 : le driver livre 2 blocs dos a dos) — latence 2.4d
-= 512 ech. Layout v2, enfant traite le backlog dans l'ordre.
+= depth x 256, calculee depuis la profondeur vivante du noeud (jamais une
+constante). Layout v2, enfant traite le backlog dans l'ordre.
+
+**2026-08-22 (2.4c-2):** seqlock param (layout v3) ; kill en plein vol ->
+bypass sec exact + relance a froid sur le meme segment, param survivant
+(test 18) ; garde parent (plus d'orphelin apres kill dur du moteur) ; chain
+lu/ecrit (M3 solde), ProxyNode depuis le document, rendu offline prouve par
+echantillons (test 20), uid non resolu = echec bruyant. 20/20, E2E 4/4.
 
 ## Criteres d'acceptation
 

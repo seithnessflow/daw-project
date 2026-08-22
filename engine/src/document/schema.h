@@ -23,10 +23,17 @@ constexpr uint32_t SCHEMA_VERSION = 1;
 
 /**
  * Processor definition.
+ *
+ * type "builtin.gain": params key "gain" (linear factor).
+ * type "vst3" (c-2): uid = 32-hex VST3 class id; params keys are VST3
+ * param ids as DECIMAL STRINGS (e.g. "0"), values normalized 0..1. The
+ * document NEVER contains module paths - uid -> module resolution is a
+ * host-side concern (--vst3-module).
  */
 struct ProcessorDef {
     std::string id;
     std::string type;
+    std::string uid;  // vst3 only; empty otherwise
     std::map<std::string, float> params;
 };
 

@@ -628,6 +628,72 @@ bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
 }
 
 // Main
+// Test 19 (c-2, M3): the chain round-trips through the document. A vst3
+// node (uid + params as {key,value} pairs) and a builtin.gain node written
+// via addTrack come back IDENTICAL through serialize/load - the document
+// layer carries processors, end of the "declared but never written" era.
+bool testDocumentChainRoundTrip() {
+    std::cout << "Test: Document chain round-trip... ";
+
+    daw::document::AutomergeDocument doc1;
+    if (!doc1.create(48000)) {
+        std::cout << "FAILED: create\n";
+        return false;
+    }
+
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "chain";
+    track.gain = 1.0f;
+
+    daw::document::ProcessorDef p1;
+    p1.id = "p1";
+    p1.type = "vst3";
+    p1.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    p1.params["0"] = 0.5f;
+    p1.params["3"] = 0.25f;
+    track.chain.push_back(p1);
+
+    daw::document::ProcessorDef p2;
+    p2.id = "p2";
+    p2.type = "builtin.gain";
+    p2.params["gain"] = 0.8f;
+    track.chain.push_back(p2);
+
+    if (!doc1.addTrack(track)) {
+        std::cout << "FAILED: addTrack: " << doc1.getLastError() << "\n";
+        return false;
+    }
+
+    const std::vector<uint8_t> bytes = doc1.toBytes();
+    daw::document::AutomergeDocument doc2;
+    if (bytes.empty() || !doc2.loadFromBytes(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: serialize/load\n";
+        return false;
+    }
+
+    const auto& project = doc2.getDocument();
+    if (project.tracks.size() != 1 || project.tracks[0].chain.size() != 2) {
+        std::cout << "FAILED: expected 1 track / 2 chain nodes\n";
+        return false;
+    }
+    const auto& r1 = project.tracks[0].chain[0];
+    const auto& r2 = project.tracks[0].chain[1];
+    if (r1.id != p1.id || r1.type != p1.type || r1.uid != p1.uid ||
+        r1.params != p1.params) {
+        std::cout << "FAILED: vst3 node did not round-trip\n";
+        return false;
+    }
+    if (r2.id != p2.id || r2.type != p2.type || !r2.uid.empty() ||
+        r2.params != p2.params) {
+        std::cout << "FAILED: builtin.gain node did not round-trip\n";
+        return false;
+    }
+
+    std::cout << "OK (vst3 uid+params and builtin.gain both identical after reload)\n";
+    return true;
+}
+
 #ifdef DAW_PLUGIN_HOST_EXE
 #include "host_messages.pb.h"
 
@@ -1227,6 +1293,289 @@ bool testProxyNodePipeline() {
     std::cout << "OK (fill=silence, dry bypass counted, wet at depth, bursts of 2 at depth 2: 0 missed)\n";
     return true;
 }
+
+// Test 17 (c-2 first gesture): the param channel applies SUCCESSIVE
+// changes, each at the very next block, through the seqlock (odd/even, see
+// shared_audio_ring.h). Functional proof of the hardened channel: default
+// 1.0 identity, then 0.5, 0.25, back to 1.0 - all powers of two, all
+// compared exactly. (The seqlock's tear-proofing itself is structural: a
+// deterministic torn-pairing repro would need to freeze the writer
+// mid-write; the protocol is asserted by construction and documented in
+// the contract header.)
+bool testParamChannelSequence() {
+    std::cout << "Test: Param channel sequence... ";
+
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    daw::host::PluginBridge bridge;
+    if (!bridge.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge start: " << bridge.error() << "\n";
+        return false;
+    }
+
+    std::vector<float> in_l(kBlock), in_r(kBlock), out_l(kBlock), out_r(kBlock);
+    for (uint32_t i = 0; i < kBlock; ++i) {
+        in_l[i] = static_cast<float>((static_cast<int>(i) * 37) % 32000 - 16000) / 32768.0f;
+        in_r[i] = -in_l[i];
+    }
+
+    // (gain sent before the block, expected multiplier on that block)
+    const struct { double sent; float expect; bool send; } steps[] = {
+        {0.0, 1.0f, false},   // nothing sent: AGain default gain = identity
+        {0.5, 0.5f, true},
+        {0.25, 0.25f, true},
+        {1.0, 1.0f, true},
+    };
+
+    for (const auto& step : steps) {
+        if (step.send) bridge.setParam(kAGainGainParamId, step.sent);
+        if (!bridge.processBlockSync(in_l.data(), in_r.data(), out_l.data(),
+                                     out_r.data(), kBlock)) {
+            std::cout << "FAILED: block failed: " << bridge.error() << "\n";
+            return false;
+        }
+        for (uint32_t i = 0; i < kBlock; ++i) {
+            if (out_l[i] != in_l[i] * step.expect || out_r[i] != in_r[i] * step.expect) {
+                std::cout << "FAILED: expected x" << step.expect << " at sample " << i
+                          << " (" << out_l[i] << " vs " << in_l[i] * step.expect << ")\n";
+                return false;
+            }
+        }
+    }
+
+    bridge.stop();
+    std::cout << "OK (default identity, then 0.5 / 0.25 / 1.0 each applied next block)\n";
+    return true;
+}
+
+// Test 18 (c-2): the crash. Child killed MID-FLIGHT -> the very next
+// unserved block is a clean DRY bypass (exact samples, no artifact, just
+// counted), childAlive() reports the death on the control side, a cold
+// restart on the SAME segment brings the sound back WET - with the latest
+// param re-applied from the surviving ring (the restart is cold
+// plugin-side, seamless ring-side). Plus the orphan guard: a child spawned
+// with a dead/unreachable --parent exits 0 on its own.
+bool testChildCrashRecovery() {
+    std::cout << "Test: Child crash and cold restart... ";
+
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    daw::host::PluginBridge bridge;
+    if (!bridge.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge start: " << bridge.error() << "\n";
+        return false;
+    }
+    bridge.setParam(kAGainGainParamId, 0.5);
+
+    std::atomic<uint64_t> missed{0};
+    daw::host::ProxyNode node("crash", bridge.ring(), &missed, 1);
+
+    auto fill = [&](std::vector<float>& buf, int block) {
+        for (uint32_t i = 0; i < kBlock; ++i) {
+            const float v = static_cast<float>((block * 131 + static_cast<int>(i) * 37) % 32000 - 16000) / 32768.0f;
+            buf[2 * i] = v;
+            buf[2 * i + 1] = -v;
+        }
+    };
+    auto paceUntil = [&](uint64_t seq) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);
+        while (bridge.ring()->output_seq.load(std::memory_order_acquire) < seq &&
+               std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::yield();
+        }
+    };
+
+    std::vector<float> buf(kBlock * 2), prev_in(kBlock * 2), cur_in(kBlock * 2);
+
+    // Blocks 1-2: pipeline fill then WET at 0.5
+    fill(cur_in, 1);
+    buf = cur_in;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    paceUntil(1);
+    prev_in = cur_in;
+    fill(cur_in, 2);
+    buf = cur_in;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    for (uint32_t i = 0; i < kBlock * 2; ++i) {
+        if (buf[i] != prev_in[i] * 0.5f) {
+            std::cout << "FAILED: pre-kill block not wet at sample " << i << "\n";
+            return false;
+        }
+    }
+    paceUntil(2);
+
+    // THE KILL, mid-flight
+    bridge.terminateChildForTest();
+    if (bridge.childAlive()) {
+        std::cout << "FAILED: childAlive() still true after kill\n";
+        return false;
+    }
+
+    // Next block: block 3 deposits, wants block 2 - already served before
+    // the kill, so still WET; block 4 wants 3, unserved -> DRY exact
+    prev_in = cur_in;
+    fill(cur_in, 3);
+    buf = cur_in;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    for (uint32_t i = 0; i < kBlock * 2; ++i) {
+        if (buf[i] != prev_in[i] * 0.5f) {
+            std::cout << "FAILED: already-served block lost after kill at sample " << i << "\n";
+            return false;
+        }
+    }
+    const uint64_t missed_before = missed.load();
+    prev_in = cur_in;
+    fill(cur_in, 4);
+    buf = cur_in;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    for (uint32_t i = 0; i < kBlock * 2; ++i) {
+        if (buf[i] != prev_in[i]) {  // DRY, exact - no artifact
+            std::cout << "FAILED: post-kill block not a clean dry bypass at sample " << i << "\n";
+            return false;
+        }
+    }
+    if (missed.load() != missed_before + 1) {
+        std::cout << "FAILED: dead-child block not counted\n";
+        return false;
+    }
+
+    // COLD RESTART on the same segment
+    if (!bridge.restartChild()) {
+        std::cout << "FAILED: restart: " << bridge.error() << "\n";
+        return false;
+    }
+    if (!bridge.childAlive() || bridge.restartCount() != 1) {
+        std::cout << "FAILED: restarted child not alive/counted\n";
+        return false;
+    }
+
+    // The new child catches up (bounded backlog) - after pacing, the next
+    // exchange is WET again at 0.5: the latest param SURVIVED the crash in
+    // the ring
+    paceUntil(4);
+    prev_in = cur_in;
+    fill(cur_in, 5);
+    buf = cur_in;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    for (uint32_t i = 0; i < kBlock * 2; ++i) {
+        if (buf[i] != prev_in[i] * 0.5f) {
+            std::cout << "FAILED: post-restart block not wet at 0.5 at sample " << i
+                      << " (param did not survive)\n";
+            return false;
+        }
+    }
+    bridge.stop();
+
+    // Orphan guard: unreachable --parent => the child exits 0 by itself,
+    // before even mapping anything
+    daw::host::HostResponse unused;
+    bool parsed = false;
+    const int code = runHostCommand(
+        std::string("\"") + DAW_PLUGIN_HOST_EXE +
+            "\" --serve nosegment --module nomodule --uid 0 --parent 2147483647",
+        unused, parsed);
+    if (code != 0) {
+        std::cout << "FAILED: dead-parent child did not exit cleanly (exit " << code << ")\n";
+        return false;
+    }
+
+    std::cout << "OK (kill -> exact dry + counted, cold restart -> wet, param survived, orphan self-exits)\n";
+    return true;
+}
+
+// Test 20 (c-2): THE SOUND COMES FROM THE DOCUMENT. A document whose chain
+// carries a vst3 node (uid + params, no path - resolution is host-side) is
+// rendered offline through a real out-of-process AGain, and the output
+// samples are EXACTLY input x 0.5 through the full pipeline (dr_wav /32768
+// load -> AGain x0.5 in float -> renderer x32767 truncating convert - the
+// expectation mirrors those three sites). M3 settled, proven by samples.
+bool testDocumentChainRender() {
+    std::cout << "Test: Document chain drives the render... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-chain-render-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Asset under its hash-name, deterministic content
+    std::vector<int16_t> in(4096 * 2);
+    for (size_t i = 0; i < 4096; ++i) {
+        const int16_t v = static_cast<int16_t>((static_cast<int>(i) * 37) % 32000 - 16000);
+        in[i * 2] = v;
+        in[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    if (!writeWav16((dir / "chainhash.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: cannot write asset\n";
+        return false;
+    }
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: doc create\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "chain track";
+    track.gain = 1.0f;
+    daw::document::ClipDef clip;
+    clip.id = "c1";
+    clip.asset_hash = "chainhash";
+    clip.start_sample = 0;
+    clip.length_samples = 4096;
+    clip.offset_samples = 0;
+    track.clips.push_back(clip);
+    daw::document::ProcessorDef proc;
+    proc.id = "p1";
+    proc.type = "vst3";
+    proc.uid = kAGainAudioUid;
+    proc.params["0"] = 0.5f;  // VST3 param id 0 (AGain gain), normalized
+    track.chain.push_back(proc);
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack: " << doc.getLastError() << "\n";
+        return false;
+    }
+
+    daw::render::OfflineRenderer renderer;
+    renderer.setVst3Modules({{kAGainAudioUid, fixtureModulePath()}}, DAW_PLUGIN_HOST_EXE);
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+    const std::string out_path = (dir / "out.wav").string();
+    const auto result = renderer.render(doc, out_path, dir.string(), config);
+    if (!result.success) {
+        std::cout << "FAILED: render: " << result.error << "\n";
+        return false;
+    }
+
+    const auto out_f = readWavSamples(out_path);
+    if (out_f.size() != in.size()) {
+        std::cout << "FAILED: output size " << out_f.size() << " vs " << in.size() << "\n";
+        return false;
+    }
+    for (size_t i = 0; i < in.size(); ++i) {
+        const float loaded = static_cast<float>(in[i]) / 32768.0f;   // dr_wav f32
+        const float halved = loaded * 0.5f;                          // AGain
+        const int16_t written = static_cast<int16_t>(halved * 32767.0f);  // convertSamples
+        const float expected = static_cast<float>(written) / 32768.0f;    // readWavSamples
+        if (out_f[i] != expected) {
+            std::cout << "FAILED: sample " << i << " = " << out_f[i]
+                      << ", expected " << expected << "\n";
+            return false;
+        }
+    }
+
+    // Control: the same render must FAIL LOUDLY when the uid cannot be
+    // resolved (AUDIT R5 - never silently a different sound)
+    daw::render::OfflineRenderer bare;
+    const auto bad = bare.render(doc, (dir / "bad.wav").string(), dir.string(), config);
+    if (bad.success || bad.error.find("Chain incomplete") == std::string::npos) {
+        std::cout << "FAILED: unresolved chain did not fail the render (" << bad.error << ")\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (document vst3 node -> out-of-process AGain -> exact halved samples; unresolved uid fails loudly)\n";
+    return true;
+}
 #endif  // DAW_PLUGIN_HOST_EXE
 
 // Test 9b: Sacred-thread lock-freedom, verified at RUNTIME on this exact
@@ -1397,6 +1746,7 @@ int main(int argc, char* argv[]) {
     run(testRingBuffer);
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);
+    run(testDocumentChainRoundTrip);
     runWithArg(testRenderDeterminism, fixtures_dir);
     run(testAudioThreadLockFreedom);
     run(testWebSocketAuth);
@@ -1407,6 +1757,9 @@ int main(int argc, char* argv[]) {
     run(testPluginHostSetupRefusal);
     run(testPluginBridgeTransparency);
     run(testProxyNodePipeline);
+    run(testParamChannelSequence);
+    run(testChildCrashRecovery);
+    run(testDocumentChainRender);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
 #endif

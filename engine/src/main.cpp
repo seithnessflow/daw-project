@@ -27,6 +27,8 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <map>
+#include <set>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -70,6 +72,9 @@ void printUsage(const char* program) {
               << "  --debug-proxy-again <path.vst3>\n"
               << "                     Test hook (2.4c-1): AGain in a child process,\n"
               << "                     proxied on the first track's chain\n"
+              << "  --vst3-module <uid>=<path.vst3>\n"
+              << "                     Resolve a document chain node (type vst3, by\n"
+              << "                     class uid) to a module on disk. Repeatable.\n"
               << "  --allow-origin <o> Allow an extra browser Origin on the WebSocket\n"
               << "                     server (can be used multiple times; defaults\n"
               << "                     allow http://localhost:5173 and http://127.0.0.1:5173)\n"
@@ -105,6 +110,7 @@ struct Options {
     uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
     std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
     std::string self_exe;            // argv[0], to locate the sibling plugin_host
+    std::map<std::string, std::string> vst3_modules;  // c-2: uid -> module path
     std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
@@ -191,6 +197,21 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.debug_proxy_module = argv[i];
+        } else if (arg == "--vst3-module") {
+            // c-2: uid -> module resolution for "vst3" chain nodes. The
+            // DOCUMENT carries uids only; paths are a host-side concern.
+            // Repeatable: --vst3-module <hex32>=<path.vst3>
+            if (++i >= argc) {
+                std::cerr << "Error: --vst3-module requires <uid>=<path>\n";
+                return false;
+            }
+            const std::string spec = argv[i];
+            const auto eq = spec.find('=');
+            if (eq == std::string::npos || eq == 0 || eq + 1 >= spec.size()) {
+                std::cerr << "Error: --vst3-module expects <uid>=<path>, got: " << spec << "\n";
+                return false;
+            }
+            opts.vst3_modules[spec.substr(0, eq)] = spec.substr(eq + 1);
         } else if (arg == "--allow-origin") {
             if (++i >= argc) {
                 std::cerr << "Error: --allow-origin requires an origin\n";
@@ -338,18 +359,21 @@ constexpr const char* kAGainAudioUid = "84E8DE5F92554F5396FAE4133C935A18";
  * registry handle and survives every rebuild (ADR-017 - a burst of changes
  * re-attaches proxies, it never re-spawns the child).
  */
-bool startDebugProxy(const Options& opts, uint32_t sample_rate,
-                     daw::graph::PluginInstanceRegistry& plugin_registry) {
-    if (opts.debug_proxy_module.empty()) {
-        return true;
-    }
+std::string hostExePath(const Options& opts) {
 #ifdef _WIN32
     const char* host_name = "plugin_host.exe";
 #else
     const char* host_name = "plugin_host";
 #endif
-    const std::string host_exe =
-        (fs::path(opts.self_exe).parent_path() / host_name).string();
+    return (fs::path(opts.self_exe).parent_path() / host_name).string();
+}
+
+bool startDebugProxy(const Options& opts, uint32_t sample_rate,
+                     daw::graph::PluginInstanceRegistry& plugin_registry) {
+    if (opts.debug_proxy_module.empty()) {
+        return true;
+    }
+    const std::string host_exe = hostExePath(opts);
 
     auto& handle = plugin_registry.ensure(kDebugProxyNodeId);
     handle.bridge = std::make_unique<daw::host::PluginBridge>();
@@ -364,12 +388,103 @@ bool startDebugProxy(const Options& opts, uint32_t sample_rate,
     return true;
 }
 
+/**
+ * Control-loop poll (c-2), EVERY registry instance: child death is detected
+ * HERE, on the control thread via the process handle - the audio callback
+ * only ever sees "block not ready" and bypasses. Cold restart on the SAME
+ * segment (ring seq and latest param survive), budget of 3 attempts per
+ * instance, then permanent bypass - always signaled (stderr + EngineState).
+ */
+void pollPluginChildren(daw::graph::PluginInstanceRegistry& plugin_registry) {
+    plugin_registry.forEach([](const std::string& node_id,
+                               daw::graph::PluginInstanceHandle& handle) {
+        if (!handle.bridge) return;
+        if (handle.bridge->childAlive()) return;
+
+        handle.child_alive.store(false, std::memory_order_relaxed);  // signal NOW
+        const uint32_t attempts = handle.child_restarts.load(std::memory_order_relaxed);
+        if (attempts >= 3) {
+            if (attempts == 3) {  // log the exhaustion exactly once
+                handle.child_restarts.store(4, std::memory_order_relaxed);
+                std::cerr << "\nPlugin child dead (" << node_id
+                          << "), restart budget exhausted - permanent bypass\n";
+            }
+            return;
+        }
+        handle.child_restarts.store(attempts + 1, std::memory_order_relaxed);
+        std::cerr << "\nPlugin child died (" << node_id << ") - cold restart (attempt "
+                  << (attempts + 1) << "/3)\n";
+        if (handle.bridge->restartChild()) {
+            handle.child_alive.store(true, std::memory_order_relaxed);
+            std::cerr << "Plugin child restarted (ring state preserved)\n";
+        } else {
+            std::cerr << "Plugin child restart failed: " << handle.bridge->error() << "\n";
+        }
+    });
+}
+
+/**
+ * c-2: ensure the out-of-process instance for a document vst3 node exists.
+ * The registry keys by NODE id: rebuilds re-attach, never re-spawn.
+ */
+daw::graph::PluginInstanceHandle* ensureVst3Child(
+    daw::graph::PluginInstanceRegistry& plugin_registry,
+    const std::string& node_id, const std::string& uid,
+    const Options& opts, uint32_t sample_rate) {
+    auto& handle = plugin_registry.ensure(node_id);
+    if (handle.bridge && handle.bridge->isRunning()) {
+        return &handle;
+    }
+    const auto it = opts.vst3_modules.find(uid);
+    if (it == opts.vst3_modules.end()) {
+        static std::set<std::string> warned;
+        if (warned.insert(uid).second) {
+            std::cerr << "Chain node " << node_id << ": no --vst3-module mapping for uid "
+                      << uid << " - node SKIPPED (signaled once)\n";
+        }
+        return nullptr;
+    }
+    handle.bridge = std::make_unique<daw::host::PluginBridge>();
+    if (!handle.bridge->start(hostExePath(opts), it->second, uid, sample_rate)) {
+        std::cerr << "Chain node " << node_id << ": plugin child failed: "
+                  << handle.bridge->error() << "\n";
+        handle.bridge.reset();
+        return nullptr;
+    }
+    std::cout << "Chain node " << node_id << ": " << uid
+              << " served out-of-process\n";
+    return &handle;
+}
+
+/**
+ * Point EngineState telemetry at a plugin instance's counters: the debug
+ * proxy if present, else the first document-driven instance. ONE instance
+ * for the thin slice; aggregation is a dated debt for the multi-plugin day.
+ * Idempotent - safe to re-call as instances appear.
+ */
+void wirePluginTelemetry(daw::websocket::WebSocketServer& ws_server,
+                         daw::graph::PluginInstanceRegistry& plugin_registry) {
+    daw::graph::PluginInstanceHandle* chosen = plugin_registry.find(kDebugProxyNodeId);
+    if (!chosen || !chosen->bridge) {
+        chosen = nullptr;
+        plugin_registry.forEach([&](const std::string&,
+                                    daw::graph::PluginInstanceHandle& handle) {
+            if (!chosen && handle.bridge) chosen = &handle;
+        });
+    }
+    if (chosen) {
+        ws_server.setPluginBlocksMissed(&chosen->blocks_missed);
+        ws_server.setPluginChildState(&chosen->child_alive, &chosen->child_restarts);
+    }
+}
+
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
     const std::string& assets_dir,
     daw::graph::AssetCache& asset_cache,
     daw::graph::PluginInstanceRegistry& plugin_registry,
+    const Options& opts,
     uint32_t proxy_depth = 1  // blocks per device callback (buffer/256)
 ) {
     auto graph = std::make_unique<daw::graph::AudioGraph>();
@@ -413,6 +528,37 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                 }
                 auto node = std::make_unique<daw::graph::GainNode>(proc_def.id, gain);
                 track.chain.push_back(std::move(node));
+            } else if (proc_def.type == "vst3") {
+                // c-2: ProxyNode from the DOCUMENT (uid on the node). The
+                // registry hands the same ring to every rebuild.
+                auto* handle = ensureVst3Child(plugin_registry, proc_def.id,
+                                               proc_def.uid, opts, sample_rate);
+                if (handle) {
+                    // Latest wins + the ring survives rebuilds: re-sending
+                    // the document's params on every rebuild is idempotent,
+                    // and it IS the param path (fader -> change -> rebuild)
+                    for (const auto& [key, value] : proc_def.params) {
+                        try {
+                            handle->bridge->setParam(
+                                static_cast<uint32_t>(std::stoul(key)), value);
+                        } catch (const std::exception&) {
+                            std::cerr << "Chain node " << proc_def.id
+                                      << ": bad vst3 param key '" << key << "' (ignored)\n";
+                        }
+                    }
+                    track.chain.push_back(std::make_unique<daw::host::ProxyNode>(
+                        proc_def.id, handle->bridge->ring(), &handle->blocks_missed,
+                        proxy_depth));
+                }
+            } else {
+                // AUDIT R5: never silently drop - a peer hearing a
+                // different mix is a collaboration bug, not a fallback
+                static std::set<std::string> warned;
+                if (warned.insert(proc_def.type).second) {
+                    std::cerr << "Chain: UNKNOWN node type '" << proc_def.type
+                              << "' (node " << proc_def.id
+                              << ") - node skipped, signaled once\n";
+                }
             }
         }
 
@@ -461,6 +607,9 @@ int doRender(const daw::document::AutomergeDocument& doc, const Options& opts) {
     config.bit_depth = opts.bit_depth;
 
     daw::render::OfflineRenderer renderer;
+    if (!opts.vst3_modules.empty()) {
+        renderer.setVst3Modules(opts.vst3_modules, hostExePath(opts));
+    }
 
     auto progress = [](int64_t current, int64_t total) -> bool {
         int percent = static_cast<int>((current * 100) / total);
@@ -523,7 +672,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
         (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize);
     std::shared_ptr<daw::graph::AudioGraph> graph =
         buildGraph(project, device.getSampleRate(), opts.assets_dir,
-                   asset_cache, plugin_registry, proxy_depth);
+                   asset_cache, plugin_registry, opts, proxy_depth);
     if (!graph) {
         std::cerr << "Failed to build audio graph\n";
         return 1;
@@ -564,9 +713,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
                                      opts.allow_origins.begin(), opts.allow_origins.end());
 
-    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
-        ws_server.setPluginBlocksMissed(&handle->blocks_missed);
-    }
+    wirePluginTelemetry(ws_server, plugin_registry);
     if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
         std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n\n";
     } else {
@@ -594,7 +741,9 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
 
         // Broadcast telemetry at configured rate
         if (now - last_telemetry >= telemetry_interval) {
+            pollPluginChildren(plugin_registry);
             if (ws_server.isRunning()) {
+                wirePluginTelemetry(ws_server, plugin_registry);
                 ws_server.broadcastTelemetry();
             }
             last_telemetry = now;
@@ -737,9 +886,7 @@ int doPlayWithServer(const Options& opts) {
     ws_config.telemetry_hz = 30;
     ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
                                      opts.allow_origins.begin(), opts.allow_origins.end());
-    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
-        ws_server.setPluginBlocksMissed(&handle->blocks_missed);
-    }
+    wirePluginTelemetry(ws_server, plugin_registry);
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
@@ -764,7 +911,7 @@ int doPlayWithServer(const Options& opts) {
 
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
-                plugin_registry,
+                plugin_registry, opts,
                 (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize));
             if (graph) {
                 if (opts.debug_rebuild_delay_ms > 0) {
@@ -834,7 +981,9 @@ int doPlayWithServer(const Options& opts) {
 
         // Broadcast telemetry at configured rate
         if (now - last_telemetry >= telemetry_interval) {
+            pollPluginChildren(plugin_registry);
             if (ws_server.isRunning()) {
+                wirePluginTelemetry(ws_server, plugin_registry);
                 ws_server.broadcastTelemetry();
             }
             last_telemetry = now;

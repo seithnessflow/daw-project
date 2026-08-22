@@ -104,8 +104,19 @@ bool PluginBridge::createSegment() {
 bool PluginBridge::spawnChild(const std::string& host_exe,
                               const std::string& module_path,
                               const std::string& class_uid) {
+    // --parent: the child watches THIS process and exits when it dies (a
+    // hard-killed engine cannot raise the shutdown flag; without this, the
+    // orphan spins forever - observed, it held plugin_host.exe locked)
+    const long long self_pid =
+#ifdef _WIN32
+        static_cast<long long>(GetCurrentProcessId());
+#else
+        static_cast<long long>(getpid());
+#endif
+    const std::string parent_arg = std::to_string(self_pid);  // pre-fork: no malloc in the child
     const std::string cmdline = "\"" + host_exe + "\" --serve \"" + segment_path_ +
-                                "\" --module \"" + module_path + "\" --uid " + class_uid;
+                                "\" --module \"" + module_path + "\" --uid " + class_uid +
+                                " --parent " + parent_arg;
 #ifdef _WIN32
     STARTUPINFOA si{};
     si.cb = sizeof(si);
@@ -129,6 +140,7 @@ bool PluginBridge::spawnChild(const std::string& host_exe,
     if (pid == 0) {
         execl(host_exe.c_str(), host_exe.c_str(), "--serve", segment_path_.c_str(),
               "--module", module_path.c_str(), "--uid", class_uid.c_str(),
+              "--parent", parent_arg.c_str(),
               static_cast<char*>(nullptr));
         _exit(127);
     }
@@ -147,13 +159,25 @@ bool PluginBridge::start(const std::string& host_exe, const std::string& module_
     if (!createSegment()) return false;
     ring_->sample_rate = sample_rate;
 
+    // Kept for cold restarts (restartChild)
+    host_exe_ = host_exe;
+    module_path_ = module_path;
+    class_uid_ = class_uid;
+
     if (!spawnChild(host_exe, module_path, class_uid)) {
         unmapSegment();
         return false;
     }
+    if (!waitChildReady(timeout_ms)) {
+        stop();
+        return false;
+    }
+    return true;
+}
 
-    // Ready = the child finished the full VST3 ceremony (heartbeat != 0).
-    // A child that died instead is detected by the process handle.
+// Ready = the child finished the full VST3 ceremony (heartbeat != 0).
+// A child that died instead is detected by the process handle.
+bool PluginBridge::waitChildReady(uint32_t timeout_ms) {
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(timeout_ms);
     while (std::chrono::steady_clock::now() < deadline) {
@@ -162,14 +186,63 @@ bool PluginBridge::start(const std::string& host_exe, const std::string& module_
         }
         if (!childAlive()) {
             error_ = "plugin_host exited during setup (see its stderr)";
-            stop();
             return false;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     error_ = "plugin_host did not become ready within timeout";
-    stop();
     return false;
+}
+
+void PluginBridge::reapChildHandle() {
+#ifdef _WIN32
+    if (process_handle_) {
+        CloseHandle(static_cast<HANDLE>(process_handle_));
+        process_handle_ = nullptr;
+    }
+    child_pid_ = 0;
+#else
+    if (child_pid_ > 0) {
+        int status = 0;
+        waitpid(static_cast<pid_t>(child_pid_), &status, WNOHANG);
+    }
+    child_pid_ = 0;
+#endif
+}
+
+bool PluginBridge::restartChild(uint32_t timeout_ms) {
+    if (!ring_) {
+        error_ = "bridge not running";
+        return false;
+    }
+    reapChildHandle();
+    // The old life's beats must not fake readiness; nobody else writes
+    // here once the child is dead
+    ring_->child_heartbeat.store(0, std::memory_order_release);
+    if (!spawnChild(host_exe_, module_path_, class_uid_)) {
+        return false;
+    }
+    if (!waitChildReady(timeout_ms)) {
+        return false;
+    }
+    ++restart_count_;
+    return true;
+}
+
+void PluginBridge::terminateChildForTest() {
+#ifdef _WIN32
+    if (process_handle_) {
+        TerminateProcess(static_cast<HANDLE>(process_handle_), 9);
+        WaitForSingleObject(static_cast<HANDLE>(process_handle_), 2000);
+    }
+#else
+    if (child_pid_ > 0) {
+        kill(static_cast<pid_t>(child_pid_), SIGKILL);
+        int status = 0;
+        waitpid(static_cast<pid_t>(child_pid_), &status, 0);
+        child_pid_ = -child_pid_;  // reaped, dead
+    }
+#endif
 }
 
 bool PluginBridge::childAlive() {
@@ -190,6 +263,9 @@ bool PluginBridge::childAlive() {
 
 void PluginBridge::setParam(uint32_t param_id, double normalized) {
     if (!ring_) return;
+    // Odd/even seqlock write (single writer, see shared_audio_ring.h):
+    // odd = write in progress, next even = published version
+    ring_->param_seq.fetch_add(1, std::memory_order_acq_rel);
     ring_->param_id.store(param_id, std::memory_order_relaxed);
     ring_->param_value.store(normalized, std::memory_order_relaxed);
     ring_->param_seq.fetch_add(1, std::memory_order_release);

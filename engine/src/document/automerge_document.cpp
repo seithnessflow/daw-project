@@ -417,7 +417,83 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                         }
                         if (r) AMresultFree(r);
 
-                        // TODO: Read chain (processors) similarly
+                        // Chain (M3 settled, c-2): processors as
+                        // {id, type, uid?, params: [{key, value}...]}
+                        r = AMmapGet(doc_, trackId, AMstr("chain"), nullptr);
+                        if (r && AMresultStatus(r) == AM_STATUS_OK) {
+                            const AMobjId* chainId = AMitemObjId(AMresultItem(r));
+                            if (chainId) {
+                                const size_t chainCount = AMobjSize(doc_, chainId, nullptr);
+                                for (size_t pi = 0; pi < chainCount; ++pi) {
+                                    AMresult* procResult = AMlistGet(doc_, chainId, pi, nullptr);
+                                    if (procResult && AMresultStatus(procResult) == AM_STATUS_OK) {
+                                        const AMobjId* procObjId = AMitemObjId(AMresultItem(procResult));
+                                        if (procObjId) {
+                                            ProcessorDef proc;
+                                            AMbyteSpan sv;
+                                            AMresult* cr = AMmapGet(doc_, procObjId, AMstr("id"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.id.assign(reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("type"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.type.assign(reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("uid"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.uid.assign(reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("params"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                const AMobjId* paramsId = AMitemObjId(AMresultItem(cr));
+                                                if (paramsId) {
+                                                    const size_t pcount = AMobjSize(doc_, paramsId, nullptr);
+                                                    for (size_t k = 0; k < pcount; ++k) {
+                                                        AMresult* pr = AMlistGet(doc_, paramsId, k, nullptr);
+                                                        if (pr && AMresultStatus(pr) == AM_STATUS_OK) {
+                                                            const AMobjId* pairObjId = AMitemObjId(AMresultItem(pr));
+                                                            if (pairObjId) {
+                                                                std::string key;
+                                                                double value = 0.0;
+                                                                AMresult* kr = AMmapGet(doc_, pairObjId, AMstr("key"), nullptr);
+                                                                if (kr && AMresultStatus(kr) == AM_STATUS_OK &&
+                                                                    AMitemToStr(AMresultItem(kr), &sv)) {
+                                                                    key.assign(reinterpret_cast<const char*>(sv.src), sv.count);
+                                                                }
+                                                                if (kr) AMresultFree(kr);
+                                                                kr = AMmapGet(doc_, pairObjId, AMstr("value"), nullptr);
+                                                                if (kr && AMresultStatus(kr) == AM_STATUS_OK) {
+                                                                    AMitemToF64(AMresultItem(kr), &value);
+                                                                }
+                                                                if (kr) AMresultFree(kr);
+                                                                if (!key.empty()) {
+                                                                    proc.params[key] = static_cast<float>(value);
+                                                                }
+                                                            }
+                                                        }
+                                                        if (pr) AMresultFree(pr);
+                                                    }
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            track.chain.push_back(std::move(proc));
+                                        }
+                                    }
+                                    if (procResult) AMresultFree(procResult);
+                                }
+                            }
+                        }
+                        if (r) AMresultFree(r);
                     }
                 }
                 if (trackResult) AMresultFree(trackResult);
@@ -658,9 +734,67 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
         if (cr) results_to_free.push_back(cr);
     }
 
-    // Create chain array (processors - empty for now)
+    // Create chain array and populate (c-2: processors travel with the
+    // track; params as a LIST of {key, value} pairs - see schema.h)
     r = AMmapPutObject(doc_, trackObjId, AMstr("chain"), AM_OBJ_TYPE_LIST);
-    if (r) results_to_free.push_back(r);
+    if (!r || AMresultStatus(r) != AM_STATUS_OK) {
+        if (r) AMresultFree(r);
+        for (auto* res : results_to_free) AMresultFree(res);
+        last_error_ = "Failed to create chain array";
+        return false;
+    }
+    const AMobjId* chainId = AMitemObjId(AMresultItem(r));
+    results_to_free.push_back(r);
+
+    for (size_t i = 0; i < track.chain.size(); ++i) {
+        const auto& proc = track.chain[i];
+
+        AMresult* procResult = AMlistPutObject(doc_, chainId, i, true, AM_OBJ_TYPE_MAP);
+        if (!procResult || AMresultStatus(procResult) != AM_STATUS_OK) {
+            if (procResult) AMresultFree(procResult);
+            for (auto* res : results_to_free) AMresultFree(res);
+            last_error_ = "Failed to create processor object";
+            return false;
+        }
+        const AMobjId* procObjId = AMitemObjId(AMresultItem(procResult));
+        results_to_free.push_back(procResult);
+
+        AMresult* cr;
+        cr = AMmapPutStr(doc_, procObjId, AMstr("id"), AMstr(proc.id.c_str()));
+        if (cr) results_to_free.push_back(cr);
+        cr = AMmapPutStr(doc_, procObjId, AMstr("type"), AMstr(proc.type.c_str()));
+        if (cr) results_to_free.push_back(cr);
+        if (!proc.uid.empty()) {
+            cr = AMmapPutStr(doc_, procObjId, AMstr("uid"), AMstr(proc.uid.c_str()));
+            if (cr) results_to_free.push_back(cr);
+        }
+
+        cr = AMmapPutObject(doc_, procObjId, AMstr("params"), AM_OBJ_TYPE_LIST);
+        if (!cr || AMresultStatus(cr) != AM_STATUS_OK) {
+            if (cr) AMresultFree(cr);
+            for (auto* res : results_to_free) AMresultFree(res);
+            last_error_ = "Failed to create params list";
+            return false;
+        }
+        const AMobjId* paramsId = AMitemObjId(AMresultItem(cr));
+        results_to_free.push_back(cr);
+
+        size_t k = 0;
+        for (const auto& [key, value] : proc.params) {
+            AMresult* pr = AMlistPutObject(doc_, paramsId, k++, true, AM_OBJ_TYPE_MAP);
+            if (!pr || AMresultStatus(pr) != AM_STATUS_OK) {
+                if (pr) AMresultFree(pr);
+                continue;
+            }
+            const AMobjId* pairObjId = AMitemObjId(AMresultItem(pr));
+            results_to_free.push_back(pr);
+            AMresult* kr;
+            kr = AMmapPutStr(doc_, pairObjId, AMstr("key"), AMstr(key.c_str()));
+            if (kr) results_to_free.push_back(kr);
+            kr = AMmapPutF64(doc_, pairObjId, AMstr("value"), static_cast<double>(value));
+            if (kr) results_to_free.push_back(kr);
+        }
+    }
 
     // Commit
     r = AMcommit(doc_, AMstr("Add track"), nullptr);

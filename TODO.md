@@ -96,8 +96,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       d'avance perd la course. kLayoutVersion=2 (4 slots), profondeur =
       politique du noeud (buffer/256), l'enfant traite le backlog DANS
       L'ORDRE (le saut au plus recent affamait le consommateur).
-      => 2.4d declarera latence = profondeur x 256 (512 ech. par defaut),
-      PAS 256. Le canal param n'est PAS un seqlock (note gravee dans le
+      => 2.4d : getLatencySamples() retournera UN CALCUL, jamais une
+      constante — latence = depth x 256, depuis la profondeur VIVANTE du
+      noeud (buffer 512 -> 2 blocs -> 512 ech. ; buffer 1024 -> 4 blocs ->
+      1024 ech.). Le canal param n'est PAS un seqlock (note gravee dans le
       contrat) : a durcir avant que c-2 n'y fasse passer plusieurs params.
       Detail d'origine :
       memoire partagee (ring audio + changements de parametres), cadence
@@ -128,12 +130,32 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          processus, timeout zero), jamais dans le callback — lui ne
          connait que « bloc pret ou pas » (absent = bypass comptabilise).
          Cette separation posee en c-1 rend c-2 presque deja ecrit.
-- [ ] 2.4c-2 LE CRASH ET LE DOCUMENT : enfant tue en plein traitement ->
-      bypass propre + signalement + compteur, relance a froid, PUIS
-      lecture du chain (M3 solde), ProxyNode construit depuis le document
-      (UID du noeud, plus le flag de test). Preuve : chain avec AGain ->
-      son traite ; enfant tue -> son sec sans glitch, moteur vivant et
-      signalant.
+- [x] 2.4c-2 FAIT 2026-08-22 (verdict CI du push de cloture = point
+      transmis), dans l'ordre impose :
+      1. SEQLOCK du canal param en premier geste (odd/even, layout v3,
+         double-check lecteur borne) — le trio ne peut plus apparier un id
+         frais avec une valeur perimee. Test 17 : changements successifs
+         appliques chacun au bloc suivant.
+      2. LE KILL (test 18) : enfant tue en plein vol -> bloc deja servi
+         conserve, bloc non servi = bypass SEC EXACT (aucun artefact) +
+         compteur ; mort vue au CONTROLE (poll 30 Hz), relance a froid sur
+         le MEME segment (budget 3, signale EngineState :
+         plugin_child_alive/restarts) ; le dernier param SURVIT au crash
+         dans le ring. + Garde parent decouverte en session : un moteur
+         tue net laissait l'enfant orphelin en spin (constate, exe
+         verrouille) -> --parent <pid>, l'enfant sort seul (prouve test 18
+         et par l'E2E kill reel : plus d'orphelin).
+      3. LE CHAIN (M3 solde) : lu ET ecrit (roundtrip test 19), params en
+         LISTE de paires {key,value} (SCHEMA.md), uid sur le noeud, chemin
+         JAMAIS dans le document (--vst3-module uid=path cote hote).
+         ProxyNode construit depuis le document (live, registre par
+         node_id) ; rendu offline via SyncProxyNode (chemin sync, latence
+         zero, echec de pont = rendu en ECHEC). Test 20 : le son vient du
+         document, echantillons exactement halves a travers le processus ;
+         uid non resolu = echec bruyant (R5 solde offline, signale live).
+      20/20 moteur, E2E 4/4 (rafale a travers le proxy).
+      Reste connu : telemetry = 1 instance (dette datee multi-plugin) ;
+      --debug-proxy-again conserve comme chemin de test.
 - [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
       tout : UN plugin de gain VST3 connu s'instancie dans un processus
       isole, traite de l'audio, et son bypass s'entend. Un plugin, un
