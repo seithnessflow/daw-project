@@ -29,7 +29,8 @@ for (const name of ['daw-engine-token-47821', 'daw-engine-token']) {
     if (token) break;
   } catch { /* engine pill will just stay grey */ }
 }
-const url = `http://localhost:5173/?project=${projectId}${token ? `&token=${token}` : ''}`;
+// lab=1: the drive organ is part of the HARNESS - the KIT is its fixture
+const url = `http://localhost:5173/?project=${projectId}&lab=1${token ? `&token=${token}` : ''}`;
 
 let failures = 0;
 function check(label, cond, detail = '') {
@@ -294,6 +295,59 @@ for (let attempt = 0; attempt < 20 && !grew; attempt++) {
   if (!grew) await page.waitForTimeout(250);
 }
 check(`track count grew (${nBefore} -> ${nBefore + 1})`, grew);
+
+console.log('Gesture 12 (Magic Potion): PRODUCT mode - drop MY file, no kit visible');
+{
+  const p3 = await context.newPage();
+  await p3.goto(`http://localhost:5173/?project=drop-${Date.now()}`);
+  await p3.waitForSelector('#server-status[data-state="connected"]', { timeout: 10000 });
+  await p3.waitForSelector('[data-track-id]', { timeout: 10000 });
+  check('no kit chips in product mode',
+    await p3.locator('[data-role="sample"]').count() === 0);
+  check('empty-state hint shown',
+    await p3.locator('.empty-hint').count() === 1);
+  // Synthesize a small WAV File in-page and drop it on track 1
+  const dt = await p3.evaluateHandle(() => {
+    const sr = 48000, frames = 4800;
+    const buf = new ArrayBuffer(44 + frames * 2);
+    const v = new DataView(buf);
+    const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, 'RIFF'); v.setUint32(4, 36 + frames * 2, true); w(8, 'WAVE');
+    w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, sr, true);
+    v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, frames * 2, true);
+    for (let n = 0; n < frames; n++) {
+      v.setInt16(44 + n * 2, Math.round(8000 * Math.sin((2 * Math.PI * 330 * n) / sr)), true);
+    }
+    const dt = new DataTransfer();
+    dt.items.add(new File([buf], 'my-note.wav', { type: 'audio/wav' }));
+    return dt;
+  });
+  await p3.dispatchEvent('[data-track-id] .track-lane', 'drop',
+    { dataTransfer: dt }, { position: { x: 100, y: 20 } });
+  let dropped = false;
+  for (let i = 0; i < 40 && !dropped; i++) {
+    dropped = (await p3.locator('.clip').count()) === 1;
+    if (!dropped) await p3.waitForTimeout(250);
+  }
+  check('dropped WAV became a clip', dropped);
+  const hash = await p3.evaluate(() =>
+    window.__dawProject.getDocument().tracks
+      .flatMap((t) => t.clips)[0]?.assetHash ?? '');
+  check(`asset is content-addressed (64 hex: ${hash.slice(0, 12)}...)`,
+    /^[0-9a-f]{64}$/.test(hash));
+  const stored = await p3.evaluate(async (h) =>
+    (await fetch(`http://localhost:3000/assets/${h}`)).status, hash);
+  check('asset lives in the verifying store', stored === 200);
+  let chip = false;
+  for (let i = 0; i < 20 && !chip; i++) {
+    chip = (await p3.locator('[data-role="sample"][data-sample-name="my-note"]').count()) === 1;
+    if (!chip) await p3.waitForTimeout(250);
+  }
+  check('palette grew a chip from MY file', chip);
+  await p3.close();
+}
 
 await browser.close();
 if (failures > 0) {

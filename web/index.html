@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DAW</title>
+    <title>Magic Potion</title>
     <style>
       /* ================================================================
          Design pass (2026-08-22): minimal, flat, dense — the Ableton
@@ -175,6 +175,15 @@
       }
       body.sample-armed .track-lane {
         cursor: copy;
+      }
+      .empty-hint {
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 8px;
+      }
+      .track-lane.dropover {
+        background: rgba(88, 179, 104, 0.10);
+        box-shadow: inset 0 0 0 1px rgba(88, 179, 104, 0.45);
       }
 
       /* ---- Overview: the whole project, always visible -------------- */
@@ -594,7 +603,7 @@
   </head>
   <body>
     <div class="topbar">
-      <h1>DAW</h1>
+      <h1>MAGIC POTION</h1>
       <div class="transport">
         <button id="play-btn" disabled title="Play (Space)">&#9654;</button>
         <button id="stop-btn" disabled title="Stop (Space)">&#9632;</button>

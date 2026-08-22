@@ -17,7 +17,7 @@ import { waitForServerConnection } from './helpers';
 const projectId = `drag-${Date.now()}`;
 
 async function openTab(page: Page): Promise<void> {
-  await page.goto(`/?project=${projectId}`);
+  await page.goto(`/?project=${projectId}&lab=1`);  // KIT = harness fixture
   await waitForServerConnection(page);
   await page.waitForSelector('[data-track-id]', { timeout: 10000 });
 }

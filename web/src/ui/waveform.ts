@@ -9,7 +9,14 @@
  * on a rebuild redraws instantly; the network is hit once per asset.
  */
 
-const SERVER_HTTP = 'http://localhost:3000';
+export const SERVER_HTTP = 'http://localhost:3000';
+
+/** Decode audio duration in seconds (shared AudioContext). */
+export async function decodeDurationSec(bytes: ArrayBuffer): Promise<number> {
+  audioCtx ??= new AudioContext({ sampleRate: 48000 });
+  const audio = await audioCtx.decodeAudioData(bytes.slice(0));
+  return audio.duration;
+}
 
 // hash -> {peaks: per-bucket [min,max] pairs, frames: asset length}
 interface PeaksEntry { peaks: Float32Array; frames: number }

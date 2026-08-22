@@ -1,6 +1,14 @@
-# DAW Hybrid - Slice 1
+# Magic Potion
 
-A hybrid DAW architecture with three tiers: browser (UI), server (sync), and native engine (audio).
+**Le logiciel s'ecoute lui-meme — tout ce qui sonne se voit.**
+
+A collaborative DAW with three tiers: browser (UI), server (sync), and
+native engine (audio). The document belongs to the human; the software
+observes continuously, displays continuously, corrects never.
+
+*(Infrastructure rename - repo, binaries, packages - is deferred churn:
+see TODO backlog. The identity lives here, in the title bar and the
+tagline, today.)*
 
 ## Architecture
 

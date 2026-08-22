@@ -121,6 +121,17 @@ Trouvailles : inter-sample peaks reels (~2 dB) sur fronts raides, lecture
 chaude (+5,6 dB) du true peak sur bruit (note calibration) ; playhead qui
 fuyait hors couloir (ui-drive) -> clamp pose. Moteur agent = --mute (regle).
 
+**2026-08-22 (Magic Potion, phase 1 — la purge et la vraie matiere) :**
+le produit s'appelle Magic Potion (titre/README ; renommage infra = backlog).
+Fixtures hors du chemin produit : KIT + labo derriere ?lab=1 (les organes
+snap/drive et les specs sont le harnais, ils le portent). Le produit mange
+TES fichiers : drop d'un WAV sur un couloir -> hash client (SHA-256) -> PUT
+verifiant -> clip pose au point de drop, duree decodee ; palette generique
+construite des assets du PROJET (l'armer/cliquer survit sans kit de demo).
+Preuve pilote (geste 12, mode produit) : zero chip embarque, hint d'etat
+vide, drop -> clip -> asset 200 au store -> chip 'my-note' dans la palette.
+Drive 12 gestes verts, suite 13/13.
+
 **2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
 AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
 silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses

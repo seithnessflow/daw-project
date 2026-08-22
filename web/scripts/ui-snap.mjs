@@ -47,7 +47,8 @@ function readToken() {
 }
 
 const token = readToken();
-const url = `${baseUrl}/?project=${encodeURIComponent(projectId)}` +
+// lab=1: the snap organ is part of the HARNESS - it sees the fixtures
+const url = `${baseUrl}/?project=${encodeURIComponent(projectId)}&lab=1` +
   (token ? `&token=${token}` : '');
 
 const VIEWPORTS = [

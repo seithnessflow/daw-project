@@ -307,6 +307,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       ne fait que deposer, l'ecriture fichier vit hors thread sacre,
       depassement = drop compte jamais d'attente. Test au signal connu.
 
+- [ ] Backlog Magic Potion (chantier auto-ecoute, 2026-08-22) : renommage
+      d'infrastructure (depot, binaires daw_*, packages) = churn differe ;
+      formats compresses au drop (mp3/flac -> decode + PUT wav) ; analyse
+      spectrale ; masquage inter-pistes ; suggestions IA (acteur Automerge).
+
 ## Court terme (sessions economes)
 
 - [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :

@@ -21,8 +21,8 @@ import {
   TIMELINE,
 } from './ui/track';
 import { formatTime } from './ui/transport';
-import { Library, loadKit } from './ui/library';
-import { fillWaveforms } from './ui/waveform';
+import { Library, loadKit, type Kit } from './ui/library';
+import { fillWaveforms, decodeDurationSec, SERVER_HTTP } from './ui/waveform';
 import { Overview } from './ui/overview';
 
 // Configuration
@@ -30,6 +30,10 @@ const SERVER_URL = 'ws://localhost:3000';
 const ENGINE_PORT = 47821;
 const PROJECT_ID =
   new URLSearchParams(window.location.search).get('project') ?? 'default';
+// Magic Potion phase 1: the embedded KIT and lab fixtures are the TEST
+// harness, not the product - visible only behind ?lab=1. The product
+// feeds on YOUR files (drop a WAV on a lane).
+const LAB_MODE = new URLSearchParams(window.location.search).get('lab') === '1';
 
 // State
 let project: Project | null = null;
@@ -352,6 +356,96 @@ function sendLastChange(): void {
   }
 }
 
+/**
+ * A dropped file becomes a project asset + a clip (phase 1): verify it
+ * is a WAV, hash it client-side, PUT through the verifying store, place
+ * the clip where it was dropped. Failures are loud, never silent.
+ */
+async function handleFileDrop(file: File, trackId: string, laneX: number): Promise<void> {
+  if (!project) return;
+  const bytes = await file.arrayBuffer();
+  const head = new Uint8Array(bytes.slice(0, 12));
+  const ascii = (o: number, n: number) =>
+    String.fromCharCode(...head.slice(o, o + n));
+  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WAVE') {
+    console.error(`drop refused: ${file.name} is not a WAV (compressed formats are backlog)`);
+    return;
+  }
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const hash = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0')).join('');
+  const res = await fetch(`${SERVER_HTTP}/assets/${hash}`, {
+    method: 'PUT', body: bytes,
+  });
+  if (res.status !== 201) {
+    console.error(`asset store refused ${file.name}: ${res.status} ${await res.text()}`);
+    return;
+  }
+  let durationSec: number;
+  try {
+    durationSec = await decodeDurationSec(bytes);
+  } catch {
+    console.error(`drop refused: ${file.name} did not decode as audio`);
+    return;
+  }
+  const sr = project.getDocument().sampleRate || 48000;
+  const sec = Math.max(0, Math.round((laneX / TIMELINE.pps) / 0.25) * 0.25);
+  const stem = file.name.replace(/\.[^.]+$/, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 24) || 'audio';
+  project.addClip(trackId, {
+    id: `clip-${stem}-${Date.now()}`,
+    assetHash: hash,
+    startSample: Math.round(sec * sr),
+    lengthSamples: Math.max(1024, Math.round(durationSec * sr)),
+    offsetSamples: 0,
+  });
+  sendLastChange();
+  renderTracks();
+  console.log(`dropped ${file.name}: asset ${hash.slice(0, 12)}..., clip at ${sec}s`);
+}
+
+/**
+ * Product palette (phase 1): the arm/click gesture survives as a
+ * generic gesture over the PROJECT's assets - no embedded demo kit.
+ */
+let lastPaletteKey = '\0unset';  // sentinel: an empty project must still render its hint
+function refreshPalette(): void {
+  if (LAB_MODE || !project) return;
+  const doc = project.getDocument();
+  const sr = doc.sampleRate || 48000;
+  const byHash = new Map<string, { name: string; seconds: number }>();
+  for (const t of doc.tracks) {
+    for (const c of t.clips) {
+      const name = c.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+      const prev = byHash.get(c.assetHash);
+      const seconds = c.lengthSamples / sr;
+      if (!prev || seconds > prev.seconds) {
+        byHash.set(c.assetHash, { name: prev?.name ?? name, seconds });
+      }
+    }
+  }
+  const key = [...byHash.keys()].sort().join(',');
+  if (key === lastPaletteKey) return;
+  lastPaletteKey = key;
+  const slot = document.getElementById('library-slot')!;
+  slot.innerHTML = '';
+  if (byHash.size === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'empty-hint';
+    hint.textContent = 'drop a WAV on a lane to begin';
+    slot.appendChild(hint);
+    library = null;
+    return;
+  }
+  const kit: Kit = {
+    sampleRate: sr,
+    samples: [...byHash.entries()].map(([hash, v]) =>
+      ({ name: v.name, hash, seconds: v.seconds })),
+  };
+  library = new Library(kit);
+  slot.appendChild(library.element);
+}
+
 async function init() {
   console.log('DAW Web Client starting...');
 
@@ -468,12 +562,40 @@ async function init() {
     followBtn.setAttribute('aria-pressed', follow ? 'true' : 'false');
   });
 
-  // The base kit's library strip (chips: arm, then click a lane to place)
-  const kit = await loadKit();
-  if (kit) {
-    library = new Library(kit);
-    document.getElementById('library-slot')!.appendChild(library.element);
+  // Lab mode: the embedded kit. Product mode: the palette builds itself
+  // from the PROJECT's assets (see refreshPalette in renderTracks).
+  if (LAB_MODE) {
+    const kit = await loadKit();
+    if (kit) {
+      library = new Library(kit);
+      document.getElementById('library-slot')!.appendChild(library.element);
+    }
   }
+
+  // Drag & drop a WAV on a lane: upload through the verifying store,
+  // clip lands where it was dropped. The product eats YOUR files.
+  tracksContainer.addEventListener('dragover', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    if (!lane) return;
+    e.preventDefault();
+    lane.classList.add('dropover');
+  });
+  tracksContainer.addEventListener('dragleave', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    lane?.classList.remove('dropover');
+  });
+  tracksContainer.addEventListener('drop', (e) => {
+    const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
+    if (!lane) return;
+    e.preventDefault();
+    lane.classList.remove('dropover');
+    const trackEl = lane.closest('[data-track-id]') as HTMLElement | null;
+    const trackId = trackEl?.getAttribute('data-track-id');
+    const file = e.dataTransfer?.files?.[0];
+    if (!trackId || !file) return;
+    const x = e.clientX - lane.getBoundingClientRect().left;
+    void handleFileDrop(file, trackId, x);
+  });
 
   // The Overview: whole project, always visible (potion A2)
   overview = new Overview({
@@ -802,6 +924,7 @@ function renderTracks(force = false) {
   // synchronously; new assets stream in from the store)
   fillWaveforms(tracksContainer);
   refreshOverview();
+  refreshPalette();
 }
 
 // Start
