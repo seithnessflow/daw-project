@@ -34,6 +34,8 @@ const PROJECT_ID =
 // State
 let project: Project | null = null;
 let selectedTrackId: string | null = null;
+let selectedClipId: string | null = null;
+let justDragged = false;   // a finished drag must not fire the click path
 
 // ---- Navigation state (potion phase A1) ------------------------------
 // pps lives in TIMELINE (mutable); zoom re-renders around an anchor.
@@ -104,6 +106,97 @@ function fitAll(): void {
   const rect = tracksContainer.getBoundingClientRect();
   const fit = (rect.width - TIMELINE.headWidth - 20) / contentSeconds();
   setZoom(fit, 0, TIMELINE.headWidth);
+}
+
+/** Snap grid step in seconds, refined as the zoom deepens. */
+function snapStep(): number {
+  const pps = TIMELINE.pps;
+  if (pps >= 80) return 0.0625;
+  if (pps >= 40) return 0.125;
+  if (pps >= 10) return 0.25;
+  return 0.5;
+}
+
+/**
+ * Clip drag (potion C1): the title bar moves the clip - snapped to the
+ * grid AND to the other clips' edges on the same track, Alt = free.
+ * Coalescing: at most one document write per animation frame during the
+ * gesture, a final one on release (the fader's road).
+ */
+function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
+  if (!project) return;
+  const clipEl = handle.closest('.clip') as HTMLElement | null;
+  const trackEl = handle.closest('[data-track-id]') as HTMLElement | null;
+  if (!clipEl || !trackEl) return;
+  const clipId = clipEl.dataset.clipId!;
+  const trackId = trackEl.getAttribute('data-track-id')!;
+  const doc = project.getDocument();
+  const sr = doc.sampleRate || 48000;
+  const track = doc.tracks.find((t) => t.id === trackId);
+  const clip = track?.clips.find((c) => c.id === clipId);
+  if (!track || !clip) return;
+
+  // Neighbor edges (start/end of every OTHER clip on this track)
+  const edges: number[] = [];
+  for (const c of track.clips) {
+    if (c.id === clipId) continue;
+    edges.push(c.startSample / sr, (c.startSample + c.lengthSamples) / sr);
+  }
+
+  const startX = e.clientX;
+  const origSec = clip.startSample / sr;
+  let moved = false;
+  let pendingSec = origSec;
+  let writeRaf = 0;
+  e.preventDefault();
+
+  const onMove = (ev: PointerEvent) => {
+    const dx = ev.clientX - startX;
+    if (!moved && Math.abs(dx) < 3) return;    // click, not yet a drag
+    moved = true;
+    clipEl.classList.add('dragging');
+    let sec = Math.max(0, origSec + dx / TIMELINE.pps);
+    if (!ev.altKey) {
+      const step = snapStep();
+      let snapped = Math.round(sec / step) * step;
+      // Neighbor edges win within 8 px
+      for (const edge of edges) {
+        if (Math.abs(sec - edge) * TIMELINE.pps < 8) { snapped = edge; break; }
+      }
+      sec = Math.max(0, snapped);
+    }
+    clipEl.style.left = `${sec * TIMELINE.pps}px`;
+    pendingSec = sec;
+    if (!writeRaf) {
+      writeRaf = requestAnimationFrame(() => {
+        writeRaf = 0;
+        project!.setClipStart(trackId, clipId, pendingSec * sr);
+        sendLastChange();
+      });
+    }
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    if (writeRaf) cancelAnimationFrame(writeRaf);
+    clipEl.classList.remove('dragging');
+    if (moved) {
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 0);
+      project!.setClipStart(trackId, clipId, pendingSec * sr);
+      sendLastChange();
+      renderTracks(true);
+    } else {
+      // A plain click on the title bar: select the clip (and its track)
+      selectedClipId = clipId;
+      selectedTrackId = trackId;
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 0);
+      renderTracks(true);
+    }
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
 }
 
 function startPlayback(): void {
@@ -301,7 +394,15 @@ async function init() {
   // three DAWs reserve the clip area for selection/editing). A lane
   // click PLACES the armed sample if one is armed, else selects the
   // track (its chain appears in the Device View).
+  // Clip drag entry point (delegated: clips are rebuilt constantly)
+  tracksContainer.addEventListener('pointerdown', (e) => {
+    const handle = (e.target as HTMLElement)
+      .closest('[data-role="clip-handle"]') as HTMLElement | null;
+    if (handle) beginClipDrag(e, handle);
+  });
+
   tracksContainer.addEventListener('click', (e) => {
+    if (justDragged) return;   // the pointerup already did the work
     const target = e.target as HTMLElement;
     const seekBand = target.closest('[data-role="seek"]') as HTMLElement | null;
     if (seekBand && engineClient) {
@@ -334,7 +435,9 @@ async function init() {
       return;
     }
     // Lane click (unarmed): select the track AND set the insert marker
-    // (Ableton: one click, two effects, zero conflict)
+    // (Ableton: one click, two effects, zero conflict). Deselects any
+    // selected clip - one selected object at a time.
+    selectedClipId = null;
     if (lane) {
       const x = e.clientX - lane.getBoundingClientRect().left;
       insertMarkerSec = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
@@ -519,6 +622,14 @@ function renderTracks(force = false) {
   marker.id = 'insert-marker';
   tracksContainer.appendChild(marker);
   updateInsertMarker();
+
+  // Selection reflection (C1): the selected clip is unambiguous
+  if (selectedClipId) {
+    const el = tracksContainer.querySelector(
+      `[data-clip-id="${selectedClipId}"]`) as HTMLElement | null;
+    if (el) el.setAttribute('aria-selected', 'true');
+    else selectedClipId = null;
+  }
 
   // Device View for the selected track (bypass and params are DOCUMENT
   // state: the display only settles when the change comes back)

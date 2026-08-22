@@ -213,6 +213,43 @@ console.log('Gesture 9 (A2): overview navigates and fits');
   check(`overview dblclick fits all (${laneW} <= ${viewW})`, laneW <= viewW);
 }
 
+console.log('Gesture 10 (C1): clip drags by its title bar, snapped, doc follows');
+{
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press('KeyW'); // stable known scale
+  await page.waitForTimeout(300);
+  const clip = page.locator('[data-track-id="lab-sine440"] .clip').first();
+  const handle = clip.locator('[data-role="clip-handle"]');
+  const before = await page.evaluate(() =>
+    window.__dawProject.getDocument()
+      .tracks.find((t) => t.id === 'lab-sine440').clips[0].startSample);
+  const box = await handle.boundingBox();
+  await page.mouse.move(box.x + 20, box.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + 5, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  const after = await page.evaluate(() =>
+    window.__dawProject.getDocument()
+      .tracks.find((t) => t.id === 'lab-sine440').clips[0].startSample);
+  check(`drag moved the clip in the DOC (${before} -> ${after})`, after > before);
+  const snapped = await page.evaluate((s) => {
+    const sr = window.__dawProject.getDocument().sampleRate || 48000;
+    const step = 0.25 * sr; // coarse grid at fit zoom is >= 0.25s
+    return (s % (sr * 0.0625)) === 0;  // finest grid divides all steps
+  }, after);
+  check('landing is on the snap grid', snapped, String(after));
+  // Click (no move) selects the clip
+  await handle.click();
+  await page.waitForTimeout(300);
+  check('clip selected (aria-selected)', await page
+    .locator('[data-track-id="lab-sine440"] .clip')
+    .first().getAttribute('aria-selected') === 'true');
+  // NOTE: no sneaky restore - a local-only setClipStart would never
+  // reach the server (the exact A3-4 silent-divergence hole). The lab
+  // is a living bench; the moved clip is an honest trace of the test.
+}
+
 console.log('Gesture 6: Add Track from the UI');
 const nBefore = await page.locator('[data-track-id]').count();
 await page.locator('#add-track-btn').click();

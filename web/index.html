@@ -296,6 +296,19 @@
         padding: 1px 5px 0;
         white-space: nowrap;
         overflow: hidden;
+        cursor: grab; /* the title bar drags; the waveform never does */
+        touch-action: none;
+      }
+      .clip.dragging {
+        opacity: 0.85;
+        z-index: 4;
+      }
+      .clip.dragging .clip-name {
+        cursor: grabbing;
+      }
+      .clip[aria-selected='true'] {
+        outline: 1px solid rgba(255, 255, 255, 0.8);
+        filter: brightness(1.18);
       }
       .clip-wave {
         flex: 1;

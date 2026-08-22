@@ -143,6 +143,19 @@ export class Project {
   }
 
   /**
+   * Move a clip on the timeline (drag writes an EXISTING field - no
+   * schema question) and generate a change.
+   */
+  setClipStart(trackId: string, clipId: string, startSample: number): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      const clip = track?.clips.find((c) => c.id === clipId);
+      if (clip) clip.startSample = Math.max(0, Math.round(startSample));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Add a clip to a track (the sample kit's placement path) and
    * generate a change.
    */
