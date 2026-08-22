@@ -235,7 +235,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       asserte DANS daw_engine_test, qui passe sous Linux depuis run #48)
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)
 - [ ] Critere 4 LNA Chrome (manuel, `--allow-origin` pret)
-- [ ] Persistance de l'outbox (localStorage) — `web/src/network/server_client.ts`
+- [x] Persistance de l'outbox — FAIT 2026-08-22 : miroir localStorage par
+      onglet + ADOPTION des files orphelines a la connexion (onglet ferme
+      pendant la coupure -> rejoue par le suivant ; doublon CRDT = no-op,
+      chaque course penche vers le doublon jamais la perte). Spec
+      `outbox-persistence` : edit hors ligne dans un onglet FERME, serveur
+      relance, nouvel onglet -> l'edit arrive, cles orphelines consommees.
+      E2E 11/11.
 - [x] Serveur : persister AVANT de diffuser — FAIT (voir 2.1 option B)
 - [x] `solo`/`mute` en `std::atomic<bool>` — FAIT 2026-08-22 (R4+S4, teste)
 

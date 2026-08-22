@@ -109,8 +109,10 @@ edits distincts + conflit sur la meme piste) est VERT, annotation
    remplacement du document local.
 
 **Dettes residuelles distinctes:**
-- L'outbox est en memoire seulement: un onglet ferme pendant la coupure
-  perd sa file. Persistance locale (IndexedDB/localStorage) a faire.
+- ~~L'outbox est en memoire seulement~~ SOLDEE 2026-08-22 : miroir
+  localStorage par onglet + adoption des files orphelines a la connexion,
+  garde par le spec `outbox-persistence` (edit hors ligne dans un onglet
+  FERME, rejoue par le suivant).
 - ~~Le serveur diffuse un change AVANT de le persister~~ CORRIGE
   2026-08-21: persist-avant-broadcast dans websocket.rs, garde par
   `cargo test --test persist_before_broadcast` (kill brutal du process a

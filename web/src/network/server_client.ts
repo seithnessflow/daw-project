@@ -3,6 +3,23 @@
  * WebSocket client for connecting to the sync server.
  */
 
+function encodeBase64(bytes: Uint8Array): string {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin);
+}
+
+function decodeBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export class ServerClient {
   private ws: WebSocket | null = null;
   private url: string;
@@ -18,8 +35,15 @@ export class ServerClient {
   // Outbox: changes emitted while disconnected (or before the initial
   // document arrives) accumulate here and are sent, in order, once the
   // initial document of the (re)connection has been delivered.
-  // In-memory only: a closed tab loses its queue (known, separate debt).
+  //
+  // PERSISTED (debt settled): the queue is mirrored to localStorage under
+  // a per-tab key, and ORPHAN queues (tabs closed mid-outage) are adopted
+  // by the next connection to the same project. Replaying an
+  // already-known Automerge change is a CRDT no-op, so every race in
+  // this scheme resolves to a harmless duplicate, never a loss.
   private outbox: Uint8Array[] = [];
+  private readonly tabId: string =
+    (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
   private resyncTimer: number | null = null;
 
   onConnect: (() => void) | null = null;
@@ -71,7 +95,9 @@ export class ServerClient {
               this.awaitingInitialDoc = false;
               this.onDocument?.(data);
               // The app has merged the server document: local offline
-              // changes can now be delivered, in emission order
+              // changes can now be delivered, in emission order - orphaned
+              // queues (closed tabs) first, they are older
+              this.adoptOrphanOutboxes();
               this.flushOutbox();
             } else {
               this.onChange?.(data);
@@ -112,6 +138,7 @@ export class ServerClient {
       this.ws.send(change);
     } else {
       this.outbox.push(change);
+      this.persistOutbox();
       console.log(`Server offline: change queued (${this.outbox.length} pending)`);
     }
   }
@@ -124,6 +151,71 @@ export class ServerClient {
     while (this.outbox.length > 0) {
       const change = this.outbox.shift()!;
       this.ws.send(change);
+    }
+    this.persistOutbox();
+  }
+
+  // ---- Outbox persistence (localStorage, never blocking) -------------------
+  // Key scheme: daw-outbox:<projectId>:<tabId>. Storage can be absent,
+  // full, or denied - every access is try/catch and the in-memory queue
+  // stays authoritative.
+
+  private storageKey(): string {
+    return `daw-outbox:${this.projectId}:${this.tabId}`;
+  }
+
+  private persistOutbox(): void {
+    try {
+      if (this.outbox.length === 0) {
+        localStorage.removeItem(this.storageKey());
+      } else {
+        localStorage.setItem(
+          this.storageKey(),
+          JSON.stringify(this.outbox.map(encodeBase64))
+        );
+      }
+    } catch {
+      // storage unavailable: the in-memory queue still works
+    }
+  }
+
+  /**
+   * Adopt queues left by tabs that closed during an outage: their changes
+   * go IN FRONT of ours (they are older), their keys are removed, and the
+   * merged queue is re-persisted under OUR key before flushing - a crash
+   * between those steps leaves duplicates, never losses. A live sibling
+   * tab whose key we adopt simply re-persists on its next queued change.
+   */
+  private adoptOrphanOutboxes(): void {
+    try {
+      const prefix = `daw-outbox:${this.projectId}:`;
+      const orphanKeys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix) && key !== this.storageKey()) {
+          orphanKeys.push(key);
+        }
+      }
+      if (orphanKeys.length === 0) return;
+      const adopted: Uint8Array[] = [];
+      for (const key of orphanKeys) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          for (const b64 of JSON.parse(raw) as string[]) {
+            adopted.push(decodeBase64(b64));
+          }
+        }
+      }
+      if (adopted.length > 0) {
+        console.log(`Adopting ${adopted.length} change(s) from ${orphanKeys.length} closed tab(s)`);
+        this.outbox.unshift(...adopted);
+      }
+      this.persistOutbox();
+      for (const key of orphanKeys) {
+        localStorage.removeItem(key);
+      }
+    } catch {
+      // storage unavailable: nothing to adopt
     }
   }
 
