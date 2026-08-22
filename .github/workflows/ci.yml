@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [master, main]
+    # Docs-only pushes build nothing. KNOWN TRAP, recorded upfront: the day
+    # this repo gets protected branches with required checks, a markdown-only
+    # push produces NO run at all and a missing required check blocks the
+    # merge - this line must evolve at that moment.
+    paths-ignore: ['**.md']
   pull_request:
     branches: [master, main]
+    paths-ignore: ['**.md']
 
 env:
   # Criterion 1 reference (asserted inside daw_engine_test; see DECISIONS.md)
@@ -54,10 +60,29 @@ jobs:
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
 
+      - name: Cache VST3 SDK build tree
+        # Sources AND objects in ONE archive: tar preserves mtimes, so ninja
+        # sees the cached SDK objects (engine/build/vst3sdk) newer than the
+        # cached SDK sources and skips them, while engine sources arrive from
+        # checkout with fresh mtimes and rebuild as usual. .ninja_log and
+        # .ninja_deps live at the build-tree root, hence engine/build whole.
+        # The SDK is pinned, so this cache lives until the pin or the CMake
+        # config that shapes it changes.
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/vst3sdk
+            engine/build
+          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/CMakeLists.txt') }}
+
       - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
         run: |
-          git clone --recursive --depth 1 --branch v3.8.1_build_84 \
-            https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
+          if [ ! -d third_party/vst3sdk ]; then
+            git clone --recursive --depth 1 --branch v3.8.1_build_84 \
+              https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
+          else
+            echo "VST3 SDK restored from cache - clone skipped"
+          fi
 
       - name: Build engine
         run: |
@@ -160,10 +185,29 @@ jobs:
           cmake -B build -DBUILD_TESTING=OFF
           cmake --build build -j$(nproc)
 
+      - name: Cache VST3 SDK build tree
+        # Sources AND objects in ONE archive: tar preserves mtimes, so ninja
+        # sees the cached SDK objects (engine/build/vst3sdk) newer than the
+        # cached SDK sources and skips them, while engine sources arrive from
+        # checkout with fresh mtimes and rebuild as usual. .ninja_log and
+        # .ninja_deps live at the build-tree root, hence engine/build whole.
+        # The SDK is pinned, so this cache lives until the pin or the CMake
+        # config that shapes it changes.
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/vst3sdk
+            engine/build
+          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/CMakeLists.txt') }}
+
       - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
         run: |
-          git clone --recursive --depth 1 --branch v3.8.1_build_84 \
-            https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
+          if [ ! -d third_party/vst3sdk ]; then
+            git clone --recursive --depth 1 --branch v3.8.1_build_84 \
+              https://github.com/steinbergmedia/vst3sdk.git third_party/vst3sdk
+          else
+            echo "VST3 SDK restored from cache - clone skipped"
+          fi
 
       - name: Build engine
         # The fader-to-engine E2E tests spawn the engine and its fixture
