@@ -221,6 +221,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          multiple de 256) = bypass permanent. Remede : kRingSlots=8,
          clamp BRUYANT ou refus de demarrer, verification de periode a
          l'initialisation. La regle sort de la prose, entre dans le code.
+         REPRODUCTEUR TROUVE (usage libre 2026-08-22) : le backend null
+         (--mute) livre ses callbacks en rafales irregulieres -> le live
+         sert massivement du DRY enfant vivant (meter sine 22,5 % =
+         pre-AGain au lieu de 11,25 % wet, aucun restart) — famine du
+         ring mesurable SANS device reel, CI-able pour cette session.
+         + trou de telemetrie : le bilan de sortie n'imprime blocks_missed
+         que pour le debug-proxy, jamais les instances document
+         (main.cpp:865 et :1107).
       4. [ ] A3-4+A3-5 CRITERE 3 VRAI (une session, PROMU par arbitrage —
          touche la promesse fondatrice) : flushOutbox perd des changes si
          le socket meurt pendant le flush ET la nouveaute locale n'est

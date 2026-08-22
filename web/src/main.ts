@@ -148,12 +148,29 @@ async function init() {
     }
   };
 
-  // Transport buttons
+  // Transport buttons. Stop REWINDS (lot 3): stop alone left the
+  // playhead parked wherever the transport died - a stopped DAW that
+  // cannot come home is a playhead you chase with no seek. Play after
+  // Stop restarts from zero, like every DAW's first convention.
   playBtn.addEventListener('click', () => {
     engineClient?.play();
   });
   stopBtn.addEventListener('click', () => {
     engineClient?.stop();
+    engineClient?.seek(0);
+  });
+
+  // Seek on click (lot 3): a click anywhere on the ruler or a time lane
+  // jumps the transport there - the timeline is a control, not a poster.
+  const tracksEl = document.getElementById('tracks')!;
+  tracksEl.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const lane = target.closest('.track-lane, .ruler') as HTMLElement | null;
+    if (!lane || !engineClient) return;
+    const x = e.clientX - lane.getBoundingClientRect().left;
+    const sr = project?.getDocument().sampleRate || 48000;
+    const seconds = Math.max(0, x / TIMELINE.pps);
+    engineClient.seek(Math.round(seconds * sr));
   });
 
   // Add track button

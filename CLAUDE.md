@@ -167,6 +167,17 @@ discontinuite = rouge, on corrige AVANT). Toute mesure affichee (VU, etc.)
 recoit un test au signal connu (ton 2.4b, valeur assertee exactement).
 Ecoute selective : `npm run ear -- --solo <piste> --bypass/--no-bypass`.
 
+Les deux gestes de la boucle complete (consignes 2026-08-22) :
+- USAGE LIBRE obligatoire par session UI : dix minutes de manipulation
+  exploratoire (pas les gestes scriptes — chercher ce qui cloche en
+  utilisateur impatient, grille en tete). Les scripts attrapent les
+  regressions ; l'usage libre attrape les decouvertes (precedent : la
+  tete de lecture fugueuse).
+- LOT MUR = ONGLET OUVERT : quand un lot merite un verdict humain,
+  OUVRE l'onglet toi-meme (`start chrome <url>`), etat charge, et
+  annonce en <= 3 lignes ce qui a change et quoi essayer. Ne jamais
+  demander a l'utilisateur de lancer quoi que ce soit.
+
 ---
 
 ## RÉGIME DE SESSION — économe, fluide, sans temps mort

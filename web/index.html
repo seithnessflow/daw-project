@@ -127,8 +127,12 @@
       .track-lane {
         position: relative;
         flex: 0 0 auto;
+        cursor: pointer; /* the timeline is a control: click = seek */
         background:
           repeating-linear-gradient(90deg, #262626 0, #262626 1px, transparent 1px, transparent 20px);
+      }
+      .ruler {
+        cursor: pointer;
       }
       .clip {
         position: absolute;
