@@ -25,8 +25,18 @@ impl FileStore {
         Ok(Self { base_path: path })
     }
 
-    fn project_path(&self, project_id: &str) -> PathBuf {
-        self.base_path.join(format!("{}.am", project_id))
+    /// Defense in depth (audit C1): even though the ws handler validates,
+    /// the store REFUSES a non-stem id rather than join it - a traversal
+    /// segment must never reach the filesystem. Callers already handle
+    /// the error path (load/save/apply_change return Result).
+    fn project_path(&self, project_id: &str) -> Result<PathBuf> {
+        let ok = !project_id.is_empty()
+            && project_id.len() <= 64
+            && project_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !ok {
+            anyhow::bail!("invalid project id: {:?}", project_id);
+        }
+        Ok(self.base_path.join(format!("{}.am", project_id)))
     }
 }
 
@@ -41,7 +51,7 @@ async fn write_atomic(path: &std::path::Path, data: &[u8]) -> std::io::Result<()
 #[async_trait]
 impl ProjectStore for FileStore {
     async fn load(&self, project_id: &str) -> Result<Option<Vec<u8>>> {
-        let path = self.project_path(project_id);
+        let path = self.project_path(project_id)?;
 
         if !path.exists() {
             return Ok(None);
@@ -55,7 +65,7 @@ impl ProjectStore for FileStore {
     }
 
     async fn save(&self, project_id: &str, data: &[u8]) -> Result<()> {
-        let path = self.project_path(project_id);
+        let path = self.project_path(project_id)?;
 
         write_atomic(&path, data)
             .await
@@ -65,7 +75,7 @@ impl ProjectStore for FileStore {
     }
 
     async fn apply_change(&self, project_id: &str, change: &[u8]) -> Result<()> {
-        let path = self.project_path(project_id);
+        let path = self.project_path(project_id)?;
 
         // Load existing or create new
         let mut doc = if path.exists() {
@@ -104,7 +114,7 @@ impl ProjectStore for FileStore {
     }
 
     async fn delete(&self, project_id: &str) -> Result<()> {
-        let path = self.project_path(project_id);
+        let path = self.project_path(project_id)?;
 
         if path.exists() {
             fs::remove_file(&path)

@@ -5,9 +5,14 @@
 
 Ordre grave (la confiance avant le sucre, arbitrage confirme) :
 
-1. [ ] CONFIANCE — les deux sessions AUDIT-3 qui touchent la promesse :
-       critere 3 vrai (A3-4/A3-5, push anti-entropie) et file param
-       multi-slots (A3-1). Puis contrat de periode (A3-2/A3-3).
+0. [ ] SECURITE (audit 2026-08-22, SECURITY.md) — avant tout pair distant :
+       C1 path traversal [FAIT] ; puis C2 (auth serveur + CORS strict),
+       H1 (CSPRNG token moteur + compare constant-time), H2 (cap taille WS
+       + parse borne hors verrou), H3 (fichiers owner-only + O_EXCL),
+       M2/M3/M5 (garde 32-bit, parseur WAV borne, clamp doc cote web).
+1. [x] CONFIANCE — critere 3 vrai FAIT (push anti-entropie, 282b030).
+       Reste : file param multi-slots (A3-1) puis contrat de periode
+       (A3-2/A3-3).
 2. [ ] 2.5 ETAT+DECOUVERTE, enrichi par le manuel : blobs Comp/Cont par
        instance DANS le document (regle de verite : blobs gagnent,
        param-list = projection UI) ; scan moduleinfo.json + blacklist au
@@ -46,7 +51,7 @@ document. Voir ABLETON-INTEGRALE §5.
 La demo que ni Soundtrap ni BandLab ne peuvent copier : un plugin natif
 pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
-- [ ] 2.1 ESCALADE 2026-08-21 : support Rust d'automerge-repo immature
+- [x] 2.1 ESCALADE 2026-08-21 : support Rust d'automerge-repo immature
       (automerge-repo-rs = non compatible reseau avec le JS ; samod =
       compatible mais "experimental, don't use anywhere serious").
       Options rapportees : A relais Node officiel (mais 2 syncs cohabitants,
@@ -352,6 +357,29 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       d'infrastructure (depot, binaires daw_*, packages) = churn differe ;
       formats compresses au drop (mp3/flac -> decode + PUT wav) ; analyse
       spectrale ; masquage inter-pistes ; suggestions IA (acteur Automerge).
+
+- [ ] COHERENCE (audit 2026-08-22) — split-rule et jumeaux restants :
+      a. buildGraph JUMEAU : offline_render.cpp reconstruit son propre
+         graphe (:196-302) — unifier avec main.cpp buildGraph (le jumeau
+         que CLAUDE.md cite deja) ;
+      b. splitter main.cpp (1155), automerge_document.cpp (829),
+         plugin_host_main.cpp (663), websocket_server.cpp (481),
+         app/wiring.ts (432), ui-drive.mjs, track.ts (regle module) ;
+      c. dette morte a exciser avec la session transport-owner :
+         AudioCommand::UpdateGraph/SetGain + graph_ptr, TransportState
+         loop_* atomics, CLI --solo/--mute-track (jumeau de SetMonitor),
+         AutomergeDocument::generate/receiveSyncMessage (stubs) ;
+      d. SCHEMA.md : engine schema.h utilise std::map pour params alors
+         que SCHEMA dit LISTE {key,value} (ordre perdu) — aligner sur
+         vector<pair> ou adoucir le doc ;
+      e. npm scripts manquants (drive/signals/kit/seed), gitignore
+         web/playwright-report/, messages.ts marque GENERE dans CLAUDE.md.
+      FAIT ce jour : proto/engine.proto (jumeau divergent) supprime ;
+      updateMeter + parseTime (exports morts) supprimes ; README verite
+      (.am, SHA-256, make test, licence, triangle, VST3).
+- [ ] Moteur : exit 9 silencieux a l'arret observe DEUX fois (backend
+      WASAPI, position figee puis mort sans log). Instrumenter la sortie
+      du callback/device pour capturer la cause avant de corriger.
 
 ## Court terme (sessions economes)
 

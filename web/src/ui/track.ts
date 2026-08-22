@@ -315,16 +315,6 @@ function createDevicePanel(
   return panel;
 }
 
-/** Update a meter display. */
-export function updateMeter(trackId: string, peak: number): void {
-  const meter = document.getElementById(`meter-${trackId}`);
-  if (!meter) return;
-  const fill = meter.querySelector('.track-meter-fill') as HTMLElement;
-  if (!fill) return;
-  const percent = Math.min(100, peak * 100);
-  fill.style.width = `${percent}%`;
-}
-
 /**
  * Update an existing track's gain UI in place (no DOM rebuild).
  * Skips the slider if the user is currently holding it.

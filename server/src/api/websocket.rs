@@ -7,7 +7,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path, State,
     },
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -45,12 +45,26 @@ fn create_default_document() -> AutoCommit {
     doc
 }
 
+/// A project id is a FILE STEM: it becomes `<id>.am` under ./projects.
+/// Validate BEFORE any FS join (audit C1: `..\..\evil` on Windows was an
+/// arbitrary .am write/read - backslash is a separator the URL layer
+/// never decodes away). Defense in depth: FileStore re-checks too.
+pub fn valid_project_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 /// WebSocket upgrade handler.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Path(project_id): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
+    if !valid_project_id(&project_id) {
+        tracing::warn!("Rejected invalid project id: {:?}", project_id);
+        return (axum::http::StatusCode::BAD_REQUEST, "invalid project id").into_response();
+    }
     tracing::info!("WebSocket connection for project: {}", project_id);
     ws.on_upgrade(move |socket| handle_socket(socket, project_id, state))
 }

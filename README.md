@@ -22,23 +22,31 @@ tagline, today.)*
 │   (source of    │     │ • Persistence   │     │ • Graph         │
 │    truth)       │     │                 │     │                 │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
-      ▲                                               │
-      │              WebSocket (Protobuf)             │
-      └───────────────────────────────────────────────┘
+      ▲   browser<->engine: WebSocket (Protobuf, telemetry/transport)  │
+      │   engine<->server:  HTTP (content-addressed assets) - triangle │
+      └───────────────────────────────────────────────────────────────┘
 ```
 
-## Slice 1 Scope
+The document is an Automerge CRDT (binary `.am`), synced by the server;
+assets are content-addressed by SHA-256 in a verifying store; nothing
+real-time crosses the remote server.
 
-**Goal:** Two browser tabs open on the same project. Move a fader in tab A, it moves in tab B, and the sound changes in headphones.
+## Scope so far
+
+**Foundational milestone:** two browser tabs on the same project — move a
+fader in tab A, it moves in tab B, and the sound changes; a VST3 plugin
+runs in an isolated process and its bypass is audible from a tab.
 
 **Features:**
-- Load project documents (JSON format)
+- Project documents = Automerge binary (`.am`), collaborative CRDT
 - Play WAV clips with sample-accurate positioning
-- Apply gain (track-level and processor chain)
-- Offline render to WAV
-- CLI for testing without browser
+- Per-track gain + out-of-process VST3 chain with bypass
+- Offline render to WAV (deterministic: same document = same hash)
+- Timeline UI (clips, drag/resize, waveforms, overview, drop-your-WAV)
+- CLI for testing without a browser
 
-**Not included:** VST plugins, recording, MIDI, undo, fancy UI.
+**Not yet:** recording, MIDI, undo, tempo/bars, automation (see TODO
+roadmap and docs/ABLETON-INTEGRALE.md).
 
 ## Prerequisites
 
@@ -81,10 +89,10 @@ cmake --build . -j$(nproc)
 cd ../..
 
 # 3. Test playback
-./build/engine/daw_engine --doc fixtures/two-tracks.json --play --assets fixtures
+./build/engine/daw_engine --doc fixtures/two-tracks.am --play --assets fixtures
 
 # 4. Test offline render
-./build/engine/daw_engine --doc fixtures/two-tracks.json --render output.wav --assets fixtures
+./build/engine/daw_engine --doc fixtures/two-tracks.am --render output.wav --assets fixtures
 ```
 
 ## Acceptance Criteria Verification
@@ -93,8 +101,8 @@ cd ../..
 
 ```bash
 # Render twice and compare hashes
-./build/engine/daw_engine --doc fixtures/two-tracks.json --render /tmp/out1.wav --assets fixtures
-./build/engine/daw_engine --doc fixtures/two-tracks.json --render /tmp/out2.wav --assets fixtures
+./build/engine/daw_engine --doc fixtures/two-tracks.am --render /tmp/out1.wav --assets fixtures
+./build/engine/daw_engine --doc fixtures/two-tracks.am --render /tmp/out2.wav --assets fixtures
 
 # Hashes must match
 sha256sum /tmp/out1.wav /tmp/out2.wav
@@ -127,7 +135,7 @@ See `docs/DECISIONS.md` ADR-008 for investigation results.
 
 ```bash
 # Create a long project and play for 10 minutes
-./build/engine/daw_engine --doc fixtures/long-project.json --play --assets fixtures
+./build/engine/daw_engine --doc fixtures/long-project.am --play --assets fixtures
 
 # Monitor the "Underruns" counter - should stay at 0
 ```
@@ -168,7 +176,7 @@ Usage:
   engine --doc <file> --info
 
 Options:
-  --doc <file>       Project document (.json)
+  --doc <file>       Project document (Automerge .am)
   --play             Play through audio device
   --render <file>    Render to WAV file
   --assets <dir>     Asset directory (default: same as doc)
@@ -195,7 +203,7 @@ Example:
       "clips": [
         {
           "id": "clip-1",
-          "assetHash": "a948904f2f0f479b",
+          "assetHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
           "startSample": 0,
           "lengthSamples": 48000,
           "offsetSamples": 0
@@ -221,7 +229,11 @@ See `docs/DECISIONS.md` for detailed rationale.
 ### Run Tests
 
 ```bash
-make test
+# Engine (MSVC, native — the only local toolchain)
+cd engine/build-msvc && ..\rebuild_msvc.bat && .\daw_engine_test.exe
+
+# Web E2E (Playwright; server + vite must be running)
+cd web && npm run test:e2e
 ```
 
 ### Build in Debug Mode
@@ -246,9 +258,6 @@ cd server && cargo fmt
 cd web && npm run format
 ```
 
-## License
-
-[To be determined]
 
 ## Licence
 
