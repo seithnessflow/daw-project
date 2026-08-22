@@ -61,6 +61,17 @@ notes propres.
 7. **Ferme tout salement** (croix sur les terminaux). Verifie au
    gestionnaire de taches : AUCUN `plugin_host.exe` orphelin ne doit
    survivre (garde parent).
+8. **MISSION AUDIT-3 (ajoutee 2026-08-22) : varie la taille de buffer.**
+   Dans le panneau de la Zen Go, change la taille de buffer : **256**,
+   puis **1024** (ou une valeur non standard si le driver le permet),
+   en relancant le moteur a chaque fois. Le rapport AUDIT-3 predit :
+   a 512 tout passe ; a 1024 le pipeline est clampe en silence (A3-2,
+   blocs secs massifs attendus) ; a une periode non multiple de 256 le
+   plugin devient partiellement muet en permanence (A3-3). Note le
+   buffer affiche par le moteur au demarrage, le compteur « blocks
+   missed » a l'arret, et ce que tes oreilles disent. C'est le rare cas
+   ou le test des mains et l'audit se valident mutuellement — fais
+   mentir le ZenGo-a-512.
 
 ## Notes brutes
 

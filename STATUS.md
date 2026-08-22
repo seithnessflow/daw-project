@@ -93,13 +93,20 @@ FERME sur ses trois cotes. Verdict final de nuit : run #60 VERT (4,6 min).
 Bilan de la nuit : runs #56-60, cinq verts, zero dette. Au reveil : le
 test des mains (docs/test-des-mains-2.4.md), puis 2.5.
 
+**2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
+AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
+silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses
+de documents en avance sur le code — plus d'erreurs de jeunesse. Ordre decide
+(TODO) : mains AVEC variation de buffer -> file param -> contrat de periode ->
+critere 3 vrai -> 2.5. Critere 3 passe en « valide avec reserve » (A3-4).
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 20/20 |
-| 3 | Convergence 2 onglets | ✅ VALIDE | Online ET offline (Playwright, coupure reelle du serveur). Voir detail pour les dettes residuelles |
+| 3 | Convergence 2 onglets | ⚠️ VALIDE AVEC RESERVE | Online ET offline (Playwright, coupure reelle du serveur). RESERVE AUDIT-3 (A3-4) : socket mort pendant un flush = perte non rattrapee, la nouveaute locale n'est jamais re-poussee apres merge. Session planifiee (TODO, ordre 4) |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
 
@@ -122,6 +129,15 @@ edits distincts + conflit sur la meme piste) est VERT, annotation
    traite comme document complet (drapeau par connexion, pas de prefixe de
    protocole necessaire) et FUSIONNE via `Automerge.merge()` - jamais de
    remplacement du document local.
+
+**Reserve AUDIT-3 (2026-08-22, A3-4/A3-5) — le trou restant :**
+`flushOutbox` retire de la file avant confirmation d'envoi (send() hors
+OPEN jette en silence) et, apres `mergeRemote`, la nouveaute LOCALE n'est
+jamais poussee vers le serveur (les cycles resync ne font que tirer).
+Le spec offline exerce le chemin outbox-vivante, pas socket-mort-pendant-
+flush. + un applyChange qui echoue ne declenche aucun resync (divergence
+silencieuse, reelle sous rafale : broadcast cap 256, Lagged = skip).
+Remede et test de garde consignes : AUDIT-3.md, session TODO ordre 4.
 
 **Dettes residuelles distinctes:**
 - ~~L'outbox est en memoire seulement~~ SOLDEE 2026-08-22 : miroir

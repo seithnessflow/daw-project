@@ -200,6 +200,39 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       tranche (fenetrage, etat, decouverte, plugins du commerce) se
       RE-CADRE en session dediee, conformement au cadrage.
 
+- [ ] ARBITRAGE AUDIT-3 (2026-08-22, rapport AUDIT-3.md — lecture complete
+      post-jalon, consigne le jour meme). Ordre DECIDE, avant 2.5 :
+      1. [ ] LE TEST DES MAINS, avec la MISSION AJOUTEE par l'audit :
+         variation de buffer dans le panneau ZenGo (256 / 1024 / valeur
+         non standard) — exerce les frontieres accusees par A3-2/A3-3
+         avec le diagnostic deja ecrit. Runbook mis a jour
+         (docs/test-des-mains-2.4.md, item 8).
+      2. [ ] A3-1 FILE PARAM (prealable direct de 2.5-etat) : le canal
+         param du ring n'a qu'un slot — deux setParam s'ecrasent, un
+         plugin a n params perd n-1 params a chaque rebuild. File SPSC
+         de paires {id, value} dans le segment, moule CommandRingBuffer.
+         Session courte, test : 2 params envoyes coup sur coup, les 2
+         appliques.
+      3. [ ] A3-2+A3-3 CONTRAT DE PERIODE (une session) : depth clampee
+         en silence a 2 (TODO promettait « buffer 1024 -> 4 blocs » —
+         phrase fausse, famille des 47 runs) + bloc partiel (periode non
+         multiple de 256) = bypass permanent. Remede : kRingSlots=8,
+         clamp BRUYANT ou refus de demarrer, verification de periode a
+         l'initialisation. La regle sort de la prose, entre dans le code.
+      4. [ ] A3-4+A3-5 CRITERE 3 VRAI (une session, PROMU par arbitrage —
+         touche la promesse fondatrice) : flushOutbox perd des changes si
+         le socket meurt pendant le flush ET la nouveaute locale n'est
+         jamais re-poussee apres merge (la reconciliation offline n'a que
+         son chemin outbox-vivante). Remede : push symetrique
+         Automerge.getChanges(remote, local) apres merge + requestResync
+         sur echec d'applyChange. Test de garde : serveur tue PENDANT un
+         flush.
+      Puis 2.5 s'ouvre, sur les notes des mains, socle assaini.
+      A3-6 (transport multi-producteur SPSC) attend la session transport
+      (candidat grille existant, meme chantier). A3-7 (rewrite complet
+      par change cote serveur, quadratique) et A3-8 (menu hygiene) restent
+      dates dans AUDIT-3.md avec leurs declencheurs.
+
 - [ ] 2.5 RE-CADRAGE POST-2.4 (session dediee, lecture + arbitrage).
       Trois conseils en entree (recus a la cloture de 2.4, a peser) :
       1. L'ETAT DES PLUGINS D'ABORD — le chainon entre AGain (un param en
@@ -264,6 +297,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] Transport a deux chemins d'ecriture : file de commandes (ring buffer)
       ET appels directs `getTransport().play()` depuis main.cpp. Un seul
       proprietaire a choisir. + Atomiques de loop "for future use" morts.
+      + AUDIT-3 (A3-6) : le ring de commandes est SPSC mais les callbacks
+      ixwebsocket poussent depuis UN THREAD PAR CONNEXION — deux onglets
+      = deux producteurs concurrents, contrat viole. Meme session : un
+      proprietaire, un producteur. + UpdateGraph/SetGain/graph_ptr morts
+      dans AudioCommandMessage.
 - [ ] ProcessorNode trop mince pour un hote VST3 (latence, bypass, etat,
       bus ; params string->float insuffisants ; contrat in-place non ecrit).
       A traiter DANS le chantier 2.4, pas avant.
