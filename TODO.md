@@ -270,8 +270,9 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
 ## Moyen terme
 
-- [ ] Moteur : lire `chain` (processeurs) du document — TODO `automerge_document.cpp:419`
-- [ ] `assetHash` FNV → SHA-256 — domaine format document, verif complete
+- [x] Moteur : lire `chain` du document — FAIT 2026-08-22 (2.4c-2, M3 solde)
+- [x] `assetHash` FNV → SHA-256 — FAIT 2026-08-22 (2.3a, vecteurs FIPS,
+      jumeau create_test_doc soude en 2.3b)
 - [x] Nettoyer `docs/DECISIONS.md` — FAIT 2026-08-22 (ADR-015 WSL marque
       obsolete, collision ADR-016 resolue par renumerotation en ADR-018)
 

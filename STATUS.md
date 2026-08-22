@@ -89,7 +89,9 @@ Critere 5 sous charge : au backlog expres (exige du son reel sur le ZenGo).
 (PUT VERIFIANT — il a debusque un jumeau FNV dans create_test_doc a sa
 premiere execution) ; le moteur tire les assets manquants du store en mode
 serveur (preuve E2E asset-fetch, 12/12). Le triangle de l'architecture est
-FERME sur ses trois cotes.
+FERME sur ses trois cotes. Verdict final de nuit : run #60 VERT (4,6 min).
+Bilan de la nuit : runs #56-60, cinq verts, zero dette. Au reveil : le
+test des mains (docs/test-des-mains-2.4.md), puis 2.5.
 
 ## Criteres d'acceptation
 
