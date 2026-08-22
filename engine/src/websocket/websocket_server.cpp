@@ -2,10 +2,20 @@
 #include "websocket_server.h"
 #include <ixwebsocket/IXNetSystem.h>
 
+#include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
+#endif
 
 namespace daw::websocket {
 
@@ -359,7 +369,9 @@ bool WebSocketServer::parseWithLength(const std::string& data, protocol::Message
                    (static_cast<uint8_t>(data[2]) << 8) |
                    static_cast<uint8_t>(data[3]);
 
-    if (data.size() < 4 + len) {
+    // Audit M2: compute in size_t - `4 + len` in uint32 wraps for a len
+    // near UINT32_MAX and would skip the bounds check.
+    if (data.size() < static_cast<size_t>(len) + 4) {
         return false;
     }
 
@@ -367,24 +379,45 @@ bool WebSocketServer::parseWithLength(const std::string& data, protocol::Message
 }
 
 std::string WebSocketServer::generateToken() {
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dis;
-
-    // Generate 256 bits of randomness (32 bytes -> 64 hex chars)
+    // Audit H1: mt19937_64 seeded from one random_device draw has ~32
+    // bits of real entropy - the "256-bit" token was determined by a
+    // single 32-bit seed. Fill 32 bytes straight from the OS CSPRNG.
+    unsigned char buf[32];
+#ifdef _WIN32
+    if (BCryptGenRandom(nullptr, buf, sizeof(buf),
+                        BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+        std::cerr << "FATAL: BCryptGenRandom failed for auth token" << std::endl;
+        std::abort();  // a weak token is worse than no server
+    }
+#else
+    std::ifstream urandom("/dev/urandom", std::ios::binary);
+    if (!urandom.read(reinterpret_cast<char*>(buf), sizeof(buf))) {
+        std::cerr << "FATAL: /dev/urandom read failed for auth token" << std::endl;
+        std::abort();
+    }
+#endif
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');
-    oss << std::setw(16) << dis(gen);
-    oss << std::setw(16) << dis(gen);
-    oss << std::setw(16) << dis(gen);
-    oss << std::setw(16) << dis(gen);
+    for (unsigned char b : buf) {
+        oss << std::setw(2) << static_cast<int>(b);
+    }
+    return oss.str();  // 32 bytes -> 64 hex chars
+}
 
-    return oss.str();
+/** Constant-time equality (audit H1): a plain != leaks timing that can
+ *  narrow a token byte by byte. Compares the full length always. */
+static bool constantTimeEquals(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    unsigned char diff = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        diff |= static_cast<unsigned char>(a[i]) ^ static_cast<unsigned char>(b[i]);
+    }
+    return diff == 0;
 }
 
 bool WebSocketServer::validateConnection(const std::string& origin, const std::string& token) const {
-    // Token must match
-    if (token != auth_token_) {
+    // Token must match (constant-time, audit H1)
+    if (!constantTimeEquals(token, auth_token_)) {
         std::cerr << "WebSocket: Invalid token from origin: "
                   << (origin.empty() ? "(no origin)" : origin) << std::endl;
         return false;

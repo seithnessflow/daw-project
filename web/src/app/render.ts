@@ -20,6 +20,7 @@ import { fillWaveforms } from '../ui/waveform';
 import { ctx, els, sendLastChange } from './context';
 import { updateInsertMarker, refreshOverview } from './navigation';
 import { refreshPalette } from './placement';
+import { cssId } from '../document/sanitize';
 
 export function renderTracks(force = false): void {
   if (!ctx.project) return;
@@ -103,7 +104,7 @@ export function renderTracks(force = false): void {
   // Selection reflection (C1): the selected clip is unambiguous
   if (ctx.selectedClipId) {
     const el = els.tracks.querySelector(
-      `[data-clip-id="${ctx.selectedClipId}"]`) as HTMLElement | null;
+      `[data-clip-id="${cssId(ctx.selectedClipId)}"]`) as HTMLElement | null;
     if (el) el.setAttribute('aria-selected', 'true');
     else ctx.selectedClipId = null;
   }

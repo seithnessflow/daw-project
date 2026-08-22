@@ -10,11 +10,12 @@ import { TIMELINE } from '../ui/track';
 import { ctx, sendLastChange } from './context';
 import { snapStep } from './navigation';
 import { renderTracks } from './render';
+import { cssId } from '../document/sanitize';
 
 /** Touch mode A: a freshly placed clip "lands" (CSS decides if it shows). */
 export function markLanded(clipId: string): void {
   const el = document.querySelector(
-    `[data-clip-id="${clipId}"]`) as HTMLElement | null;
+    `[data-clip-id="${cssId(clipId)}"]`) as HTMLElement | null;
   el?.classList.add('landed');
 }
 

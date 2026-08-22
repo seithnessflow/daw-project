@@ -17,6 +17,7 @@
  */
 
 import type { TrackDef, ProcessorDef } from '../document/schema';
+import { clampSamples, cssId } from '../document/sanitize';
 
 /** Timeline scale, shared by tracks, ruler and playhead. */
 export const TIMELINE = {
@@ -144,9 +145,12 @@ export function createTrackUI(
     const clipEl = document.createElement('div');
     clipEl.className = 'clip';
     clipEl.dataset.clipId = clip.id;
-    clipEl.style.left = `${(clip.startSample / sampleRate) * TIMELINE.pps}px`;
-    clipEl.style.width = `${Math.max(
-      2, (clip.lengthSamples / sampleRate) * TIMELINE.pps)}px`;
+    // Clamp document-derived spans (M5): a hostile lengthSamples must
+    // not become a giant DOM node that freezes a peer.
+    const startS = clampSamples(clip.startSample);
+    const lenS = clampSamples(clip.lengthSamples);
+    clipEl.style.left = `${(startS / sampleRate) * TIMELINE.pps}px`;
+    clipEl.style.width = `${Math.max(2, (lenS / sampleRate) * TIMELINE.pps)}px`;
     clipEl.style.background = `hsl(${hue} var(--sat) 34%)`;
     clipEl.style.borderColor = `hsl(${hue} var(--sat) 52%)`;
     const nameStrip = document.createElement('div');
@@ -320,7 +324,7 @@ function createDevicePanel(
  * Skips the slider if the user is currently holding it.
  */
 export function updateTrackGainUI(trackId: string, gain: number): void {
-  const el = document.querySelector(`[data-track-id="${trackId}"]`);
+  const el = document.querySelector(`[data-track-id="${cssId(trackId)}"]`);
   if (!el) return;
   const input = el.querySelector('[data-role="gain"]') as HTMLInputElement | null;
   if (input && document.activeElement !== input) {
@@ -341,16 +345,16 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
   if (!view) return;
   for (const proc of chain) {
     const toggle = view.querySelector(
-      `[data-role="bypass"][data-proc-id="${proc.id}"]`) as HTMLElement | null;
+      `[data-role="bypass"][data-proc-id="${cssId(proc.id)}"]`) as HTMLElement | null;
     if (toggle) {
       toggle.setAttribute('aria-pressed', proc.bypass ? 'true' : 'false');
     }
     const panel = view.querySelector(
-      `.device[data-proc-id="${proc.id}"]`) as HTMLElement | null;
+      `.device[data-proc-id="${cssId(proc.id)}"]`) as HTMLElement | null;
     if (!panel) continue;
     for (const p of proc.params) {
       const slider = panel.querySelector(
-        `[data-role="param"][data-param-key="${p.key}"]`) as HTMLInputElement | null;
+        `[data-role="param"][data-param-key="${cssId(p.key)}"]`) as HTMLInputElement | null;
       if (slider && document.activeElement !== slider) {
         slider.value = String(p.value);
         const valueEl = slider.nextElementSibling as HTMLElement | null;

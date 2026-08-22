@@ -19,6 +19,7 @@
 
 import { getPeaksEntry } from './waveform';
 import { TIMELINE } from './track';
+import { cssId } from '../document/sanitize';
 
 interface TrackState {
   target: number;   // last telemetry value (0..1+)
@@ -129,7 +130,7 @@ function tick(ts: number): void {
     }
     if (s.hot !== wasHot) {
       const head = document.querySelector(
-        `[data-track-id="${trackId}"] .track-head`) as HTMLElement | null;
+        `[data-track-id="${cssId(trackId)}"] .track-head`) as HTMLElement | null;
       head?.classList.toggle('life-hot', s.hot);
     }
     if (s.shown > 0.001 || s.peak > 0.003) alive = true;

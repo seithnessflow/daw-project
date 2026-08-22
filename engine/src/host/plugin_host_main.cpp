@@ -112,19 +112,23 @@ bool readWav16Stereo(const std::string& path, std::vector<int16_t>& samples, uin
         const std::string id(buf.data() + off, 4);
         uint32_t size;
         std::memcpy(&size, buf.data() + off + 4, 4);
+        // Audit M3: the chunk body must fit in the buffer BEFORE any field
+        // read or allocation - a lying size header was an OOB read and a
+        // pre-check 2 GB alloc. Compute in size_t (no 32-bit wrap).
+        const size_t body_end = off + 8 + static_cast<size_t>(size);
+        if (body_end > buf.size()) return false;
         if (id == "fmt " && size >= 16) {
             std::memcpy(&channels, buf.data() + off + 10, 2);
             std::memcpy(&sample_rate, buf.data() + off + 12, 4);
             std::memcpy(&bits, buf.data() + off + 22, 2);
         } else if (id == "data") {
             if (channels != 2 || bits != 16) return false;
-            const size_t count = size / 2;
+            const size_t count = size / 2;               // body already bounded
             samples.resize(count);
-            if (off + 8 + size > buf.size()) return false;
             std::memcpy(samples.data(), buf.data() + off + 8, count * 2);
             return true;
         }
-        off += 8 + size + (size % 2);
+        off += 8 + static_cast<size_t>(size) + (size % 2);
     }
     return false;
 }
