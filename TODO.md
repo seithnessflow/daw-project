@@ -93,6 +93,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       Preuve : le WAV de reference 2.4b rejoue EN CONTINU a travers le
       pont, echantillons identiques au rendu hors ligne — le pont est
       transparent, prouve au bit pres.
+      PREMIER GESTE A LA REPRISE : relire shared_audio_ring.h A FROID
+      avant d'ecrire proxy/--serve — le contrat a ete ecrit dans l'elan
+      du cadrage et jamais confronte a du code ; une fois les deux cotes
+      ecrits, chaque retouche du layout se paie double.
       TROIS PIEGES CONNUS D'AVANCE :
       1. Pas d'atomiques inter-processus gratuits : les std::atomic du
          ring DOIVENT etre dans le segment et lock-free — etendre le
@@ -121,15 +125,19 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
 ## Court terme (sessions economes)
 
-- [ ] HYGIENE CI (20 min, entre c-1 et c-2, deux lignes de yaml chacune) :
-      1. `paths-ignore: ['**.md']` — avec en commentaire de commit le piege
-         connu : le jour des branches protegees a checks obligatoires, un
-         push markdown-only ne produira AUCUN run et un check requis absent
-         bloque le merge — la ligne devra evoluer a ce moment-la.
-      2. `actions/cache` sur le BUILD TREE du SDK vst3 (pas seulement les
-         sources), cle = pin du SDK + hash du CMakeLists qui le configure ;
-         le SDK etant epingle, le cache tiendra des mois et chaque session
-         du chantier hote cessera de payer 30-45 min de runner 2 coeurs.
+- [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :
+      1. `paths-ignore: ['**.md']` sur push et pull_request, piege
+         branches-protegees documente en commentaire yaml + message de
+         commit. Preuve : push docs-only sans aucun run (constate a la
+         cloture de S1).
+      2. Cache du build tree SDK : `third_party/vst3sdk` + `engine/build`
+         dans UNE archive (mtimes coherents pour ninja), cle = pin
+         v3.8.1_build_84 + hash de `engine/cmake/vst3sdk.cmake` — bloc SDK
+         EXTRAIT du CMakeLists expres : les editions engine (chaque session
+         du chantier) n'evincent plus le cache. Runs froids reels : 11,6 et
+         12 min (#50/#51) — pas 30-45. Mesure a chaud : premier push de
+         code suivant (re-run navigateur indisponible) ; cache automerge-c
+         seulement si > ~5 min.
 
 - [ ] Verifier le hash GCC en CI (`89f1a1105dc09e92`) — regarder GitHub Actions
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)

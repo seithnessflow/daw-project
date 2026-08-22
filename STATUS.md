@@ -47,6 +47,11 @@ compilateur (static_assert lock-free sur tous les types partages avec le
 callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback
 (retention par generation, ADR-010 annote) ; solo/mute atomiques (S4 solde).
 
+**2026-08-22 (S1 hygiene CI):** pushes markdown-only ne declenchent plus de
+run (piege branches-protegees documente) ; build tree SDK en cache actions,
+cle = pin + hash de cmake/vst3sdk.cmake (extrait du CMakeLists pour survivre
+aux editions engine). Runs froids reels : ~12 min (#50/#51), verdicts verts.
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |
