@@ -93,6 +93,15 @@ FERME sur ses trois cotes. Verdict final de nuit : run #60 VERT (4,6 min).
 Bilan de la nuit : runs #56-60, cinq verts, zero dette. Au reveil : le
 test des mains (docs/test-des-mains-2.4.md), puis 2.5.
 
+**2026-08-22 (outillage yeux+oreille) :** `npm run snap` (Playwright sur la
+stack vivante, 2 viewports, --two-tabs) et `npm run ear` (rendu offline de
+l'etat courant + analyseur WAV pur Node, gate -1 dBFS/clip/discontinuite,
+ecoute SELECTIVE par chirurgie de snapshot : --solo/--mute/--bypass).
+Calibre sur le ton connu (-12,04/-15,05 dBFS assertes), rouge prouve
+(clip+saut injectes detectes), contribution AGain mesuree a 6,03 dB
+(=0,5 exact). Self-test analyseur en CI ; snap/ear restent hors CI (stack
+vivante). Boucle + securite auditive gravees dans CLAUDE.md.
+
 **2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
 AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
 silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses

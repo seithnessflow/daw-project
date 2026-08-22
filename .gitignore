@@ -57,3 +57,5 @@ server/projects/
 web/projects/
 web/test-results/
 server/assets/
+web/snap/
+web/ear/

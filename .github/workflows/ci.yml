@@ -148,6 +148,12 @@ jobs:
           npm ci
           npm run build
 
+      # The EAR's analyzer, self-tested on fixtures (pure Node, no stack,
+      # no audio device - the only tooling-session piece that belongs in
+      # CI; snap and the full ear depend on the living stack and stay out)
+      - name: Ear analyzer self-test
+        run: node web/scripts/ear-analyze.test.mjs
+
   test-e2e:
     runs-on: ubuntu-latest
     needs: [] # Independent of build-linux

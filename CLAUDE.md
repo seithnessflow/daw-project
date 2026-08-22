@@ -152,6 +152,21 @@ Interdit:
 - Commits: emoji robot + Co-Authored-By Claude
 - ADR pour decisions architecturales
 
+## Outillage UI/audio — les yeux et l'oreille (chantier UI)
+
+Boucle permanente : modifier (petit lot, hot-reload) -> `npm run snap` ->
+grille (1 casse / 2 ergonomie : corriger seul ; 3 concept : proposer et
+attendre ; 4 gout : ne jamais trancher) -> chemin audio touche ? ->
+`npm run ear` -> toutes les ~10 iterations ou niveau 3-4 : full.png +
+3 lignes, attendre. Invariants Playwright verrouilles AVANT toute refonte.
+
+Securite auditive, non negociable : mes runs moteur = `--mute` ; jamais de
+lecture audible de ma propre initiative ; avant toute ecoute utilisateur et
+apres toute modif du chemin audio : `ear` d'abord (crete > -1 dBFS, clip,
+discontinuite = rouge, on corrige AVANT). Toute mesure affichee (VU, etc.)
+recoit un test au signal connu (ton 2.4b, valeur assertee exactement).
+Ecoute selective : `npm run ear -- --solo <piste> --bypass/--no-bypass`.
+
 ---
 
 ## RÉGIME DE SESSION — économe, fluide, sans temps mort

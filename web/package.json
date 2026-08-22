@@ -10,7 +10,11 @@
     "format": "prettier --write src/**/*.ts",
     "proto:gen": "cp ../engine/src/protocol/messages.proto src/proto/ && npx protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/proto --ts_proto_opt=esModuleInterop=true,outputEncodeMethods=true src/proto/messages.proto && mv src/proto/src/proto/messages.ts src/proto/messages.ts && rm -rf src/proto/src",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "snap": "node scripts/ui-snap.mjs",
+    "ear": "node scripts/ear.mjs",
+    "ear:analyze": "node scripts/ear-analyze.mjs",
+    "ear:selftest": "node scripts/ear-analyze.test.mjs"
   },
   "dependencies": {
     "@automerge/automerge": "2.2.9",
