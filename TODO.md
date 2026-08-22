@@ -1,5 +1,46 @@
 # TODO
 
+## ROADMAP POST-MANUEL ABLETON (2026-08-22 — lecture integrale, synthese
+## dans docs/ABLETON-INTEGRALE.md ; les designs CRDT y sont acquis)
+
+Ordre grave (la confiance avant le sucre, arbitrage confirme) :
+
+1. [ ] CONFIANCE — les deux sessions AUDIT-3 qui touchent la promesse :
+       critere 3 vrai (A3-4/A3-5, push anti-entropie) et file param
+       multi-slots (A3-1). Puis contrat de periode (A3-2/A3-3).
+2. [ ] 2.5 ETAT+DECOUVERTE, enrichi par le manuel : blobs Comp/Cont par
+       instance DANS le document (regle de verite : blobs gagnent,
+       param-list = projection UI) ; scan moduleinfo.json + blacklist au
+       2e crash par class-uid ; exposedParams par instance (Configure
+       Mode) ; champ deactivated distinct de bypass (0-CPU vs dry a
+       latence constante) ; Utility natif (perimetre fini consigne).
+3. [ ] LES GAINS PROCHES (sessions courtes, ordre de valeur) :
+       a. fades/crossfades 4 ms anti-clic (fadeIn/Out/curve sur clip +
+          rampe moteur) — solde la dette crossfade de 2.4d ;
+       b. slide-du-contenu (offsetSamples, pur geste) + selection de
+          temps + split/consolidate ;
+       c. clip.gainDb + clip.pitchCents ; track.pan constant-power ;
+       d. nudge, count-in.
+4. [ ] AUTOMATION (la grande couche) : lanes en point-maps a ids stables
+       (design complet dans ABLETON-INTEGRALE §4), override ephemere par
+       utilisateur, moteur breakpoints -> IParameterChanges. Les
+       enveloppes de clip (abs/mod) suivent, pipeline prevu des le debut.
+5. [ ] SENDS/RETOURS + GROUPES (+ sidechain=resampling : routage a 3
+       prises, un champ input:{sourceTrackId, tap}).
+6. [ ] TEMPO — LA migration (double timestamp secondes<->beats, tempo
+       LWW-register facon Link, signature = evenements) : ouvre metronome,
+       grilles metriques, grooves. Session de cadrage dediee AVANT.
+7. [ ] LES DEPASSEMENTS (ou notre architecture bat l'original) :
+       undo per-acteur persistant navigable (historique Automerge) ;
+       freeze = cache de rendu prouvable par hash ; export/stems
+       (2 passes queues, part-des-retours).
+8. [ ] FUTURS NOMMES : enregistrement + take-lanes-vues (comping CRDT),
+       vue de jam collaborative (Session repensee sur etat de presence,
+       jamais dans Automerge), Follow Actions avec seed.
+REFUS ECRITS : macros/racks (indirection non arbitrable par CRDT), M4L
+(fichiers externes mutables), alea sans seed, etat de performance dans le
+document. Voir ABLETON-INTEGRALE §5.
+
 ## Tranche 2 — HOTE VST3 (le cap)
 
 La demo que ni Soundtrap ni BandLab ne peuvent copier : un plugin natif
