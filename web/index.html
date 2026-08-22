@@ -312,9 +312,12 @@
       }
       .clip-edge {
         position: absolute;
-        top: 0;
+        top: 13px; /* NEVER over the title bar: tiny clips stay grabbable
+                      (found by the beat-building session: a 12px kick was
+                      swallowed whole by its own edge handles) */
         bottom: 0;
         width: 6px;
+        max-width: 30%;
         cursor: ew-resize;
         touch-action: none;
         z-index: 2;

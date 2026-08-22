@@ -3,37 +3,37 @@
   "samples": [
     {
       "name": "kick",
-      "hash": "e93e08a81a5acd8256ac10ae7fb605a3f5bf3fb2644f58602b4e4116d9f597ee",
+      "hash": "2f84b86cf5643bed23e31d8ceebc336631ccd239d1b969892cad785aa9b9fd41",
       "seconds": 0.4
     },
     {
       "name": "snare",
-      "hash": "0da9aa1bcdeed27602e88ba7784d46c5ae5a110804d6768e5a6f216a10aca3a0",
+      "hash": "f6fa8fd4efb573e0fbce54b7f16400ce7f8f949c4671d4e8b6219822dd3f860e",
       "seconds": 0.25
     },
     {
       "name": "hat",
-      "hash": "0309b8769f572e76ddc0484273cc56968f4a66fef04838a107502f7dc443dc95",
+      "hash": "403e692fefef8535611a42a97d8b1978fc3613cb105393b9c6e59e7935976805",
       "seconds": 0.09
     },
     {
       "name": "clap",
-      "hash": "202aeeee991e126b68fba044a4e1f771a7d683ec793f128ea9b2be5b4a83964f",
+      "hash": "87e36a9d96e6b8e1b0c01147962262e71dc180fcd0f5a52277bc327aad3dd139",
       "seconds": 0.3
     },
     {
       "name": "bass-C2",
-      "hash": "31cc6956db1ccfbdcd8dfc73183015beb31bb33b5313c7e72b81a75b462b8671",
+      "hash": "655602966bfe4a94fc2bb7248b77124e007ab26bdc4963de2d28db62f538d2f2",
       "seconds": 1
     },
     {
       "name": "chord-Am",
-      "hash": "31fb589c3a7cce51963b47a7e31b1636e3c140f81460b9036ac72a56b93fd280",
+      "hash": "d0a48a76c078ba30f56f945365e3f58c998d537d3cb6e31ed781ca11fc8a7c94",
       "seconds": 1.5
     },
     {
       "name": "riser",
-      "hash": "d6bc95da68ca77b364e8172fc013c16f36846db0c449e689451cdd67e2577345",
+      "hash": "7c57836a74f84f59e5cd3a6d3a4fabb12054f78804be0f1c5d77a2bf13066f91",
       "seconds": 2
     }
   ]

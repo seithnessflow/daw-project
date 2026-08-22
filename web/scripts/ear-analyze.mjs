@@ -147,7 +147,41 @@ export function analyze(wav) {
         continue;
       }
     }
-    discontinuities += jumpAt.length;
+    // CLICK vs CONTENT (calibrated twice on 2026-08-22, by LISTENING to
+    // a built drum beat):
+    // 1. DENSITY - loud high-frequency material (hats, noise) produces
+    //    dozens of big sample-to-sample transitions by nature; a click
+    //    is ISOLATED. A jump with >= 4 fellow jumps within +-10 ms is
+    //    dense content, never a click.
+    // 2. ATTACK - an isolated jump followed by BODY (post-energy >> pre)
+    //    is a percussive onset, not a click.
+    // What remains after both filters is the real thing: an isolated
+    // transient with nothing behind it.
+    let clicks = 0;
+    let content = 0;
+    const dense = Math.round(0.010 * sampleRate);
+    const w0 = Math.round(0.002 * sampleRate);
+    const w1 = Math.round(0.012 * sampleRate);
+    for (let k = 0; k < jumpAt.length; k++) {
+      const [n] = jumpAt[k];
+      let neighbors = 0;
+      for (let m = k - 1; m >= 0 && n - jumpAt[m][0] <= dense; m--) neighbors++;
+      for (let m = k + 1; m < jumpAt.length && jumpAt[m][0] - n <= dense; m++) neighbors++;
+      if (neighbors >= 4) { content++; continue; }
+      let pre = 0, post = 0, np = 0, nq = 0;
+      for (let i = n - w1; i <= n - w0; i++) {
+        if (i >= 0) { pre += x[i] * x[i]; np++; }
+      }
+      for (let i = n + w0; i <= n + w1; i++) {
+        if (i < x.length) { post += x[i] * x[i]; nq++; }
+      }
+      const preR = Math.sqrt(pre / Math.max(1, np));
+      const postR = Math.sqrt(post / Math.max(1, nq));
+      if (postR > 4 * preR && postR > 0.01) content++;
+      else clicks++;
+    }
+    periodicEdges += content;   // content reports with the periodic bucket
+    discontinuities += clicks;
   }
 
   // True peak: 4x oversample only around candidates (samples whose

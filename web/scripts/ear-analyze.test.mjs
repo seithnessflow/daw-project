@@ -140,6 +140,30 @@ console.log('Test 4: loud square = periodic edges, green; square + spike = red')
   // covers it) and the square file alone stays green.
 }
 
+// ---- 5. Percussive attacks are content, not clicks (calibrated after
+// the ear flagged a real drum beat as 1796 clicks) ----------------------
+console.log('Test 5: drum burst train = attacks green; lone spike still red');
+{
+  const sr = 48000;
+  const frames = 2 * sr;
+  const s = new Float64Array(frames * 2);
+  for (let hit = 0; hit < 8; hit++) {
+    const at = Math.round(hit * 0.25 * sr);
+    for (let n = 0; n < 4800 && at + n < frames; n++) {
+      // hard attack (starts at 0.6), decaying 100 Hz body = a kick shape
+      const v = 0.6 * Math.exp(-n / 4000) * Math.cos((2 * Math.PI * 100 * n) / sr);
+      s[2 * (at + n)] = v;
+      s[2 * (at + n) + 1] = v;
+    }
+  }
+  const path = join(dir, 'drums.wav');
+  writeWav16(path, s);
+  const r = analyze(readWav(path));
+  check('attacks not flagged as clicks', r.discontinuities === 0,
+    `disc=${r.discontinuities}`);
+  check('verdict green on drums', r.verdict.ok, JSON.stringify(r.verdict));
+}
+
 if (failures > 0) {
   console.error(`\near-analyze self-test: ${failures} FAILURE(S)`);
   process.exit(1);

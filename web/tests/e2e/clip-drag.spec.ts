@@ -71,12 +71,18 @@ test.describe('Clip drag convergence (two tabs)', () => {
       JSON.stringify((window as any).__dawProject.getHeads()));
     expect(headsA2, 'document kept changing after pointerup').toBe(headsA1);
 
-    // Resize by the right edge in A; B converges on all three fields
+    // Resize by the right edge in A; B converges on all three fields.
+    // GESTURE UPDATED with the edge-handle fix (edges live below the
+    // title bar, capped at 30% width, so tiny clips stay grabbable):
+    // zoom in first, exactly as a human would before a precision edit.
+    await A.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    for (let i = 0; i < 4; i++) await A.keyboard.press('+');
+    await A.waitForTimeout(400);
     const edge = A.locator('.clip-edge-right').first();
     const ebox = (await edge.boundingBox())!;
-    await A.mouse.move(ebox.x + 3, ebox.y + 20);
+    await A.mouse.move(ebox.x + ebox.width / 2, ebox.y + ebox.height / 2);
     await A.mouse.down();
-    await A.mouse.move(ebox.x + 3 + 80, ebox.y + 20, { steps: 6 });
+    await A.mouse.move(ebox.x + ebox.width / 2 + 80, ebox.y + ebox.height / 2, { steps: 6 });
     await A.mouse.up();
     await A.waitForTimeout(400);
     const resizedA = await clipGeom(A);

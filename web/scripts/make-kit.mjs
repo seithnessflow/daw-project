@@ -49,6 +49,11 @@ function wav16Stereo(samplesMono) {
   return buf;
 }
 
+// Headroom calibration (2026-08-22, found by LISTENING to a built beat:
+// four default-gain tracks stacked = instant clipping at 0 dBFS). The
+// whole kit ships 6 dB down so a first beat breathes instead of burning.
+const HEADROOM = 0.5;
+
 const env = (n, len, a, d) => {
   // attack a samples, then exponential decay with time constant d
   if (n < a) return n / a;
@@ -120,7 +125,9 @@ const KIT = [
 
 const manifest = [];
 for (const item of KIT) {
-  const buf = wav16Stereo(item.make());
+  const raw = item.make();
+  for (let i = 0; i < raw.length; i++) raw[i] *= HEADROOM;
+  const buf = wav16Stereo(raw);
   const hash = createHash('sha256').update(buf).digest('hex');
   const file = path.join(assetsDir, `${hash}.wav`);
   if (!fs.existsSync(file)) fs.writeFileSync(file, buf);
