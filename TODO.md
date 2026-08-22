@@ -263,6 +263,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       la checklist de l'utilisateur impatient). La session 2.5 OUVRE sur
       ces notes.
 
+- [ ] REFONTE UI (prochaine session, boucle outillage) : s'ouvre sur
+      docs/refonte-ui-preparation.md — proposition niveau 3 (timeline
+      d'abord, decision a ratifier), PUIS contrat de selection ARIA +
+      unification helpers (le harnais AVANT le premier pixel), puis la
+      structure. Les niveaux 1 constates a l'audit outillage (wrap dB,
+      congestion Track 1) se dissolvent dans la refonte, pas de rapiecage.
+
 ## Court terme (sessions economes)
 
 - [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :
