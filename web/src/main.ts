@@ -356,6 +356,13 @@ function sendLastChange(): void {
   }
 }
 
+/** Touch mode A: a freshly placed clip "lands" (CSS decides if it shows). */
+function markLanded(clipId: string): void {
+  const el = tracksContainer.querySelector(
+    `[data-clip-id="${clipId}"]`) as HTMLElement | null;
+  el?.classList.add('landed');
+}
+
 /**
  * A dropped file becomes a project asset + a clip (phase 1): verify it
  * is a WAV, hash it client-side, PUT through the verifying store, place
@@ -392,8 +399,9 @@ async function handleFileDrop(file: File, trackId: string, laneX: number): Promi
   const sec = Math.max(0, Math.round((laneX / TIMELINE.pps) / 0.25) * 0.25);
   const stem = file.name.replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 24) || 'audio';
+  const clipId = `clip-${stem}-${Date.now()}`;
   project.addClip(trackId, {
-    id: `clip-${stem}-${Date.now()}`,
+    id: clipId,
     assetHash: hash,
     startSample: Math.round(sec * sr),
     lengthSamples: Math.max(1024, Math.round(durationSec * sr)),
@@ -401,6 +409,7 @@ async function handleFileDrop(file: File, trackId: string, laneX: number): Promi
   });
   sendLastChange();
   renderTracks();
+  markLanded(clipId);
   console.log(`dropped ${file.name}: asset ${hash.slice(0, 12)}..., clip at ${sec}s`);
 }
 
@@ -658,8 +667,9 @@ async function init() {
       const sr = project.getDocument().sampleRate || 48000;
       const x = e.clientX - lane.getBoundingClientRect().left;
       const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      const placedId = `clip-${armed.name}-${Date.now()}`;
       project.addClip(id, {
-        id: `clip-${armed.name}-${Date.now()}`,
+        id: placedId,
         assetHash: armed.hash,
         startSample: Math.round(seconds * sr),
         lengthSamples: Math.round(armed.seconds * sr),
@@ -667,6 +677,7 @@ async function init() {
       });
       sendLastChange();
       renderTracks();
+      markLanded(placedId);
       return;
     }
     // Lane click (unarmed): select the track AND set the insert marker
@@ -794,6 +805,21 @@ async function init() {
     }
     followPaused = true;
   });
+
+  // Phase 3: the touch prototypes, hot-switchable and COMBINABLE - the
+  // user arbitrates in co-presence, never the agent. A mode change
+  // rebuilds so mode C's saturation writes always start from base.
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    '[data-role="touch-mode"]')) {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode!;
+      const on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      document.body.classList.toggle(`mode-${mode}`, on);
+      if (mode === 'c' && !on) document.body.classList.remove('life-clipping');
+      renderTracks(true);
+    });
+  }
 
   addTrackBtn.addEventListener('click', () => {
     if (!project) return;

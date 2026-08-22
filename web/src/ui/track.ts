@@ -45,6 +45,12 @@ export function createTrackUI(
   el.className = 'track';
   el.dataset.trackId = track.id;
   const hue = trackHue(track.id);
+  // Color rides CSS variables so a single property modulates EVERYTHING
+  // (touch mode C: saturation follows activity - the life layer writes
+  // --sat only, a rebuild restores the base)
+  el.dataset.hue = String(hue);
+  el.style.setProperty('--hue', String(hue));
+  el.style.setProperty('--sat', '45%');
   const isEmpty = track.clips.length === 0 && track.chain.length === 0;
   if (isEmpty) el.classList.add('track-empty');
   if (selected) el.classList.add('track-selected');
@@ -56,7 +62,7 @@ export function createTrackUI(
   // Color bar: the track's identity (drives the clip fill too)
   const colorBar = document.createElement('div');
   colorBar.className = 'track-color';
-  colorBar.style.background = `hsl(${hue}, 45%, 50%)`;
+  colorBar.style.background = `hsl(${hue} var(--sat) 50%)`;
   head.appendChild(colorBar);
 
   const headBody = document.createElement('div');
@@ -111,6 +117,10 @@ export function createTrackUI(
   faderInput.addEventListener('input', () => {
     const gain = parseFloat(faderInput.value);
     gainDisplay.textContent = formatGain(gain);
+    // Touch mode A: the value pops on change (CSS decides if it shows)
+    gainDisplay.classList.remove('pop');
+    void gainDisplay.offsetWidth;  // restart the animation
+    gainDisplay.classList.add('pop');
     onGainChange(gain);
   });
   faderInput.addEventListener('click', (e) => e.stopPropagation());
@@ -137,12 +147,12 @@ export function createTrackUI(
     clipEl.style.left = `${(clip.startSample / sampleRate) * TIMELINE.pps}px`;
     clipEl.style.width = `${Math.max(
       2, (clip.lengthSamples / sampleRate) * TIMELINE.pps)}px`;
-    clipEl.style.background = `hsl(${hue}, 40%, 34%)`;
-    clipEl.style.borderColor = `hsl(${hue}, 45%, 52%)`;
+    clipEl.style.background = `hsl(${hue} var(--sat) 34%)`;
+    clipEl.style.borderColor = `hsl(${hue} var(--sat) 52%)`;
     const nameStrip = document.createElement('div');
     nameStrip.className = 'clip-name';
     nameStrip.dataset.role = 'clip-handle';  // ONLY the title bar drags
-    nameStrip.style.background = `hsl(${hue}, 45%, 26%)`;
+    nameStrip.style.background = `hsl(${hue} var(--sat) 26%)`;
     // Human name, not the generated id: 'clip-kick-1787...' -> 'kick'
     nameStrip.textContent = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
     clipEl.title = clip.assetHash;

@@ -168,6 +168,22 @@ function tick(ts: number): void {
     if (!pulsed.has(el)) el.style.filter = '';
   }
 
+  // ---- Touch mode C: color IS energy (saturation follows activity) --
+  if (document.body.classList.contains('mode-c')) {
+    let anyHot = false;
+    for (const el of document.querySelectorAll<HTMLElement>('[data-track-id]')) {
+      const id = el.getAttribute('data-track-id')!;
+      const s = tracks.get(id);
+      const level = s?.shown ?? 0;
+      if (s?.hot) anyHot = true;
+      // playing track = full color, silent track = almost grey
+      const sat = 8 + Math.min(1, level * 4) * 42;
+      el.style.setProperty('--sat', `${sat.toFixed(0)}%`);
+      if (level > 0.001) alive = true;
+    }
+    document.body.classList.toggle('life-clipping', anyHot);
+  }
+
   // ---- Ambient health: silence while playing / plugin misses ----
   const anySignal = [...tracks.values()].some((s) => s.target > 0.001);
   const status = ensureStatusEl();
