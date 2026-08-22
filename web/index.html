@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DAW - Slice 1</title>
+    <title>DAW</title>
     <style>
       * {
         box-sizing: border-box;
@@ -13,27 +13,35 @@
         background: #1a1a1a;
         color: #e0e0e0;
         margin: 0;
-        padding: 20px;
+        padding: 16px 20px;
+      }
+      /* ---- Top bar: identity, connections, transport, position ---- */
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
       }
       h1 {
-        margin: 0 0 20px;
-        font-size: 24px;
-        font-weight: 500;
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
       }
       .status {
         display: flex;
-        gap: 20px;
-        margin-bottom: 20px;
-        font-size: 14px;
+        gap: 16px;
+        font-size: 13px;
       }
       .status-item {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 7px;
       }
       .status-dot {
-        width: 10px;
-        height: 10px;
+        width: 9px;
+        height: 9px;
         border-radius: 50%;
         background: #555;
       }
@@ -45,17 +53,16 @@
       }
       .transport {
         display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
+        gap: 8px;
       }
       button {
         background: #333;
         color: #e0e0e0;
         border: 1px solid #555;
-        padding: 10px 20px;
+        padding: 8px 18px;
         border-radius: 4px;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 13px;
       }
       button:hover {
         background: #444;
@@ -64,32 +71,120 @@
         opacity: 0.5;
         cursor: not-allowed;
       }
-      .tracks {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
+      .position {
+        font-family: monospace;
+        font-size: 15px;
+        color: #9fd49f;
+        margin-left: auto;
       }
-      .track {
-        background: #252525;
-        padding: 15px;
+
+      /* ---- Timeline: one scroll container; sticky track heads on the
+             left, time lanes on the right, one playhead across all ---- */
+      .tracks {
+        position: relative;
+        overflow-x: auto;
+        border: 1px solid #2e2e2e;
         border-radius: 8px;
+        background: #202020;
+      }
+      .ruler-row,
+      .track {
         display: flex;
-        align-items: center;
-        gap: 20px;
+        align-items: stretch;
+        border-bottom: 1px solid #2a2a2a;
+      }
+      .track-head,
+      .ruler-spacer {
+        flex: 0 0 260px;
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: #252525;
+        border-right: 1px solid #333;
+        padding: 8px 10px;
+      }
+      .ruler-spacer {
+        padding: 4px 10px;
+        font-size: 11px;
+        color: #888;
+      }
+      .ruler {
+        position: relative;
+        height: 22px;
+        flex: 0 0 auto;
+      }
+      .ruler-tick {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        border-left: 1px solid #3a3a3a;
+        font-size: 10px;
+        color: #777;
+        padding-left: 3px;
+        line-height: 22px;
+        user-select: none;
+      }
+      .track-lane {
+        position: relative;
+        flex: 0 0 auto;
+        background:
+          repeating-linear-gradient(90deg, #262626 0, #262626 1px, transparent 1px, transparent 20px);
+      }
+      .clip {
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        background: #3a5f8a;
+        border: 1px solid #5b84b1;
+        border-radius: 4px;
+        font-size: 10px;
+        font-family: monospace;
+        color: #cfe0f0;
+        padding: 2px 5px;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: #e8c15a;
+        z-index: 3;
+        pointer-events: none;
+      }
+
+      /* ---- Track head interior ---- */
+      .track-title-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
       }
       .track-name {
-        width: 150px;
         font-weight: 500;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .track-gain {
+        font-family: monospace;
+        font-size: 11px;
+        color: #aaa;
+        min-width: 64px;
+        text-align: right;
+        white-space: nowrap;
       }
       .track-fader {
-        flex: 1;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        margin-top: 6px;
       }
       .track-fader input {
         flex: 1;
-        height: 6px;
+        height: 5px;
         -webkit-appearance: none;
         background: #444;
         border-radius: 3px;
@@ -97,27 +192,22 @@
       }
       .track-fader input::-webkit-slider-thumb {
         -webkit-appearance: none;
-        width: 16px;
-        height: 16px;
-        background: #666;
+        width: 14px;
+        height: 14px;
+        background: #777;
         border-radius: 50%;
         cursor: pointer;
       }
       .track-fader input::-webkit-slider-thumb:hover {
-        background: #888;
-      }
-      .track-gain {
-        width: 50px;
-        text-align: right;
-        font-family: monospace;
-        font-size: 12px;
+        background: #999;
       }
       .track-meter {
-        width: 100px;
-        height: 10px;
+        width: 70px;
+        height: 7px;
         background: #333;
-        border-radius: 5px;
+        border-radius: 4px;
         overflow: hidden;
+        align-self: center;
       }
       .track-meter-fill {
         height: 100%;
@@ -125,39 +215,74 @@
         width: 0%;
         transition: width 50ms;
       }
-      .position {
-        font-family: monospace;
-        font-size: 18px;
-        margin-bottom: 20px;
+      .track-chain {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .chain-node {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #2d2d2d;
+        border: 1px solid #3c3c3c;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 11px;
+      }
+      .chain-bypass {
+        padding: 2px 8px;
+        font-size: 11px;
+      }
+      .chain-bypass[aria-pressed='true'] {
+        background: #6a4a1f;
+        border-color: #a5762f;
+      }
+
+      /* A track with no content collapses to a compact strip: the mixer
+         wall of empty rows squeezes itself */
+      .track-empty .track-head {
+        padding: 4px 10px;
+      }
+      .track-empty .track-name {
+        font-size: 12px;
+        color: #999;
+      }
+      .track-empty .track-fader {
+        margin-top: 2px;
+      }
+
+      .addtrack {
+        margin-top: 12px;
       }
     </style>
   </head>
   <body>
-    <h1>DAW - Slice 1</h1>
-
-    <div class="status">
-      <div class="status-item">
-        <div class="status-dot" id="server-status"></div>
-        <span>Server</span>
+    <div class="topbar">
+      <h1>DAW</h1>
+      <div class="status">
+        <div class="status-item">
+          <div class="status-dot" id="server-status"></div>
+          <span>Server</span>
+        </div>
+        <div class="status-item">
+          <div class="status-dot" id="engine-status"></div>
+          <span>Engine</span>
+        </div>
       </div>
-      <div class="status-item">
-        <div class="status-dot" id="engine-status"></div>
-        <span>Engine</span>
+      <div class="transport">
+        <button id="play-btn" disabled>Play</button>
+        <button id="stop-btn" disabled>Stop</button>
       </div>
-    </div>
-
-    <div class="position">
-      <span id="position">00:00.000</span>
-    </div>
-
-    <div class="transport">
-      <button id="play-btn" disabled>Play</button>
-      <button id="stop-btn" disabled>Stop</button>
+      <div class="position">
+        <span id="position">00:00.000</span>
+      </div>
     </div>
 
     <div class="tracks" id="tracks"></div>
 
-    <button id="add-track-btn" style="margin-top: 15px;">+ Add Track</button>
+    <button id="add-track-btn" class="addtrack">+ Add Track</button>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

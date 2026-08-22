@@ -5,23 +5,43 @@
 
 import type { TrackDef } from '../document/schema';
 
+/** Timeline scale, shared by tracks, ruler and playhead (refonte lot 2). */
+export const TIMELINE = {
+  pps: 20,          // pixels per second
+  headWidth: 260,   // sticky track-head column, px (mirrors CSS flex-basis)
+};
+
 /**
- * Create a track UI element.
+ * Create a track UI element: a sticky head (name, fader, chain, meter)
+ * and a time lane where the document's clips are finally DRAWN.
+ *
+ * @param laneSeconds width of the time lane, in seconds (shared scale)
  */
 export function createTrackUI(
   track: TrackDef,
+  sampleRate: number,
+  laneSeconds: number,
   onGainChange: (gain: number) => void,
   onBypassToggle?: (processorId: string, bypass: boolean) => void
 ): HTMLElement {
   const el = document.createElement('div');
   el.className = 'track';
   el.dataset.trackId = track.id;
+  const isEmpty = track.clips.length === 0 && track.chain.length === 0;
+  if (isEmpty) el.classList.add('track-empty');
 
-  // Track name
+  const head = document.createElement('div');
+  head.className = 'track-head';
+  el.appendChild(head);
+
+  // Title row: name + gain value
+  const titleRow = document.createElement('div');
+  titleRow.className = 'track-title-row';
   const nameEl = document.createElement('div');
   nameEl.className = 'track-name';
   nameEl.textContent = track.name;
-  el.appendChild(nameEl);
+  titleRow.appendChild(nameEl);
+  head.appendChild(titleRow);
 
   // Fader
   const faderContainer = document.createElement('div');
@@ -51,8 +71,17 @@ export function createTrackUI(
   });
 
   faderContainer.appendChild(faderInput);
-  faderContainer.appendChild(gainDisplay);
-  el.appendChild(faderContainer);
+  head.appendChild(faderContainer);
+  titleRow.appendChild(gainDisplay);
+
+  // Meter rides the fader row
+  const meter = document.createElement('div');
+  meter.className = 'track-meter';
+  meter.id = `meter-${track.id}`;
+  const meterFill = document.createElement('div');
+  meterFill.className = 'track-meter-fill';
+  meter.appendChild(meterFill);
+  faderContainer.appendChild(meter);
 
   // Chain (2.4d): one row per processor with its bypass toggle. The
   // button reflects DOCUMENT state; a click asks for the opposite - the
@@ -85,21 +114,51 @@ export function createTrackUI(
 
       chainEl.appendChild(row);
     }
-    el.appendChild(chainEl);
+    head.appendChild(chainEl);
   }
 
-  // Meter
-  const meter = document.createElement('div');
-  meter.className = 'track-meter';
-  meter.id = `meter-${track.id}`;
-
-  const meterFill = document.createElement('div');
-  meterFill.className = 'track-meter-fill';
-  meter.appendChild(meterFill);
-
-  el.appendChild(meter);
+  // The time lane: the document's clips, finally drawn to scale
+  const lane = document.createElement('div');
+  lane.className = 'track-lane';
+  lane.style.width = `${laneSeconds * TIMELINE.pps}px`;
+  for (const clip of track.clips) {
+    const clipEl = document.createElement('div');
+    clipEl.className = 'clip';
+    clipEl.dataset.clipId = clip.id;
+    clipEl.style.left = `${(clip.startSample / sampleRate) * TIMELINE.pps}px`;
+    clipEl.style.width = `${Math.max(
+      2, (clip.lengthSamples / sampleRate) * TIMELINE.pps)}px`;
+    clipEl.textContent = clip.assetHash.slice(0, 8);
+    clipEl.title = clip.assetHash;
+    lane.appendChild(clipEl);
+  }
+  el.appendChild(lane);
 
   return el;
+}
+
+/**
+ * Build the ruler row: sticky spacer + second ticks on the shared scale.
+ */
+export function createRulerUI(laneSeconds: number): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'ruler-row';
+  const spacer = document.createElement('div');
+  spacer.className = 'ruler-spacer';
+  spacer.textContent = 'tracks';
+  row.appendChild(spacer);
+  const ruler = document.createElement('div');
+  ruler.className = 'ruler';
+  ruler.style.width = `${laneSeconds * TIMELINE.pps}px`;
+  for (let s = 0; s <= laneSeconds; s += 1) {
+    const tick = document.createElement('div');
+    tick.className = 'ruler-tick';
+    tick.style.left = `${s * TIMELINE.pps}px`;
+    if (s % 5 === 0) tick.textContent = `${s}s`;
+    ruler.appendChild(tick);
+  }
+  row.appendChild(ruler);
+  return row;
 }
 
 /**

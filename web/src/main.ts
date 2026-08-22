@@ -8,7 +8,14 @@
 import { Project } from './document/project';
 import { ServerClient } from './network/server_client';
 import { EngineClient } from './network/engine_client';
-import { createTrackUI, updateMeter, updateTrackGainUI, updateTrackChainUI } from './ui/track';
+import {
+  createTrackUI,
+  createRulerUI,
+  updateMeter,
+  updateTrackGainUI,
+  updateTrackChainUI,
+  TIMELINE,
+} from './ui/track';
 import { formatTime } from './ui/transport';
 
 // Configuration
@@ -123,6 +130,12 @@ async function init() {
   };
   engineClient.onPosition = (samples, sampleRate) => {
     positionEl.textContent = formatTime(samples, sampleRate);
+    // Playhead on the shared timeline scale
+    const playhead = document.getElementById('playhead');
+    if (playhead) {
+      playhead.style.left =
+        `${TIMELINE.headWidth + (samples / sampleRate) * TIMELINE.pps}px`;
+    }
   };
   engineClient.onMeters = (meters) => {
     for (const { trackId, peakLeft, peakRight } of meters) {
@@ -193,9 +206,10 @@ function renderTracks() {
     doc.tracks.every(
       (t, i) =>
         existingEls[i].getAttribute('data-track-id') === t.id &&
-        // chain nodes are structure too: one appearing on an existing
-        // track must rebuild that DOM (its UI lives in createTrackUI)
-        existingEls[i].querySelectorAll('.chain-node').length === t.chain.length
+        // chain nodes and clips are structure too: one appearing on an
+        // existing track must rebuild that DOM (UI lives in createTrackUI)
+        existingEls[i].querySelectorAll('.chain-node').length === t.chain.length &&
+        existingEls[i].querySelectorAll('.clip').length === t.clips.length
     );
 
   if (sameStructure) {
@@ -208,8 +222,20 @@ function renderTracks() {
 
   tracksContainer.innerHTML = '';
 
+  // Shared time scale: the longest clip end, with margin (min 35 s)
+  const sr = doc.sampleRate || 48000;
+  let endSec = 30;
+  for (const t of doc.tracks) {
+    for (const c of t.clips) {
+      endSec = Math.max(endSec, (c.startSample + c.lengthSamples) / sr);
+    }
+  }
+  const laneSeconds = Math.ceil(endSec) + 5;
+
+  tracksContainer.appendChild(createRulerUI(laneSeconds));
+
   for (const track of doc.tracks) {
-    const element = createTrackUI(track, (gain) => {
+    const element = createTrackUI(track, sr, laneSeconds, (gain) => {
       console.log('onGainChange called:', track.id, gain);
       // Update local document
       project!.setTrackGain(track.id, gain);
@@ -235,6 +261,13 @@ function renderTracks() {
     });
     tracksContainer.appendChild(element);
   }
+
+  // One playhead across ruler and every lane (moved by onPosition)
+  const playhead = document.createElement('div');
+  playhead.className = 'playhead';
+  playhead.id = 'playhead';
+  playhead.style.left = `${TIMELINE.headWidth}px`;
+  tracksContainer.appendChild(playhead);
 }
 
 // Start
