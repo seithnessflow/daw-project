@@ -7,8 +7,17 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path, State,
     },
+    http::HeaderMap,
     response::{IntoResponse, Response},
 };
+
+use super::origin::origin_allowed;
+
+/// Cap on a single incoming WS frame (audit H2): an unbounded Automerge
+/// blob parsed under the store lock is a DoS. 8 MB dwarfs any legitimate
+/// single change (a fat drag coalesces to a few KB) while refusing the
+/// pathological.
+const MAX_WS_MESSAGE: usize = 8 * 1024 * 1024;
 use futures::{SinkExt, StreamExt};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -59,14 +68,24 @@ pub fn valid_project_id(id: &str) -> bool {
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Path(project_id): Path<String>,
+    headers: HeaderMap,
     State(state): State<Arc<AppState>>,
 ) -> Response {
+    // Audit C2: a drive-by website (disallowed Origin) is refused before
+    // the upgrade; native clients (no Origin) pass, like the engine.
+    if !origin_allowed(&headers) {
+        tracing::warn!("Rejected ws: disallowed origin");
+        return (axum::http::StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
     if !valid_project_id(&project_id) {
         tracing::warn!("Rejected invalid project id: {:?}", project_id);
         return (axum::http::StatusCode::BAD_REQUEST, "invalid project id").into_response();
     }
     tracing::info!("WebSocket connection for project: {}", project_id);
-    ws.on_upgrade(move |socket| handle_socket(socket, project_id, state))
+    // Audit H2: bound a single frame (unbounded blob under the store lock
+    // is a DoS surface).
+    ws.max_message_size(MAX_WS_MESSAGE)
+        .on_upgrade(move |socket| handle_socket(socket, project_id, state))
 }
 
 /// Handle an individual WebSocket connection.

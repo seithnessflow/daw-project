@@ -17,18 +17,21 @@ et suivi dans TODO.md.*
 
 ## A FAIRE, par priorite (suivi TODO « SECURITE »)
 
-- **C2 — Aucune auth serveur + CORS grand ouvert** (`server/src/main.rs`
-  allow_origin(Any)/allow_private_network(true) ; ws et assets sans auth).
-  N'importe quelle page web visitee peut lire/muter/empoisonner tous les
-  projets. Fix : secret partage sur ws+assets, allowlist d'Origin stricte,
-  retirer allow_private_network. PREREQUIS du 1er pair distant.
+- **[FAIT, moitie locale] C2 — drive-by website bloque** : garde d'Origin
+  local-first sur ws ET assets (`api/origin.rs` : autorise localhost/
+  127.0.0.1/[::1] toute origine, refuse toute origine navigateur
+  cross-machine ; absente = client natif exempt, comme le moteur).
+  `allow_origin(Any)` retire du CORS (liste 5173). Cap de frame WS 8 Mo
+  pose (H2 moitie). Tests unitaires origin + e2e 15/15.
+  RESTE (moitie distante) : secret partage pour un VRAI pair distant
+  (aujourd'hui client natif sans Origin = exempt) — a faire au 1er pair.
 - **H1 — Token moteur ~32 bits d'entropie reelle**
   (`websocket_server.cpp` : mt19937_64 seed 32 bits, compare non
   constant-time). Fix : 32 octets d'un CSPRNG OS (BCryptGenRandom) +
   comparaison constant-time.
-- **H2 — Blob Automerge non borne = DoS sous verrou global** (frames WS
-  sans cap de taille, parse sous store_lock). Fix : cap de taille WS,
-  parse borne hors du mutex.
+- **H2 — Blob Automerge non borne = DoS sous verrou global** : cap de
+  frame WS 8 Mo [FAIT] ; RESTE : sortir le parse Automerge de dessous
+  store_lock (ou le borner davantage).
 - **H3 — Fichiers credential/segment en permissions par defaut** (token
   JSON, `%TEMP%\daw-ring-*.shm` sans O_EXCL ni ACL owner-only). Fix :
   0600 / ACL restrictive + O_EXCL.

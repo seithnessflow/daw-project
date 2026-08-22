@@ -5,7 +5,7 @@
 
 Ordre grave (la confiance avant le sucre, arbitrage confirme) :
 
-0. [ ] SECURITE (audit 2026-08-22, SECURITY.md) — avant tout pair distant :
+0. [~] SECURITE (S1 FAIT: Origin local-first ws+assets, cap WS 8Mo, CORS resserre) (audit 2026-08-22, SECURITY.md) — avant tout pair distant :
        C1 path traversal [FAIT] ; puis C2 (auth serveur + CORS strict),
        H1 (CSPRNG token moteur + compare constant-time), H2 (cap taille WS
        + parse borne hors verrou), H3 (fichiers owner-only + O_EXCL),

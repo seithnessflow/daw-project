@@ -11,6 +11,7 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use axum::http::Method;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -33,10 +34,16 @@ async fn main() -> Result<()> {
         store_lock: tokio::sync::Mutex::new(()),
     });
 
-    // CORS layer for browser access
+    // CORS layer for browser access (audit C2: was allow_origin(Any) -
+    // any website could fetch/PUT assets on localhost). Tightened to the
+    // dev web origins; the ws + asset handlers enforce the same Origin
+    // allowlist in code (CORS does not gate WebSocket).
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
+        .allow_origin([
+            "http://localhost:5173".parse().unwrap(),
+            "http://127.0.0.1:5173".parse().unwrap(),
+        ])
+        .allow_methods([Method::GET, Method::PUT])
         .allow_headers(Any)
         // Required for Chrome Local Network Access
         .allow_private_network(true);

@@ -15,9 +15,11 @@
 
 use axum::body::Bytes;
 use axum::extract::Path;
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use sha2::{Digest, Sha256};
+
+use super::origin::origin_allowed;
 
 const ASSETS_DIR: &str = "./assets";
 
@@ -29,7 +31,10 @@ fn asset_file(hash: &str) -> Option<std::path::PathBuf> {
     Some(std::path::Path::new(ASSETS_DIR).join(format!("{hash}.wav")))
 }
 
-pub async fn get_asset(Path(hash): Path<String>) -> impl IntoResponse {
+pub async fn get_asset(headers: HeaderMap, Path(hash): Path<String>) -> impl IntoResponse {
+    if !origin_allowed(&headers) {
+        return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
     let Some(path) = asset_file(&hash) else {
         return (StatusCode::BAD_REQUEST, "hash must be hex (<= 64 chars)").into_response();
     };
@@ -44,7 +49,10 @@ pub async fn get_asset(Path(hash): Path<String>) -> impl IntoResponse {
     }
 }
 
-pub async fn put_asset(Path(hash): Path<String>, body: Bytes) -> impl IntoResponse {
+pub async fn put_asset(headers: HeaderMap, Path(hash): Path<String>, body: Bytes) -> impl IntoResponse {
+    if !origin_allowed(&headers) {
+        return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
     let Some(path) = asset_file(&hash) else {
         return (StatusCode::BAD_REQUEST, "hash must be hex (<= 64 chars)").into_response();
     };
