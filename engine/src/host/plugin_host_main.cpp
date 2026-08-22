@@ -433,8 +433,8 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     uint64_t beats = 1;
 
     while (ring->shutdown.load(std::memory_order_acquire) == 0) {
-        const uint64_t seq = ring->input_seq.load(std::memory_order_acquire);
-        if (seq == last_in) {
+        const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);
+        if (newest == last_in) {
             // Deliberate yield-spin: the block budget is 5.3 ms and Windows
             // sleep granularity (up to 15.6 ms) can eat it whole. One busy
             // core on a 32-thread machine is the cheap side of that trade.
@@ -443,7 +443,20 @@ int runServe(const std::string& segment_path, const std::string& module_path,
             std::this_thread::yield();
             continue;
         }
-        last_in = seq;  // newest wins; missed blocks were bypassed engine-side
+        // Process the whole backlog IN ORDER: the driver deposits bursts of
+        // blocks-per-callback back-to-back, and EVERY one of them will be
+        // collected depth blocks later - skipping to the newest starves the
+        // consumer (first live run measured 534/1875 dry blocks). If truly
+        // behind, only the last kRingSlots-2 deposits still have intact
+        // slots; older ones were overwritten and already bypassed.
+        uint64_t s = last_in + 1;
+        if (newest >= s + (daw::host::kRingSlots - 2)) {
+            s = newest - (daw::host::kRingSlots - 2) + 1;
+        }
+        last_in = newest;
+        for (; s <= newest &&
+               ring->shutdown.load(std::memory_order_acquire) == 0; ++s) {
+        const uint64_t seq = s;
         const uint32_t slot = static_cast<uint32_t>(seq % daw::host::kRingSlots);
 
         Vst::ParameterChanges param_changes;
@@ -489,6 +502,7 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 
         ring->output_seq.store(seq, std::memory_order_release);
         ring->child_heartbeat.store(++beats, std::memory_order_release);
+        }  // backlog loop
     }
 
     inst.teardown();

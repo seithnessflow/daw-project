@@ -17,6 +17,8 @@
 #include "graph/audio_graph.h"
 #include "graph/clip_player.h"
 #include "graph/plugin_registry.h"
+#include "host/plugin_bridge.h"
+#include "host/proxy_node.h"
 #include "network/server_client.h"
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
@@ -65,6 +67,9 @@ void printUsage(const char* program) {
               << "  --sample-rate <n>  Sample rate for rendering (default: 48000)\n"
               << "  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)\n"
               << "  --ws-port <n>      WebSocket server port (default: 47821)\n"
+              << "  --debug-proxy-again <path.vst3>\n"
+              << "                     Test hook (2.4c-1): AGain in a child process,\n"
+              << "                     proxied on the first track's chain\n"
               << "  --allow-origin <o> Allow an extra browser Origin on the WebSocket\n"
               << "                     server (can be used multiple times; defaults\n"
               << "                     allow http://localhost:5173 and http://127.0.0.1:5173)\n"
@@ -98,12 +103,15 @@ struct Options {
     uint32_t bit_depth = 24;
     uint16_t ws_port = 47821;    // Changed default to 47821
     uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
+    std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
+    std::string self_exe;            // argv[0], to locate the sibling plugin_host
     std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
 };
 
 bool parseArgs(int argc, char* argv[], Options& opts) {
+    opts.self_exe = (argc >= 1 && argv[0]) ? argv[0] : "";
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
 
@@ -175,6 +183,14 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.debug_rebuild_delay_ms = static_cast<uint32_t>(std::stoul(argv[i]));
+        } else if (arg == "--debug-proxy-again") {
+            // 2.4c-1 test hook: hard-wired ProxyNode over AGain, BEFORE the
+            // document's chain drives it (that lands in c-2)
+            if (++i >= argc) {
+                std::cerr << "Error: --debug-proxy-again requires a path to AGain .vst3\n";
+                return false;
+            }
+            opts.debug_proxy_module = argv[i];
         } else if (arg == "--allow-origin") {
             if (++i >= argc) {
                 std::cerr << "Error: --allow-origin requires an origin\n";
@@ -311,17 +327,51 @@ int showInfo(const daw::document::AutomergeDocument& doc) {
  * @param asset_cache Asset cache (shared across rebuilds)
  * @return Audio graph, or nullptr on failure
  */
+// 2.4c-1: registry key and AGain class uid for the hard-wired debug proxy.
+// The uid is the SDK sample's stable audio-class id (verified by test 11).
+constexpr const char* kDebugProxyNodeId = "debug-proxy-again";
+constexpr const char* kAGainAudioUid = "84E8DE5F92554F5396FAE4133C935A18";
+
+/**
+ * Start the debug AGain child (--debug-proxy-again) into the registry.
+ * Control thread, BEFORE the first buildGraph: the bridge lives in the
+ * registry handle and survives every rebuild (ADR-017 - a burst of changes
+ * re-attaches proxies, it never re-spawns the child).
+ */
+bool startDebugProxy(const Options& opts, uint32_t sample_rate,
+                     daw::graph::PluginInstanceRegistry& plugin_registry) {
+    if (opts.debug_proxy_module.empty()) {
+        return true;
+    }
+#ifdef _WIN32
+    const char* host_name = "plugin_host.exe";
+#else
+    const char* host_name = "plugin_host";
+#endif
+    const std::string host_exe =
+        (fs::path(opts.self_exe).parent_path() / host_name).string();
+
+    auto& handle = plugin_registry.ensure(kDebugProxyNodeId);
+    handle.bridge = std::make_unique<daw::host::PluginBridge>();
+    if (!handle.bridge->start(host_exe, opts.debug_proxy_module, kAGainAudioUid,
+                              sample_rate)) {
+        std::cerr << "Failed to start debug proxy child: "
+                  << handle.bridge->error() << "\n";
+        handle.bridge.reset();
+        return false;
+    }
+    std::cout << "Debug proxy: AGain served out-of-process (" << host_exe << ")\n";
+    return true;
+}
+
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
     const std::string& assets_dir,
     daw::graph::AssetCache& asset_cache,
-    daw::graph::PluginInstanceRegistry& plugin_registry
+    daw::graph::PluginInstanceRegistry& plugin_registry,
+    uint32_t proxy_depth = 1  // blocks per device callback (buffer/256)
 ) {
-    // ADR-017: plugin chain nodes will resolve their instance handles here
-    // instead of instantiating anything. Unused until the VST3 host (2.4).
-    (void)plugin_registry;
-
     auto graph = std::make_unique<daw::graph::AudioGraph>();
     graph->setSampleRate(sample_rate);
 
@@ -367,6 +417,17 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         }
 
         graph->addTrack(std::move(track));
+    }
+
+    // 2.4c-1: hard-wired debug proxy on the FIRST track (the chain-driven
+    // path lands in c-2). The registry hands the SAME ring to every rebuild:
+    // a ProxyNode is 3 pointers, the child is never re-instantiated.
+    if (auto* handle = plugin_registry.find(kDebugProxyNodeId);
+        handle && handle->bridge && handle->bridge->isRunning() &&
+        graph->getTrackCount() > 0) {
+        graph->getTrack(0)->chain.push_back(std::make_unique<daw::host::ProxyNode>(
+            kDebugProxyNodeId, handle->bridge->ring(), &handle->blocks_missed,
+            proxy_depth));
     }
 
     return graph;
@@ -453,11 +514,16 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     // readers acquire copies from the device's atomic slot)
     daw::graph::AssetCache asset_cache;
     daw::graph::PluginInstanceRegistry plugin_registry;
+    if (!startDebugProxy(opts, device.getSampleRate(), plugin_registry)) {
+        return 1;
+    }
     const auto& project = doc.getDocument();
 
+    const uint32_t proxy_depth =
+        (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize);
     std::shared_ptr<daw::graph::AudioGraph> graph =
         buildGraph(project, device.getSampleRate(), opts.assets_dir,
-                   asset_cache, plugin_registry);
+                   asset_cache, plugin_registry, proxy_depth);
     if (!graph) {
         std::cerr << "Failed to build audio graph\n";
         return 1;
@@ -498,6 +564,9 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
                                      opts.allow_origins.begin(), opts.allow_origins.end());
 
+    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
+        ws_server.setPluginBlocksMissed(&handle->blocks_missed);
+    }
     if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
         std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n\n";
     } else {
@@ -561,6 +630,12 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     device.shutdown();
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
+    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
+        std::cout << "Bridge blocks missed: "
+                  << handle->blocks_missed.load(std::memory_order_relaxed)
+                  << (handle->bridge->childAlive() ? " (child alive)" : " (child DEAD)")
+                  << "\n";
+    }
 
     return 0;
 }
@@ -604,6 +679,9 @@ int doPlayWithServer(const Options& opts) {
 
     daw::graph::AssetCache asset_cache;
     daw::graph::PluginInstanceRegistry plugin_registry;  // ADR-017 (R2)
+    if (!startDebugProxy(opts, device.getSampleRate(), plugin_registry)) {
+        return 1;
+    }
 
     // Main-thread-only state: the builder lives in the main loop (R1 -
     // construction is OFF the network thread), so no graph mutex is needed.
@@ -659,6 +737,9 @@ int doPlayWithServer(const Options& opts) {
     ws_config.telemetry_hz = 30;
     ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
                                      opts.allow_origins.begin(), opts.allow_origins.end());
+    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
+        ws_server.setPluginBlocksMissed(&handle->blocks_missed);
+    }
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
@@ -681,8 +762,10 @@ int doPlayWithServer(const Options& opts) {
                 snapshot = doc.getDocument();
             }
 
-            auto graph = buildGraph(snapshot, device.getSampleRate(),
-                                    opts.assets_dir, asset_cache, plugin_registry);
+            auto graph = buildGraph(
+                snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
+                plugin_registry,
+                (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize));
             if (graph) {
                 if (opts.debug_rebuild_delay_ms > 0) {
                     // Test hook: simulate an expensive (plugin) build
@@ -789,6 +872,12 @@ int doPlayWithServer(const Options& opts) {
     retired_graphs.clear();
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
+    if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
+        std::cout << "Bridge blocks missed: "
+                  << handle->blocks_missed.load(std::memory_order_relaxed)
+                  << (handle->bridge->childAlive() ? " (child alive)" : " (child DEAD)")
+                  << "\n";
+    }
 
     return 0;
 }

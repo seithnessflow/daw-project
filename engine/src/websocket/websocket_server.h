@@ -108,6 +108,15 @@ public:
      */
     void broadcastTelemetry();
 
+    /**
+     * Optional 2.4c-1 counter: bridge blocks bypassed (child late/dead).
+     * Owned by the plugin registry handle on the control side; must outlive
+     * this server. Written by the audio callback (relaxed), read here.
+     */
+    void setPluginBlocksMissed(const std::atomic<uint64_t>* counter) {
+        plugin_blocks_missed_ = counter;
+    }
+
 private:
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
@@ -149,6 +158,7 @@ private:
     // References (not owned)
     audio::AudioDevice* device_ = nullptr;
     const std::atomic<std::shared_ptr<graph::AudioGraph>>* graph_slot_ = nullptr;
+    const std::atomic<uint64_t>* plugin_blocks_missed_ = nullptr;
 
     // Telemetry
     uint32_t telemetry_hz_ = 30;

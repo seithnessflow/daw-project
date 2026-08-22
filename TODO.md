@@ -81,7 +81,25 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       par echantillons EXACTE (identite a 1.0, moitie a 0.5). 14/14.
       CI : les deux jobs vendorent le SDK epingle + deps VSTGUI Linux —
       plus de code hote hors du filet (verif du run CI post-push).
-- [ ] 2.4c-1 LE PONT SEUL, HORS DOCUMENT (temps reel d'abord) :
+- [x] 2.4c-1 FAIT 2026-08-22 (verdict CI du push de cloture = point de
+      synchronisation transmis) : pont transparent PROUVE au bit pres
+      (test 15 : 3 passes continues du fixture 2.4b a travers un enfant
+      --serve persistant = rendu hors ligne exact) ; ProxyNode +
+      --debug-proxy-again + pipeline callback sans attente (test 16 :
+      fill silencieux, bypass sec compte, wet a profondeur, rafales de 2) ;
+      rafale E2E verte A TRAVERS le proxy (enfant spawne une seule fois,
+      0 underrun) ; smoke reel 10 s WASAPI : 0 underrun, 4 blocs manques
+      (amorcage du device, borne, documente).
+      REVISION EN COURS DE ROUTE (premiere preuve vivante : 534/1875 blocs
+      sec) : la profondeur du pipeline est passee de 1 a 2 blocs — le
+      driver livre buffer/256 blocs DOS A DOS par callback, une trame
+      d'avance perd la course. kLayoutVersion=2 (4 slots), profondeur =
+      politique du noeud (buffer/256), l'enfant traite le backlog DANS
+      L'ORDRE (le saut au plus recent affamait le consommateur).
+      => 2.4d declarera latence = profondeur x 256 (512 ech. par defaut),
+      PAS 256. Le canal param n'est PAS un seqlock (note gravee dans le
+      contrat) : a durcir avant que c-2 n'y fasse passer plusieurs params.
+      Detail d'origine :
       memoire partagee (ring audio + changements de parametres), cadence
       callback<->enfant, ProxyNode instancie EN DUR (--debug-proxy-again,
       pas encore le chain). DECISION PRISE EN ENTREE : pipeline a une
@@ -135,9 +153,8 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          v3.8.1_build_84 + hash de `engine/cmake/vst3sdk.cmake` — bloc SDK
          EXTRAIT du CMakeLists expres : les editions engine (chaque session
          du chantier) n'evincent plus le cache. Runs froids reels : 11,6 et
-         12 min (#50/#51) — pas 30-45. Mesure a chaud : premier push de
-         code suivant (re-run navigateur indisponible) ; cache automerge-c
-         seulement si > ~5 min.
+         12 min (#50/#51) — pas 30-45. A CHAUD : 4,4 min (run #52, vert) —
+         critere < ~5 min ATTEINT, cache automerge-c non necessaire.
 
 - [ ] Verifier le hash GCC en CI (`89f1a1105dc09e92`) — regarder GitHub Actions
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)

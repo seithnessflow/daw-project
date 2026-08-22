@@ -301,6 +301,10 @@ void WebSocketServer::broadcastTelemetry() {
     state->set_buffer_underruns(device_->getBufferUnderrunCount());
     state->set_latency_samples(device_->getBufferSize());
     // CPU usage would require platform-specific measurement, leave at 0 for now
+    if (plugin_blocks_missed_) {
+        state->set_plugin_blocks_missed(
+            plugin_blocks_missed_->load(std::memory_order_relaxed));
+    }
 
     // Broadcast all
     sendToAll(pos_msg);

@@ -13,6 +13,7 @@
 #include "../src/render/offline_render.h"
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
+#include "../src/host/proxy_node.h"
 #include "../src/websocket/websocket_server.h"
 
 #include <ixwebsocket/IXNetSystem.h>
@@ -1038,6 +1039,194 @@ bool testPluginBridgeTransparency() {
     std::cout << "OK (3 continuous passes bit-equal to offline render, clean shutdown)\n";
     return true;
 }
+
+// Test 16 (2.4c-1): the ONE-FRAME PIPELINE of ProxyNode, both faces.
+// (a) Ring with NO child: block 1 = silence (pipeline fill, not an
+//     incident), block N = DRY block N-1 (time-aligned bypass), one missed
+//     count per unserved block. Fully deterministic, no process involved.
+// (b) Real child: block 1 = silence, block N = WET block N-1 (AGain at
+//     0.5 through the ring param channel), zero missed. The test paces the
+//     child (polls output_seq) so wet delivery is deterministic; the
+//     callback never does - that is exactly what (a) covers.
+bool testProxyNodePipeline() {
+    std::cout << "Test: Proxy node one-frame pipeline... ";
+
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    auto fillBlock = [](std::vector<float>& buf, int block) {
+        for (uint32_t i = 0; i < kBlock; ++i) {
+            const float v = static_cast<float>((block * 131 + static_cast<int>(i) * 37) % 32000 - 16000) / 32768.0f;
+            buf[2 * i] = v;
+            buf[2 * i + 1] = -v;
+        }
+    };
+
+    // ---- (a) no child: dry bypass, counted --------------------------------
+    {
+        auto orphan = std::make_unique<daw::host::SharedAudioRing>();
+        std::memset(static_cast<void*>(orphan.get()), 0, sizeof(daw::host::SharedAudioRing));
+        std::atomic<uint64_t> missed{0};
+        daw::host::ProxyNode node("orphan", orphan.get(), &missed);
+
+        std::vector<float> buf(kBlock * 2), prev_in(kBlock * 2);
+        for (int b = 1; b <= 4; ++b) {
+            std::vector<float> cur_in(kBlock * 2);
+            fillBlock(cur_in, b);
+            buf = cur_in;
+            node.process(buf.data(), buf.data(), kBlock, 0);  // in place, like the chain
+            if (b == 1) {
+                for (const float s : buf) {
+                    if (s != 0.0f) {
+                        std::cout << "FAILED: block 1 not silent (pipeline fill)\n";
+                        return false;
+                    }
+                }
+                if (missed.load() != 0) {
+                    std::cout << "FAILED: pipeline fill counted as missed\n";
+                    return false;
+                }
+            } else {
+                if (buf != prev_in) {
+                    std::cout << "FAILED: block " << b << " is not the DRY block " << (b - 1) << "\n";
+                    return false;
+                }
+                if (missed.load() != static_cast<uint64_t>(b - 1)) {
+                    std::cout << "FAILED: missed=" << missed.load() << " after block " << b << "\n";
+                    return false;
+                }
+            }
+            prev_in = cur_in;
+        }
+    }
+
+    // ---- (b) real child: wet path, one block late, zero missed ------------
+    daw::host::PluginBridge bridge;
+    if (!bridge.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge start: " << bridge.error() << "\n";
+        return false;
+    }
+    bridge.setParam(kAGainGainParamId, 0.5);
+
+    std::atomic<uint64_t> missed{0};
+    daw::host::ProxyNode node("live", bridge.ring(), &missed);
+    std::vector<float> buf(kBlock * 2), prev_in(kBlock * 2);
+    bool ok = true;
+    for (int b = 1; b <= 6 && ok; ++b) {
+        std::vector<float> cur_in(kBlock * 2);
+        fillBlock(cur_in, b);
+        buf = cur_in;
+        node.process(buf.data(), buf.data(), kBlock, 0);
+        if (b == 1) {
+            for (const float s : buf) {
+                if (s != 0.0f) {
+                    std::cout << "FAILED: live block 1 not silent\n";
+                    ok = false;
+                    break;
+                }
+            }
+        } else {
+            for (uint32_t i = 0; i < kBlock * 2; ++i) {
+                if (buf[i] != prev_in[i] * 0.5f) {  // exact: 0.5 is a power of two
+                    std::cout << "FAILED: live block " << b
+                              << " not WET block " << (b - 1) << " at sample " << i
+                              << " (" << buf[i] << " vs " << prev_in[i] * 0.5f << ")\n";
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        // Pace the child: wet delivery of block b must be certain before
+        // the next deposit (the callback never does this - case (a) is
+        // what happens when it can't be)
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+        while (bridge.ring()->output_seq.load(std::memory_order_acquire) <
+                   static_cast<uint64_t>(b) &&
+               std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::yield();
+        }
+        prev_in = cur_in;
+    }
+
+    const uint64_t live_missed = missed.load();
+    const bool alive = bridge.childAlive();
+    bridge.stop();
+    if (!ok) return false;
+    if (live_missed != 0) {
+        std::cout << "FAILED: " << live_missed << " missed blocks with a paced child\n";
+        return false;
+    }
+    if (!alive) {
+        std::cout << "FAILED: child died during the pipeline test\n";
+        return false;
+    }
+
+    // ---- (c) depth=2, deposits in BURSTS OF TWO with no pacing inside the
+    // pair: the real device-callback cadence (512-frame buffer = 2 blocks
+    // back-to-back). This is the exact scenario the first live run failed
+    // (534/1875 dry with depth 1); with depth 2 every wanted block was
+    // deposited a full device period earlier - zero missed, deterministic.
+    daw::host::PluginBridge bridge2;
+    if (!bridge2.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge2 start: " << bridge2.error() << "\n";
+        return false;
+    }
+    bridge2.setParam(kAGainGainParamId, 0.5);
+    std::atomic<uint64_t> missed2{0};
+    daw::host::ProxyNode node2("live-d2", bridge2.ring(), &missed2, 2);
+
+    std::vector<std::vector<float>> history(1);  // 1-indexed by block
+    ok = true;
+    for (int pair = 1; pair <= 7 && ok; pair += 2) {
+        for (int k = 0; k < 2 && ok; ++k) {
+            const int blk = pair + k;
+            std::vector<float> cur(kBlock * 2);
+            fillBlock(cur, blk);
+            history.push_back(cur);
+            buf = cur;
+            node2.process(buf.data(), buf.data(), kBlock, 0);
+            if (blk <= 2) {
+                for (const float s : buf) {
+                    if (s != 0.0f) {
+                        std::cout << "FAILED: depth-2 fill block " << blk << " not silent\n";
+                        ok = false;
+                        break;
+                    }
+                }
+            } else {
+                const auto& want_in = history[blk - 2];
+                for (uint32_t i = 0; i < kBlock * 2; ++i) {
+                    if (buf[i] != want_in[i] * 0.5f) {
+                        std::cout << "FAILED: depth-2 block " << blk
+                                  << " not WET block " << (blk - 2) << " at sample " << i << "\n";
+                        ok = false;
+                        break;
+                    }
+                }
+            }
+        }
+        // Pace BETWEEN pairs only (one device period of headroom)
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+        while (bridge2.ring()->output_seq.load(std::memory_order_acquire) <
+                   static_cast<uint64_t>(pair + 1) &&
+               std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::yield();
+        }
+    }
+
+    const uint64_t d2_missed = missed2.load();
+    const bool alive2 = bridge2.childAlive();
+    bridge2.stop();
+    if (!ok) return false;
+    if (d2_missed != 0) {
+        std::cout << "FAILED: depth-2 missed " << d2_missed << " blocks in paired bursts\n";
+        return false;
+    }
+    if (!alive2) {
+        std::cout << "FAILED: depth-2 child died\n";
+        return false;
+    }
+    std::cout << "OK (fill=silence, dry bypass counted, wet at depth, bursts of 2 at depth 2: 0 missed)\n";
+    return true;
+}
 #endif  // DAW_PLUGIN_HOST_EXE
 
 // Test 9b: Sacred-thread lock-freedom, verified at RUNTIME on this exact
@@ -1217,6 +1406,7 @@ int main(int argc, char* argv[]) {
     run(testPluginHostProcessGain);
     run(testPluginHostSetupRefusal);
     run(testPluginBridgeTransparency);
+    run(testProxyNodePipeline);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
 #endif

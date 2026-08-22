@@ -21,13 +21,19 @@
  *   a trench coat). Sequence-published double buffers only - the peaks
  *   mold, across a process boundary.
  *
- * One-frame pipeline (decided upfront, TODO 2.4c-1): the engine deposits
- * block N and collects block N-1, giving the child a full block period
- * (5.3 ms at 48k/256) to process. Cost: one block of latency, declared via
- * getLatencySamples() in 2.4d. A missing block is NEVER waited for on the
- * audio thread: bypass + incident counter. Child death is detected by the
- * CONTROL thread via the process handle - the callback only knows "block
- * ready or not".
+ * Pipelined exchange (decided in TODO 2.4c-1, DEPTH REVISED the same day):
+ * the engine deposits block N and collects block N-depth. The original
+ * one-frame depth assumed a regular block cadence; reality (first live
+ * run, 534/1875 blocks missed): the driver delivers bursts of
+ * buffer_size/256 blocks back-to-back microseconds apart, so the child
+ * must be given a full DEVICE PERIOD, not a block period. Depth is a
+ * NODE-SIDE POLICY (= blocks per device callback, 2 for the 512 default),
+ * the layout only provides enough slots (kRingSlots=4 covers depth<=2
+ * with write/read separation). Cost: depth blocks of latency, declared
+ * via getLatencySamples() in 2.4d. A missing block is NEVER waited for on
+ * the audio thread: bypass + incident counter. Child death is detected by
+ * the CONTROL thread via the process handle - the callback only knows
+ * "block ready or not".
  */
 
 #include <atomic>
@@ -37,10 +43,10 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 1;
+inline constexpr uint32_t kLayoutVersion = 2;       // v2: 4 slots (pipeline depth 2)
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
-inline constexpr uint32_t kRingSlots = 2;           // double buffer per direction
+inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
 
 struct SharedAudioRing {
     // ---- Contract header (plain, written once by the engine) ----

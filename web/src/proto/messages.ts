@@ -9,6 +9,8 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "daw.protocol";
 
+/** SPDX-License-Identifier: GPL-3.0-or-later */
+
 /** Transport control */
 export interface TransportCommand {
   action: TransportCommand_Action;
@@ -88,6 +90,8 @@ export interface EngineState {
   cpuPercent: number;
   /** Current output latency */
   latencySamples: number;
+  /** 2.4c-1: bridge blocks bypassed (child late/dead) */
+  pluginBlocksMissed: number;
 }
 
 /** Error from engine */
@@ -621,7 +625,7 @@ export const Meters: MessageFns<Meters> = {
 };
 
 function createBaseEngineState(): EngineState {
-  return { bufferUnderruns: 0, cpuPercent: 0, latencySamples: 0 };
+  return { bufferUnderruns: 0, cpuPercent: 0, latencySamples: 0, pluginBlocksMissed: 0 };
 }
 
 export const EngineState: MessageFns<EngineState> = {
@@ -634,6 +638,9 @@ export const EngineState: MessageFns<EngineState> = {
     }
     if (message.latencySamples !== 0) {
       writer.uint32(24).uint32(message.latencySamples);
+    }
+    if (message.pluginBlocksMissed !== 0) {
+      writer.uint32(32).uint64(message.pluginBlocksMissed);
     }
     return writer;
   },
@@ -675,6 +682,14 @@ export const EngineState: MessageFns<EngineState> = {
             message.latencySamples = reader.uint32();
             continue;
           }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.pluginBlocksMissed = longToNumber(reader.uint64());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -704,6 +719,11 @@ export const EngineState: MessageFns<EngineState> = {
         : isSet(object.latency_samples)
         ? globalThis.Number(object.latency_samples)
         : 0,
+      pluginBlocksMissed: isSet(object.pluginBlocksMissed)
+        ? globalThis.Number(object.pluginBlocksMissed)
+        : isSet(object.plugin_blocks_missed)
+        ? globalThis.Number(object.plugin_blocks_missed)
+        : 0,
     };
   },
 
@@ -718,6 +738,9 @@ export const EngineState: MessageFns<EngineState> = {
     if (message.latencySamples !== 0) {
       obj.latencySamples = Math.round(message.latencySamples);
     }
+    if (message.pluginBlocksMissed !== 0) {
+      obj.pluginBlocksMissed = Math.round(message.pluginBlocksMissed);
+    }
     return obj;
   },
 
@@ -729,6 +752,7 @@ export const EngineState: MessageFns<EngineState> = {
     message.bufferUnderruns = object.bufferUnderruns ?? 0;
     message.cpuPercent = object.cpuPercent ?? 0;
     message.latencySamples = object.latencySamples ?? 0;
+    message.pluginBlocksMissed = object.pluginBlocksMissed ?? 0;
     return message;
   },
 };

@@ -65,6 +65,13 @@ public:
     [[nodiscard]] bool isRunning() const { return ring_ != nullptr; }
     [[nodiscard]] const std::string& error() const { return error_; }
 
+    /**
+     * The mapped segment, for a ProxyNode to drive (one-frame pipeline).
+     * Valid between start() and stop(). ONE producer per ring: never drive
+     * the same ring through both a ProxyNode and processBlockSync().
+     */
+    [[nodiscard]] SharedAudioRing* ring() noexcept { return ring_; }
+
 private:
     SharedAudioRing* ring_ = nullptr;
     std::string segment_path_;

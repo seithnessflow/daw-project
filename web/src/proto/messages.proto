@@ -52,6 +52,7 @@ message EngineState {
     uint64 buffer_underruns = 1;       // Cumulative underrun count
     uint32 cpu_percent = 2;            // Audio thread CPU usage (0-100)
     uint32 latency_samples = 3;        // Current output latency
+    uint64 plugin_blocks_missed = 4;   // 2.4c-1: bridge blocks bypassed (child late/dead)
 }
 
 // Error from engine

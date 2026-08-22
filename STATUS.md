@@ -51,6 +51,13 @@ callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback
 run (piege branches-protegees documente) ; build tree SDK en cache actions,
 cle = pin + hash de cmake/vst3sdk.cmake (extrait du CMakeLists pour survivre
 aux editions engine). Runs froids reels : ~12 min (#50/#51), verdicts verts.
+A chaud : 4,4 min (run #52) — critere atteint.
+
+**2026-08-22 (2.4c-1):** le pont est transparent au bit pres (tests 15-16,
+16/16) ; rafale E2E verte a travers le proxy ; smoke WASAPI 10 s : 0
+underrun. Profondeur de pipeline revisee 1->2 sur preuve vivante (534/1875
+blocs sec en depth 1 : le driver livre 2 blocs dos a dos) — latence 2.4d
+= 512 ech. Layout v2, enfant traite le backlog dans l'ordre.
 
 ## Criteres d'acceptation
 

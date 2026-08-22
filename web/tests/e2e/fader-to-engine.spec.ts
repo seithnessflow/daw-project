@@ -61,6 +61,22 @@ function resolveBinary(envVar: string, name: string): string {
   );
 }
 
+/**
+ * The built AGain bundle (2.4c-1), or null when the SDK is not vendored.
+ * When present, the burst test runs WITH the out-of-process proxy in the
+ * chain - the same scenario, strengthened, never weakened.
+ */
+function resolveAgainBundle(): string | null {
+  const candidates = [
+    path.join(REPO_ROOT, 'engine', 'build-msvc', 'VST3', 'Release', 'again.vst3'),
+    path.join(REPO_ROOT, 'engine', 'build', 'VST3', 'Release', 'again.vst3'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 /** Poll a predicate until it holds or the timeout expires. */
 async function waitUntil(
   pred: () => boolean,
@@ -178,7 +194,11 @@ test.describe('Milestone: Fader to Engine', () => {
     const logFd = fs.openSync(logPath, 'w');
     // --debug-rebuild-delay-ms simulates the expensive builds the VST3 host
     // will have (DLL instantiation): without a cost, a 3-track build takes
-    // microseconds and coalescing would be unobservable
+    // microseconds and coalescing would be unobservable.
+    // With AGain built (2.4c-1), the SAME burst runs through the
+    // out-of-process proxy: every rebuild re-attaches to the registry's
+    // child instead of re-spawning it (ADR-017).
+    const again = resolveAgainBundle();
     const engine: ChildProcess = spawn(
       engineExe,
       [
@@ -187,6 +207,7 @@ test.describe('Milestone: Fader to Engine', () => {
         '--play', '--mute',
         '--ws-port', '47902',
         '--debug-rebuild-delay-ms', '100',
+        ...(again ? ['--debug-proxy-again', again] : []),
       ],
       { stdio: ['ignore', logFd, logFd] }
     );
@@ -232,6 +253,17 @@ test.describe('Milestone: Fader to Engine', () => {
 
       // And the engine is alive
       expect(engine.exitCode, 'engine process died during the burst').toBeNull();
+
+      if (again) {
+        // The child was spawned exactly ONCE (startup), never by a rebuild
+        // (canary: fails the day someone moves the spawn into buildGraph),
+        // and its ceremony succeeded
+        expect(
+          countInFile(logPath, 'Debug proxy: AGain served'),
+          'proxy child not spawned exactly once'
+        ).toBe(1);
+        expect(/Failed to start debug proxy/.test(log), 'proxy child failed to start').toBe(false);
+      }
     } finally {
       engine.kill();
     }

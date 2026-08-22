@@ -16,15 +16,28 @@
  * Threading: control thread only. Never touched by the audio callback.
  */
 
+#include "../host/plugin_bridge.h"
+
+#include <atomic>
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace daw::graph {
 
 struct PluginInstanceHandle {
-    // 2.4: child process handle, instance id, shared-memory channel,
-    // declared latency. Empty until the host exists.
+    // 2.4c-1: the live child + its ring. The handle owns the bridge; graph
+    // rebuilds re-attach ProxyNodes to bridge->ring() without touching the
+    // child (that is the whole point of this registry). blocks_missed is
+    // written by the audio callback (relaxed), read by telemetry.
+    // Declared latency joins in 2.4d.
+    std::unique_ptr<daw::host::PluginBridge> bridge;
+    std::atomic<uint64_t> blocks_missed{0};
+
+    PluginInstanceHandle() = default;
+    PluginInstanceHandle(const PluginInstanceHandle&) = delete;
+    PluginInstanceHandle& operator=(const PluginInstanceHandle&) = delete;
 };
 
 class PluginInstanceRegistry {
