@@ -11,14 +11,15 @@
 
 const SERVER_HTTP = 'http://localhost:3000';
 
-// hash -> per-bucket [min, max] pairs (fixed bucket count, scaled at draw)
-const peaksCache = new Map<string, Float32Array>();
+// hash -> {peaks: per-bucket [min,max] pairs, frames: asset length}
+interface PeaksEntry { peaks: Float32Array; frames: number }
+const peaksCache = new Map<string, PeaksEntry>();
 const pending = new Set<string>();
 const BUCKETS = 256;
 
 let audioCtx: AudioContext | null = null;
 
-async function loadPeaks(hash: string): Promise<Float32Array | null> {
+async function loadPeaks(hash: string): Promise<PeaksEntry | null> {
   const cached = peaksCache.get(hash);
   if (cached) return cached;
   if (pending.has(hash)) return null;  // someone else is fetching
@@ -42,8 +43,9 @@ async function loadPeaks(hash: string): Promise<Float32Array | null> {
       peaks[b * 2] = min;
       peaks[b * 2 + 1] = max;
     }
-    peaksCache.set(hash, peaks);
-    return peaks;
+    const entry = { peaks, frames: data.length };
+    peaksCache.set(hash, entry);
+    return entry;
   } catch {
     return null;
   } finally {
@@ -51,7 +53,7 @@ async function loadPeaks(hash: string): Promise<Float32Array | null> {
   }
 }
 
-function draw(canvas: HTMLCanvasElement, peaks: Float32Array): void {
+function draw(canvas: HTMLCanvasElement, entry: PeaksEntry): void {
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
   if (w === 0 || h === 0) return;
@@ -62,10 +64,19 @@ function draw(canvas: HTMLCanvasElement, peaks: Float32Array): void {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = 'rgba(235, 242, 250, 0.55)';
   const mid = h / 2;
+  // The clip shows a WINDOW of the asset (trims move offset/length):
+  // map pixels into the bucket range of that window; beyond the asset's
+  // end there is honestly nothing to draw.
+  const offset = Number(canvas.dataset.offsetSamples ?? 0);
+  const length = Number(canvas.dataset.lengthSamples ?? entry.frames);
+  const b0 = (offset / entry.frames) * BUCKETS;
+  const bSpan = (length / entry.frames) * BUCKETS;
   for (let x = 0; x < w; x++) {
-    const b = Math.min(BUCKETS - 1, Math.floor((x / w) * BUCKETS));
-    const min = peaks[b * 2];
-    const max = peaks[b * 2 + 1];
+    const b = b0 + (x / w) * bSpan;
+    if (b >= BUCKETS) break;
+    const bi = Math.min(BUCKETS - 1, Math.floor(b));
+    const min = entry.peaks[bi * 2];
+    const max = entry.peaks[bi * 2 + 1];
     const y0 = mid + min * mid;
     const y1 = mid + max * mid;
     ctx.fillRect(x, y0, 1, Math.max(1, y1 - y0));
@@ -87,8 +98,8 @@ export function fillWaveforms(root: ParentNode = document): void {
     if (cached) {
       draw(canvas, cached);
     } else {
-      void loadPeaks(hash).then((peaks) => {
-        if (peaks && !canvas.dataset.drawn) draw(canvas, peaks);
+      void loadPeaks(hash).then((entry) => {
+        if (entry && !canvas.dataset.drawn) draw(canvas, entry);
       });
     }
   }

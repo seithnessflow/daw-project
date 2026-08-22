@@ -156,6 +156,23 @@ export class Project {
   }
 
   /**
+   * Resize a clip (edge drag, potion C2) - writes the three EXISTING
+   * fields together so a trim never tears across peers.
+   */
+  setClipBounds(trackId: string, clipId: string,
+    bounds: { startSample: number; lengthSamples: number; offsetSamples: number }): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      const clip = track?.clips.find((c) => c.id === clipId);
+      if (!clip) return;
+      clip.startSample = Math.max(0, Math.round(bounds.startSample));
+      clip.lengthSamples = Math.max(1024, Math.round(bounds.lengthSamples));
+      clip.offsetSamples = Math.max(0, Math.round(bounds.offsetSamples));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Add a clip to a track (the sample kit's placement path) and
    * generate a change.
    */

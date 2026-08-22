@@ -150,7 +150,18 @@ export function createTrackUI(
     const wave = document.createElement('canvas');
     wave.className = 'clip-wave';
     wave.dataset.assetHash = clip.assetHash;
+    // The waveform shows this clip's WINDOW of the asset (trims move it)
+    wave.dataset.offsetSamples = String(clip.offsetSamples);
+    wave.dataset.lengthSamples = String(clip.lengthSamples);
     clipEl.appendChild(wave);
+    // Resize handles (C2): 6px edge zones, ew-resize affordance
+    for (const side of ['left', 'right'] as const) {
+      const edge = document.createElement('div');
+      edge.className = `clip-edge clip-edge-${side}`;
+      edge.dataset.role = 'clip-edge';
+      edge.dataset.edge = side;
+      clipEl.appendChild(edge);
+    }
     lane.appendChild(clipEl);
   }
   el.appendChild(lane);

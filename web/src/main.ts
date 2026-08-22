@@ -199,6 +199,109 @@ function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   window.addEventListener('pointerup', onUp);
 }
 
+/**
+ * Clip resize (potion C2): 6px edge zones. The right edge writes
+ * lengthSamples; the left edge trims head - startSample, offsetSamples
+ * and lengthSamples move TOGETHER (one document change, no tearing).
+ * Same snapping and same coalesced write road as the move drag.
+ */
+function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
+  if (!project) return;
+  const clipEl = edgeEl.closest('.clip') as HTMLElement | null;
+  const trackEl = edgeEl.closest('[data-track-id]') as HTMLElement | null;
+  if (!clipEl || !trackEl) return;
+  const side = edgeEl.dataset.edge as 'left' | 'right';
+  const clipId = clipEl.dataset.clipId!;
+  const trackId = trackEl.getAttribute('data-track-id')!;
+  const doc = project.getDocument();
+  const sr = doc.sampleRate || 48000;
+  const track = doc.tracks.find((t) => t.id === trackId);
+  const clip = track?.clips.find((c) => c.id === clipId);
+  if (!track || !clip) return;
+
+  const edges: number[] = [];
+  for (const c of track.clips) {
+    if (c.id === clipId) continue;
+    edges.push(c.startSample / sr, (c.startSample + c.lengthSamples) / sr);
+  }
+
+  const startX = e.clientX;
+  const orig = {
+    start: clip.startSample / sr,
+    length: clip.lengthSamples / sr,
+    offset: clip.offsetSamples / sr,
+  };
+  const MIN_LEN = 1024 / sr;
+  let pending = { ...orig };
+  let moved = false;
+  let writeRaf = 0;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const snapSec = (sec: number, alt: boolean): number => {
+    if (alt) return sec;
+    const step = snapStep();
+    let snapped = Math.round(sec / step) * step;
+    for (const edge of edges) {
+      if (Math.abs(sec - edge) * TIMELINE.pps < 8) { snapped = edge; break; }
+    }
+    return snapped;
+  };
+
+  const onMove = (ev: PointerEvent) => {
+    const dx = ev.clientX - startX;
+    if (!moved && Math.abs(dx) < 3) return;
+    moved = true;
+    clipEl.classList.add('dragging');
+    if (side === 'right') {
+      const endSec = snapSec(orig.start + orig.length + dx / TIMELINE.pps, ev.altKey);
+      pending.length = Math.max(MIN_LEN, endSec - orig.start);
+    } else {
+      let newStart = snapSec(orig.start + dx / TIMELINE.pps, ev.altKey);
+      // Head trim: offset cannot go negative, length cannot vanish
+      const minStart = orig.start - orig.offset;
+      const maxStart = orig.start + orig.length - MIN_LEN;
+      newStart = Math.min(maxStart, Math.max(0, Math.max(minStart, newStart)));
+      const d = newStart - orig.start;
+      pending = {
+        start: newStart,
+        offset: orig.offset + d,
+        length: orig.length - d,
+      };
+    }
+    clipEl.style.left = `${pending.start * TIMELINE.pps}px`;
+    clipEl.style.width = `${Math.max(2, pending.length * TIMELINE.pps)}px`;
+    if (!writeRaf) {
+      writeRaf = requestAnimationFrame(() => {
+        writeRaf = 0;
+        flushBounds();
+      });
+    }
+  };
+  const flushBounds = () => {
+    project!.setClipBounds(trackId, clipId, {
+      startSample: pending.start * sr,
+      lengthSamples: pending.length * sr,
+      offsetSamples: pending.offset * sr,
+    });
+    sendLastChange();
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    if (writeRaf) cancelAnimationFrame(writeRaf);
+    clipEl.classList.remove('dragging');
+    if (moved) {
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 0);
+      flushBounds();
+      renderTracks(true);
+    }
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
 function startPlayback(): void {
   if (!engineClient?.isConnected()) return;
   const sr = project?.getDocument().sampleRate || 48000;
@@ -394,10 +497,15 @@ async function init() {
   // three DAWs reserve the clip area for selection/editing). A lane
   // click PLACES the armed sample if one is armed, else selects the
   // track (its chain appears in the Device View).
-  // Clip drag entry point (delegated: clips are rebuilt constantly)
+  // Clip drag/resize entry points (delegated: clips rebuild constantly)
   tracksContainer.addEventListener('pointerdown', (e) => {
-    const handle = (e.target as HTMLElement)
-      .closest('[data-role="clip-handle"]') as HTMLElement | null;
+    const target = e.target as HTMLElement;
+    const edge = target.closest('[data-role="clip-edge"]') as HTMLElement | null;
+    if (edge) {
+      beginClipResize(e, edge);
+      return;
+    }
+    const handle = target.closest('[data-role="clip-handle"]') as HTMLElement | null;
     if (handle) beginClipDrag(e, handle);
   });
 

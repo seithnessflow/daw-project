@@ -310,6 +310,24 @@
         outline: 1px solid rgba(255, 255, 255, 0.8);
         filter: brightness(1.18);
       }
+      .clip-edge {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        cursor: ew-resize;
+        touch-action: none;
+        z-index: 2;
+      }
+      .clip-edge-left {
+        left: 0;
+      }
+      .clip-edge-right {
+        right: 0;
+      }
+      .clip-edge:hover {
+        background: rgba(255, 255, 255, 0.18);
+      }
       .clip-wave {
         flex: 1;
         width: 100%;
