@@ -66,14 +66,17 @@ jobs:
         # cached SDK sources and skips them, while engine sources arrive from
         # checkout with fresh mtimes and rebuild as usual. .ninja_log and
         # .ninja_deps live at the build-tree root, hence engine/build whole.
-        # The SDK is pinned, so this cache lives until the pin or the CMake
-        # config that shapes it changes.
+        # The SDK is pinned, so this cache lives until the pin (bump the
+        # literal below with it) or the cmake file that shapes the SDK build
+        # changes. Keyed on cmake/vst3sdk.cmake ON PURPOSE: engine-side
+        # CMakeLists.txt edits (new sources, new tests - every session of
+        # the host chantier) must NOT evict months of SDK build.
         uses: actions/cache@v4
         with:
           path: |
             third_party/vst3sdk
             engine/build
-          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/CMakeLists.txt') }}
+          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/cmake/vst3sdk.cmake') }}
 
       - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
         run: |
@@ -191,14 +194,17 @@ jobs:
         # cached SDK sources and skips them, while engine sources arrive from
         # checkout with fresh mtimes and rebuild as usual. .ninja_log and
         # .ninja_deps live at the build-tree root, hence engine/build whole.
-        # The SDK is pinned, so this cache lives until the pin or the CMake
-        # config that shapes it changes.
+        # The SDK is pinned, so this cache lives until the pin (bump the
+        # literal below with it) or the cmake file that shapes the SDK build
+        # changes. Keyed on cmake/vst3sdk.cmake ON PURPOSE: engine-side
+        # CMakeLists.txt edits (new sources, new tests - every session of
+        # the host chantier) must NOT evict months of SDK build.
         uses: actions/cache@v4
         with:
           path: |
             third_party/vst3sdk
             engine/build
-          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/CMakeLists.txt') }}
+          key: vst3-buildtree-${{ runner.os }}-v3.8.1_build_84-${{ hashFiles('engine/cmake/vst3sdk.cmake') }}
 
       - name: Clone VST3 SDK (pinned, see docs/cadrage-2.4.md)
         run: |
