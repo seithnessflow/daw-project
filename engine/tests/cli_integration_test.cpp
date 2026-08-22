@@ -14,6 +14,7 @@
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
 #include "../src/host/proxy_node.h"
+#include "../src/util/sha256.h"
 #include "../src/websocket/websocket_server.h"
 
 #include <ixwebsocket/IXNetSystem.h>
@@ -628,6 +629,64 @@ bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
 }
 
 // Main
+// Test: SHA-256 (2.3a) against the FIPS 180-4 vectors - including the
+// million-'a' vector that exercises multi-block streaming - and the
+// asset-loading contract: AssetCache hashes file CONTENTS with it, so
+// assetHash finally IS what SCHEMA.md always claimed.
+bool testSha256AssetHash() {
+    std::cout << "Test: SHA-256 asset hash... ";
+
+    if (daw::util::sha256Hex("abc", 3) !=
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") {
+        std::cout << "FAILED: FIPS vector 'abc'\n";
+        return false;
+    }
+    if (daw::util::sha256Hex("", 0) !=
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") {
+        std::cout << "FAILED: FIPS vector empty\n";
+        return false;
+    }
+    {
+        const std::string million(1000000, 'a');
+        if (daw::util::sha256Hex(million.data(), million.size()) !=
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0") {
+            std::cout << "FAILED: FIPS vector 1M x 'a' (streaming)\n";
+            return false;
+        }
+    }
+
+    // File hashing == buffer hashing, and the asset pipeline uses it
+    const fs::path dir = fs::temp_directory_path() / "daw-sha-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    const std::string wav_path = (dir / "tone.wav").string();
+    std::vector<int16_t> samples(1024 * 2, 1234);
+    if (!writeWav16(wav_path, 2, 48000, samples)) {
+        std::cout << "FAILED: cannot write wav\n";
+        return false;
+    }
+    std::ifstream f(wav_path, std::ios::binary);
+    const std::vector<char> bytes((std::istreambuf_iterator<char>(f)),
+                                  std::istreambuf_iterator<char>());
+    const std::string from_file = daw::util::sha256HexFile(wav_path);
+    if (from_file.size() != 64 ||
+        from_file != daw::util::sha256Hex(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: file hash != buffer hash\n";
+        return false;
+    }
+    daw::graph::AssetCache cache;
+    const auto* asset = cache.loadOrGet(wav_path);
+    if (!asset || asset->hash != from_file) {
+        std::cout << "FAILED: AssetCache hash is not the file's SHA-256\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (FIPS vectors incl. 1M streaming; AssetCache = SHA-256 of contents)\n";
+    return true;
+}
+
 // Test 19 (c-2, M3): the chain round-trips through the document. A vst3
 // node (uid + params as {key,value} pairs) and a builtin.gain node written
 // via addTrack come back IDENTICAL through serialize/load - the document
@@ -1784,6 +1843,7 @@ int main(int argc, char* argv[]) {
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
+    run(testSha256AssetHash);
     runWithArg(testRenderDeterminism, fixtures_dir);
     run(testAudioThreadLockFreedom);
     run(testWebSocketAuth);

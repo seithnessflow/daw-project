@@ -209,6 +209,8 @@ add_library(daw_engine_lib STATIC
     src/host/proxy_node.cpp
     src/host/sync_proxy_node.h
     src/host/sync_proxy_node.cpp
+    src/util/sha256.h
+    src/util/sha256.cpp
 )
 
 target_include_directories(daw_engine_lib PUBLIC

@@ -10,36 +10,11 @@
 #include <iomanip>
 #include <sstream>
 
-// Simple SHA-256 would require a library. For now, use a simple hash.
-// In production, use OpenSSL or similar.
-static std::string computeSimpleHash(const std::string& path) {
-    // Read file and compute a simple checksum
-    // This is NOT cryptographically secure - just a placeholder
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        return "";
-    }
-
-    uint64_t hash = 0xcbf29ce484222325ULL;  // FNV-1a offset basis
-    constexpr uint64_t prime = 0x100000001b3ULL;
-
-    char buffer[4096];
-    while (file.read(buffer, sizeof(buffer))) {
-        for (size_t i = 0; i < sizeof(buffer); ++i) {
-            hash ^= static_cast<uint8_t>(buffer[i]);
-            hash *= prime;
-        }
-    }
-    // Process remaining bytes
-    for (std::streamsize i = 0; i < file.gcount(); ++i) {
-        hash ^= static_cast<uint8_t>(buffer[i]);
-        hash *= prime;
-    }
-
-    std::ostringstream oss;
-    oss << std::hex << std::setfill('0') << std::setw(16) << hash;
-    return oss.str();
-}
+// 2.3a: assetHash is finally what SCHEMA.md always claimed - SHA-256 of
+// the file CONTENTS (self-contained impl in util/sha256, FIPS-vector
+// tested). Content addressing semantics unchanged: the hash is the asset's
+// name key (<hash>.wav) across the whole pipeline.
+#include "../util/sha256.h"
 
 namespace daw::graph {
 
@@ -81,7 +56,7 @@ AudioAsset ClipPlayer::loadWav(const std::string& path) {
     }
 
     // Compute hash
-    asset.hash = computeSimpleHash(path);
+    asset.hash = daw::util::sha256HexFile(path);
 
     return asset;
 }
