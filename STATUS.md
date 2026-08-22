@@ -75,8 +75,14 @@ La tranche 2.4 (hote VST3, tranche fine) est TENUE.
 **2026-08-22, verdict final — run #55 (d034102) VERT en 4,3 min :** la
 promesse du premier message du chantier est tenue mot pour mot, jusqu'a
 « depuis un onglet ». Quatre sessions (hygiene CI, c-1, c-2, 2.4d), cinq
-pushes, cinq verdicts verts, zero dette de verdict. Prochaine session :
-re-cadrage 2.5 (TODO), qui se clot sur le test des mains.
+pushes, cinq verdicts verts, zero dette de verdict.
+
+**Nuit du 2026-08-22 (post-jalon, runs #56-58 verts) :** outillage du test
+des mains (docs/test-des-mains-2.4.md + seed teste), elagage docs (prealable
+4 enfin solde), persistance outbox (dette critere 3, spec 11/11).
+PROCHAINE ETAPE, dans l'ordre : 1. LE TEST DES MAINS (runbook pret,
+intrant obligatoire) ; 2. session 2.5 re-cadrage, qui OUVRE sur ces notes.
+Critere 5 sous charge : au backlog expres (exige du son reel sur le ZenGo).
 
 ## Criteres d'acceptation
 

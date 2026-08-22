@@ -258,7 +258,8 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
 - [ ] Moteur : lire `chain` (processeurs) du document — TODO `automerge_document.cpp:419`
 - [ ] `assetHash` FNV → SHA-256 — domaine format document, verif complete
-- [ ] Nettoyer `docs/DECISIONS.md` (contenu WSL obsolete)
+- [x] Nettoyer `docs/DECISIONS.md` — FAIT 2026-08-22 (ADR-015 WSL marque
+      obsolete, collision ADR-016 resolue par renumerotation en ADR-018)
 
 ## Stack (a evaluer, pas urgent)
 
