@@ -231,12 +231,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          12 min (#50/#51) — pas 30-45. A CHAUD : 4,4 min (run #52, vert) —
          critere < ~5 min ATTEINT, cache automerge-c non necessaire.
 
-- [ ] Verifier le hash GCC en CI (`89f1a1105dc09e92`) — regarder GitHub Actions
+- [x] Verifier le hash GCC en CI — FAIT via le premier run vert (le hash est
+      asserte DANS daw_engine_test, qui passe sous Linux depuis run #48)
 - [ ] Critere 5 sous charge CPU (procedure dans STATUS.md, temps machine)
 - [ ] Critere 4 LNA Chrome (manuel, `--allow-origin` pret)
 - [ ] Persistance de l'outbox (localStorage) — `web/src/network/server_client.ts`
 - [x] Serveur : persister AVANT de diffuser — FAIT (voir 2.1 option B)
-- [ ] `solo`/`mute` en `std::atomic<bool>` — domaine thread audio, tests non-regression obligatoires
+- [x] `solo`/`mute` en `std::atomic<bool>` — FAIT 2026-08-22 (R4+S4, teste)
 
 ## Candidats grille (constats de lecture 2026-08-22, arbitrage a l'audit 2)
 

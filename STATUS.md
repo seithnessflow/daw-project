@@ -25,7 +25,7 @@ Rien de temps reel ne traverse le serveur distant.
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 10/10 |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 20/20 |
 | Engine C++ (GCC/CI) | ✅ | ✅ | PREMIER RUN VERT 2026-08-22 (run #48, a91d57b) : 14 tests moteur sous Linux dont hash + plugin_host/AGain, E2E complet. Avant lui : 47 runs rouges jamais regardes (lecon inscrite au regime) |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
 | Web TypeScript | ✅ | ✅ | Automerge reel, critere 3 valide |
@@ -83,7 +83,7 @@ re-cadrage 2.5 (TODO), qui se clot sur le test des mains.
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
-| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 10/10 |
+| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 20/20 |
 | 3 | Convergence 2 onglets | ✅ VALIDE | Online ET offline (Playwright, coupure reelle du serveur). Voir detail pour les dettes residuelles |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |

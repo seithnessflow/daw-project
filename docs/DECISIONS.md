@@ -426,7 +426,11 @@ La topologie est un **triangle**, pas une ligne :
 
 ---
 
-## ADR-015: WSL Audio Limitations
+## ADR-015: WSL Audio Limitations — OBSOLETE (elagage 2026-08-22)
+
+**Cet ADR ne decrit plus le projet : le developpement est 100% natif
+Windows (MSVC), les arbres WSL ont ete supprimes (audit 1, S2). Conserve
+pour l'historique uniquement.**
 
 **Statut:** Accepté
 **Date:** 2026-08-20
@@ -490,7 +494,13 @@ Audio Device: NULL Playback Device                       ← Null backend, pas b
 
 ---
 
-## ADR-016: Fixed Block Size Processing
+## ADR-018: Fixed Block Size Processing
+
+*(Renumerote 2026-08-22 : ce chapitre portait « ADR-016 », en collision
+avec le fichier ADR-016-automerge-version-alignment.md. Le contenu est
+inchange et plus vrai que jamais : le bloc 256 est devenu un contrat
+inter-processus — kRingBlockSize == kHostBlockSize, asserte des deux
+cotes du ring.)*
 
 **Statut:** Accepté
 **Date:** 2026-08-20

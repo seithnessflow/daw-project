@@ -1,14 +1,0 @@
-Loaded: C:\Users\mb668\daw-project\fixtures\test.am
-
-Playing project...
-Press Ctrl+C to stop.
-
-Audio Device: ZenGo SC USB Audio Driver Playback 1/2 (ZenGo SC)
-Sample Rate: 48000 Hz
-Buffer Size: 512 frames
-
-Auth token written to: C:\Users\mb668\AppData\Local\Temp\daw-engine-token
-Position: 0.0106667 / 0 s | Peak L: 0 R: 0 | Underruns: 0    Position: 0.0213333 / 0 s | Peak L: 0 R: 0 | Underruns: 0    Position: 0.032 / 0 s | Peak L: 0 R: 0 | Underruns: 0    Position: 0.0426667 / 0 s | Peak L: 0 R: 0 | Underruns: 0    Position: 0.0533333 / 0 s | Peak L: 0 R: 0 | Underruns: 0    
-
-Stopping...
-Done. Buffer underruns: 0

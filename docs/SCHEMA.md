@@ -62,7 +62,7 @@
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | Yes | UUID v4. Immutable after creation. |
-| `assetHash` | `string` | Yes | SHA-256 hex digest of the source audio file. |
+| `assetHash` | `string` | Yes | Content hash of the source audio file. TARGET: SHA-256 (TODO 2.3). REALITY TODAY: FNV-1a 64-bit hex (16 chars, `clip_player.cpp`) - an interim the whole pipeline shares (assets resolve as `<assetHash>.wav`), swapped in one move at 2.3. |
 | `startSample` | `int64` | Yes | Position on timeline where clip begins. |
 | `lengthSamples` | `int64` | Yes | Duration of the clip in samples. |
 | `offsetSamples` | `int64` | Yes | Offset into the source asset. |
