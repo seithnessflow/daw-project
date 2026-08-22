@@ -33,6 +33,12 @@ export function createTrackUI(
   faderInput.max = '2';
   faderInput.step = '0.01';
   faderInput.value = track.gain.toString();
+  // SELECTION CONTRACT (refonte prep, section 3): tests and helpers anchor
+  // on data-role, never on the element type or a style class - a redesigned
+  // fader keeps the contract, the pixels stay free. aria-label rides along:
+  // the contract IS accessibility.
+  faderInput.dataset.role = 'gain';
+  faderInput.setAttribute('aria-label', `Gain ${track.name}`);
 
   const gainDisplay = document.createElement('span');
   gainDisplay.className = 'track-gain';
@@ -66,9 +72,11 @@ export function createTrackUI(
 
       const bypassBtn = document.createElement('button');
       bypassBtn.className = 'chain-bypass';
+      bypassBtn.dataset.role = 'bypass';  // selection contract
       bypassBtn.dataset.procId = proc.id;
       bypassBtn.textContent = 'bypass';
       bypassBtn.setAttribute('aria-pressed', proc.bypass ? 'true' : 'false');
+      bypassBtn.setAttribute('aria-label', `Bypass ${proc.type} ${track.name}`);
       bypassBtn.addEventListener('click', () => {
         const current = bypassBtn.getAttribute('aria-pressed') === 'true';
         onBypassToggle?.(proc.id, !current);
@@ -119,7 +127,7 @@ export function updateTrackGainUI(trackId: string, gain: number): void {
   const el = document.querySelector(`[data-track-id="${trackId}"]`);
   if (!el) return;
 
-  const input = el.querySelector('input[type="range"]') as HTMLInputElement | null;
+  const input = el.querySelector('[data-role="gain"]') as HTMLInputElement | null;
   if (input && document.activeElement !== input) {
     input.value = gain.toString();
   }
@@ -139,7 +147,7 @@ export function updateTrackChainUI(trackId: string, chain: TrackDef['chain']): v
   if (!el) return;
   for (const proc of chain) {
     const btn = el.querySelector(
-      `.chain-bypass[data-proc-id="${proc.id}"]`
+      `[data-role="bypass"][data-proc-id="${proc.id}"]`
     ) as HTMLElement | null;
     if (btn) {
       btn.setAttribute('aria-pressed', proc.bypass ? 'true' : 'false');

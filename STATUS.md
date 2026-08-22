@@ -102,6 +102,14 @@ Calibre sur le ton connu (-12,04/-15,05 dBFS assertes), rouge prouve
 (=0,5 exact). Self-test analyseur en CI ; snap/ear restent hors CI (stack
 vivante). Boucle + securite auditive gravees dans CLAUDE.md.
 
+**2026-08-22 (refonte UI, lot 1 — le contrat avant le pixel) :** test des
+mains REPORTE (decision utilisateur : produit trop embryonnaire) et requalifie
+en GATE DE SORTIE de la refonte ; metaphore RATIFIEE : timeline d'abord.
+Contrat de selection pose (data-role/data-state + ARIA, jumeaux helpers/diag
+fusionnes, zero pixel change) — suite e2e 12/12 en 1,7 min comme preuve,
+snap re-ancre sur le contrat. La refonte peut etre agressive : les tests
+tiennent la semantique, les pixels sont libres.
+
 **2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
 AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
 silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses

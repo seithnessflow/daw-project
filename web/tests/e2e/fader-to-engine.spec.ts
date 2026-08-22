@@ -356,7 +356,7 @@ test.describe('Milestone: Fader to Engine', () => {
     // back through the document (aria-pressed only settles via the doc)
     await page.goto(`/?project=${projectId}`);
     await waitForServerConnection(page);
-    const bypassBtn = page.locator('.chain-bypass');
+    const bypassBtn = page.locator('[data-role="bypass"]');
     await bypassBtn.waitFor({ timeout: 10000 });
     await expect(bypassBtn).toHaveAttribute('aria-pressed', 'false');
     await bypassBtn.click();

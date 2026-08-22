@@ -7,14 +7,20 @@ grille est dans STATUS/session outillage).*
 
 ---
 
-## 1. Proposition niveau 3 — la metaphore (decision a ratifier APRES les mains)
+## 1. Proposition niveau 3 — la metaphore : RATIFIEE (timeline d'abord)
 
-*Ordre corrige 2026-08-22 (conseil recu et consigne) : la ratification
-vient APRES le test des mains, jamais avant — les quinze minutes de
-manipulation sont un intrant de CETTE decision aussi ; le seul capteur
-de niveau 3-4 du projet n'a pas touche le produit depuis la page a deux
-boutons. L'utilisateur sentira dans ses mains si ce produit est une
-console ou une timeline.*
+*Historique des ordres, dans l'ordre reel :*
+1. *Conseil consigne : ratifier APRES le test des mains (intrant niveau 3).*
+2. *DECISION UTILISATEUR 2026-08-22 (prime) : « je peux pas tester tant
+   qu'il y a pas tous les sens fonctionnels, c'est trop embryonnaire —
+   faut une boucle d'amelioration. » Le test des mains est REPORTE et
+   change de nature : il devient le GATE DE SORTIE de la refonte (il
+   jugera le resultat) au lieu d'un intrant. Declencheur : la timeline
+   utilisable a l'ecran. Ses notes restent l'intrant du re-cadrage 2.5
+   et de la mission buffer (AUDIT-3).*
+3. *Consequence : la metaphore est ratifiee MAINTENANT — timeline
+   d'abord — sur la convergence avis utilisateur + les trois raisons
+   ci-dessous, l'intrant mains etant explicitement differe.*
 
 **Constat (capture full-1536.png)** : l'ecran est une liste de lignes
 fader ; le document contient des clips (id, assetHash, start, length) que
@@ -115,10 +121,8 @@ changement visuel. C'est le harnais qui autorise l'agressivite.
 
 ## 4. Plan de la session refonte (bornee, dans l'ordre)
 
-0. PREREQUIS : LE TEST DES MAINS est fait et ses notes lues (intrant du
-   point 2 — voir l'ordre corrige en tete de section 1). S'il ne l'est
-   pas a l'ouverture, il devient le premier geste de la seance, stack
-   relancee au besoin (~30 s).
+0. ~~PREREQUIS mains~~ REPORTE (decision utilisateur, section 1) : le
+   test des mains est le GATE DE SORTIE de la refonte, pas son entree.
 1. Contrat de selection + unification helpers (section 3) -> suite e2e
    complete verte, AUCUN changement visuel. Commit. (Bonus consigne :
    ce contrat EST de l'accessibilite — DAW navigable au lecteur d'ecran

@@ -55,10 +55,13 @@ async function init() {
   serverClient = new ServerClient(SERVER_URL);
   serverClient.onConnect = () => {
     serverStatus.classList.add('connected');
+    // Selection contract: tests read data-state, the class only styles
+    serverStatus.dataset.state = 'connected';
     console.log('Connected to server');
   };
   serverClient.onDisconnect = () => {
     serverStatus.classList.remove('connected');
+    serverStatus.dataset.state = 'disconnected';
     console.log('Disconnected from server');
   };
   let hasLoadedInitialDoc = false;
@@ -106,12 +109,14 @@ async function init() {
   engineClient = new EngineClient({ port: ENGINE_PORT, token: engineToken });
   engineClient.onConnect = () => {
     engineStatus.classList.add('connected');
+    engineStatus.dataset.state = 'connected';
     playBtn.disabled = false;
     stopBtn.disabled = false;
     console.log('Connected to engine');
   };
   engineClient.onDisconnect = () => {
     engineStatus.classList.remove('connected');
+    engineStatus.dataset.state = 'disconnected';
     playBtn.disabled = true;
     stopBtn.disabled = true;
     console.log('Disconnected from engine');

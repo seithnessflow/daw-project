@@ -202,11 +202,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 
 - [ ] ARBITRAGE AUDIT-3 (2026-08-22, rapport AUDIT-3.md — lecture complete
       post-jalon, consigne le jour meme). Ordre DECIDE, avant 2.5 :
-      1. [ ] LE TEST DES MAINS, avec la MISSION AJOUTEE par l'audit :
-         variation de buffer dans le panneau ZenGo (256 / 1024 / valeur
-         non standard) — exerce les frontieres accusees par A3-2/A3-3
-         avec le diagnostic deja ecrit. Runbook mis a jour
-         (docs/test-des-mains-2.4.md, item 8).
+      1. [ ] LE TEST DES MAINS — REPORTE 2026-08-22 (decision utilisateur :
+         produit trop embryonnaire, la boucle d'amelioration passe devant).
+         Nouveau declencheur : la refonte UI livre une timeline utilisable ;
+         les mains deviennent le GATE DE SORTIE de la refonte. La mission
+         buffer ZenGo (256/1024/tordu, runbook item 8) et les notes-intrant
+         de 2.5 restent attachees au test, seule sa date bouge. Les items
+         2-4 ci-dessous ne sont PLUS bloques par lui.
       2. [ ] A3-1 FILE PARAM (prealable direct de 2.5-etat) : le canal
          param du ring n'a qu'un slot — deux setParam s'ecrasent, un
          plugin a n params perd n-1 params a chaque rebuild. File SPSC
@@ -263,12 +265,15 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       la checklist de l'utilisateur impatient). La session 2.5 OUVRE sur
       ces notes.
 
-- [ ] REFONTE UI (prochaine session, boucle outillage) : s'ouvre sur
-      docs/refonte-ui-preparation.md — PREREQUIS : test des mains fait
-      (ses notes sont un intrant de la metaphore, ordre corrige) ; puis
-      contrat de selection ARIA + unification helpers (le harnais AVANT
-      le premier pixel), puis ratification (timeline d'abord propose),
-      puis la structure. Les niveaux 1 constates a l'audit outillage (wrap dB,
+- [ ] REFONTE UI (EN COURS, boucle outillage) : metaphore RATIFIEE
+      2026-08-22 — timeline d'abord (docs/refonte-ui-preparation.md,
+      section 1, intrant mains explicitement differe par decision
+      utilisateur). Fait ce jour : contrat de selection (data-role/
+      data-state + ARIA), jumeaux helpers/diag fusionnes, zero pixel
+      change, suite e2e complete comme preuve. Reste : structure
+      timeline (clips rendus, pistes vides compactes, tete de lecture),
+      par petits lots dans la boucle snap/grille. GATE DE SORTIE : le
+      test des mains. Les niveaux 1 constates a l'audit outillage (wrap dB,
       congestion Track 1) se dissolvent dans la refonte, pas de rapiecage.
 
 ## Court terme (sessions economes)

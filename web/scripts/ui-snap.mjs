@@ -55,7 +55,7 @@ const VIEWPORTS = [
 async function settle(page) {
   const notes = [];
   try {
-    await page.waitForSelector('#server-status.connected', { timeout: 10000 });
+    await page.waitForSelector('#server-status[data-state="connected"]', { timeout: 10000 });
     notes.push('server pill: connected');
   } catch {
     notes.push('server pill: NOT connected (10s) - captures show the degraded state');
@@ -68,7 +68,7 @@ async function settle(page) {
     notes.push('tracks: NONE rendered (10s)');
   }
   const engineConnected = await page
-    .locator('#engine-status.connected')
+    .locator('#engine-status[data-state="connected"]')
     .count()
     .then((c) => c > 0)
     .catch(() => false);

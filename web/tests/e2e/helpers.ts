@@ -151,8 +151,10 @@ export function printDiagnostics(
  * Wait for WebSocket connection to server.
  */
 export async function waitForServerConnection(page: Page, timeout = 10000): Promise<void> {
+  // Selection contract: data-state carries the logic, classes only style
   await page.waitForFunction(
-    () => document.querySelector('#server-status')?.classList.contains('connected'),
+    () => (document.querySelector('#server-status') as HTMLElement | null)
+      ?.dataset.state === 'connected',
     { timeout }
   );
 }
@@ -163,7 +165,7 @@ export async function waitForServerConnection(page: Page, timeout = 10000): Prom
 export async function getTrackGain(page: Page, trackId: string): Promise<number> {
   const value = await page.evaluate((id) => {
     const track = document.querySelector(`[data-track-id="${id}"]`);
-    const input = track?.querySelector('input[type="range"]') as HTMLInputElement;
+    const input = track?.querySelector('[data-role="gain"]') as HTMLInputElement;
     return input ? parseFloat(input.value) : -1;
   }, trackId);
   return value;
@@ -175,7 +177,7 @@ export async function getTrackGain(page: Page, trackId: string): Promise<number>
 export async function setTrackGain(page: Page, trackId: string, gain: number): Promise<void> {
   await page.evaluate(({ id, g }) => {
     const track = document.querySelector(`[data-track-id="${id}"]`);
-    const input = track?.querySelector('input[type="range"]') as HTMLInputElement;
+    const input = track?.querySelector('[data-role="gain"]') as HTMLInputElement;
     if (input) {
       input.value = g.toString();
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -226,7 +228,8 @@ export async function waitForTrackCount(
  */
 export async function waitForServerDisconnected(page: Page, timeout = 15000): Promise<void> {
   await page.waitForFunction(
-    () => !document.querySelector('#server-status')?.classList.contains('connected'),
+    () => (document.querySelector('#server-status') as HTMLElement | null)
+      ?.dataset.state !== 'connected',
     { timeout }
   );
 }
