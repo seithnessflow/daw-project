@@ -188,6 +188,31 @@ console.log('Gesture 8 (A1): lane click sets the insert marker, Play starts ther
   }
 }
 
+console.log('Gesture 9 (A2): overview navigates and fits');
+{
+  await page.evaluate(() => document.activeElement?.blur()); // free the keyboard
+  await page.keyboard.press('+'); // ensure zoomed in enough to scroll
+  await page.keyboard.press('+');
+  await page.keyboard.press('+');
+  await page.waitForTimeout(300);
+  const ov = page.locator('[data-role="overview"]');
+  const box = await ov.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  const scrolled = await page.evaluate(() =>
+    document.getElementById('tracks').scrollLeft);
+  check(`overview click scrolls the view (scrollLeft=${scrolled.toFixed(0)})`, scrolled > 0);
+  await ov.dblclick();
+  await page.waitForTimeout(300);
+  const laneW = await page.evaluate(() =>
+    document.querySelector('.track-lane').offsetWidth);
+  const viewW = await page.evaluate(() =>
+    document.getElementById('tracks').clientWidth);
+  check(`overview dblclick fits all (${laneW} <= ${viewW})`, laneW <= viewW);
+}
+
 console.log('Gesture 6: Add Track from the UI');
 const nBefore = await page.locator('[data-track-id]').count();
 await page.locator('#add-track-btn').click();

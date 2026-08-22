@@ -23,6 +23,7 @@ import {
 import { formatTime } from './ui/transport';
 import { Library, loadKit } from './ui/library';
 import { fillWaveforms } from './ui/waveform';
+import { Overview } from './ui/overview';
 
 // Configuration
 const SERVER_URL = 'ws://localhost:3000';
@@ -80,6 +81,29 @@ function updateInsertMarker(): void {
   if (marker) {
     marker.style.left = `${TIMELINE.headWidth + insertMarkerSec * TIMELINE.pps}px`;
   }
+  refreshOverview();
+}
+
+/** Redraw the overview strip (rAF-coalesced; cheap canvas pass). */
+function refreshOverview(): void {
+  if (!overview || !project || overviewRaf) return;
+  overviewRaf = requestAnimationFrame(() => {
+    overviewRaf = 0;
+    if (!overview || !project) return;
+    const doc = project.getDocument();
+    const viewStart = Math.max(0,
+      (tracksContainer.scrollLeft) / TIMELINE.pps);
+    const viewEnd = viewStart +
+      (tracksContainer.clientWidth - TIMELINE.headWidth) / TIMELINE.pps;
+    overview.render(doc, contentSeconds(), viewStart, viewEnd,
+      lastPlayheadSec, insertMarkerSec);
+  });
+}
+
+function fitAll(): void {
+  const rect = tracksContainer.getBoundingClientRect();
+  const fit = (rect.width - TIMELINE.headWidth - 20) / contentSeconds();
+  setZoom(fit, 0, TIMELINE.headWidth);
 }
 
 function startPlayback(): void {
@@ -109,6 +133,10 @@ window.__dawProject = null;
 let serverClient: ServerClient | null = null;
 let engineClient: EngineClient | null = null;
 let library: Library | null = null;
+let overview: Overview | null = null;
+let lastPlayheadSec = -1;
+let overviewRaf = 0;
+const zoomStack: { pps: number; scrollLeft: number }[] = [];
 
 // DOM elements
 const serverStatus = document.getElementById('server-status')!;
@@ -200,6 +228,8 @@ async function init() {
   };
   engineClient.onPosition = (samples, sampleRate) => {
     positionEl.textContent = formatTime(samples, sampleRate);
+    lastPlayheadSec = samples / sampleRate;
+    refreshOverview();
     // Playhead on the shared scale, PARKED at the lane's end when the
     // engine plays past the content (its transport never stops on its
     // own): an escaped playhead stretched the scroll width into nowhere.
@@ -248,6 +278,24 @@ async function init() {
     library = new Library(kit);
     document.getElementById('library-slot')!.appendChild(library.element);
   }
+
+  // The Overview: whole project, always visible (potion A2)
+  overview = new Overview({
+    onScrollTo: (sec) => {
+      followPaused = true;
+      programmaticScroll = true;
+      tracksContainer.scrollLeft = Math.max(0,
+        sec * TIMELINE.pps - (tracksContainer.clientWidth - TIMELINE.headWidth) / 2);
+      refreshOverview();
+    },
+    onZoom: (factor, anchorSec) => {
+      const rect = tracksContainer.getBoundingClientRect();
+      setZoom(TIMELINE.pps * factor, anchorSec,
+        TIMELINE.headWidth + (rect.width - TIMELINE.headWidth) / 2);
+    },
+    onFit: fitAll,
+  });
+  document.getElementById('overview-slot')!.appendChild(overview.element);
 
   // Seek ONLY on the ruler's seek band (docs/UI-CONVENTIONS.md: all
   // three DAWs reserve the clip area for selection/editing). A lane
@@ -321,10 +369,24 @@ async function init() {
     } else if (e.key === '-') {
       setZoom(TIMELINE.pps / 1.25, centerSec, centerX - rect.left);
     } else if (e.code === 'KeyW') {
-      const fit = (rect.width - TIMELINE.headWidth - 20) / contentSeconds();
-      setZoom(fit, 0, TIMELINE.headWidth);
+      fitAll();
     } else if (e.code === 'KeyH') {
       document.body.classList.toggle('compact-tracks');
+    } else if (e.code === 'KeyZ') {
+      // Zoom to the marker's neighborhood; X pops back (Ableton Z/X)
+      zoomStack.push({ pps: TIMELINE.pps, scrollLeft: tracksContainer.scrollLeft });
+      const windowSec = 8;
+      const pps = (rect.width - TIMELINE.headWidth) / windowSec;
+      setZoom(pps, Math.max(0, insertMarkerSec - windowSec / 2), TIMELINE.headWidth);
+    } else if (e.code === 'KeyX') {
+      const prev = zoomStack.pop();
+      if (prev) {
+        TIMELINE.pps = prev.pps;
+        renderTracks(true);
+        programmaticScroll = true;
+        tracksContainer.scrollLeft = prev.scrollLeft;
+        refreshOverview();
+      }
     }
   });
 
@@ -344,6 +406,7 @@ async function init() {
   }, { passive: false });
 
   tracksContainer.addEventListener('scroll', () => {
+    refreshOverview();
     if (programmaticScroll) {
       programmaticScroll = false;
       return;
@@ -476,6 +539,7 @@ function renderTracks(force = false) {
   // Waveforms inside the freshly built clips (cached peaks draw
   // synchronously; new assets stream in from the store)
   fillWaveforms(tracksContainer);
+  refreshOverview();
 }
 
 // Start

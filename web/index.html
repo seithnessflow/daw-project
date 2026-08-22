@@ -168,6 +168,17 @@
         cursor: copy;
       }
 
+      /* ---- Overview: the whole project, always visible -------------- */
+      .overview {
+        display: block;
+        width: 100%;
+        height: 36px;
+        border-radius: var(--r);
+        margin-bottom: 8px;
+        cursor: pointer;
+        touch-action: none;
+      }
+
       /* ---- Timeline ------------------------------------------------- */
       .tracks {
         position: relative;
@@ -563,6 +574,8 @@
     </div>
 
     <div id="library-slot"></div>
+
+    <div id="overview-slot"></div>
 
     <div class="tracks" id="tracks"></div>
 
