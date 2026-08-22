@@ -17,6 +17,7 @@
  */
 
 #include "host_messages.pb.h"
+#include "shared_audio_ring.h"
 
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
@@ -32,11 +33,19 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 namespace {
@@ -146,6 +155,101 @@ bool writeWav16Stereo(const std::string& path, const std::vector<int16_t>& sampl
 // document's chain will drive in 2.4c.
 
 constexpr int32_t kHostBlockSize = 256;
+static_assert(daw::host::kRingBlockSize == static_cast<uint32_t>(kHostBlockSize),
+              "ring block size and host block size are the same contract");
+
+// ---- The VST3 instantiation ceremony, shared by --process and --serve ------
+// Extracted (not duplicated) when --serve arrived: one ceremony, two callers.
+// Every refusal is a clean error string, never a crash.
+struct PluginInstance {
+    VST3::Hosting::Module::Ptr module;
+    Steinberg::IPtr<Steinberg::Vst::IComponent> component;
+    Steinberg::FUnknownPtr<Steinberg::Vst::IAudioProcessor> processor;
+    Steinberg::Vst::HostApplication host_app;
+    bool active = false;
+
+    bool setup(const std::string& module_path, const std::string& uid_str,
+               double sample_rate, std::string& error) {
+        using namespace Steinberg;
+
+        std::string err;
+        module = VST3::Hosting::Module::create(module_path, err);
+        if (!module) {
+            error = err.empty() ? "failed to load module" : err;
+            return false;
+        }
+
+        auto uid = VST3::UID::fromString(uid_str);
+        if (!uid) {
+            error = "invalid class uid: " + uid_str;
+            return false;
+        }
+
+        component = module->getFactory().createInstance<Vst::IComponent>(*uid);
+        if (!component) {
+            error = "createInstance refused (uid not an instantiable audio component)";
+            return false;
+        }
+
+        if (component->initialize(&host_app) != kResultOk) {
+            error = "IComponent::initialize refused";
+            component = nullptr;
+            return false;
+        }
+
+        processor = FUnknownPtr<Vst::IAudioProcessor>(component);
+        if (!processor) {
+            error = "component exposes no IAudioProcessor";
+            teardown();
+            return false;
+        }
+
+        Vst::SpeakerArrangement stereo = Vst::SpeakerArr::kStereo;
+        if (processor->setBusArrangements(&stereo, 1, &stereo, 1) != kResultOk) {
+            error = "setBusArrangements(stereo/stereo) refused";
+            teardown();
+            return false;
+        }
+
+        Vst::ProcessSetup setup{};
+        setup.processMode = Vst::kRealtime;
+        setup.symbolicSampleSize = Vst::kSample32;
+        setup.maxSamplesPerBlock = kHostBlockSize;
+        setup.sampleRate = sample_rate;
+        if (processor->setupProcessing(setup) != kResultOk) {
+            error = "setupProcessing refused";
+            teardown();
+            return false;
+        }
+
+        if (component->activateBus(Vst::kAudio, Vst::kInput, 0, true) != kResultOk ||
+            component->activateBus(Vst::kAudio, Vst::kOutput, 0, true) != kResultOk) {
+            error = "activateBus refused";
+            teardown();
+            return false;
+        }
+
+        if (component->setActive(true) != kResultOk) {
+            error = "setActive refused";
+            teardown();
+            return false;
+        }
+        active = true;
+        return true;
+    }
+
+    void teardown() {
+        if (component) {
+            if (active) {
+                component->setActive(false);
+                active = false;
+            }
+            component->terminate();
+            component = nullptr;
+        }
+        processor = nullptr;
+    }
+};
 
 int failProcess(daw::host::HostResponse& resp, const std::string& error) {
     auto* pr = resp.mutable_process();
@@ -168,59 +272,12 @@ int runProcess(const std::string& module_path, const std::string& uid_str,
         return failProcess(resp, "cannot read 16-bit stereo WAV: " + in_path);
     }
 
+    PluginInstance inst;
     std::string err;
-    auto module = VST3::Hosting::Module::create(module_path, err);
-    if (!module) {
-        return failProcess(resp, err.empty() ? "failed to load module" : err);
+    if (!inst.setup(module_path, uid_str, static_cast<double>(sample_rate), err)) {
+        return failProcess(resp, err);
     }
-
-    auto uid = VST3::UID::fromString(uid_str);
-    if (!uid) {
-        return failProcess(resp, "invalid class uid: " + uid_str);
-    }
-
-    auto component = module->getFactory().createInstance<Vst::IComponent>(*uid);
-    if (!component) {
-        return failProcess(resp, "createInstance refused (uid not an instantiable audio component)");
-    }
-
-    Vst::HostApplication host_app;
-    if (component->initialize(&host_app) != kResultOk) {
-        return failProcess(resp, "IComponent::initialize refused");
-    }
-
-    FUnknownPtr<Vst::IAudioProcessor> processor(component);
-    if (!processor) {
-        component->terminate();
-        return failProcess(resp, "component exposes no IAudioProcessor");
-    }
-
-    Vst::SpeakerArrangement stereo = Vst::SpeakerArr::kStereo;
-    if (processor->setBusArrangements(&stereo, 1, &stereo, 1) != kResultOk) {
-        component->terminate();
-        return failProcess(resp, "setBusArrangements(stereo/stereo) refused");
-    }
-
-    Vst::ProcessSetup setup{};
-    setup.processMode = Vst::kRealtime;
-    setup.symbolicSampleSize = Vst::kSample32;
-    setup.maxSamplesPerBlock = kHostBlockSize;
-    setup.sampleRate = static_cast<double>(sample_rate);
-    if (processor->setupProcessing(setup) != kResultOk) {
-        component->terminate();
-        return failProcess(resp, "setupProcessing refused");
-    }
-
-    if (component->activateBus(Vst::kAudio, Vst::kInput, 0, true) != kResultOk ||
-        component->activateBus(Vst::kAudio, Vst::kOutput, 0, true) != kResultOk) {
-        component->terminate();
-        return failProcess(resp, "activateBus refused");
-    }
-
-    if (component->setActive(true) != kResultOk) {
-        component->terminate();
-        return failProcess(resp, "setActive refused");
-    }
+    auto& processor = inst.processor;
 
     std::vector<float> in_l(kHostBlockSize), in_r(kHostBlockSize);
     std::vector<float> out_l(kHostBlockSize), out_r(kHostBlockSize);
@@ -274,8 +331,7 @@ int runProcess(const std::string& module_path, const std::string& uid_str,
         data.inputParameterChanges = &param_changes;
 
         if (processor->process(data) != kResultOk) {
-            component->setActive(false);
-            component->terminate();
+            inst.teardown();
             return failProcess(resp, "process refused at block " + std::to_string(blocks));
         }
 
@@ -290,8 +346,7 @@ int runProcess(const std::string& module_path, const std::string& uid_str,
         ++blocks;
     }
 
-    component->setActive(false);
-    component->terminate();
+    inst.teardown();
 
     if (!writeWav16Stereo(out_path, out_samples, sample_rate)) {
         return failProcess(resp, "cannot write output WAV: " + out_path);
@@ -305,6 +360,142 @@ int runProcess(const std::string& module_path, const std::string& uid_str,
     return writeResponse(resp) ? 0 : 1;
 }
 
+// ---- Serve mode (2.4c-1) ---------------------------------------------------
+// Persistent child on the shared segment (ADR-017): map the ring the engine
+// created, run the ceremony, publish heartbeat=1 as the ready signal the
+// bridge waits for, then serve blocks until the shutdown flag. The child
+// always jumps to the NEWEST input_seq: a block it missed was already
+// bypassed (and counted) engine-side - processing stale audio would only
+// add latency to the living.
+
+daw::host::SharedAudioRing* mapSegment(const std::string& path) {
+    // Handles are deliberately not tracked: the mapping lives exactly as
+    // long as this process, the OS reclaims both together.
+#ifdef _WIN32
+    HANDLE file = CreateFileA(path.c_str(), GENERIC_READ | GENERIC_WRITE,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return nullptr;
+    HANDLE mapping = CreateFileMappingA(file, nullptr, PAGE_READWRITE, 0,
+                                        sizeof(daw::host::SharedAudioRing), nullptr);
+    if (!mapping) {
+        CloseHandle(file);
+        return nullptr;
+    }
+    void* view = MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0,
+                               sizeof(daw::host::SharedAudioRing));
+    return static_cast<daw::host::SharedAudioRing*>(view);
+#else
+    const int fd = open(path.c_str(), O_RDWR);
+    if (fd < 0) return nullptr;
+    void* view = mmap(nullptr, sizeof(daw::host::SharedAudioRing),
+                      PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (view == MAP_FAILED) {
+        close(fd);
+        return nullptr;
+    }
+    return static_cast<daw::host::SharedAudioRing*>(view);
+#endif
+}
+
+int runServe(const std::string& segment_path, const std::string& module_path,
+             const std::string& uid_str) {
+    using namespace Steinberg;
+
+    daw::host::SharedAudioRing* ring = mapSegment(segment_path);
+    if (!ring) {
+        std::cerr << "plugin_host error: cannot map segment: " << segment_path << std::endl;
+        return 1;
+    }
+    if (ring->magic != daw::host::kRingMagic ||
+        ring->layout_version != daw::host::kLayoutVersion ||
+        ring->block_size != daw::host::kRingBlockSize) {
+        std::cerr << "plugin_host error: segment contract mismatch (magic="
+                  << ring->magic << " layout=" << ring->layout_version
+                  << " block=" << ring->block_size << ")" << std::endl;
+        return 1;
+    }
+
+    PluginInstance inst;
+    std::string err;
+    if (!inst.setup(module_path, uid_str, static_cast<double>(ring->sample_rate), err)) {
+        std::cerr << "plugin_host error: " << err << std::endl;
+        return 1;
+    }
+
+    // Ready signal: the bridge's start() waits for a nonzero heartbeat
+    ring->child_heartbeat.store(1, std::memory_order_release);
+    std::cerr << "plugin_host: serving on " << segment_path << " at "
+              << ring->sample_rate << " Hz" << std::endl;
+
+    uint64_t last_in = 0;
+    uint64_t last_param = 0;
+    uint64_t beats = 1;
+
+    while (ring->shutdown.load(std::memory_order_acquire) == 0) {
+        const uint64_t seq = ring->input_seq.load(std::memory_order_acquire);
+        if (seq == last_in) {
+            // Deliberate yield-spin: the block budget is 5.3 ms and Windows
+            // sleep granularity (up to 15.6 ms) can eat it whole. One busy
+            // core on a 32-thread machine is the cheap side of that trade.
+            // Dated debt: waitable event if this child ever shares a small
+            // machine.
+            std::this_thread::yield();
+            continue;
+        }
+        last_in = seq;  // newest wins; missed blocks were bypassed engine-side
+        const uint32_t slot = static_cast<uint32_t>(seq % daw::host::kRingSlots);
+
+        Vst::ParameterChanges param_changes;
+        param_changes.setMaxParameters(1);
+        const uint64_t pseq = ring->param_seq.load(std::memory_order_acquire);
+        if (pseq != last_param) {
+            last_param = pseq;
+            int32 queue_index = 0;
+            auto* queue = param_changes.addParameterData(
+                ring->param_id.load(std::memory_order_relaxed), queue_index);
+            if (queue) {
+                int32 point_index = 0;
+                queue->addPoint(0, ring->param_value.load(std::memory_order_relaxed),
+                                point_index);
+            }
+        }
+
+        // Zero-copy: VST3 channel pointers aim straight into the segment
+        float* in_ch[2] = {ring->in[slot][0], ring->in[slot][1]};
+        float* out_ch[2] = {ring->out[slot][0], ring->out[slot][1]};
+        Vst::AudioBusBuffers in_bus{};
+        in_bus.numChannels = 2;
+        in_bus.channelBuffers32 = in_ch;
+        Vst::AudioBusBuffers out_bus{};
+        out_bus.numChannels = 2;
+        out_bus.channelBuffers32 = out_ch;
+
+        Vst::ProcessData data{};
+        data.processMode = Vst::kRealtime;
+        data.symbolicSampleSize = Vst::kSample32;
+        data.numSamples = kHostBlockSize;
+        data.numInputs = 1;
+        data.numOutputs = 1;
+        data.inputs = &in_bus;
+        data.outputs = &out_bus;
+        data.inputParameterChanges = &param_changes;
+
+        if (inst.processor->process(data) != kResultOk) {
+            std::cerr << "plugin_host error: process refused at seq " << seq << std::endl;
+            inst.teardown();
+            return 1;
+        }
+
+        ring->output_seq.store(seq, std::memory_order_release);
+        ring->child_heartbeat.store(++beats, std::memory_order_release);
+    }
+
+    inst.teardown();
+    std::cerr << "plugin_host: clean shutdown after " << (beats - 1) << " blocks" << std::endl;
+    return 0;
+}
+
 }  // namespace
 
 int runEnumerate(const std::string& path);
@@ -314,6 +505,24 @@ int main(int argc, char* argv[]) {
 
     if (mode == "--enumerate" && argc == 3) {
         return runEnumerate(argv[2]);
+    }
+
+    if (mode == "--serve") {
+        // Calling convention fixed by PluginBridge::spawnChild - the two
+        // sides of this command line live in two executables
+        std::string segment_path, module_path, uid;
+        bool args_ok = (argc >= 3);
+        if (args_ok) segment_path = argv[2];
+        for (int i = 3; i + 1 < argc && args_ok; i += 2) {
+            const std::string a = argv[i];
+            const std::string v = argv[i + 1];
+            if (a == "--module") module_path = v;
+            else if (a == "--uid") uid = v;
+            else args_ok = false;
+        }
+        if (args_ok && !module_path.empty() && !uid.empty()) {
+            return runServe(segment_path, module_path, uid);
+        }
     }
 
     if (mode == "--process") {
@@ -345,7 +554,8 @@ int main(int argc, char* argv[]) {
 
     std::cerr << "Usage:\n"
               << "  plugin_host --enumerate <path.vst3>\n"
-              << "  plugin_host --process <path.vst3> --uid <hex32> --in <in.wav> --out <out.wav> [--param <id>:<norm>]"
+              << "  plugin_host --process <path.vst3> --uid <hex32> --in <in.wav> --out <out.wav> [--param <id>:<norm>]\n"
+              << "  plugin_host --serve <segment.shm> --module <path.vst3> --uid <hex32>"
               << std::endl;
     return 2;
 }

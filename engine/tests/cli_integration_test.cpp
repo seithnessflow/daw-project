@@ -12,6 +12,7 @@
 #include "../src/graph/clip_player.h"
 #include "../src/render/offline_render.h"
 #include "../src/audio/ring_buffer.h"
+#include "../src/host/plugin_bridge.h"
 #include "../src/websocket/websocket_server.h"
 
 #include <ixwebsocket/IXNetSystem.h>
@@ -938,6 +939,105 @@ bool testPluginHostSetupRefusal() {
     std::cout << "OK (controller class + unknown uid refused cleanly)\n";
     return true;
 }
+
+// Test 15 (2.4c-1): the bridge is TRANSPARENT. The 2.4b fixture, replayed
+// CONTINUOUSLY (3 consecutive passes through ONE persistent --serve child)
+// block by block across the shared segment, equals the proven --process
+// offline render sample for sample. Ready ceremony (heartbeat), the param
+// channel and clean shutdown are exercised on the way. Sync path only -
+// the one-frame audio-callback pipeline is proven by the ProxyNode tests.
+bool testPluginBridgeTransparency() {
+    std::cout << "Test: Plugin bridge transparency... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-bridge-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Same deterministic fixture as test 13 (saw, R = -L)
+    std::vector<int16_t> in(4096 * 2);
+    for (size_t i = 0; i < 4096; ++i) {
+        const int16_t v = static_cast<int16_t>(((i * 37) % 32000) - 16000);
+        in[i * 2] = v;
+        in[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    const std::string in_path = (dir / "in.wav").string();
+    if (!writeWav16(in_path, 2, 48000, in)) {
+        std::cout << "FAILED: cannot write input\n";
+        return false;
+    }
+
+    // Reference: the proven 2.4b offline path, gain 0.5
+    daw::host::HostResponse ref_resp;
+    bool parsed = false;
+    if (runPluginHostProcess(kAGainAudioUid, in_path, (dir / "ref.wav").string(),
+                             "0:0.5", ref_resp, parsed) != 0) {
+        std::cout << "FAILED: reference --process run failed\n";
+        return false;
+    }
+    const auto ref = readWavSamples((dir / "ref.wav").string());
+    const auto in_f = readWavSamples(in_path);
+    if (ref.size() != in_f.size() || ref.empty()) {
+        std::cout << "FAILED: reference size mismatch\n";
+        return false;
+    }
+
+    daw::host::PluginBridge bridge;
+    if (!bridge.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge start: " << bridge.error() << "\n";
+        return false;
+    }
+    bridge.setParam(kAGainGainParamId, 0.5);
+
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    const size_t frames = in_f.size() / 2;  // 4096, a multiple of 256
+    bool ok = true;
+    for (int pass = 0; pass < 3 && ok; ++pass) {
+        std::vector<float> in_l(kBlock), in_r(kBlock), out_l(kBlock), out_r(kBlock);
+        size_t mismatch_at = SIZE_MAX;
+        for (size_t frame = 0; frame < frames && ok; frame += kBlock) {
+            for (uint32_t i = 0; i < kBlock; ++i) {
+                in_l[i] = in_f[(frame + i) * 2];
+                in_r[i] = in_f[(frame + i) * 2 + 1];
+            }
+            if (!bridge.processBlockSync(in_l.data(), in_r.data(),
+                                         out_l.data(), out_r.data(), kBlock)) {
+                std::cout << "FAILED: pass " << pass << " frame " << frame
+                          << ": " << bridge.error() << "\n";
+                ok = false;
+                break;
+            }
+            // Same 16-bit quantization as the --process WAV path, so the
+            // comparison is bit-exact against the reference file
+            for (uint32_t i = 0; i < kBlock && mismatch_at == SIZE_MAX; ++i) {
+                const float ql = std::clamp(out_l[i] * 32768.0f, -32768.0f, 32767.0f);
+                const float qr = std::clamp(out_r[i] * 32768.0f, -32768.0f, 32767.0f);
+                const float fl = static_cast<float>(static_cast<int16_t>(ql)) / 32768.0f;
+                const float fr = static_cast<float>(static_cast<int16_t>(qr)) / 32768.0f;
+                if (fl != ref[(frame + i) * 2] || fr != ref[(frame + i) * 2 + 1]) {
+                    mismatch_at = frame + i;
+                }
+            }
+        }
+        if (ok && mismatch_at != SIZE_MAX) {
+            std::cout << "FAILED: pass " << pass << " differs from offline render at frame "
+                      << mismatch_at << "\n";
+            ok = false;
+        }
+    }
+
+    const bool alive_at_end = bridge.childAlive();
+    bridge.stop();
+    fs::remove_all(dir, ec);
+
+    if (!ok) return false;
+    if (!alive_at_end) {
+        std::cout << "FAILED: child died during the replay\n";
+        return false;
+    }
+    std::cout << "OK (3 continuous passes bit-equal to offline render, clean shutdown)\n";
+    return true;
+}
 #endif  // DAW_PLUGIN_HOST_EXE
 
 // Test 9b: Sacred-thread lock-freedom, verified at RUNTIME on this exact
@@ -1116,6 +1216,7 @@ int main(int argc, char* argv[]) {
     run(testPluginHostBadModule);
     run(testPluginHostProcessGain);
     run(testPluginHostSetupRefusal);
+    run(testPluginBridgeTransparency);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
 #endif

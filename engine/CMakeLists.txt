@@ -202,6 +202,9 @@ add_library(daw_engine_lib STATIC
     src/network/server_client.cpp
     src/websocket/websocket_server.h
     src/websocket/websocket_server.cpp
+    src/host/shared_audio_ring.h
+    src/host/plugin_bridge.h
+    src/host/plugin_bridge.cpp
 )
 
 target_include_directories(daw_engine_lib PUBLIC
