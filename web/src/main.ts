@@ -8,7 +8,7 @@
 import { Project } from './document/project';
 import { ServerClient } from './network/server_client';
 import { EngineClient } from './network/engine_client';
-import { createTrackUI, updateMeter, updateTrackGainUI } from './ui/track';
+import { createTrackUI, updateMeter, updateTrackGainUI, updateTrackChainUI } from './ui/track';
 import { formatTime } from './ui/transport';
 
 // Configuration
@@ -182,16 +182,21 @@ function renderTracks() {
   // Same track structure -> update gains in place. A full innerHTML rebuild
   // on every received change (30/s during a remote drag) thrashes the DOM
   // and would yank the slider out of the local user's hand.
-  const existing = Array.from(
-    tracksContainer.querySelectorAll('[data-track-id]')
-  ).map((e) => e.getAttribute('data-track-id'));
+  const existingEls = Array.from(tracksContainer.querySelectorAll('[data-track-id]'));
   const sameStructure =
-    existing.length === doc.tracks.length &&
-    doc.tracks.every((t, i) => existing[i] === t.id);
+    existingEls.length === doc.tracks.length &&
+    doc.tracks.every(
+      (t, i) =>
+        existingEls[i].getAttribute('data-track-id') === t.id &&
+        // chain nodes are structure too: one appearing on an existing
+        // track must rebuild that DOM (its UI lives in createTrackUI)
+        existingEls[i].querySelectorAll('.chain-node').length === t.chain.length
+    );
 
   if (sameStructure) {
     for (const track of doc.tracks) {
       updateTrackGainUI(track.id, track.gain);
+      updateTrackChainUI(track.id, track.chain);
     }
     return;
   }
@@ -214,6 +219,14 @@ function renderTracks() {
       } else {
         console.log('Not sending - change:', !!change, 'serverClient:', !!serverClient);
       }
+    }, (processorId, bypass) => {
+      // 2.4d: bypass is document state - same path as the fader
+      project!.setProcessorBypass(track.id, processorId, bypass);
+      const change = project!.getLastChange();
+      if (change && serverClient) {
+        serverClient.sendChange(change);
+      }
+      renderTracks();
     });
     tracksContainer.appendChild(element);
   }

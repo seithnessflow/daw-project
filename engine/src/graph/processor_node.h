@@ -72,6 +72,15 @@ public:
     [[nodiscard]] virtual float getParameter(const std::string& name) const noexcept = 0;
 
     /**
+     * Latency this node introduces, in samples (2.4d, AUDIT R3).
+     *
+     * ALWAYS A COMPUTATION, never a constant: a pipelined proxy returns
+     * depth x block size from its LIVE depth. Control thread reads it for
+     * telemetry and (one day) PDC; it must not change while active.
+     */
+    [[nodiscard]] virtual uint32_t getLatencySamples() const noexcept { return 0; }
+
+    /**
      * Prepare for playback.
      *
      * Called before audio processing starts. May allocate resources.

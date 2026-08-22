@@ -74,6 +74,7 @@
 | `id` | `string` | Yes | UUID v4. Immutable after creation. |
 | `type` | `string` | Yes | Processor type identifier. |
 | `uid` | `string` | vst3 only | 32-hex VST3 class id. The document NEVER carries module paths - uid -> module resolution is host-side (`--vst3-module`). |
+| `bypass` | `bool` | Yes (default false) | 2.4d: bypass is DOCUMENT state, driven from the tab. Live vst3: dry time-aligned (latency kept, pipeline warm). Offline / zero-latency nodes: identity. |
 | `params` | `list<{key, value}>` | Yes | Parameter pairs as a LIST of `{key: string, value: float}` maps (list-of-pairs, not a map: iterable by index across every consumer). |
 
 ## Processor Types
@@ -157,6 +158,7 @@ function migrate(doc: any): ProjectDocument {
           "id": "550e8400-e29b-41d4-a716-446655440021",
           "type": "vst3",
           "uid": "84E8DE5F92554F5396FAE4133C935A18",
+          "bypass": false,
           "params": [
             { "key": "0", "value": 0.5 }
           ]

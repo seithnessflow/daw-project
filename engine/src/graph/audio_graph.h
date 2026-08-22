@@ -170,6 +170,23 @@ public:
      */
     [[nodiscard]] std::vector<std::tuple<std::string, float, float>> getMeters() const noexcept;
 
+    /**
+     * Graph processing latency (2.4d): the worst track's chain latency sum.
+     * Computed from the nodes' LIVE declarations - never a constant.
+     * Control thread (telemetry); the graph is immutable once active.
+     */
+    [[nodiscard]] uint32_t getLatencySamples() const noexcept {
+        uint32_t worst = 0;
+        for (const auto& track : tracks_) {
+            uint32_t sum = 0;
+            for (const auto& processor : track.chain) {
+                sum += processor->getLatencySamples();
+            }
+            if (sum > worst) worst = sum;
+        }
+        return worst;
+    }
+
 private:
     std::vector<AudioTrack> tracks_;
     uint32_t sample_rate_ = 48000;

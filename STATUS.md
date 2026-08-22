@@ -66,6 +66,12 @@ bypass sec exact + relance a froid sur le meme segment, param survivant
 lu/ecrit (M3 solde), ProxyNode depuis le document, rendu offline prouve par
 echantillons (test 20), uid non resolu = echec bruyant. 20/20, E2E 4/4.
 
+**2026-08-22 (2.4d — LE JALON):** un toggle bypass clique dans le navigateur
+change le son, prouve par echantillons, a travers AGain dans son processus
+(E2E 10/10). getLatencySamples = calcul (depth vivante), telemetrie honnete ;
+bypass = etat du document, un chemin vivant pour les deux constructeurs.
+La tranche 2.4 (hote VST3, tranche fine) est TENUE.
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |

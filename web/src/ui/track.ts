@@ -10,7 +10,8 @@ import type { TrackDef } from '../document/schema';
  */
 export function createTrackUI(
   track: TrackDef,
-  onGainChange: (gain: number) => void
+  onGainChange: (gain: number) => void,
+  onBypassToggle?: (processorId: string, bypass: boolean) => void
 ): HTMLElement {
   const el = document.createElement('div');
   el.className = 'track';
@@ -46,6 +47,38 @@ export function createTrackUI(
   faderContainer.appendChild(faderInput);
   faderContainer.appendChild(gainDisplay);
   el.appendChild(faderContainer);
+
+  // Chain (2.4d): one row per processor with its bypass toggle. The
+  // button reflects DOCUMENT state; a click asks for the opposite - the
+  // display only settles when the change comes back through the doc.
+  if (track.chain.length > 0) {
+    const chainEl = document.createElement('div');
+    chainEl.className = 'track-chain';
+    for (const proc of track.chain) {
+      const row = document.createElement('div');
+      row.className = 'chain-node';
+      row.dataset.procId = proc.id;
+
+      const label = document.createElement('span');
+      label.className = 'chain-node-type';
+      label.textContent = proc.type;
+      row.appendChild(label);
+
+      const bypassBtn = document.createElement('button');
+      bypassBtn.className = 'chain-bypass';
+      bypassBtn.dataset.procId = proc.id;
+      bypassBtn.textContent = 'bypass';
+      bypassBtn.setAttribute('aria-pressed', proc.bypass ? 'true' : 'false');
+      bypassBtn.addEventListener('click', () => {
+        const current = bypassBtn.getAttribute('aria-pressed') === 'true';
+        onBypassToggle?.(proc.id, !current);
+      });
+      row.appendChild(bypassBtn);
+
+      chainEl.appendChild(row);
+    }
+    el.appendChild(chainEl);
+  }
 
   // Meter
   const meter = document.createElement('div');
@@ -94,6 +127,23 @@ export function updateTrackGainUI(trackId: string, gain: number): void {
   const display = el.querySelector('.track-gain') as HTMLElement | null;
   if (display) {
     display.textContent = formatGain(gain);
+  }
+}
+
+/**
+ * Update a track's chain bypass states in place (no DOM rebuild) - the
+ * bypass twin of updateTrackGainUI, for remote changes.
+ */
+export function updateTrackChainUI(trackId: string, chain: TrackDef['chain']): void {
+  const el = document.querySelector(`[data-track-id="${trackId}"]`);
+  if (!el) return;
+  for (const proc of chain) {
+    const btn = el.querySelector(
+      `.chain-bypass[data-proc-id="${proc.id}"]`
+    ) as HTMLElement | null;
+    if (btn) {
+      btn.setAttribute('aria-pressed', proc.bypass ? 'true' : 'false');
+    }
   }
 }
 

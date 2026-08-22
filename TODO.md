@@ -156,12 +156,35 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       20/20 moteur, E2E 4/4 (rafale a travers le proxy).
       Reste connu : telemetry = 1 instance (dette datee multi-plugin) ;
       --debug-proxy-again conserve comme chemin de test.
-- [ ] 2.4 Hote VST3 — premier objectif, tranche la plus fine qui traverse
-      tout : UN plugin de gain VST3 connu s'instancie dans un processus
-      isole, traite de l'audio, et son bypass s'entend. Un plugin, un
-      parametre, une preuve. Fenetrage, etat, decouverte des plugins :
-      apres. (Regle dure : c'est le prochain morceau qui se CONSTRUIT,
-      dettes non vides ou pas.)
+- [x] 2.4d FAIT 2026-08-22 (verdict CI du push de cloture = point
+      transmis) — LE BYPASS S'ENTEND, version E2E du jalon historique :
+      un toggle clique DANS LE NAVIGATEUR change le son, prouve par
+      echantillons, a travers AGain dans son processus (spec 'bypass
+      toggle...' : seed par le contrat serveur, clic reel, re-lecture par
+      le meme contrat, rendus wet/dry compares ; 10/10 E2E).
+      1. getLatencySamples() = CALCUL (depth vivante x 256) sur
+         ProcessorNode/ProxyNode ; AudioGraph::getLatencySamples (pire
+         piste) ; la telemetrie cesse de mentir (buffer + graphe, R3).
+      2. bypass = ETAT DU NOEUD dans le document (SCHEMA.md), un seul
+         chemin vivant lu par les DEUX constructeurs : live = dry aligne
+         dans le temps (latence conservee, pipeline chaud, pas un
+         incident) ; offline = identite, zero enfant spawne. Roundtrip
+         test 19, preuve au rendu test 20 (identite exacte au bit pres).
+      3. Web : bouton bypass par noeud de chain (aria-pressed = etat du
+         DOC, le clic demande l'inverse et l'affichage ne se pose qu'au
+         retour du document) ; schema TS aligne sur la liste de paires
+         (jumeau) ; structure DOM = pistes ET noeuds de chain.
+      Hors perimetre reporte (dettes datees) : PDC inter-pistes
+      (declencheur : premiere piste mixant sec et plugin), bypass sans
+      clic en live (crossfade), fenetrage/GUI, etat plugin persiste,
+      decouverte de plugins.
+
+- [x] 2.4 Hote VST3 — LE CAP EST TENU 2026-08-22 : UN plugin de gain VST3
+      (AGain) s'instancie dans un processus isole, traite de l'audio, et
+      son bypass s'entend depuis un onglet — un plugin, un parametre, une
+      preuve par echantillons, sur les deux OS. Ce qui reste de la
+      tranche (fenetrage, etat, decouverte, plugins du commerce) se
+      RE-CADRE en session dediee, conformement au cadrage.
 
 ## Court terme (sessions economes)
 

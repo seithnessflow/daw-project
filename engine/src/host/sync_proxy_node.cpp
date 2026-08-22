@@ -7,6 +7,15 @@ namespace daw::host {
 
 void SyncProxyNode::process(float* output, const float* input, uint32_t frame_count,
                             int64_t /*position_samples*/) noexcept {
+    if (bypass_) {
+        // Identity, zero latency, bridge untouched
+        if (!input) {
+            std::memset(output, 0, frame_count * 2 * sizeof(float));
+        } else if (output != input) {
+            std::memmove(output, input, frame_count * 2 * sizeof(float));
+        }
+        return;
+    }
     if (failed_ || !bridge_ || frame_count > kRingBlockSize) {
         failed_ = true;
         std::memset(output, 0, frame_count * 2 * sizeof(float));

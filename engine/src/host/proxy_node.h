@@ -46,11 +46,21 @@ public:
     static constexpr const char* TYPE = "host.proxy";
 
     /** depth: blocks per device callback; clamped to [1, kRingSlots - 2]
-     *  so a deposit never overwrites a slot still being read. */
+     *  so a deposit never overwrites a slot still being read.
+     *  bypass (2.4d, document state): the node still deposits (pipeline
+     *  kept warm for a click-managed un-bypass) but always returns the
+     *  DRY time-aligned block - same latency wet or dry, no time jump. */
     ProxyNode(std::string id, SharedAudioRing* ring,
-              std::atomic<uint64_t>* blocks_missed, uint32_t depth = 1)
+              std::atomic<uint64_t>* blocks_missed, uint32_t depth = 1,
+              bool bypass = false)
         : id_(std::move(id)), ring_(ring), missed_(blocks_missed),
-          depth_(depth < 1 ? 1 : (depth > kRingSlots - 2 ? kRingSlots - 2 : depth)) {}
+          depth_(depth < 1 ? 1 : (depth > kRingSlots - 2 ? kRingSlots - 2 : depth)),
+          bypass_(bypass) {}
+
+    /** The pipeline's latency, from the LIVE depth - never a constant. */
+    [[nodiscard]] uint32_t getLatencySamples() const noexcept override {
+        return depth_ * kRingBlockSize;
+    }
 
     void process(float* output, const float* input, uint32_t frame_count,
                  int64_t position_samples) noexcept override;
@@ -72,6 +82,7 @@ private:
     SharedAudioRing* ring_ = nullptr;
     std::atomic<uint64_t>* missed_ = nullptr;
     uint32_t depth_ = 1;
+    bool bypass_ = false;
 };
 
 }  // namespace daw::host

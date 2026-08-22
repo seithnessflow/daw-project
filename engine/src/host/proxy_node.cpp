@@ -45,6 +45,18 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
     }
     const uint64_t want = seq - depth_;
     const uint32_t wslot = static_cast<uint32_t>(want % kRingSlots);
+    if (bypass_) {
+        // Document-driven bypass: DRY block N-depth, same latency as wet -
+        // the un-bypass swap changes the sound, never the timing. Not an
+        // incident: no count.
+        const float* const dry_l = ring_->in[wslot][0];
+        const float* const dry_r = ring_->in[wslot][1];
+        for (uint32_t i = 0; i < kRingBlockSize; ++i) {
+            output[2 * i] = dry_l[i];
+            output[2 * i + 1] = dry_r[i];
+        }
+        return;
+    }
     if (ring_->output_seq.load(std::memory_order_acquire) >= want) {
         const float* const out_l = ring_->out[wslot][0];
         const float* const out_r = ring_->out[wslot][1];

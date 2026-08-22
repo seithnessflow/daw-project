@@ -650,6 +650,7 @@ bool testDocumentChainRoundTrip() {
     p1.id = "p1";
     p1.type = "vst3";
     p1.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    p1.bypass = true;  // 2.4d: bypass is document state
     p1.params["0"] = 0.5f;
     p1.params["3"] = 0.25f;
     track.chain.push_back(p1);
@@ -680,17 +681,17 @@ bool testDocumentChainRoundTrip() {
     const auto& r1 = project.tracks[0].chain[0];
     const auto& r2 = project.tracks[0].chain[1];
     if (r1.id != p1.id || r1.type != p1.type || r1.uid != p1.uid ||
-        r1.params != p1.params) {
+        r1.bypass != true || r1.params != p1.params) {
         std::cout << "FAILED: vst3 node did not round-trip\n";
         return false;
     }
     if (r2.id != p2.id || r2.type != p2.type || !r2.uid.empty() ||
-        r2.params != p2.params) {
+        r2.bypass != false || r2.params != p2.params) {
         std::cout << "FAILED: builtin.gain node did not round-trip\n";
         return false;
     }
 
-    std::cout << "OK (vst3 uid+params and builtin.gain both identical after reload)\n";
+    std::cout << "OK (vst3 uid+params+bypass and builtin.gain both identical after reload)\n";
     return true;
 }
 
@@ -1563,9 +1564,45 @@ bool testDocumentChainRender() {
         }
     }
 
+    // 2.4d: THE BYPASS IS HEARD. Same document with bypass=true on the
+    // node -> the render is the exact IDENTITY of the input through the
+    // load/convert pipeline (and no child is even spawned for it)
+    daw::document::AutomergeDocument doc_byp;
+    if (!doc_byp.create(48000)) {
+        std::cout << "FAILED: bypass doc create\n";
+        return false;
+    }
+    track.chain[0].bypass = true;
+    if (!doc_byp.addTrack(track)) {
+        std::cout << "FAILED: bypass addTrack\n";
+        return false;
+    }
+    const std::string byp_path = (dir / "byp.wav").string();
+    const auto result_byp = renderer.render(doc_byp, byp_path, dir.string(), config);
+    if (!result_byp.success) {
+        std::cout << "FAILED: bypass render: " << result_byp.error << "\n";
+        return false;
+    }
+    const auto byp_f = readWavSamples(byp_path);
+    if (byp_f.size() != in.size()) {
+        std::cout << "FAILED: bypass output size\n";
+        return false;
+    }
+    for (size_t i = 0; i < in.size(); ++i) {
+        const float loaded = static_cast<float>(in[i]) / 32768.0f;
+        const int16_t written = static_cast<int16_t>(loaded * 32767.0f);
+        const float expected = static_cast<float>(written) / 32768.0f;
+        if (byp_f[i] != expected) {
+            std::cout << "FAILED: bypass sample " << i << " = " << byp_f[i]
+                      << ", expected identity " << expected << "\n";
+            return false;
+        }
+    }
+
     // Control: the same render must FAIL LOUDLY when the uid cannot be
     // resolved (AUDIT R5 - never silently a different sound)
     daw::render::OfflineRenderer bare;
+    track.chain[0].bypass = false;
     const auto bad = bare.render(doc, (dir / "bad.wav").string(), dir.string(), config);
     if (bad.success || bad.error.find("Chain incomplete") == std::string::npos) {
         std::cout << "FAILED: unresolved chain did not fail the render (" << bad.error << ")\n";
@@ -1573,7 +1610,7 @@ bool testDocumentChainRender() {
     }
 
     fs::remove_all(dir, ec);
-    std::cout << "OK (document vst3 node -> out-of-process AGain -> exact halved samples; unresolved uid fails loudly)\n";
+    std::cout << "OK (halved wet, exact identity on bypass, unresolved uid fails loudly)\n";
     return true;
 }
 #endif  // DAW_PLUGIN_HOST_EXE

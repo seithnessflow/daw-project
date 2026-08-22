@@ -238,6 +238,14 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         // Create processors
         for (const auto& proc_def : track_def.chain) {
             if (proc_def.type == graph::GainNode::TYPE) {
+                if (proc_def.bypass) {
+                    // zero-latency node: bypass = omission; the chain-count
+                    // check still needs a node, so a bypassed SyncProxyNode
+                    // (identity, no bridge) stands in
+                    track.chain.push_back(std::make_unique<host::SyncProxyNode>(
+                        proc_def.id, nullptr, true));
+                    continue;
+                }
                 float gain = 1.0f;
                 auto it = proc_def.params.find("gain");
                 if (it != proc_def.params.end()) {
@@ -250,6 +258,12 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                 // real-time constraint; zero latency, bit-exact). A missing
                 // mapping or failed spawn is a MISSING node - the render
                 // loop declares the whole render failed via failed().
+                if (proc_def.bypass) {
+                    // 2.4d: bypassed = identity, no child spawned at all
+                    track.chain.push_back(std::make_unique<host::SyncProxyNode>(
+                        proc_def.id, nullptr, true));
+                    continue;
+                }
                 auto module_it = vst3_modules_.find(proc_def.uid);
                 if (module_it == vst3_modules_.end()) {
                     std::cerr << "Render: no --vst3-module mapping for uid "

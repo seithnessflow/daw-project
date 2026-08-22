@@ -34,6 +34,7 @@ struct ProcessorDef {
     std::string id;
     std::string type;
     std::string uid;  // vst3 only; empty otherwise
+    bool bypass = false;  // 2.4d: document state, driven from the tab
     std::map<std::string, float> params;
 };
 

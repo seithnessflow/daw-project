@@ -452,6 +452,15 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                             }
                                             if (cr) AMresultFree(cr);
 
+                                            cr = AMmapGet(doc_, procObjId, AMstr("bypass"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                bool bypassVal = false;
+                                                if (AMitemToBool(AMresultItem(cr), &bypassVal)) {
+                                                    proc.bypass = bypassVal;
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
+
                                             cr = AMmapGet(doc_, procObjId, AMstr("params"), nullptr);
                                             if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
                                                 const AMobjId* paramsId = AMitemObjId(AMresultItem(cr));
@@ -768,6 +777,8 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
             cr = AMmapPutStr(doc_, procObjId, AMstr("uid"), AMstr(proc.uid.c_str()));
             if (cr) results_to_free.push_back(cr);
         }
+        cr = AMmapPutBool(doc_, procObjId, AMstr("bypass"), proc.bypass);
+        if (cr) results_to_free.push_back(cr);
 
         cr = AMmapPutObject(doc_, procObjId, AMstr("params"), AM_OBJ_TYPE_LIST);
         if (!cr || AMresultStatus(cr) != AM_STATUS_OK) {

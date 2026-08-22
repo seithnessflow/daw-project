@@ -330,6 +330,126 @@ test.describe('Milestone: Fader to Engine', () => {
     expect(peak).toBeGreaterThan(0.05);
     expect(maxError).toBeLessThan(4 / 32768);
   });
+
+  // 2.4d - THE MILESTONE, E2E: a bypass toggle CLICKED IN THE BROWSER
+  // changes the sound, proven by samples, through a plugin running in its
+  // own process. Bit-exactness of the pipeline itself is engine test 20;
+  // here the point is the full round trip: browser -> server doc ->
+  // engine render through the out-of-process child.
+  test('bypass toggle in the browser changes the sound through an out-of-process plugin', async ({ page }) => {
+    test.setTimeout(120000);
+    const again = resolveAgainBundle();
+    test.skip(!again, 'VST3 SDK not vendored (third_party/vst3sdk) - no plugin to bypass');
+
+    const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    const createTestDoc = resolveBinary('CREATE_TEST_DOC', 'create_test_doc');
+    const projectId = `e2e-bypass-${Date.now()}`;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'daw-e2e-bypass-'));
+    const AGAIN_UID = '84E8DE5F92554F5396FAE4133C935A18';
+
+    // Tone asset via the engine's own generator (for hash + wav)
+    execFileSync(createTestDoc, [path.join(dir, 'base.am'), dir, '2'], { stdio: 'pipe' });
+    const Automerge = require('@automerge/automerge');
+    const base = Automerge.load(new Uint8Array(fs.readFileSync(path.join(dir, 'base.am'))));
+    const assetHash: string = base.tracks[0].clips[0].assetHash;
+    fs.copyFileSync(path.join(dir, 'test_tone.wav'), path.join(dir, `${assetHash}.wav`));
+
+    // Talk to the server through ITS OWN contract, like any web client:
+    // first server message = full doc, client messages = changes
+    const WebSocketImpl: any = (globalThis as any).WebSocket ?? require('ws');
+    const wsUrl = `ws://localhost:3000/ws/${projectId}`;
+    const openSocket = (): Promise<any> =>
+      new Promise((resolve, reject) => {
+        const sock = new WebSocketImpl(wsUrl);
+        sock.binaryType = 'arraybuffer';
+        sock.onopen = () => resolve(sock);
+        sock.onerror = () => reject(new Error(`cannot connect ${wsUrl}`));
+      });
+    const nextMessage = (sock: any): Promise<Uint8Array> =>
+      new Promise((resolve) => {
+        sock.onmessage = (ev: any) => resolve(new Uint8Array(ev.data));
+      });
+    const fetchServerDoc = async (): Promise<Uint8Array> => {
+      const sock = await openSocket();
+      const bytes = await nextMessage(sock);
+      sock.close();
+      return bytes;
+    };
+
+    // --- Seed: clip + AGain chain node (0.5, bypass OFF) as ONE change
+    const seedSock = await openSocket();
+    const serverDoc = Automerge.load(await nextMessage(seedSock));
+    const seeded = Automerge.change(serverDoc, (d: any) => {
+      const t = d.tracks[0];
+      t.clips.push({
+        id: 'e2e-clip', assetHash,
+        startSample: 0, lengthSamples: 48000, offsetSamples: 0,
+      });
+      t.chain.push({
+        id: 'e2e-again', type: 'vst3', uid: AGAIN_UID, bypass: false,
+        params: [{ key: '0', value: 0.5 }],
+      });
+    });
+    seedSock.send(Automerge.getLastLocalChange(seeded));
+    seedSock.close();
+    fs.writeFileSync(path.join(dir, 'wet.am'), Buffer.from(Automerge.save(seeded)));
+
+    // Deterministic sync point: the server holds the seeded chain
+    let seedVisible = false;
+    for (let attempt = 0; attempt < 40 && !seedVisible; attempt++) {
+      const d = Automerge.load(await fetchServerDoc());
+      seedVisible = d.tracks[0]?.chain?.length === 1;
+      if (!seedVisible) await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(seedVisible, 'server never persisted the seeded chain').toBe(true);
+
+    // --- The browser: see the chain, CLICK bypass, watch the state come
+    // back through the document (aria-pressed only settles via the doc)
+    await page.goto(`/?project=${projectId}`);
+    await waitForServerConnection(page);
+    const bypassBtn = page.locator('.chain-bypass');
+    await bypassBtn.waitFor({ timeout: 10000 });
+    await expect(bypassBtn).toHaveAttribute('aria-pressed', 'false');
+    await bypassBtn.click();
+    await expect(bypassBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // --- Post-toggle doc, fetched through the same contract
+    let dryBytes: Uint8Array | null = null;
+    for (let attempt = 0; attempt < 40 && !dryBytes; attempt++) {
+      const bytes = await fetchServerDoc();
+      const d = Automerge.load(bytes);
+      if (d.tracks[0]?.chain[0]?.bypass === true) dryBytes = bytes;
+      else await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(dryBytes, 'server never converged to bypass=true').not.toBeNull();
+    fs.writeFileSync(path.join(dir, 'dry.am'), Buffer.from(dryBytes as Uint8Array));
+
+    // --- Render both states through the real out-of-process AGain
+    const render = (doc: string, wav: string) =>
+      execFileSync(
+        engineExe,
+        ['--doc', path.join(dir, doc), '--render', path.join(dir, wav),
+         '--assets', dir, '--bit-depth', '16',
+         '--vst3-module', `${AGAIN_UID}=${again}`],
+        { stdio: 'pipe' }
+      );
+    render('wet.am', 'wet.wav');
+    render('dry.am', 'dry.wav');
+
+    const wet = readWav16(path.join(dir, 'wet.wav'));
+    const dry = readWav16(path.join(dir, 'dry.wav'));
+    expect(dry.length).toBe(wet.length);
+    let peak = 0;
+    let maxErr = 0;
+    for (let i = 0; i < dry.length; i++) {
+      const abs = Math.abs(dry[i]);
+      if (abs > peak) peak = abs;
+      const err = Math.abs(wet[i] - 0.5 * dry[i]);
+      if (err > maxErr) maxErr = err;
+    }
+    expect(peak, 'bypassed render is silent - the tone is missing').toBeGreaterThan(0.05);
+    expect(maxErr, 'wet render is not half the bypassed render').toBeLessThan(4 / 32768);
+  });
 });
 
 test.describe('Engine connection status', () => {

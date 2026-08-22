@@ -28,8 +28,11 @@ class SyncProxyNode final : public graph::ProcessorNode {
 public:
     static constexpr const char* TYPE = "host.sync-proxy";
 
-    SyncProxyNode(std::string id, PluginBridge* bridge)
-        : id_(std::move(id)), bridge_(bridge) {}
+    /** bypass (2.4d, document state): identity pass-through, ZERO latency
+     *  (offline has no pipeline to keep warm), bridge never touched - a
+     *  bypassed node may carry bridge == nullptr (no child spawned). */
+    SyncProxyNode(std::string id, PluginBridge* bridge, bool bypass = false)
+        : id_(std::move(id)), bridge_(bridge), bypass_(bypass) {}
 
     void process(float* output, const float* input, uint32_t frame_count,
                  int64_t position_samples) noexcept override;
@@ -48,6 +51,7 @@ private:
     std::string type_{TYPE};
     std::string id_;
     PluginBridge* bridge_ = nullptr;
+    bool bypass_ = false;
     bool failed_ = false;
 };
 

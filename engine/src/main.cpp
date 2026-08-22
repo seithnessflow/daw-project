@@ -521,6 +521,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         // Create processors
         for (const auto& proc_def : track_def.chain) {
             if (proc_def.type == daw::graph::GainNode::TYPE) {
+                if (proc_def.bypass) continue;  // zero-latency node: bypass = omission
                 float gain = 1.0f;
                 auto it = proc_def.params.find("gain");
                 if (it != proc_def.params.end()) {
@@ -546,9 +547,12 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                                       << ": bad vst3 param key '" << key << "' (ignored)\n";
                         }
                     }
+                    // bypass rides the document into the node: the child
+                    // stays warm, the dry path keeps the same latency, and
+                    // the toggle is just another rebuild
                     track.chain.push_back(std::make_unique<daw::host::ProxyNode>(
                         proc_def.id, handle->bridge->ring(), &handle->blocks_missed,
-                        proxy_depth));
+                        proxy_depth, proc_def.bypass));
                 }
             } else {
                 // AUDIT R5: never silently drop - a peer hearing a

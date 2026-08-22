@@ -109,6 +109,20 @@ export class Project {
   }
 
   /**
+   * Toggle a chain node's bypass (2.4d) and generate a change.
+   */
+  setProcessorBypass(trackId: string, processorId: string, bypass: boolean): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      const proc = track?.chain.find((p) => p.id === processorId);
+      if (proc) {
+        proc.bypass = bypass;
+      }
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Add a track and generate a change.
    */
   addTrack(track: TrackDef): void {

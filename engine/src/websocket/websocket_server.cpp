@@ -299,7 +299,10 @@ void WebSocketServer::broadcastTelemetry() {
     protocol::Message state_msg;
     auto* state = state_msg.mutable_engine_state();
     state->set_buffer_underruns(device_->getBufferUnderrunCount());
-    state->set_latency_samples(device_->getBufferSize());
+    // 2.4d (AUDIT R3): output latency = device buffer + the graph's own
+    // declared latency (plugin pipelines) - computed, never a constant
+    state->set_latency_samples(device_->getBufferSize() +
+                               (graph ? graph->getLatencySamples() : 0));
     // CPU usage would require platform-specific measurement, leave at 0 for now
     if (plugin_blocks_missed_) {
         state->set_plugin_blocks_missed(
