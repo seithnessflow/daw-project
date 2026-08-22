@@ -57,6 +57,10 @@ export class Library {
             arming && c === chip ? 'true' : 'false');
         }
         document.body.classList.toggle('sample-armed', arming);
+        // Release focus: the keyboard handler bails on a focused BUTTON,
+        // so a still-focused chip swallowed Space/zoom (found by the
+        // background composer). Arm the sample, give the keys back.
+        chip.blur();
       });
       this.element.appendChild(chip);
     }

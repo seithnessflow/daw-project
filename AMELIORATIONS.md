@@ -38,3 +38,20 @@ deja poussees avec leurs commits :
 - **Token par port** : les moteurs de spec n'ecrasent plus le token du
   moteur interactif. Declencheur : pastille Engine morte deux fois en
   une heure.
+
+## 2026-08-22 — Un produit testable en une commande
+
+**Declencheur :** le test des mains reporte depuis des sessions parce que
+monter la stack = 3 terminaux + copier le token + projet `default` pollue.
+
+**Amelioration :** `scripts\daw.ps1` — une commande monte serveur+moteur+
+web, garantit les assets du kit dans le store, attend le token, ouvre le
+navigateur sur un projet `studio` propre avec le token deja dans l'URL.
+Ecran de depart (choix a l'ecran) : « charger un demo » (groove qui
+sonne, -5,97 dBFS) ou « partir vierge » (glisse tes WAV). `-Stop` tue
+tout, `-Mute` pour la verif sans son. Gate `?starter=1` : le harnais e2e
+(mecaniques produit brutes) ne voit jamais l'overlay.
+Frictions premier-run corrigees : focus des chips qui avalait les
+raccourcis (chip.blur). Bug latent start-stack corrige ($pid en
+lecture seule -> $procId). Verifie : pastilles vertes + demo 21 clips +
+e2e 15/15 + moteur 21/21 + oreille verte + exit 0.

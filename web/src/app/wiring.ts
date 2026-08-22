@@ -13,6 +13,7 @@ import * as life from '../ui/life';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
 import { Overview } from '../ui/overview';
+import { mountStarter } from '../ui/starter';
 import {
   ctx, els, sendLastChange,
   SERVER_URL, ENGINE_PORT, PROJECT_ID, LAB_MODE,
@@ -61,6 +62,17 @@ export async function init(): Promise<void> {
       // document is a pristine placeholder with no user edits)
       ctx.project!.load(data);
       hasLoadedInitialDoc = true;
+      // First contact via the LAUNCHER (?starter=1): offer the starter
+      // choice (demo groove / start empty). Gated on the launcher flag so
+      // the e2e harness - which drives raw product mechanics on empty
+      // product projects - never sees the modal overlay. No-op in lab
+      // mode or when the project already has clips.
+      const wantStarter =
+        new URLSearchParams(window.location.search).get('starter') === '1';
+      if (!LAB_MODE && wantStarter) {
+        mountStarter(document.getElementById('starter-slot')!, ctx.project!,
+          sendLastChange, () => renderTracks(true));
+      }
     } else {
       // Reconnection: MERGE the server document into the local one -
       // never replace it, so offline edits survive and reconcile

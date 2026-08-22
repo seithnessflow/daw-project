@@ -1,0 +1,51 @@
+/* Starter screen (first contact on an empty product project) */
+.starter {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(3px);
+}
+.starter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 28px 32px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  min-width: 300px;
+}
+.starter-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.starter-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+.starter-btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  border-radius: var(--r);
+  background: var(--surface-3);
+  color: var(--text);
+  text-align: left;
+}
+.starter-btn:hover {
+  background: #3a3a3a;
+}
+.starter-btn-primary {
+  background: #23412f;
+  color: #9fd9b4;
+  font-weight: 600;
+}
+.starter-btn-primary:hover {
+  background: #2b5039;
+}

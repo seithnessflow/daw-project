@@ -19,6 +19,7 @@ import './styles/trackhead.css';
 import './styles/devices.css';
 import './styles/life.css';
 import './styles/touch-modes.css';
+import './styles/starter.css';
 
 import { init } from './app/wiring';
 

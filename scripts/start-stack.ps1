@@ -58,13 +58,14 @@ function Stop-Stack {
         $pids = Get-Content $pidFile | ConvertFrom-Json
 
         foreach ($name in @("web", "engine", "server")) {
-            $pid = $pids.$name
-            if ($pid) {
+            # NOT $pid: that is a read-only automatic variable in PowerShell
+            $procId = $pids.$name
+            if ($procId) {
                 try {
-                    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                    $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
                     if ($proc) {
-                        Write-Status "Stopping $name (PID $pid)"
-                        Stop-Process -Id $pid -Force
+                        Write-Status "Stopping $name (PID $procId)"
+                        Stop-Process -Id $procId -Force
                     }
                 } catch {
                     # Process already gone
