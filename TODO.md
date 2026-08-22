@@ -264,10 +264,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       ces notes.
 
 - [ ] REFONTE UI (prochaine session, boucle outillage) : s'ouvre sur
-      docs/refonte-ui-preparation.md — proposition niveau 3 (timeline
-      d'abord, decision a ratifier), PUIS contrat de selection ARIA +
-      unification helpers (le harnais AVANT le premier pixel), puis la
-      structure. Les niveaux 1 constates a l'audit outillage (wrap dB,
+      docs/refonte-ui-preparation.md — PREREQUIS : test des mains fait
+      (ses notes sont un intrant de la metaphore, ordre corrige) ; puis
+      contrat de selection ARIA + unification helpers (le harnais AVANT
+      le premier pixel), puis ratification (timeline d'abord propose),
+      puis la structure. Les niveaux 1 constates a l'audit outillage (wrap dB,
       congestion Track 1) se dissolvent dans la refonte, pas de rapiecage.
 
 ## Court terme (sessions economes)

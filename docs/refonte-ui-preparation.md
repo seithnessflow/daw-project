@@ -7,7 +7,14 @@ grille est dans STATUS/session outillage).*
 
 ---
 
-## 1. Proposition niveau 3 — la metaphore (decision a ratifier en ouverture)
+## 1. Proposition niveau 3 — la metaphore (decision a ratifier APRES les mains)
+
+*Ordre corrige 2026-08-22 (conseil recu et consigne) : la ratification
+vient APRES le test des mains, jamais avant — les quinze minutes de
+manipulation sont un intrant de CETTE decision aussi ; le seul capteur
+de niveau 3-4 du projet n'a pas touche le produit depuis la page a deux
+boutons. L'utilisateur sentira dans ses mains si ce produit est une
+console ou une timeline.*
 
 **Constat (capture full-1536.png)** : l'ecran est une liste de lignes
 fader ; le document contient des clips (id, assetHash, start, length) que
@@ -108,9 +115,16 @@ changement visuel. C'est le harnais qui autorise l'agressivite.
 
 ## 4. Plan de la session refonte (bornee, dans l'ordre)
 
+0. PREREQUIS : LE TEST DES MAINS est fait et ses notes lues (intrant du
+   point 2 — voir l'ordre corrige en tete de section 1). S'il ne l'est
+   pas a l'ouverture, il devient le premier geste de la seance, stack
+   relancee au besoin (~30 s).
 1. Contrat de selection + unification helpers (section 3) -> suite e2e
-   complete verte, AUCUN changement visuel. Commit.
-2. Ratification de la metaphore (section 1) sur ce document + la capture.
+   complete verte, AUCUN changement visuel. Commit. (Bonus consigne :
+   ce contrat EST de l'accessibilite — DAW navigable au lecteur d'ecran
+   par construction, sous-produit d'une decision de testabilite.)
+2. Ratification de la metaphore (section 1) sur ce document + la capture
+   + LES NOTES DES MAINS.
 3. Structure timeline : en-tetes de piste + zone temps + clips rendus
    (donnees deja dans le document), pistes vides compactes. La boucle
    snap/grille tourne a chaque lot ; ear si le chemin audio est touche
