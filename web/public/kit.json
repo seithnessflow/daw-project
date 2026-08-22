@@ -1,0 +1,40 @@
+{
+  "sampleRate": 48000,
+  "samples": [
+    {
+      "name": "kick",
+      "hash": "e93e08a81a5acd8256ac10ae7fb605a3f5bf3fb2644f58602b4e4116d9f597ee",
+      "seconds": 0.4
+    },
+    {
+      "name": "snare",
+      "hash": "0da9aa1bcdeed27602e88ba7784d46c5ae5a110804d6768e5a6f216a10aca3a0",
+      "seconds": 0.25
+    },
+    {
+      "name": "hat",
+      "hash": "0309b8769f572e76ddc0484273cc56968f4a66fef04838a107502f7dc443dc95",
+      "seconds": 0.09
+    },
+    {
+      "name": "clap",
+      "hash": "202aeeee991e126b68fba044a4e1f771a7d683ec793f128ea9b2be5b4a83964f",
+      "seconds": 0.3
+    },
+    {
+      "name": "bass-C2",
+      "hash": "31cc6956db1ccfbdcd8dfc73183015beb31bb33b5313c7e72b81a75b462b8671",
+      "seconds": 1
+    },
+    {
+      "name": "chord-Am",
+      "hash": "31fb589c3a7cce51963b47a7e31b1636e3c140f81460b9036ac72a56b93fd280",
+      "seconds": 1.5
+    },
+    {
+      "name": "riser",
+      "hash": "d6bc95da68ca77b364e8172fc013c16f36846db0c449e689451cdd67e2577345",
+      "seconds": 2
+    }
+  ]
+}

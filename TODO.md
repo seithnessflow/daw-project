@@ -293,6 +293,12 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       test des mains. Les niveaux 1 constates a l'audit outillage (wrap dB,
       congestion Track 1) se dissolvent dans la refonte, pas de rapiecage.
 
+- [ ] Dette (trouvee 2026-08-22, vraie-UI lot B) : %TEMP%\daw-engine-token
+      est GLOBAL — les moteurs ephemeres des specs ecrasent le token du
+      moteur interactif (pastille Engine morte en 4001 pour toute page
+      neuve). Remede : fichier par port (daw-engine-token-<port>) cote
+      moteur + lecture assortie cote outils. Session courte moteur+web.
+
 ## Court terme (sessions economes)
 
 - [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :

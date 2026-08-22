@@ -82,6 +82,42 @@
         margin-left: auto;
       }
 
+      /* ---- Library strip: the base kit ---- */
+      .library {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .library-label {
+        font-size: 11px;
+        color: #8f8f8f;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-right: 4px;
+      }
+      .sample-chip {
+        padding: 3px 10px;
+        font-size: 12px;
+        border-radius: 12px;
+        background: #2a2a2a;
+        border-color: #444;
+      }
+      .sample-chip[aria-pressed='true'] {
+        background: #1f4f36;
+        border-color: #3d8f63;
+        color: #c9f0da;
+      }
+      .library-hint {
+        font-size: 11px;
+        color: #6e6e6e;
+        margin-left: 6px;
+      }
+      body.sample-armed .track-lane {
+        cursor: copy;
+      }
+
       /* ---- Timeline area ---- */
       .tracks {
         position: relative;
@@ -426,6 +462,8 @@
         <span id="position">00:00.000</span>
       </div>
     </div>
+
+    <div id="library-slot"></div>
 
     <div class="tracks" id="tracks"></div>
 

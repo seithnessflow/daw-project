@@ -21,6 +21,8 @@ import {
   TIMELINE,
 } from './ui/track';
 import { formatTime } from './ui/transport';
+import { Library, loadKit } from './ui/library';
+import { fillWaveforms } from './ui/waveform';
 
 // Configuration
 const SERVER_URL = 'ws://localhost:3000';
@@ -40,6 +42,7 @@ declare global {
 window.__dawProject = null;
 let serverClient: ServerClient | null = null;
 let engineClient: EngineClient | null = null;
+let library: Library | null = null;
 
 // DOM elements
 const serverStatus = document.getElementById('server-status')!;
@@ -158,9 +161,17 @@ async function init() {
     engineClient?.seek(0);
   });
 
+  // The base kit's library strip (chips: arm, then click a lane to place)
+  const kit = await loadKit();
+  if (kit) {
+    library = new Library(kit);
+    document.getElementById('library-slot')!.appendChild(library.element);
+  }
+
   // Seek ONLY on the ruler's seek band (docs/UI-CONVENTIONS.md: all
-  // three DAWs reserve the clip area for selection/editing). Clicking a
-  // track row selects the track and its chain appears in the Device View.
+  // three DAWs reserve the clip area for selection/editing). A lane
+  // click PLACES the armed sample if one is armed, else selects the
+  // track (its chain appears in the Device View).
   tracksContainer.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     const seekBand = target.closest('[data-role="seek"]') as HTMLElement | null;
@@ -171,12 +182,31 @@ async function init() {
       return;
     }
     const trackEl = target.closest('[data-track-id]') as HTMLElement | null;
-    if (trackEl) {
-      const id = trackEl.getAttribute('data-track-id');
-      if (id && id !== selectedTrackId) {
-        selectedTrackId = id;
-        renderTracks(true);
-      }
+    if (!trackEl) return;
+    const id = trackEl.getAttribute('data-track-id');
+    if (!id || !project) return;
+
+    const armed = library?.getArmed() ?? null;
+    const lane = target.closest('.track-lane') as HTMLElement | null;
+    if (armed && lane) {
+      // Place the armed sample, snapped to a 0.25 s grid
+      const sr = project.getDocument().sampleRate || 48000;
+      const x = e.clientX - lane.getBoundingClientRect().left;
+      const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      project.addClip(id, {
+        id: `clip-${armed.name}-${Date.now()}`,
+        assetHash: armed.hash,
+        startSample: Math.round(seconds * sr),
+        lengthSamples: Math.round(armed.seconds * sr),
+        offsetSamples: 0,
+      });
+      sendLastChange();
+      renderTracks();
+      return;
+    }
+    if (id !== selectedTrackId) {
+      selectedTrackId = id;
+      renderTracks(true);
     }
   });
 
@@ -294,6 +324,10 @@ function renderTracks(force = false) {
       sendLastChange();
     },
   ));
+
+  // Waveforms inside the freshly built clips (cached peaks draw
+  // synchronously; new assets stream in from the store)
+  fillWaveforms(tracksContainer);
 }
 
 // Start
