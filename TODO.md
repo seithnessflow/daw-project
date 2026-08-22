@@ -243,6 +243,15 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       par change cote serveur, quadratique) et A3-8 (menu hygiene) restent
       dates dans AUDIT-3.md avec leurs declencheurs.
 
+- [ ] INTRANTS 2.5 CONSIGNES (recherche mecanique profonde 2026-08-22,
+      sources SDK dans docs/UI-CONVENTIONS.md) : les 5 mecaniques a
+      respecter pour que etat+decouverte soient credibles — (1) deux
+      blobs Comp/Cont, restauration processor-first ; (2) cle = class ID,
+      jamais le chemin ; (3) scan moduleinfo.json + enfant fallback +
+      blacklist persistee ; (4) flush numSamples==0 ; (5) kLatencyChanged
+      = rebuild + PDC. Premier device natif a livrer : Utility/Gain
+      (valide le pipeline param/etat au-dela d'AGain).
+
 - [ ] 2.5 RE-CADRAGE POST-2.4 (session dediee, lecture + arbitrage).
       Trois conseils en entree (recus a la cloture de 2.4, a peser) :
       1. L'ETAT DES PLUGINS D'ABORD — le chainon entre AGain (un param en
