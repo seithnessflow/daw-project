@@ -72,6 +72,12 @@ change le son, prouve par echantillons, a travers AGain dans son processus
 bypass = etat du document, un chemin vivant pour les deux constructeurs.
 La tranche 2.4 (hote VST3, tranche fine) est TENUE.
 
+**2026-08-22, verdict final — run #55 (d034102) VERT en 4,3 min :** la
+promesse du premier message du chantier est tenue mot pour mot, jusqu'a
+« depuis un onglet ». Quatre sessions (hygiene CI, c-1, c-2, 2.4d), cinq
+pushes, cinq verdicts verts, zero dette de verdict. Prochaine session :
+re-cadrage 2.5 (TODO), qui se clot sur le test des mains.
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |

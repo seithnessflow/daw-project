@@ -186,6 +186,30 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       tranche (fenetrage, etat, decouverte, plugins du commerce) se
       RE-CADRE en session dediee, conformement au cadrage.
 
+- [ ] 2.5 RE-CADRAGE POST-2.4 (session dediee, lecture + arbitrage).
+      Trois conseils en entree (recus a la cloture de 2.4, a peser) :
+      1. L'ETAT DES PLUGINS D'ABORD — le chainon entre AGain (un param en
+         clair) et tout plugin reel (blobs opaques Ko-Mo). Decision a
+         moitie ecrite depuis la tranche 1 (gros blobs HORS du CRDT, hash
+         dans le document) mais jamais implementee ; sans etat persiste,
+         un vrai plugin oublie tout au reload. Marche la plus proche du
+         muscle existant (setState/getState VST3 + le canal 2.3 assets).
+      2. LA DECOUVERTE ENSUITE — scanner les plugins installes, resoudre
+         UID -> chemin PAR MACHINE (le document ne porte que des UID,
+         deja acquis). Petit, controle pur ; fait passer de « AGain en
+         dur » a « tes plugins ». Le registre par UID de c-2 l'a prepare.
+      3. LE FENETRAGE EN DERNIER, avec mefiance — le plus visible, le
+         moins prouvable (aucun test par echantillons ne verifie une
+         fenetre), tentation d'options maximale (native/capturee/dockee =
+         bifurcations). La verrue assumee du cadrage d'origine — fenetres
+         OS flottantes — reste le bon premier choix : elle marche, elle
+         est laide, elle n'hypotheque rien.
+      Filtre pour chaque arbitrage : « nouveau module derriere un contrat
+      existant, ou option qui dedouble un chemin ? » (regle module/switch,
+      recue et verifiee sur le bypass de 2.4d).
+      CLOTURE DU RE-CADRAGE : le test des mains de l'utilisateur — le
+      jalon 2.4 s'ecoute en vrai avant d'ecrire la suite.
+
 ## Court terme (sessions economes)
 
 - [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :
