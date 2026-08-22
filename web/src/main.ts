@@ -488,10 +488,22 @@ async function init() {
       console.log('Reconnected: merging server document into local state');
       const hadPending = serverClient!.pendingCount() > 0;
       const mergedNovelty = project!.mergeRemote(data);
+      // A3-4, the push half of anti-entropy: local novelty the server
+      // LACKS (a dead-socket flush swallows changes silently - the
+      // browser discards sends on a closing socket) goes back up, in
+      // causal order, on EVERY reconnection. Pull alone could never
+      // close this hole: resync only re-fetched what the server had.
+      const missing = project!.getMissingChanges(data);
+      if (missing.length > 0) {
+        console.log(`Pushing ${missing.length} change(s) the server lacks`);
+        for (const change of missing) {
+          serverClient!.sendChange(change);
+        }
+      }
       // Anti-entropy: whenever an exchange moved anything, demand TWO
       // consecutive no-op exchanges before stopping the verification
       // cycles (a peer's late flush can land while we are mid-cycle).
-      if (mergedNovelty || hadPending) {
+      if (mergedNovelty || hadPending || missing.length > 0) {
         resyncCycles = 2;
       } else if (resyncCycles > 0) {
         resyncCycles--;
@@ -503,7 +515,12 @@ async function init() {
     renderTracks();
   };
   serverClient.onChange = (change) => {
-    project!.applyChange(change);
+    // A3-5: a change that fails to apply (missing deps after a lagged
+    // broadcast) must trigger a resync - silence was divergence
+    if (!project!.applyChange(change)) {
+      console.warn('Change failed to apply - requesting resync');
+      serverClient!.requestResync(200);
+    }
     renderTracks();
   };
 

@@ -270,14 +270,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          + trou de telemetrie : le bilan de sortie n'imprime blocks_missed
          que pour le debug-proxy, jamais les instances document
          (main.cpp:865 et :1107).
-      4. [ ] A3-4+A3-5 CRITERE 3 VRAI (une session, PROMU par arbitrage —
-         touche la promesse fondatrice) : flushOutbox perd des changes si
-         le socket meurt pendant le flush ET la nouveaute locale n'est
-         jamais re-poussee apres merge (la reconciliation offline n'a que
-         son chemin outbox-vivante). Remede : push symetrique
-         Automerge.getChanges(remote, local) apres merge + requestResync
-         sur echec d'applyChange. Test de garde : serveur tue PENDANT un
-         flush.
+      4. [x] A3-4+A3-5 CRITERE 3 VRAI — FAIT 2026-08-22 : push symetrique
+         getMissingChanges(remote) -> sendChange a chaque reconnexion
+         (en ordre causal), flushOutbox non-destructif (ceinture),
+         requestResync sur echec d'applyChange, commentaire anti-entropie
+         menteur corrige (A3-8.1 solde). Garde : criterion3-push.spec —
+         le flush avale est REPRODUIT exactement (change consomme jamais
+         envoye), serveur redemarre, le push le ramene (vert du premier
+         coup). Suite 15/15. STATUS : critere 3 reserve LEVEE.
       Puis 2.5 s'ouvre, sur les notes des mains, socle assaini.
       A3-6 (transport multi-producteur SPSC) attend la session transport
       (candidat grille existant, meme chantier). A3-7 (rewrite complet

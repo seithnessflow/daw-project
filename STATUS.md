@@ -159,7 +159,7 @@ critere 3 vrai -> 2.5. Critere 3 passe en « valide avec reserve » (A3-4).
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 20/20 |
-| 3 | Convergence 2 onglets | ⚠️ VALIDE AVEC RESERVE | Online ET offline (Playwright, coupure reelle du serveur). RESERVE AUDIT-3 (A3-4) : socket mort pendant un flush = perte non rattrapee, la nouveaute locale n'est jamais re-poussee apres merge. Session planifiee (TODO, ordre 4) |
+| 3 | Convergence 2 onglets | ✅ VALIDE (reserve levee 2026-08-22) | Online, offline, ET push anti-entropie : la nouveaute locale que le serveur n'a pas (flush avale par un socket mourant compris) est diffee et RE-POUSSEE a chaque reconnexion. Garde : criterion3-push.spec (flush avale reproduit exactement, serveur redemarre, le change revient). A3-5 solde aussi (applyChange qui echoue -> resync) |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
 

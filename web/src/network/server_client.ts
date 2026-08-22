@@ -148,10 +148,16 @@ export class ServerClient {
       return;
     }
     console.log(`Flushing ${this.outbox.length} queued change(s) to server`);
-    while (this.outbox.length > 0) {
-      const change = this.outbox.shift()!;
+    // Non-destructive iteration (A3-4 hardening): a socket dying
+    // mid-loop silently discards sends - the queue is only cleared
+    // AFTER the loop, and only if the socket is still open. Whatever
+    // slips through anyway is caught by the reconnection PUSH (the
+    // local document still holds every change).
+    for (const change of this.outbox) {
+      if (this.ws.readyState !== WebSocket.OPEN) return;  // keep the rest
       this.ws.send(change);
     }
+    this.outbox = [];
     this.persistOutbox();
   }
 
@@ -230,11 +236,12 @@ export class ServerClient {
    * Anti-entropy: schedule one resync cycle (close + auto-reconnect, which
    * makes the server send its current full document again for merging).
    *
-   * Needed because the server broadcasts a change BEFORE persisting it: a
-   * peer reconnecting in that window can both miss the broadcast and read
-   * a stale stored document. The app requests a resync after any
-   * reconnection that brought novelty or delivered queued changes, and
-   * stops as soon as an exchange is a no-op.
+   * The server persists BEFORE broadcasting (fixed 2026-08-21); resync
+   * covers the residual holes: a lagged broadcast channel skipping
+   * messages, a change that failed to apply, and the verification
+   * cycles after any exchange that moved data. The reconnection handler
+   * also PUSHES local novelty the server lacks (A3-4) - resync is the
+   * pull half, the push half lives in main.ts onDocument.
    */
   requestResync(delayMs = 1000): void {
     if (this.resyncTimer !== null) return;

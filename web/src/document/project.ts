@@ -62,13 +62,34 @@ export class Project {
 
   /**
    * Apply an incremental change from another peer.
+   *
+   * @returns false when the change could not be applied (missing deps,
+   * corrupt bytes) - the caller must request a resync, silence here was
+   * the A3-5 divergence hole.
    */
-  applyChange(change: Uint8Array): void {
+  applyChange(change: Uint8Array): boolean {
     try {
       const [newDoc] = Automerge.applyChanges(this.doc, [change]);
       this.doc = newDoc;
+      return true;
     } catch (e) {
       console.error('Failed to apply change:', e);
+      return false;
+    }
+  }
+
+  /**
+   * The changes the REMOTE document lacks (A3-4): local novelty that a
+   * dead-socket flush may have swallowed. Sent back on every
+   * reconnection merge - the push half of anti-entropy.
+   */
+  getMissingChanges(remoteBytes: Uint8Array): Uint8Array[] {
+    try {
+      const remote = Automerge.load<ProjectDef>(remoteBytes);
+      return Automerge.getChanges(remote, this.doc);
+    } catch (e) {
+      console.error('Failed to diff against remote document:', e);
+      return [];
     }
   }
 
