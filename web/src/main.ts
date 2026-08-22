@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * DAW Web Client - Slice 1
+ * DAW Web Client — la vraie UI (conventions: docs/UI-CONVENTIONS.md).
  *
- * Minimal UI for testing sync and engine communication.
+ * Structure: control bar top / split ruler (seek band only) / track
+ * headers left + time lanes / Device View bottom for the SELECTED track.
+ * Seek lives on the ruler's seek band ONLY (all three DAWs agree);
+ * clicking a track row selects it.
  */
 
 import { Project } from './document/project';
@@ -11,9 +14,10 @@ import { EngineClient } from './network/engine_client';
 import {
   createTrackUI,
   createRulerUI,
+  createDeviceView,
   updateMeter,
   updateTrackGainUI,
-  updateTrackChainUI,
+  updateDeviceViewUI,
   TIMELINE,
 } from './ui/track';
 import { formatTime } from './ui/transport';
@@ -21,15 +25,13 @@ import { formatTime } from './ui/transport';
 // Configuration
 const SERVER_URL = 'ws://localhost:3000';
 const ENGINE_PORT = 47821;
-// Project id can be overridden via ?project=<id> (used by E2E tests to get
-// an isolated project per run)
 const PROJECT_ID =
   new URLSearchParams(window.location.search).get('project') ?? 'default';
 
 // State
 let project: Project | null = null;
+let selectedTrackId: string | null = null;
 
-// Expose for E2E testing diagnostics
 declare global {
   interface Window {
     __dawProject: Project | null;
@@ -46,19 +48,23 @@ const positionEl = document.getElementById('position')!;
 const playBtn = document.getElementById('play-btn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stop-btn') as HTMLButtonElement;
 const tracksContainer = document.getElementById('tracks')!;
+const deviceViewSlot = document.getElementById('device-view-slot')!;
 const addTrackBtn = document.getElementById('add-track-btn') as HTMLButtonElement;
 
-/**
- * Initialize the application.
- */
+/** Push the last local change to the server (the one road out). */
+function sendLastChange(): void {
+  const change = project?.getLastChange();
+  if (change && serverClient) {
+    serverClient.sendChange(change);
+  }
+}
+
 async function init() {
   console.log('DAW Web Client starting...');
 
-  // Create project document
   project = new Project();
-  window.__dawProject = project; // Expose for E2E diagnostics
+  window.__dawProject = project;
 
-  // Connect to server
   serverClient = new ServerClient(SERVER_URL);
   serverClient.onConnect = () => {
     serverStatus.classList.add('connected');
@@ -86,12 +92,9 @@ async function init() {
       console.log('Reconnected: merging server document into local state');
       const hadPending = serverClient!.pendingCount() > 0;
       const mergedNovelty = project!.mergeRemote(data);
-      // Anti-entropy: the server broadcasts changes BEFORE persisting them,
-      // so a reconnection can both miss a peer's live flush and read a
-      // stale stored document. Whenever an exchange moved anything
-      // (novelty received or queued changes flushed), demand TWO
+      // Anti-entropy: whenever an exchange moved anything, demand TWO
       // consecutive no-op exchanges before stopping the verification
-      // cycles: a peer's late flush can land while we are mid-cycle.
+      // cycles (a peer's late flush can land while we are mid-cycle).
       if (mergedNovelty || hadPending) {
         resyncCycles = 2;
       } else if (resyncCycles > 0) {
@@ -108,9 +111,7 @@ async function init() {
     renderTracks();
   };
 
-  // Connect to engine
-  // Token is read from URL query param or can be set via engineClient.setToken()
-  // Engine writes token to %TEMP%/daw-engine-token
+  // Engine connection (token from URL; written by the engine to %TEMP%)
   const urlParams = new URLSearchParams(window.location.search);
   const engineToken = urlParams.get('token') ?? '';
   engineClient = new EngineClient({ port: ENGINE_PORT, token: engineToken });
@@ -130,10 +131,9 @@ async function init() {
   };
   engineClient.onPosition = (samples, sampleRate) => {
     positionEl.textContent = formatTime(samples, sampleRate);
-    // Playhead on the shared timeline scale, PARKED at the lane's end when
-    // the engine plays past the content (its transport never stops on its
-    // own): an escaped playhead stretched the scroll width into nowhere
-    // (found by ui-drive, gesture 4).
+    // Playhead on the shared scale, PARKED at the lane's end when the
+    // engine plays past the content (its transport never stops on its
+    // own): an escaped playhead stretched the scroll width into nowhere.
     const playhead = document.getElementById('playhead');
     if (playhead) {
       const lane = document.querySelector('.track-lane') as HTMLElement | null;
@@ -148,10 +148,8 @@ async function init() {
     }
   };
 
-  // Transport buttons. Stop REWINDS (lot 3): stop alone left the
-  // playhead parked wherever the transport died - a stopped DAW that
-  // cannot come home is a playhead you chase with no seek. Play after
-  // Stop restarts from zero, like every DAW's first convention.
+  // Transport. Stop REWINDS: a stopped DAW that cannot come home is a
+  // playhead you chase.
   playBtn.addEventListener('click', () => {
     engineClient?.play();
   });
@@ -160,50 +158,47 @@ async function init() {
     engineClient?.seek(0);
   });
 
-  // Seek on click (lot 3): a click anywhere on the ruler or a time lane
-  // jumps the transport there - the timeline is a control, not a poster.
-  const tracksEl = document.getElementById('tracks')!;
-  tracksEl.addEventListener('click', (e) => {
+  // Seek ONLY on the ruler's seek band (docs/UI-CONVENTIONS.md: all
+  // three DAWs reserve the clip area for selection/editing). Clicking a
+  // track row selects the track and its chain appears in the Device View.
+  tracksContainer.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
-    const lane = target.closest('.track-lane, .ruler') as HTMLElement | null;
-    if (!lane || !engineClient) return;
-    const x = e.clientX - lane.getBoundingClientRect().left;
-    const sr = project?.getDocument().sampleRate || 48000;
-    const seconds = Math.max(0, x / TIMELINE.pps);
-    engineClient.seek(Math.round(seconds * sr));
+    const seekBand = target.closest('[data-role="seek"]') as HTMLElement | null;
+    if (seekBand && engineClient) {
+      const x = e.clientX - seekBand.getBoundingClientRect().left;
+      const sr = project?.getDocument().sampleRate || 48000;
+      engineClient.seek(Math.round(Math.max(0, x / TIMELINE.pps) * sr));
+      return;
+    }
+    const trackEl = target.closest('[data-track-id]') as HTMLElement | null;
+    if (trackEl) {
+      const id = trackEl.getAttribute('data-track-id');
+      if (id && id !== selectedTrackId) {
+        selectedTrackId = id;
+        renderTracks(true);
+      }
+    }
   });
 
-  // Add track button
   addTrackBtn.addEventListener('click', () => {
     if (!project) return;
-
     const trackCount = project.getDocument().tracks.length;
-    const newTrack = {
+    project.addTrack({
       id: `track-${Date.now()}`,
       name: `Track ${trackCount + 1}`,
       gain: 1.0,
       clips: [],
       chain: [],
-    };
-
-    project.addTrack(newTrack);
-
-    // Send change to server
-    const change = project.getLastChange();
-    if (change && serverClient) {
-      serverClient.sendChange(change);
-    }
-
+    });
+    sendLastChange();
     renderTracks();
   });
 
-  // Start connections
   try {
     await serverClient.connect(PROJECT_ID);
   } catch (e) {
     console.error('Failed to connect to server:', e);
   }
-
   try {
     await engineClient.connect();
   } catch (e) {
@@ -212,33 +207,38 @@ async function init() {
 }
 
 /**
- * Render track UI from project document.
+ * Render tracks + Device View from the project document.
+ *
+ * Same structure -> update gains/bypass/params in place (a full rebuild
+ * on every received change would thrash the DOM and yank sliders out of
+ * the local user's hand). `force` rebuilds regardless (track selection).
  */
-function renderTracks() {
+function renderTracks(force = false) {
   if (!project) return;
-
   const doc = project.getDocument();
 
-  // Same track structure -> update gains in place. A full innerHTML rebuild
-  // on every received change (30/s during a remote drag) thrashes the DOM
-  // and would yank the slider out of the local user's hand.
+  if (selectedTrackId === null || !doc.tracks.some((t) => t.id === selectedTrackId)) {
+    selectedTrackId = doc.tracks[0]?.id ?? null;
+  }
+  const selectedTrack = doc.tracks.find((t) => t.id === selectedTrackId) ?? null;
+
   const existingEls = Array.from(tracksContainer.querySelectorAll('[data-track-id]'));
+  const deviceCount = deviceViewSlot.querySelectorAll('.device').length;
   const sameStructure =
+    !force &&
     existingEls.length === doc.tracks.length &&
     doc.tracks.every(
       (t, i) =>
         existingEls[i].getAttribute('data-track-id') === t.id &&
-        // chain nodes and clips are structure too: one appearing on an
-        // existing track must rebuild that DOM (UI lives in createTrackUI)
-        existingEls[i].querySelectorAll('.chain-node').length === t.chain.length &&
         existingEls[i].querySelectorAll('.clip').length === t.clips.length
-    );
+    ) &&
+    deviceCount === (selectedTrack?.chain.length ?? 0);
 
   if (sameStructure) {
     for (const track of doc.tracks) {
       updateTrackGainUI(track.id, track.gain);
-      updateTrackChainUI(track.id, track.chain);
     }
+    if (selectedTrack) updateDeviceViewUI(selectedTrack.chain);
     return;
   }
 
@@ -257,30 +257,18 @@ function renderTracks() {
   tracksContainer.appendChild(createRulerUI(laneSeconds));
 
   for (const track of doc.tracks) {
-    const element = createTrackUI(track, sr, laneSeconds, (gain) => {
-      console.log('onGainChange called:', track.id, gain);
-      // Update local document
-      project!.setTrackGain(track.id, gain);
-
-      // Send change to server - engine will receive it via server subscription
-      const change = project!.getLastChange();
-      console.log('Change generated:', change ? `${change.length} bytes` : 'null');
-      if (change && serverClient) {
-        console.log('Sending change to server...');
-        serverClient.sendChange(change);
-        console.log('Change sent');
-      } else {
-        console.log('Not sending - change:', !!change, 'serverClient:', !!serverClient);
-      }
-    }, (processorId, bypass) => {
-      // 2.4d: bypass is document state - same path as the fader
-      project!.setProcessorBypass(track.id, processorId, bypass);
-      const change = project!.getLastChange();
-      if (change && serverClient) {
-        serverClient.sendChange(change);
-      }
-      renderTracks();
-    });
+    const element = createTrackUI(
+      track, sr, laneSeconds, track.id === selectedTrackId,
+      (gain) => {
+        project!.setTrackGain(track.id, gain);
+        sendLastChange();
+      },
+      (kind, on) => {
+        // Engine-local monitoring (not document state); wired in lot C
+        engineClient?.setMonitor(track.id,
+          kind === 'solo' ? on : undefined, kind === 'mute' ? on : undefined);
+      },
+    );
     tracksContainer.appendChild(element);
   }
 
@@ -290,6 +278,22 @@ function renderTracks() {
   playhead.id = 'playhead';
   playhead.style.left = `${TIMELINE.headWidth}px`;
   tracksContainer.appendChild(playhead);
+
+  // Device View for the selected track (bypass and params are DOCUMENT
+  // state: the display only settles when the change comes back)
+  deviceViewSlot.innerHTML = '';
+  deviceViewSlot.appendChild(createDeviceView(
+    selectedTrack,
+    (procId, bypass) => {
+      project!.setProcessorBypass(selectedTrackId!, procId, bypass);
+      sendLastChange();
+      renderTracks();
+    },
+    (procId, key, value) => {
+      project!.setProcessorParam(selectedTrackId!, procId, key, value);
+      sendLastChange();
+    },
+  ));
 }
 
 // Start

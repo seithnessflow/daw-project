@@ -152,9 +152,21 @@ export class EngineClient {
    * Set track monitoring state (solo/mute).
    * Note: Gain is NOT set here - it goes through the Automerge document.
    */
-  setMonitor(trackId: string, solo: boolean, mute: boolean): void {
-    // TODO: Implement when needed
-    console.log('setMonitor not yet implemented:', trackId, solo, mute);
+  // Last monitor state per track: the protocol carries ABSOLUTE
+  // solo+mute, so a one-sided toggle merges with what we last sent.
+  // Engine-local state (not the document): a rebuilt graph re-reads it
+  // engine-side via copyMonitorState.
+  private monitorState = new Map<string, { solo: boolean; mute: boolean }>();
+
+  setMonitor(trackId: string, solo?: boolean, mute?: boolean): void {
+    const prev = this.monitorState.get(trackId) ?? { solo: false, mute: false };
+    const next = { solo: solo ?? prev.solo, mute: mute ?? prev.mute };
+    this.monitorState.set(trackId, next);
+    const message = encodeMessage({
+      type: 'setMonitor',
+      data: { trackId, solo: next.solo, mute: next.mute },
+    });
+    this.sendBinary(message);
   }
 
   /**

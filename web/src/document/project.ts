@@ -123,6 +123,39 @@ export class Project {
   }
 
   /**
+   * Set one processor parameter ({key,value} pair list, SCHEMA.md) and
+   * generate a change. The engine re-sends document params on rebuild,
+   * so this IS the plugin-param path (same road as the fader).
+   */
+  setProcessorParam(trackId: string, processorId: string, key: string, value: number): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      const proc = track?.chain.find((p) => p.id === processorId);
+      if (!proc) return;
+      const param = proc.params.find((p) => p.key === key);
+      if (param) {
+        param.value = value;
+      } else {
+        proc.params.push({ key, value });
+      }
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * Add a clip to a track (the sample kit's placement path) and
+   * generate a change.
+   */
+  addClip(trackId: string, clip: { id: string; assetHash: string;
+    startSample: number; lengthSamples: number; offsetSamples: number }): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      if (track) track.clips.push(clip);
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Add a track and generate a change.
    */
   addTrack(track: TrackDef): void {
