@@ -30,14 +30,23 @@
         --red: #d05548;
         --r: 3px;
       }
+      html,
+      body {
+        height: 100%;
+      }
       body {
         font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
         font-size: 12px;
         background: var(--bg);
         color: var(--text);
         margin: 0;
-        padding: 10px 14px 148px;
+        padding: 10px 14px 0;
         font-variant-numeric: tabular-nums;
+        /* Viewport flex: tracks flex between transport and the Device
+           View - no desert, no page scroll (the level-2 hole) */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
       button {
         font: inherit;
@@ -182,9 +191,11 @@
       /* ---- Timeline ------------------------------------------------- */
       .tracks {
         position: relative;
-        overflow-x: auto;
+        overflow: auto;
         border-radius: var(--r);
         background: var(--surface);
+        flex: 1;
+        min-height: 0;
       }
       .ruler-row,
       .track {
@@ -443,7 +454,8 @@
       }
 
       .addtrack {
-        margin-top: 8px;
+        margin: 6px 0;
+        align-self: flex-start;
         background: transparent;
         color: var(--text-2);
         font-size: 11px;
@@ -455,11 +467,8 @@
 
       /* ---- Device View ---------------------------------------------- */
       .device-view-slot {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 10;
+        margin: 0 -14px; /* full-bleed inside the flex column */
+        flex: 0 0 auto;
       }
       .device-view {
         background: #181818;
