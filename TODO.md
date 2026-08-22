@@ -207,8 +207,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       Filtre pour chaque arbitrage : « nouveau module derriere un contrat
       existant, ou option qui dedouble un chemin ? » (regle module/switch,
       recue et verifiee sur le bypass de 2.4d).
-      CLOTURE DU RE-CADRAGE : le test des mains de l'utilisateur — le
-      jalon 2.4 s'ecoute en vrai avant d'ecrire la suite.
+      PREALABLE OBLIGATOIRE (ordre corrige a la cloture de 2.4) : LE TEST
+      DES MAINS de l'utilisateur AVANT la session de re-cadrage — pas
+      apres, pas en parallele. Ses notes brutes sont un INTRANT de
+      l'arbitrage : ce que les mains trouvent (lenteur au toggle, bizarrerie
+      a la relance, detail d'affichage) decide de l'ordre mieux que tout
+      backlog. Mode d'emploi : docs/test-des-mains-2.4.md (stack + seed +
+      la checklist de l'utilisateur impatient). La session 2.5 OUVRE sur
+      ces notes.
 
 ## Court terme (sessions economes)
 
