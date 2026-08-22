@@ -250,6 +250,41 @@ console.log('Gesture 10 (C1): clip drags by its title bar, snapped, doc follows'
   // is a living bench; the moved clip is an honest trace of the test.
 }
 
+console.log('Gesture 11: Ctrl+D duplicates onto the grid, Delete removes');
+{
+  // Place one hat on the sweep track, select it
+  await page.locator('[data-role="sample"][data-sample-name="hat"]').click();
+  await page.locator('[data-track-id="lab-sweep"] .track-lane')
+    .click({ position: { x: 60, y: 20 } });
+  await page.waitForTimeout(300);
+  await page.locator('[data-role="sample"][data-sample-name="hat"]').click(); // disarm
+  const hats = page.locator('[data-track-id="lab-sweep"] .clip');
+  const base = await hats.count();
+  await page.locator('[data-track-id="lab-sweep"] [data-role="clip-handle"]')
+    .last().click();
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press('Control+KeyD');
+  await page.keyboard.press('Control+KeyD');
+  await page.waitForTimeout(500);
+  check(`Ctrl+D x2 made ${base + 2} clips`, await hats.count() === base + 2,
+    String(await hats.count()));
+  const starts = await page.evaluate(() => {
+    const d = window.__dawProject.getDocument();
+    const t = d.tracks.find((t) => t.id === 'lab-sweep');
+    return t.clips.map((c) => c.startSample).sort((a, b) => a - b).slice(-3);
+  });
+  check('duplicates land on ascending grid slots', starts[0] < starts[1] && starts[1] < starts[2],
+    starts.join(','));
+  // The copy is selected: Delete removes it, selection clears
+  await page.keyboard.press('Delete');
+  await page.waitForTimeout(400);
+  check(`Delete removed the copy (${base + 1} left)`, await hats.count() === base + 1,
+    String(await hats.count()));
+  check('selection cleared after delete', await page
+    .locator('.clip[aria-selected="true"]').count() === 0);
+}
+
 console.log('Gesture 6: Add Track from the UI');
 const nBefore = await page.locator('[data-track-id]').count();
 await page.locator('#add-track-btn').click();

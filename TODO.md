@@ -299,6 +299,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       neuve). Remede : fichier par port (daw-engine-token-<port>) cote
       moteur + lecture assortie cote outils. Session courte moteur+web.
 
+- [ ] ORGANE --capture (approuve 2026-08-22, session MOTEUR bornee, cadree
+      a part) : le backend null gagne --capture <wav> pour que l'oreille
+      ecoute le CHEMIN LIVE (ring, famine, dry/wet) et plus seulement le
+      rendu offline. Discipline du pont obligatoire : ring de capture
+      SPSC au contrat (static_assert lock-free + offsetof), le callback
+      ne fait que deposer, l'ecriture fichier vit hors thread sacre,
+      depassement = drop compte jamais d'attente. Test au signal connu.
+
 ## Court terme (sessions economes)
 
 - [x] HYGIENE CI FAIT 2026-08-22 (S1, commits 74c61d1 + 5cc9089) :

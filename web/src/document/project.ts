@@ -173,6 +173,19 @@ export class Project {
   }
 
   /**
+   * Delete a clip (Delete key on the selection) and generate a change.
+   */
+  deleteClip(trackId: string, clipId: string): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      const track = d.tracks.find((t) => t.id === trackId);
+      if (!track) return;
+      const i = track.clips.findIndex((c) => c.id === clipId);
+      if (i >= 0) track.clips.splice(i, 1);
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Add a clip to a track (the sample kit's placement path) and
    * generate a change.
    */

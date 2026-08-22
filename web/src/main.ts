@@ -564,6 +564,49 @@ async function init() {
   window.addEventListener('keydown', (e) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+    // Delete: remove the selected clip. Selection is then CLEARED
+    // (Ableton behavior - deleting leaves nothing selected; noted).
+    if ((e.code === 'Delete' || e.code === 'Backspace') && selectedClipId && project) {
+      e.preventDefault();
+      const doc = project.getDocument();
+      const track = doc.tracks.find((t) =>
+        t.clips.some((c) => c.id === selectedClipId));
+      if (track) {
+        project.deleteClip(track.id, selectedClipId);
+        sendLastChange();
+        selectedClipId = null;
+        renderTracks(true);
+      }
+      return;
+    }
+    // Ctrl+D: duplicate the selected clip to the next grid slot at or
+    // after its end, selection moves to the COPY - hammer D to lay
+    // eight kicks.
+    if (e.code === 'KeyD' && (e.ctrlKey || e.metaKey) && selectedClipId && project) {
+      e.preventDefault();
+      const doc = project.getDocument();
+      const sr = doc.sampleRate || 48000;
+      const track = doc.tracks.find((t) =>
+        t.clips.some((c) => c.id === selectedClipId));
+      const clip = track?.clips.find((c) => c.id === selectedClipId);
+      if (track && clip) {
+        const grid = snapStep() * sr;
+        const start = Math.ceil((clip.startSample + clip.lengthSamples) / grid) * grid;
+        const name = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+        const copyId = `clip-${name}-${Date.now()}`;
+        project.addClip(track.id, {
+          id: copyId,
+          assetHash: clip.assetHash,
+          startSample: Math.round(start),
+          lengthSamples: clip.lengthSamples,
+          offsetSamples: clip.offsetSamples,
+        });
+        sendLastChange();
+        selectedClipId = copyId;
+        renderTracks(true);
+      }
+      return;
+    }
     if (e.code === 'Space' && !e.repeat) {
       e.preventDefault();
       if (!engineClient?.isConnected()) return;
