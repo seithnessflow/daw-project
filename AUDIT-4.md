@@ -252,7 +252,7 @@ restent ou l'arbitrage AUDIT-3 les a mis, verifies toujours ouverts.
    coupe dans les brackets) — fail-closed donc sans danger, mais une
    page servie sur [::1] est bloquee et aucun test IPv6 n'existe.
 5. Adoption d'outbox orphelines : deux fenetres de perte etroites
-   (`server_client.ts:195-226`) — clé d'un onglet VIVANT adoptable
+   (`server_client.ts:195-226`) — cle d'un onglet VIVANT adoptable
    entre getItem et removeItem ; suppression des cles meme si
    persistOutbox a echoue (quota avale). Heartbeat localStorage +
    suppression apres persist reussi.
