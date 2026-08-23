@@ -38,10 +38,10 @@ interdisait le produit).
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 22/22 |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 23/23 |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
-| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 21/21 |
+| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 22/22 |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
@@ -50,7 +50,7 @@ interdisait le produit).
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir docs/DECISIONS.md, 2026-08-21) |
-| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 22/22 |
+| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 23/23 |
 | 3 | Convergence DEUX MACHINES, deux reseaux, un projet (redefini ADR-019) | ⛔ JAMAIS TESTE | La version 2-onglets (sous-ensemble) : ⚠️ valide avec reserve (AUDIT-4 : trio deps-manquantes A4-1/2/3, remede session TODO ordre 2 — c'est la fondation que deux machines exigeront). Historique : JOURNAL.md |
 | 4 | LNA HTTPS→WS local | ✅ VALIDE — formulation exacte : l'acces au moteur local depuis une origine HTTPS publique fonctionne sur Chrome 151/Windows 11 (2026-08-23), sous reserve d'autorisation utilisateur, avec etat lisible par API. SCEAU pose dans le navigateur de l'utilisateur : sonde granted, canari 4 ms, onopen 3 ms, AUTH OK + telemetrie 23 ms (version relevee sur le binaire installe 151.0.7922.170 ; champ UA non transcrit) | ETABLI (campagne 2026-08-23, oracle temporel automatise sur le VRAI Chrome 151, profils vierges) : (1) invite Chrome apparue et autorisee -> WS connecte (test des mains du matin) ; (2) fetch ET WebSocket sont TOUS DEUX soumis au LNA et savent declencher la demande (etat prompt -> les deux pendent en attente de decision ; AUCUN echec immediat : le pire cas « subit sans pouvoir demander » est ECARTE) ; (3) ZERO GESTE : une connexion lancee au chargement de page declenche l'invite — l'onboarding « connexion au chargement » est viable ; (4) permissions.query('local-network-access' et 'local-network') expose l'etat (prompt/granted lus en reel) -> l'UI n'a jamais a deviner ; feature-detection obligatoire (Firefox/Safari sans API) ; (5) auth prouvee de bout en bout quand permis (AUTH OK + telemetrie ; token perime -> close 4001, signature distincte de 1006). Mecanisme : carve-out loopback (le tunnel ne sert que la page ; l'URL WS est 127.0.0.1). INCONNUS DATES 2026-08-23 (documentation, pas bloquants) : texte exact de l'invite, semantique dismissal (Echap) et refus explicite (clic Bloquer), duree de memorisation, Firefox/Safari, --allow-origin en prod (design 1pre), audio/telemetrie soutenus a travers ce chemin. Canari fetch mode cors NON CONCLUSIF sur ce moteur (400 sans CORS = « Failed to fetch » meme reseau ouvert) — garder ecrit. Le moteur ne loggue pas les connexions acceptees (a corriger) |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns (2026-08-20, ZenGo SC 48kHz/512) mais **sans charge CPU** — procedure ci-dessous |

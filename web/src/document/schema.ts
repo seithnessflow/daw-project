@@ -45,6 +45,9 @@ export interface TrackDef {
 export interface ProjectDef {
   schemaVersion: number;
   sampleRate: number;
+  /** V1.2: root master gain, linear 0..2. ADDITIVE - absent on old
+   *  documents means 1.0 (every consumer defaults it). */
+  masterGain?: number;
   tracks: TrackDef[];
   [key: string]: unknown;  // Index signature for Automerge compatibility
 }

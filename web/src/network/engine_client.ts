@@ -43,7 +43,7 @@ export class EngineClient {
   tokenRefresher: (() => Promise<string | null>) | null = null;
   private refreshedOnce = false;
   onPosition: ((samples: number, sampleRate: number) => void) | null = null;
-  onMeters: ((meters: MeterData[]) => void) | null = null;
+  onMeters: ((meters: MeterData[], masterLeft: number, masterRight: number) => void) | null = null;
   onState: ((state: EngineState) => void) | null = null;
   onError: ((message: string) => void) | null = null;
 
@@ -248,7 +248,9 @@ export class EngineClient {
             trackId: t.trackId,
             peakLeft: t.peakLeft,
             peakRight: t.peakRight,
-          }))
+          })),
+          msg.data.masterPeakLeft ?? 0,
+          msg.data.masterPeakRight ?? 0,
         );
         break;
       case 'state':

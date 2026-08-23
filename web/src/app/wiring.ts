@@ -8,7 +8,7 @@
 import { Project } from '../document/project';
 import { ServerClient } from '../network/server_client';
 import { EngineClient } from '../network/engine_client';
-import { TIMELINE } from '../ui/track';
+import { TIMELINE, formatGain } from '../ui/track';
 import * as life from '../ui/life';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
@@ -159,6 +159,14 @@ export async function init(): Promise<void> {
     console.log('Disconnected from engine');
   };
 
+  // V1.2: master fader -> document (same road as track gains)
+  els.masterGain.addEventListener('input', () => {
+    if (!ctx.project) return;
+    ctx.project.setMasterGain(Number(els.masterGain.value));
+    sendLastChange();
+    els.masterDb.textContent = formatGain(Number(els.masterGain.value));
+  });
+
   // V1.1: loop toggle - local performance state, pushed to the engine
   els.loopBtn.addEventListener('click', () => {
     const on = els.loopBtn.getAttribute('aria-pressed') !== 'true';
@@ -193,9 +201,16 @@ export async function init(): Promise<void> {
     }
   };
   // The life layer eats the telemetry - raw values never hit the DOM
-  engineClient.onMeters = (meters) => {
+  engineClient.onMeters = (meters, masterLeft, masterRight) => {
     life.setTrackLevels(meters.map(({ trackId, peakLeft, peakRight }) =>
       ({ trackId, peak: Math.max(peakLeft, peakRight) })));
+    // V1.2: master VU - direct mutation (30 Hz, two bars, no layout).
+    // Red above -1 dBFS (~0.891 linear): the ear's line, now VISIBLE.
+    const CLIP = 0.8913;
+    els.masterVuL.style.width = `${Math.min(100, masterLeft * 100)}%`;
+    els.masterVuR.style.width = `${Math.min(100, masterRight * 100)}%`;
+    els.masterVuL.classList.toggle('clipping', masterLeft > CLIP);
+    els.masterVuR.classList.toggle('clipping', masterRight > CLIP);
   };
   engineClient.onState = (state) => {
     life.setEngineState(state.pluginBlocksMissed);

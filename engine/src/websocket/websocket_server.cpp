@@ -308,6 +308,10 @@ void WebSocketServer::broadcastTelemetry() {
         track->set_peak_left(left);
         track->set_peak_right(right);
     }
+    // V1.2: master peaks (post-gain), computed in AudioGraph::process
+    const auto [mpl, mpr] = graph->getMasterPeaks();
+    meters->set_master_peak_left(mpl);
+    meters->set_master_peak_right(mpr);
 
     // Build engine state message
     protocol::Message state_msg;

@@ -15,8 +15,41 @@ namespace daw::graph {
 
 AudioGraph::AudioGraph() = default;
 AudioGraph::~AudioGraph() = default;
-AudioGraph::AudioGraph(AudioGraph&&) noexcept = default;
-AudioGraph& AudioGraph::operator=(AudioGraph&&) noexcept = default;
+
+// Manual moves: the V1.2 master atomics delete the defaulted ones
+// (AudioTrack's mold - atomics are copied by value, relaxed).
+AudioGraph::AudioGraph(AudioGraph&& other) noexcept
+    : tracks_(std::move(other.tracks_))
+    , sample_rate_(other.sample_rate_)
+    , max_block_size_(other.max_block_size_)
+    , track_buffer_(std::move(other.track_buffer_))
+    , mix_buffer_(std::move(other.mix_buffer_))
+    , master_gain_(other.master_gain_.load(std::memory_order_relaxed))
+    , master_peak_left_(other.master_peak_left_.load(std::memory_order_relaxed))
+    , master_peak_right_(other.master_peak_right_.load(std::memory_order_relaxed))
+    , num_tracks_(other.num_tracks_)
+    , peak_left_(std::move(other.peak_left_))
+    , peak_right_(std::move(other.peak_right_)) {}
+
+AudioGraph& AudioGraph::operator=(AudioGraph&& other) noexcept {
+    if (this != &other) {
+        tracks_ = std::move(other.tracks_);
+        sample_rate_ = other.sample_rate_;
+        max_block_size_ = other.max_block_size_;
+        track_buffer_ = std::move(other.track_buffer_);
+        mix_buffer_ = std::move(other.mix_buffer_);
+        master_gain_.store(other.master_gain_.load(std::memory_order_relaxed),
+                           std::memory_order_relaxed);
+        master_peak_left_.store(other.master_peak_left_.load(std::memory_order_relaxed),
+                                std::memory_order_relaxed);
+        master_peak_right_.store(other.master_peak_right_.load(std::memory_order_relaxed),
+                                 std::memory_order_relaxed);
+        num_tracks_ = other.num_tracks_;
+        peak_left_ = std::move(other.peak_left_);
+        peak_right_ = std::move(other.peak_right_);
+    }
+    return *this;
+}
 
 bool AudioGraph::process(
     float* output,
@@ -42,6 +75,9 @@ bool AudioGraph::process(
     std::memset(output, 0, frame_count * 2 * sizeof(float));
 
     if (tracks_.empty()) {
+        // Master meters must SAY silence too (same lesson as clearMeters)
+        master_peak_left_.store(0.0f, std::memory_order_relaxed);
+        master_peak_right_.store(0.0f, std::memory_order_relaxed);
         return true;
     }
 
@@ -80,6 +116,26 @@ bool AudioGraph::process(
             output[j] += track_buffer_[j];
         }
     }
+
+    // V1.2: master gain applied HERE - offline_render calls this same
+    // process(), so live/offline parity is free (no twin). Multiplication
+    // is UNCONDITIONAL: x1.0 is bit-exact in IEEE754, the reference hash
+    // is safe by construction.
+    const float master = master_gain_.load(std::memory_order_relaxed);
+    float mpl = 0.0f;
+    float mpr = 0.0f;
+    for (uint32_t j = 0; j < frame_count; ++j) {
+        const float l = output[j * 2] * master;
+        const float r = output[j * 2 + 1] * master;
+        output[j * 2] = l;
+        output[j * 2 + 1] = r;
+        const float al = l < 0.0f ? -l : l;
+        const float ar = r < 0.0f ? -r : r;
+        if (al > mpl) mpl = al;
+        if (ar > mpr) mpr = ar;
+    }
+    master_peak_left_.store(mpl, std::memory_order_relaxed);
+    master_peak_right_.store(mpr, std::memory_order_relaxed);
 
     return true;
 }

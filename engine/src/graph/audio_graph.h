@@ -181,6 +181,26 @@ public:
             peak_left_[i].store(0.0f, std::memory_order_relaxed);
             peak_right_[i].store(0.0f, std::memory_order_relaxed);
         }
+        master_peak_left_.store(0.0f, std::memory_order_relaxed);
+        master_peak_right_.store(0.0f, std::memory_order_relaxed);
+    }
+
+    /**
+     * V1.2: master gain, applied at the end of process() (live AND
+     * offline share that path). Set by the builders from the document.
+     */
+    void setMasterGain(float gain) noexcept {
+        master_gain_.store(gain, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] float getMasterGain() const noexcept {
+        return master_gain_.load(std::memory_order_relaxed);
+    }
+
+    /** V1.2: master peaks, post-gain (written by process, read by telemetry). */
+    [[nodiscard]] std::pair<float, float> getMasterPeaks() const noexcept {
+        return { master_peak_left_.load(std::memory_order_relaxed),
+                 master_peak_right_.load(std::memory_order_relaxed) };
     }
 
     /**
@@ -214,6 +234,11 @@ private:
     // Using std::atomic<float> with memory_order_relaxed for both operations.
     // Relaxed ordering is sufficient: no synchronization needed, we just want
     // a recent-ish value for visual metering. No barriers, no cost.
+    // V1.2: master stage (atomics - sacred-thread rules)
+    std::atomic<float> master_gain_{1.0f};
+    std::atomic<float> master_peak_left_{0.0f};
+    std::atomic<float> master_peak_right_{0.0f};
+
     size_t num_tracks_ = 0;
     std::unique_ptr<std::atomic<float>[]> peak_left_;
     std::unique_ptr<std::atomic<float>[]> peak_right_;

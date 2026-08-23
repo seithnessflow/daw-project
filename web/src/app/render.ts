@@ -13,6 +13,7 @@ import {
   createDeviceView,
   updateTrackGainUI,
   updateDeviceViewUI,
+  formatGain,
   TIMELINE,
 } from '../ui/track';
 import * as life from '../ui/life';
@@ -32,6 +33,14 @@ export function renderTracks(force = false): void {
   }
   const selectedTrack =
     doc.tracks.find((t) => t.id === ctx.selectedTrackId) ?? null;
+
+  // V1.2: master strip follows the document (remote moves converge) -
+  // never fight the hand currently on the fader.
+  const masterGain = typeof doc.masterGain === 'number' ? doc.masterGain : 1;
+  if (document.activeElement !== els.masterGain) {
+    els.masterGain.value = String(masterGain);
+  }
+  els.masterDb.textContent = formatGain(masterGain);
 
   const existingEls = Array.from(els.tracks.querySelectorAll('[data-track-id]'));
   const deviceCount = els.deviceViewSlot.querySelectorAll('.device').length;

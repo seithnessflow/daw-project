@@ -119,6 +119,12 @@ public:
     ProjectDef getDocument() const;
 
     /**
+     * V1.2: set the root masterGain (authoring API, addTrack's family -
+     * in production the browser owns the document).
+     */
+    bool setMasterGain(float gain);
+
+    /**
      * Check if document is loaded.
      */
     bool isLoaded() const { return doc_ != nullptr; }

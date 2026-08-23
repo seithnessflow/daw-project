@@ -356,6 +356,20 @@ premier du genre : wrap exact 900+512 sur [0,1000) -> 412), e2e 21/21
 dont transport-loop.spec (wrap VU dans la telemetrie, gel du compteur
 apres loop OFF, moteur reel).
 
+**2026-08-23 (V1.2 — la piste master existe) :** masterGain a la racine
+du document (ADDITIF, absent = 1.0, hash de reference sur par
+construction — verifie), applique en DERNIER etage de
+AudioGraph::process (offline = live par construction, zero jumeau) ;
+peaks master calcules la aussi et AJOUTES AU PROTO Meters — le
+navigateur n'avait AUCUN chemin master avant (trou trouve par l'agent
+Plan). UI : tranche MASTER dans la barre (fader lie au doc, VU stereo,
+dB, rouge > -1 dBFS — la regle de l'oreille enfin visible). Moves
+manuels d'AudioGraph (les atomiques master tuaient le move par defaut).
+Setter d'authoring cote moteur (famille addTrack). Tests : moteur 23/23
+(testMasterGainRender : peaks EXACTEMENT halves au niveau flottant,
+roundtrip du champ) ; e2e 22/22 (master-gain.spec : convergence 2
+onglets, patron critere 3). SCHEMA.md a jour.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

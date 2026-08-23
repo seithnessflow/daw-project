@@ -66,6 +66,7 @@ struct TrackDef {
 struct ProjectDef {
     uint32_t schema_version = SCHEMA_VERSION;
     uint32_t sample_rate = 48000;
+    float master_gain = 1.0f;  // V1.2: root masterGain, additive (1.0 when absent)
     std::vector<TrackDef> tracks;
 };
 

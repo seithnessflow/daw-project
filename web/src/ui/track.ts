@@ -364,8 +364,8 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
   }
 }
 
-/** Format gain value for display. */
-function formatGain(gain: number): string {
+/** Format gain value for display (exported for the master strip, V1.2). */
+export function formatGain(gain: number): string {
   if (gain === 0) return '-inf';
   const db = 20 * Math.log10(gain);
   return `${db.toFixed(1)} dB`;

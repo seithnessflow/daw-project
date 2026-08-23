@@ -16,6 +16,16 @@
         <button id="follow-btn" data-role="follow" class="follow-btn"
                 title="Follow playhead">&#8677;</button>
       </div>
+      <div class="master-strip" id="master-strip" title="Master output">
+        <span class="master-label">MASTER</span>
+        <div class="master-vu" aria-hidden="true">
+          <div class="master-vu-bar" id="master-vu-l"></div>
+          <div class="master-vu-bar" id="master-vu-r"></div>
+        </div>
+        <input type="range" id="master-gain" data-role="master-gain"
+               min="0" max="2" step="0.01" value="1" aria-label="Master gain">
+        <span class="master-db" id="master-db">0.0 dB</span>
+      </div>
       <div class="position">
         <span id="position">00:00.000</span>
       </div>

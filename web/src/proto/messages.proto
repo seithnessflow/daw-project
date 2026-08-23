@@ -47,6 +47,8 @@ message TrackMeter {
 // All meters (sent at 30 Hz)
 message Meters {
     repeated TrackMeter tracks = 1;
+    float master_peak_left = 2;   // V1.2: post-master-gain output peaks -
+    float master_peak_right = 3;  // the browser had NO master path before
 }
 
 // Engine state (sent at 30 Hz with telemetry)

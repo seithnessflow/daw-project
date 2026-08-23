@@ -1898,6 +1898,98 @@ bool testTransportLoopAndStop() {
     return true;
 }
 
+/**
+ * V1.2: masterGain drives the render. Proof at the FLOAT stage (peaks are
+ * computed before quantization): x0.5 is exact in IEEE754, so the peaks
+ * must be EXACTLY halved - EXPECT equality, never toBeCloseTo (regime).
+ * The default (field absent / 1.0) is covered by testRenderDeterminism:
+ * its reference hash would move if the master stage changed anything.
+ */
+bool testMasterGainRender() {
+    std::cout << "Test: masterGain halves the render exactly... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-master-fixture";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    std::vector<int16_t> square(24000 * 2);
+    for (size_t i = 0; i < 24000; ++i) {
+        const int16_t v = (i % 96 < 48) ? int16_t{8192} : int16_t{-8192};
+        square[i * 2] = v;
+        square[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    const std::string hashA = writeHashedAsset(dir, 2, square);
+    if (hashA.empty()) {
+        std::cout << "FAILED: could not write fixture asset\n";
+        return false;
+    }
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: document creation failed\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "track-1";
+    track.name = "Square";
+    track.gain = 1.0f;
+    daw::document::ClipDef clip;
+    clip.id = "clip-1";
+    clip.asset_hash = hashA;
+    clip.start_sample = 0;
+    clip.length_samples = 24000;
+    clip.offset_samples = 0;
+    track.clips.push_back(clip);
+    doc.addTrack(track);
+
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+    config.end_sample = -1;
+    daw::render::OfflineRenderer renderer;
+
+    const std::string outA = (dir / "full.wav").string();
+    const std::string outB = (dir / "half.wav").string();
+    auto resultA = renderer.render(doc, outA, dir.string(), config);
+
+    if (!doc.setMasterGain(0.5f)) {
+        std::cout << "FAILED: setMasterGain: " << doc.getLastError() << "\n";
+        return false;
+    }
+    // Roundtrip: the field must come back from the document itself
+    if (doc.getDocument().master_gain != 0.5f) {
+        std::cout << "FAILED: masterGain roundtrip gave "
+                  << doc.getDocument().master_gain << "\n";
+        return false;
+    }
+    auto resultB = renderer.render(doc, outB, dir.string(), config);
+
+    fs::remove(outA);
+    fs::remove(outB);
+
+    if (!resultA.success || !resultB.success) {
+        std::cout << "FAILED: render failed: " << resultA.error
+                  << " / " << resultB.error << "\n";
+        return false;
+    }
+    if (resultA.peak_left <= 0.05f) {
+        std::cout << "FAILED: fixture rendered (near-)silence\n";
+        return false;
+    }
+    if (resultB.peak_left != resultA.peak_left * 0.5f ||
+        resultB.peak_right != resultA.peak_right * 0.5f) {
+        std::cout << "FAILED: peaks not exactly halved: "
+                  << resultA.peak_left << "/" << resultA.peak_right
+                  << " -> " << resultB.peak_left << "/" << resultB.peak_right << "\n";
+        return false;
+    }
+
+    std::cout << "OK (peak " << resultA.peak_left << " -> "
+              << resultB.peak_left << ", exact)\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -1929,6 +2021,7 @@ int main(int argc, char* argv[]) {
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);
     runWithArg(testRenderDeterminism, fixtures_dir);
+    run(testMasterGainRender);
     run(testAudioThreadLockFreedom);
     run(testTransportLoopAndStop);
     run(testWebSocketAuth);

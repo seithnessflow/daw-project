@@ -89,6 +89,10 @@ export interface TrackMeter {
 /** All meters (sent at 30 Hz) */
 export interface Meters {
   tracks: TrackMeter[];
+  /** V1.2: post-master-gain output peaks - */
+  masterPeakLeft: number;
+  /** the browser had NO master path before */
+  masterPeakRight: number;
 }
 
 /** Engine state (sent at 30 Hz with telemetry) */
@@ -589,13 +593,19 @@ export const TrackMeter: MessageFns<TrackMeter> = {
 };
 
 function createBaseMeters(): Meters {
-  return { tracks: [] };
+  return { tracks: [], masterPeakLeft: 0, masterPeakRight: 0 };
 }
 
 export const Meters: MessageFns<Meters> = {
   encode(message: Meters, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.tracks) {
       TrackMeter.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.masterPeakLeft !== 0) {
+      writer.uint32(21).float(message.masterPeakLeft);
+    }
+    if (message.masterPeakRight !== 0) {
+      writer.uint32(29).float(message.masterPeakRight);
     }
     return writer;
   },
@@ -621,6 +631,22 @@ export const Meters: MessageFns<Meters> = {
             message.tracks.push(TrackMeter.decode(reader, reader.uint32()));
             continue;
           }
+          case 2: {
+            if (tag !== 21) {
+              break;
+            }
+
+            message.masterPeakLeft = reader.float();
+            continue;
+          }
+          case 3: {
+            if (tag !== 29) {
+              break;
+            }
+
+            message.masterPeakRight = reader.float();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -636,6 +662,16 @@ export const Meters: MessageFns<Meters> = {
   fromJSON(object: any): Meters {
     return {
       tracks: globalThis.Array.isArray(object?.tracks) ? object.tracks.map((e: any) => TrackMeter.fromJSON(e)) : [],
+      masterPeakLeft: isSet(object.masterPeakLeft)
+        ? globalThis.Number(object.masterPeakLeft)
+        : isSet(object.master_peak_left)
+        ? globalThis.Number(object.master_peak_left)
+        : 0,
+      masterPeakRight: isSet(object.masterPeakRight)
+        ? globalThis.Number(object.masterPeakRight)
+        : isSet(object.master_peak_right)
+        ? globalThis.Number(object.master_peak_right)
+        : 0,
     };
   },
 
@@ -643,6 +679,12 @@ export const Meters: MessageFns<Meters> = {
     const obj: any = {};
     if (message.tracks?.length) {
       obj.tracks = message.tracks.map((e) => TrackMeter.toJSON(e));
+    }
+    if (message.masterPeakLeft !== 0) {
+      obj.masterPeakLeft = message.masterPeakLeft;
+    }
+    if (message.masterPeakRight !== 0) {
+      obj.masterPeakRight = message.masterPeakRight;
     }
     return obj;
   },
@@ -653,6 +695,8 @@ export const Meters: MessageFns<Meters> = {
   fromPartial<I extends Exact<DeepPartial<Meters>, I>>(object: I): Meters {
     const message = createBaseMeters();
     message.tracks = object.tracks?.map((e) => TrackMeter.fromPartial(e)) || [];
+    message.masterPeakLeft = object.masterPeakLeft ?? 0;
+    message.masterPeakRight = object.masterPeakRight ?? 0;
     return message;
   },
 };

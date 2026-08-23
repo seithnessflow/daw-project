@@ -568,6 +568,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
 ) {
     auto graph = std::make_unique<daw::graph::AudioGraph>();
     graph->setSampleRate(sample_rate);
+    graph->setMasterGain(project.master_gain);  // V1.2
 
     for (const auto& track_def : project.tracks) {
         daw::graph::AudioTrack track;

@@ -294,6 +294,18 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
     }
     if (result) AMresultFree(result);
 
+    // Read masterGain (V1.2 - ADDITIVE: absent on old docs and fixtures,
+    // default 1.0 keeps every historical render bit-identical)
+    result = AMmapGet(doc_, AM_ROOT, AMstr("masterGain"), nullptr);
+    if (result && AMresultStatus(result) == AM_STATUS_OK) {
+        AMitem* item = AMresultItem(result);
+        double f64;
+        if (AMitemToF64(item, &f64)) {
+            out.master_gain = static_cast<float>(f64);
+        }
+    }
+    if (result) AMresultFree(result);
+
     // Read tracks array
     result = AMmapGet(doc_, AM_ROOT, AMstr("tracks"), nullptr);
     if (result && AMresultStatus(result) == AM_STATUS_OK) {
@@ -542,6 +554,16 @@ bool AutomergeDocument::writeDocument(const ProjectDef& def) {
     }
     results_to_free.push_back(result);
 
+    // Write masterGain (V1.2 - the render hash is over WAV bytes, not doc
+    // bytes: writing 1.0 explicitly changes nothing audible)
+    result = AMmapPutF64(doc_, AM_ROOT, AMstr("masterGain"),
+                         static_cast<double>(def.master_gain));
+    if (!checkResult(result, "write masterGain")) {
+        for (auto* r : results_to_free) AMresultFree(r);
+        return false;
+    }
+    results_to_free.push_back(result);
+
     // Create tracks array
     result = AMmapPutObject(doc_, AM_ROOT, AMstr("tracks"), AM_OBJ_TYPE_LIST);
     if (!checkResult(result, "create tracks array")) {
@@ -658,6 +680,20 @@ bool AutomergeDocument::setTrackGain(const std::string& track_id, float gain) {
 
     notifyChange();
     return true;
+}
+
+bool AutomergeDocument::setMasterGain(float gain) {
+    // V1.2. Same family as addTrack: document AUTHORING for tests and
+    // create_test_doc (in production the browser owns the document).
+    if (!doc_) {
+        last_error_ = "No document loaded";
+        return false;
+    }
+    AMresult* result = AMmapPutF64(doc_, AM_ROOT, AMstr("masterGain"),
+                                   static_cast<double>(gain));
+    const bool ok = checkResult(result, "set masterGain");
+    if (result) AMresultFree(result);
+    return ok;
 }
 
 bool AutomergeDocument::addTrack(const TrackDef& track) {

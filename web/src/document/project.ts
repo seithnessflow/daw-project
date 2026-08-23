@@ -121,6 +121,16 @@ export class Project {
   }
 
   /**
+   * V1.2: set the root master gain (linear, clamped 0..2 like tracks).
+   */
+  setMasterGain(gain: number): void {
+    this.doc = Automerge.change(this.doc, (d) => {
+      d.masterGain = Math.max(0, Math.min(2, gain));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
    * Get the last change for sending to the server.
    */
   getLastChange(): Uint8Array | null {

@@ -53,6 +53,7 @@
 |-------|------|----------|-------------|
 | `schemaVersion` | `uint32` | Yes | Always present, even in v1. Enables migrations. |
 | `sampleRate` | `uint32` | Yes | Project sample rate in Hz. Fixed at 48000 for slice 1. |
+| `masterGain` | `float` | No (V1.2, additive) | Root master gain, linear 0.0-2.0. ABSENT on older documents = 1.0 (every consumer defaults it). Applied as the last stage of the mix, identically live and offline. |
 | `tracks` | `array<Track>` | Yes | Ordered list of tracks. May be empty. |
 
 ### Track

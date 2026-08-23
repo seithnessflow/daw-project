@@ -32,6 +32,44 @@ h1 {
   border-radius: var(--r);
   padding: 4px 14px 3px;
 }
+/* ---- Master strip (V1.2): fader + stereo VU + dB ---------------- */
+.master-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.master-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--text-3);
+}
+.master-vu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 90px;
+}
+.master-vu-bar {
+  height: 4px;
+  width: 0%;
+  border-radius: 2px;
+  background: var(--green);
+  transition: width 60ms linear;
+}
+.master-vu-bar.clipping {
+  background: #e03131;  /* > -1 dBFS: the ear's red line */
+}
+#master-gain {
+  width: 110px;
+}
+.master-db {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+  min-width: 52px;
+  color: var(--text-2);
+}
+
 .status {
   display: flex;
   gap: 12px;

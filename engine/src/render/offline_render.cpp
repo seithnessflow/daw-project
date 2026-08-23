@@ -198,6 +198,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
     graph_ptr->setSampleRate(sample_rate);
 
     const auto& doc = document.getDocument();
+    graph_ptr->setMasterGain(doc.master_gain);  // V1.2: same stage as live
 
     for (const auto& track_def : doc.tracks) {
         graph::AudioTrack track;
