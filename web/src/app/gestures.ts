@@ -49,6 +49,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   const onMove = (ev: PointerEvent) => {
     const dx = ev.clientX - startX;
     if (!moved && Math.abs(dx) < 3) return;    // click, not yet a drag
+    if (!moved) ctx.project!.beginUndoGroup(); // V1.3: one gesture = one undo
     moved = true;
     clipEl.classList.add('dragging');
     let sec = Math.max(0, origSec + dx / TIMELINE.pps);
@@ -80,6 +81,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
       ctx.project!.setClipStart(trackId, clipId, pendingSec * sr);
+      ctx.project!.endUndoGroup();  // V1.3
       sendLastChange();
       renderTracks(true);
     } else {
@@ -141,6 +143,7 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
   const onMove = (ev: PointerEvent) => {
     const dx = ev.clientX - startX;
     if (!moved && Math.abs(dx) < 3) return;
+    if (!moved) ctx.project!.beginUndoGroup(); // V1.3: one gesture = one undo
     moved = true;
     clipEl.classList.add('dragging');
     if (side === 'right') {
@@ -185,6 +188,7 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
       flushBounds();
+      ctx.project!.endUndoGroup();  // V1.3
       renderTracks(true);
     } else {
       // A plain click on an edge SELECTS the clip, exactly like the

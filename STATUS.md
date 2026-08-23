@@ -41,7 +41,7 @@ interdisait le produit).
 | Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 23/23 |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000 |
-| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 22/22 |
+| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 23/23 |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 

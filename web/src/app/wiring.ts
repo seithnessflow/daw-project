@@ -159,6 +159,13 @@ export async function init(): Promise<void> {
     console.log('Disconnected from engine');
   };
 
+  // V1.3: master sweeps coalesce into one undo entry, like track faders
+  els.masterGain.addEventListener('pointerdown', () => {
+    ctx.project?.beginUndoGroup();
+    window.addEventListener('pointerup',
+      () => ctx.project?.endUndoGroup(), { once: true });
+  });
+
   // V1.2: master fader -> document (same road as track gains)
   els.masterGain.addEventListener('input', () => {
     if (!ctx.project) return;
@@ -352,6 +359,20 @@ export async function init(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     const tag = (e.target as HTMLElement).tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+
+    // V1.3: undo/redo FIRST - and before the zoom branch below, whose
+    // bare KeyZ test used to swallow Ctrl+Z into a zoom (ultra-found bug).
+    if (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault();
+      if (ctx.project?.undo(sendLastChange)) renderTracks(true);
+      return;
+    }
+    if ((e.code === 'KeyY' && (e.ctrlKey || e.metaKey)) ||
+        (e.code === 'KeyZ' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
+      e.preventDefault();
+      if (ctx.project?.redo(sendLastChange)) renderTracks(true);
+      return;
+    }
     // Delete: remove the selected clip; selection CLEARED (Ableton)
     if ((e.code === 'Delete' || e.code === 'Backspace') &&
         ctx.selectedClipId && ctx.project) {
@@ -414,8 +435,9 @@ export async function init(): Promise<void> {
       fitAll();
     } else if (e.code === 'KeyH') {
       document.body.classList.toggle('compact-tracks');
-    } else if (e.code === 'KeyZ') {
-      // Zoom to the marker's neighborhood; X pops back (Ableton Z/X)
+    } else if (e.code === 'KeyZ' && !e.ctrlKey && !e.metaKey) {
+      // Zoom to the marker's neighborhood; X pops back (Ableton Z/X).
+      // Modifier guard: without it, Ctrl+Z zoomed (ultra bug, fixed V1.3).
       ctx.zoomStack.push({ pps: TIMELINE.pps, scrollLeft: els.tracks.scrollLeft });
       const windowSec = 8;
       const pps = (rect.width - TIMELINE.headWidth) / windowSec;

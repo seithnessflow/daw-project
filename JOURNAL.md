@@ -370,6 +370,22 @@ Setter d'authoring cote moteur (famille addTrack). Tests : moteur 23/23
 roundtrip du champ) ; e2e 22/22 (master-gain.spec : convergence 2
 onglets, patron critere 3). SCHEMA.md a jour.
 
+**2026-08-23 (V1.3 — Ctrl+Z. Enfin.) :** journal d'inverses TYPES
+(web/src/document/undo.ts) : chaque mutateur local capture son inverse
+AVANT d'appliquer ; undo = rejeu en NOUVEAUX changes (les heads ne
+reculent jamais — le travail distant survit par construction, prouve
+par spec 2 onglets). Groupes de geste (begin/endUndoGroup, premiere
+capture par cible) : un drag de 60 ecritures = UNE entree, faders piste
+ET master inclus (pointerdown/up). Cas limites du challenge tous
+implantes : deleteClip inverse = addClip 5 champs meme id ; param
+NOUVEAU inverse = splice (removeProcessorParam ne) ; deleteTrack ne
+comme inverse d'addTrack (TrackDef complet) ; load() vide les piles ;
+routage du rejeu (undo->redo, redo->undo) ; ops distantes = zero
+contact avec les piles. BUG l'ultra corrige : KeyZ sans garde de
+modificateur — Ctrl+Z zoomait. Piles bornees 100. Tests : e2e 23/23
+dont undo-redo.spec (5 invariants : geste=1 entree, restauration
+convergente, geste distant intact, redo vide, pas de vol de zoom).
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

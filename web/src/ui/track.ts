@@ -18,6 +18,7 @@
 
 import type { TrackDef, ProcessorDef } from '../document/schema';
 import { clampSamples, cssId } from '../document/sanitize';
+import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
 
 /** Timeline scale, shared by tracks, ruler and playhead. */
 export const TIMELINE = {
@@ -125,6 +126,12 @@ export function createTrackUI(
     onGainChange(gain);
   });
   faderInput.addEventListener('click', (e) => e.stopPropagation());
+  // V1.3: one fader SWEEP = one undo entry (the input storm coalesces)
+  faderInput.addEventListener('pointerdown', () => {
+    ctx.project?.beginUndoGroup();
+    window.addEventListener('pointerup',
+      () => ctx.project?.endUndoGroup(), { once: true });
+  });
 
   faderContainer.appendChild(faderInput);
   const meter = document.createElement('div');
