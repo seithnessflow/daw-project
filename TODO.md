@@ -643,10 +643,13 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 ## signaling texte (serveur verbatim), JamChannel (1 diffuseur/projet,
 ## JOIN des auditeurs, STUN seul), latence ping mesuree au badge,
 ## file de signaling anti-CONNECTING + reassert (le bug de la
-## premiere spec). RESTE : S8c ecoute — tap -> AudioWorklet ->
-## MediaStream addTrack cote diffuseur ; lecture + tranche JAM cote
-## auditeur ; latence bout-en-bout affichee ; puis le test REEL deux
-## machines (portable).
+## premiere spec). S8c FAIT 2026-08-24 : tap -> worklet tap-player
+## (FIFO 50 blocs drop-oldest) -> MediaStreamDestination -> addTrack ;
+## auditeur joue (autoplay gere, badge « clic pour le son ») ; garde =
+## track distant live/false (les frames RTP arrivent) avec le vrai
+## moteur. LA TRANCHE S8 EST COMPLETE EN LOCAL. RESTE : le test REEL
+## deux machines (le portable ECOUTE la tour — manip utilisateur a
+## l'oreille), TURN (dette datee), mesure CPU worklet (dette).
 ## (c'est LUI qu'on coupe s'il deborde.)
 ## Rappel de la revue : la preuve est calibree sur le plugin le plus
 ## gentil du monde — latence nulle, etat minuscule, deterministe,

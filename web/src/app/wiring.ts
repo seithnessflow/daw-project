@@ -26,6 +26,7 @@ import { startPlayback, stopPlayback } from './transport';
 import { beginClipDrag, beginClipResize, beginFadeDrag, markLanded } from './gestures';
 import { toggleHelp, isHelpOpen } from '../ui/help';
 import { JamChannel } from '../network/jam';
+import { JamAudio } from '../network/jam_audio';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 
@@ -216,11 +217,13 @@ export async function init(): Promise<void> {
   // S8b: the jam traversal - one broadcaster per project, listeners
   // answer; latency MEASURED over the data channel and displayed.
   const jam = new JamChannel(serverClient);
+  const jamAudio = new JamAudio();
   (window as any).__dawJam = jam;
+  (window as any).__dawJamAudio = jamAudio;
   jamReassert = () => jam.reassert();
   const jamBtn = document.getElementById('jam-btn') as HTMLButtonElement;
   let jamBadge: HTMLElement | null = null;
-  jam.onStateChange = () => {
+  const renderJamBadge = () => {
     const peers = jam.peerCount();
     const lat = [...jam.latencyMs.values()];
     if (!jamBadge && jam.role !== 'idle') {
@@ -231,19 +234,39 @@ export async function init(): Promise<void> {
     }
     if (jamBadge) {
       jamBadge.dataset.state = peers > 0 ? 'connected' : jam.role;
+      const audio =
+        jamAudio.playbackState === 'playing' ? ' ▶' :
+        jamAudio.playbackState === 'blocked' ? ' (clic pour le son)' : '';
       jamBadge.textContent = jam.role === 'idle' ? 'jam off'
         : `jam ${jam.role === 'broadcasting' ? 'diffuse' : 'ecoute'} ${peers} pair(s)` +
-          (lat.length ? ` ${Math.max(...lat)} ms` : '');
+          (lat.length ? ` ${Math.max(...lat)} ms` : '') + audio;
     }
     jamBtn.setAttribute('aria-pressed', jam.role === 'broadcasting' ? 'true' : 'false');
   };
+  jam.onStateChange = renderJamBadge;
+  jamAudio.onStateChange = renderJamBadge;
+  // S8c: the listener PLAYS what arrives
+  jam.onRemoteTrack = (stream) => jamAudio.playRemote(stream);
+  // S8c: the broadcaster's outgoing stream (built before offers fly)
+  let jamStream: MediaStream | null = null;
+  jam.localStreamProvider = () => jamStream;
+  const startBroadcastWithAudio = async () => {
+    jamStream = await jamAudio.initBroadcast();
+    engineClient.setTap(true);   // the tap feeds the worklet
+    jam.startBroadcast();
+  };
   jamBtn.addEventListener('click', () => {
-    if (jam.role === 'broadcasting') jam.stop();
-    else { if (jam.role === 'listening') jam.stop(); jam.startBroadcast(); }
+    if (jam.role === 'broadcasting') {
+      jam.stop();
+      jamAudio.stop();
+    } else {
+      if (jam.role === 'listening') { jam.stop(); jamAudio.stop(); }
+      void startBroadcastWithAudio();
+    }
   });
   {
     const mode = new URLSearchParams(window.location.search).get('jam');
-    if (mode === 'broadcast') jam.startBroadcast();
+    if (mode === 'broadcast') void startBroadcastWithAudio();
     else if (mode === 'listen') jam.startListen();
   }
 
@@ -253,10 +276,12 @@ export async function init(): Promise<void> {
   let tapNextSeq = -1;
   let tapGaps = 0;
   let tapBadge: HTMLElement | null = null;
-  engineClient.onAudioTap = (firstSeq, blockCount, _samples, dropped) => {
+  engineClient.onAudioTap = (firstSeq, blockCount, samples, dropped) => {
     if (tapNextSeq >= 0 && firstSeq !== tapNextSeq) tapGaps++;
     tapNextSeq = firstSeq + blockCount;
     tapBlocks += blockCount;
+    // S8c: when broadcasting, the tap IS the outgoing jam audio
+    if (jam.role === 'broadcasting') jamAudio.feed(samples, blockCount);
     if (!tapBadge) {
       tapBadge = document.createElement('div');
       tapBadge.className = 'status-item';

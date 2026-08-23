@@ -615,6 +615,21 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (S8c — l'audio DANS le tuyau : la tranche streaming est
+fonctionnellement complete en local) :** le diffuseur nourrit un
+AudioWorklet tap-player (FIFO bornee 50 blocs, en retard = drop du
+plus VIEUX pour rester live, underruns comptes) depuis les lots
+AudioTap ; sa sortie va dans un MediaStreamAudioDestinationNode dont
+le stream monte dans la RTCPeerConnection (Opus et jitter = le
+navigateur). L'auditeur joue le stream distant (<audio>, politique
+d'autoplay geree : bloque -> « clic pour le son » au badge, un geste
+relance). LA PREUVE PAR CONSTRUCTION dans la spec : en WebRTC
+Chromium, track.muted ne passe a false QUE quand des frames RTP
+arrivent — la garde asserte live/false chez l'auditeur avec le VRAI
+moteur tape en amont. Vert du premier coup. La tranche S8 est
+complete en LOCAL ; restent le test REEL deux machines (le portable
+ECOUTE la tour, latence affichee a l'oreille) et TURN en dette datee.
+
 **2026-08-24 (S8b — la traversee : deux onglets se connectent en
 P2P) :** le signaling voyage en TEXTE sur le WS document (prefixe
 `signal:`, relais serveur VERBATIM — il ne parse jamais la charge,
