@@ -104,7 +104,10 @@ while ((Get-Date) -lt $deadline) {
 }
 if (-not $webReady) { Write-Error "Web (vite) did not come up on 5173" }
 
-$url = "http://localhost:5173/?project=$PROJECT&token=$token&starter=1"
+# 1pre: token in the FRAGMENT (never sent to any server, absent from
+# logs/history/Referer). The page reads #token first, then falls back to
+# the local /api/engine-token endpoint (zero-paste path).
+$url = "http://localhost:5173/?project=$PROJECT&starter=1#token=$token"
 
 # ---- Open the browser (unless muted verification run) ----
 if (-not $Mute) { Start-Process $url }

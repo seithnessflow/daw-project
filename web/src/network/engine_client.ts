@@ -38,6 +38,10 @@ export class EngineClient {
 
   onConnect: (() => void) | null = null;
   onDisconnect: (() => void) | null = null;
+  /** 1pre: called when the engine rejects our token (close 4001) -
+   *  returns a fresh token or null. ONE silent retry, never a loop. */
+  tokenRefresher: (() => Promise<string | null>) | null = null;
+  private refreshedOnce = false;
   onPosition: ((samples: number, sampleRate: number) => void) | null = null;
   onMeters: ((meters: MeterData[]) => void) | null = null;
   onState: ((state: EngineState) => void) | null = null;
@@ -95,9 +99,21 @@ export class EngineClient {
           resolve();
         };
 
-        this.ws.onclose = (event) => {
+        this.ws.onclose = async (event) => {
           console.log('Engine WebSocket closed:', event.code, event.reason);
           this.onDisconnect?.();
+          // 4001 = the engine refused THIS token (distinct signature,
+          // proven live 2026-08-23). Stale after an engine restart:
+          // re-fetch and retry once, silently.
+          if (event.code === 4001 && this.tokenRefresher && !this.refreshedOnce) {
+            this.refreshedOnce = true;
+            const fresh = await this.tokenRefresher();
+            if (fresh) {
+              this.token = fresh;
+              this.connect().catch(console.error);
+              return;
+            }
+          }
           this.scheduleReconnect();
         };
 
@@ -203,6 +219,7 @@ export class EngineClient {
   }
 
   private handleMessage(data: ArrayBuffer): void {
+    this.refreshedOnce = false;  // data flowing = token accepted
     const msg = decodeMessage(data);
     if (!msg) {
       console.warn('Failed to decode engine message');

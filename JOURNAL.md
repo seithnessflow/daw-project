@@ -284,6 +284,18 @@ concevoir. REGLE GRAVEE dans CLAUDE.md : une cible plus petite que ses
 propres poignees est inatteignable (fades/automation/marqueurs :
 verifier a chaque poignee).
 
+**2026-08-23 (session 1pre — le token sans copier-coller) :** le geste
+fondateur « j'ouvre le site, ca marche » tient au niveau dev :
+resolution fragment -> query legacy -> endpoint local /api/engine-token
+(le serveur de dev lit %TEMP%, la page ne peut pas ; reponse illisible
+cross-origine faute de CORS, LNA par-dessus). La regle 4001 est cablee
+et PROUVEE sur un restart moteur reel : token perime -> re-fetch + une
+retentative silencieuse, l'onglet reverdit sans rechargement. daw.ps1
+passe au fragment (M4 attenue : le token ne voyage plus en query).
+Garde : token-zero-paste.spec. Le chemin site-distant (moteur qui sert
+son token Origin-gate, ou lancement-fragment seul) reste date dans
+TODO/ADR-019 — non bloquant pour 1bis.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

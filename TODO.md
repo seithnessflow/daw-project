@@ -76,7 +76,20 @@ dedouble). Ordre :
           du differenciateur.
        Le reste de la liste ATTEND (fades = candidats au degel, PAS
        degeles ; grille, master meter, renommage, tempo).
-1pre. [ ] MECANISME DE LIVRAISON DU TOKEN (a trancher AVANT 1bis —
+1pre. [x] MECANISME DE LIVRAISON DU TOKEN — FAIT 2026-08-23 (etage
+       dev, suffisant pour 1bis ou chaque machine porte sa stack) :
+       resolution FRAGMENT (#token, lancements moteur/daw.ps1) ->
+       query (legacy) -> endpoint local /api/engine-token (vite
+       middleware lit %TEMP%, la page ne peut pas ; pas de CORS =
+       illisible cross-origine, LNA par-dessus). REGLE 4001 CABLEE :
+       token refuse -> re-fetch + UNE retentative silencieuse (marche
+       apres un RESTART moteur reel, sans recharger l'onglet). Garde :
+       token-zero-paste.spec (2 invariants : pastille verte sans aucun
+       token dans l'URL ; recovery 4001 apres kill+restart moteur).
+       RESTE (production, quand le site sera distant — date, pas
+       bloquant pour 1bis) : le moteur sert le token lui-meme
+       (Origin-gate) OU lancement-fragment seul ; consigne ADR-019.
+       (item d'origine : a trancher AVANT 1bis —
        decouvert par le 4001 accidentel du harnais LNA 2026-08-23) :
        une page servie d'un domaine distant ne peut pas lire
        %TEMP%\daw-engine-token-<port>. Option de tete (reviewer
