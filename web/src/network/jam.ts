@@ -155,7 +155,16 @@ export class JamChannel {
     if (msg.to && msg.to !== this.server.id) return;           // directed elsewhere
     try {
       if (msg.kind === 'offer' && !msg.sdp) {
-        // JOIN request from a listener - only the broadcaster answers
+        // Empty offer = JOIN request (listener) or ANNOUNCE (a
+        // broadcaster that just started). A waiting listener must
+        // RAISE ITS HAND again on an announce - otherwise a listener
+        // that arrived FIRST never hooks a later broadcaster (found
+        // live: 'jam diffuse 0 pair(s)' on the real two-machine run).
+        if (this.role === 'listening' && !msg.to &&
+            this.peerCount() === 0 && !this.peers.has(msg.from)) {
+          this.send({ jam: true, from: this.server.id, kind: 'offer' });
+          return;
+        }
         if (this.role !== 'broadcasting') return;
         const pc = this.newPeer(msg.from);
         const ch = pc.createDataChannel('jam-ctl');
