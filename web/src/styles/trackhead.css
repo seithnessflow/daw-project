@@ -36,14 +36,17 @@
   border-radius: 2px;
   background: var(--surface-3);
   color: var(--text-2);
+  transition: background-color 90ms ease, box-shadow 90ms ease;
 }
 .monitor-mute[aria-pressed='true'] {
   background: var(--orange);
   color: #241605;
+  box-shadow: 0 0 6px rgba(207, 138, 60, 0.4);
 }
 .monitor-solo[aria-pressed='true'] {
   background: var(--blue);
   color: #0a1a29;
+  box-shadow: 0 0 6px rgba(79, 143, 208, 0.45);
 }
 .track-fader {
   display: flex;

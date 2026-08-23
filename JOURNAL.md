@@ -587,3 +587,17 @@ statuts en pilules a halo. CSS pur les deux fois — zero DOM, les
 specs sensibles a la geometrie re-vertes (l'unique rouge etait la
 collision de port 47821 documentee, pas la CSS). Traces :
 traces/refonte-t1/.
+
+**2026-08-23 (refonte, tranches 3-6 — la premiere passe complete) :**
+t3 zone pistes (heads en couches, selection teintee potion, faders a
+gorge et curseur eclaire, vumetres a lunette, clips decolles du
+couloir, halo de selection passe au potion A INTENSITE EGALE — la loi
+session B « lisible a toute largeur » intacte) ; t4 devices (cartes en
+couches, bypass = LAMPE ambre allumee/enfoncee eteinte) ; t5 kit +
+overlays (chips en relief, arme = vert luisant, aide flottante sur
+fond floute) ; t6 micro-interactions avec la regle gravee : seule la
+LUMIERE transitionne — jamais la geometrie des clips (les drags
+ecrivent left/width en direct et la main ne doit jamais attendre), ni
+les vumetres (la balistique appartient a la couche life). Les six
+tranches sont passees UNE fois ; la directive « au fur et a mesure »
+les garde ouvertes aux passes suivantes.

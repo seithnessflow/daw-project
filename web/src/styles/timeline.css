@@ -103,9 +103,15 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* refonte t3: clips LIFT off the lane */
+  /* refonte t3: clips LIFT off the lane. t6: only LIGHT ever
+     transitions - geometry (left/width) is written live by drags and
+     must never lag behind the hand. */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  transition: filter 90ms ease, box-shadow 90ms ease;
+}
+.clip:hover:not([aria-selected='true']) {
+  filter: brightness(1.08);
 }
 .clip-name {
   flex: 0 0 13px;

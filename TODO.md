@@ -38,9 +38,19 @@ avant refonte, trace visuelle par tranche). Ordre des tranches :
 4. [x] PANNEAU DEVICES — FAIT 2026-08-23 (055261f) : cartes en
        couches, barres de titre eclairees, bypass = LAMPE (ambre
        allumee avec halo / enfoncee eteinte).
-5. [ ] PALETTE/KIT + OVERLAYS (aide, starter, messages d'etat).
-6. [ ] MICRO-INTERACTIONS : hover/focus/transitions, coherence des
-       curseurs, feedbacks de geste.
+5. [x] PALETTE/KIT + OVERLAYS — FAIT 2026-08-23 (3632e59) : chips en
+       relief, arme = munitions vertes luisantes, aide en panneau
+       flottant sur fond floute.
+6. [x] MICRO-INTERACTIONS — FAIT 2026-08-23 : transitions de LUMIERE
+       seulement (jamais la geometrie — les drags ecrivent left/width
+       en direct), hover de clip, halos M/S presses, menu + device
+       anime 90 ms. REGLE GRAVEE : ni transition sur les vumetres
+       (la balistique appartient a la couche life), ni sur la
+       geometrie des clips.
+       LA REFONTE 6/6 EST PASSEE UNE PREMIERE FOIS — les tranches
+       restent OUVERTES aux passes suivantes (le « au fur et a
+       mesure » de la directive : chaque session peut re-passer une
+       tranche avec un cran d'ambition de plus).
 
 ## TRANCHE 3 — LE DIFFERENCIATEUR (ADR-019, recadrage 2026-08-23)
 
