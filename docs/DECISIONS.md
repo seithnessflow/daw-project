@@ -655,6 +655,26 @@ Hash de reference: 89f1a1105dc09e92
 Toute deviation fait echouer `daw_engine_test` (CI comprise). Mise a jour du
 hash uniquement pour un changement de rendu delibere et documente ici.
 
+### 2026-08-23 — graine de document DETERMINISTE PAR COPIE (A4-3)
+
+Le document racine commun a tous les etages est genere UNE FOIS
+(`web/scripts/make-seed.mjs` : acteur fixe `da5eed00...`, time 0, les
+2 pistes par defaut) et VENDORE en octets identiques : le serveur Rust
+l'embarque (`include_bytes!("seed.am")`), le web le charge en
+placeholder (`seed.ts`, base64 du meme fichier). Deux options
+rejetees : construction identique dans chaque langage (pari fragile
+sur le determinisme d'encodage inter-implementations) et edition
+bloquee avant premier contact (tue le hors-ligne). Consequence : tout
+placeholder et tout nouveau projet serveur partagent la MEME racine ->
+les editions faites AVANT le premier contact mergent au lieu d'etre
+ecrasees. NE JAMAIS regenerer la graine a la legere : de nouveaux
+octets = une nouvelle racine = exactement le conflit qu'elle previent.
+sha256 de la graine : e0d16a34c4b75464a791e655ca760803f608912383e9f9
+918c97b650dcc83b21 (320 octets). Limite ecrite : les projets NES AVANT
+la graine gardent leur racine historique — pour eux, le cas
+« editer hors-ligne puis premier contact » reste un conflit de racines
+(accepte, date).
+
 ### 2026-08-23 — nouveau hash de reference `56729beb61993cd7` (V1.6 fades)
 
 Changement de rendu DELIBERE : le fade implicite anti-clic de 4 ms

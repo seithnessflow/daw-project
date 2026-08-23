@@ -33,10 +33,25 @@ dedouble). Ordre :
        (session courte, 30 s de mains) : comportement au refus,
        memorisation, annulation ; + logguer les connexions acceptees
        cote moteur (le log etait muet pendant la preuve).
-1. [ ] CRITERE 3 VRAIMENT VRAI (= ordre AUDIT-4 item 2 ci-dessous,
-       REQUALIFIE fondation du multi-machine : le trio deps-manquantes
-       est exactement le bug que deux machines sur deux reseaux
-       declencheront en premier).
+1. [x] CRITERE 3 VRAIMENT VRAI — FAIT 2026-08-23 (ouverture de
+       l'entrelacs, meme soir que la cloture vague 1). A4-1 refus
+       bruyant serveur (get_missing_deps apres load_incremental,
+       jamais broadcast sans persist reel), A4-2 getMissingDeps cote
+       JS -> applyChange false -> resync, A4-3 GRAINE COMMUNE VENDORED
+       (make-seed.mjs, octets identiques web/serveur, premier contact
+       = merge+push, plus de load destructeur, demarrage sans serveur
+       editable), A4-1c fermeture sur echec de save initial, A4-4
+       heartbeat 'hb' 15 s + watchdog 45 s onglet. Gardes : cargo test
+       7/7, sync-resilience.spec (3 invariants dont serveur-demarre-
+       apres). Reserve critere 3 (2 onglets) levee dans STATUS.
+       LIMITE ECRITE : un VIEUX projet (racine pre-graine) ne merge
+       pas des editions faites hors-ligne avant premier contact (deux
+       racines etrangeres) — s'applique aux projets nes apres.
+       DECOUVERTE de la garde : les vieux docs (default.am) portent
+       des deps manquantes PERMANENTES (cicatrices ere A4-1) -> le
+       refus se mesure en DELTA (un change qui en AJOUTE), jamais en
+       absolu (boucle de resync infinie sinon) ; auto-guerison au
+       premier contact (la graine poussee une fois, adoptee).
 0pre. [~] ARBITRAGE POST-SEANCE-MUSIQUE (2026-08-23, compte-rendu de la
        premiere seance utilisateur complete — 203 clips, AGain, rendu
        48 s). ORDRE RE-ARBITRE 2026-08-23 (2e passe utilisateur) :
@@ -111,8 +126,14 @@ dedouble). Ordre :
        NOUVEAU HASH DE REFERENCE 56729beb61993cd7 (DECISIONS.md).
        VAGUE 1 COMPLETE : V1.1 boucle/arret, V1.2 master, V1.3 undo,
        V1.4 visibilite, V1.5 devices+eviction, V1.6 fades. Prochain
-       cap grave : ENTRELACS (critere-3-vrai A4-1/2/3 + heartbeat,
-       puis design placement SCHEMA v2 avec clips MIDI co-designes).
+       cap grave : ENTRELACS (critere-3-vrai A4-1/2/3 + heartbeat
+       FAIT, puis design placement SCHEMA v2 avec clips MIDI
+       co-designes — DOSSIER ECRIT docs/SCHEMA-V2-DESIGN.md, statut
+       PROPOSITION a ratifier : cle de stem cache-d'entrees, stem par
+       DERNIER noeud vst3 de la chaine (raffinement par-noeud = dette),
+       PDC declaree (stemLatencySamples), etat plugin stateHash +
+       stateVersion LWW hors CRDT, notes MIDI en map a ids stables ;
+       tout ADDITIF, migrate() reste vierge jusqu'au tempo).
 1pre. [x] MECANISME DE LIVRAISON DU TOKEN — FAIT 2026-08-23 (etage
        dev, suffisant pour 1bis ou chaque machine porte sa stack) :
        resolution FRAGMENT (#token, lancements moteur/daw.ps1) ->

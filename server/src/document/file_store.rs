@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use automerge::Automerge;
+use automerge::{Automerge, ReadDoc};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -77,16 +77,36 @@ impl ProjectStore for FileStore {
     async fn apply_change(&self, project_id: &str, change: &[u8]) -> Result<()> {
         let path = self.project_path(project_id)?;
 
-        // Load existing or create new
+        // Load existing, or start from the SEED (A4-3: a change for a
+        // brand-new project can only be seed-rooted; an empty doc would
+        // reject it as missing-deps below, which is the point)
         let mut doc = if path.exists() {
             let data = fs::read(&path).await?;
             Automerge::load(&data)?
         } else {
-            Automerge::new()
+            Automerge::load(super::SEED_DOC)?
         };
+
+        // A4-1: automerge-rs queues a change whose dependencies are
+        // missing WITHOUT error - "Ok" here used to mean "silently
+        // dropped, then broadcast anyway". Refuse loudly instead; the
+        // caller must NOT broadcast a change the disk does not hold.
+        // DELTA, not absolute: documents scarred by the pre-guard era
+        // carry historical missing deps forever - only a change that
+        // ADDS missing deps (its own deps absent) is the Lagged case.
+        let missing_before = doc.get_missing_deps(&[]).len();
 
         // Apply the change
         doc.load_incremental(change)?;
+
+        let missing = doc.get_missing_deps(&[]);
+        if missing.len() > missing_before {
+            anyhow::bail!(
+                "change refused: {} missing dependenc{} (out-of-order delivery or foreign root)",
+                missing.len() - missing_before,
+                if missing.len() - missing_before == 1 { "y" } else { "ies" }
+            );
+        }
 
         // Save back (atomic: same guarantee as save())
         let data = doc.save();
@@ -123,5 +143,71 @@ impl ProjectStore for FileStore {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::document::ProjectStore;
+    use automerge::{transaction::Transactable, AutoCommit, ROOT};
+
+    /// A4-1 guard: the exact Lagged/skip scenario. A change whose
+    /// dependency was never delivered must be REFUSED (bail), never
+    /// silently queued-then-dropped-then-"Ok". In order, it applies.
+    #[tokio::test]
+    async fn apply_change_refuses_missing_deps() {
+        let dir = std::env::temp_dir().join("daw-store-a41-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = FileStore::new(&dir).unwrap();
+
+        // Seed-rooted doc, then two dependent changes c1 -> c2
+        let mut doc = AutoCommit::load(super::super::SEED_DOC).unwrap();
+        let heads0 = doc.get_heads();
+        doc.put(ROOT, "sampleRate", 44100i64).unwrap();
+        let heads1 = doc.get_heads();
+        doc.put(ROOT, "sampleRate", 96000i64).unwrap();
+        let heads2 = doc.get_heads();
+        let c1 = doc.get_change_by_hash(&heads1[0]).unwrap().raw_bytes().to_vec();
+        let c2 = doc.get_change_by_hash(&heads2[0]).unwrap().raw_bytes().to_vec();
+        assert_ne!(heads0, heads1);
+
+        // Out of order: c2 alone (its dep c1 was "skipped") -> refusal
+        let err = store.apply_change("a41", &c2).await;
+        assert!(err.is_err(), "missing-dep change must be refused");
+        assert!(format!("{}", err.unwrap_err()).contains("missing dependenc"));
+
+        // In order: c1 then c2 both apply, document holds the final value
+        store.apply_change("a41", &c1).await.unwrap();
+        store.apply_change("a41", &c2).await.unwrap();
+        let stored = store.load("a41").await.unwrap().unwrap();
+        let stored_doc = Automerge::load(&stored).unwrap();
+        let (value, _) = stored_doc.get(ROOT, "sampleRate").unwrap().unwrap();
+        assert_eq!(value.to_i64().unwrap(), 96000);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A4-3 guard: a change made on the vendored seed applies to a
+    /// BRAND-NEW project (no file on disk) - the store starts from the
+    /// seed, not from an empty doc that would reject everything.
+    #[tokio::test]
+    async fn apply_change_seeds_new_project() {
+        let dir = std::env::temp_dir().join("daw-store-a43-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let store = FileStore::new(&dir).unwrap();
+
+        let mut doc = AutoCommit::load(super::super::SEED_DOC).unwrap();
+        doc.put(ROOT, "masterGain", 0.5f64).unwrap();
+        let heads = doc.get_heads();
+        let c = doc.get_change_by_hash(&heads[0]).unwrap().raw_bytes().to_vec();
+
+        store.apply_change("a43", &c).await.unwrap();
+        let stored = store.load("a43").await.unwrap().unwrap();
+        let stored_doc = Automerge::load(&stored).unwrap();
+        let (value, _) = stored_doc.get(ROOT, "masterGain").unwrap().unwrap();
+        assert_eq!(value.to_f64().unwrap(), 0.5);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

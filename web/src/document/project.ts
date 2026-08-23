@@ -11,8 +11,19 @@
  */
 
 import * as Automerge from '@automerge/automerge';
-import { ProjectDef, TrackDef, ClipDef, ProcessorDef, SCHEMA_VERSION } from './schema';
+import { ProjectDef, TrackDef, ClipDef, ProcessorDef } from './schema';
 import { UndoJournal, type InverseOp } from './undo';
+import { seedBytes } from './seed';
+
+/**
+ * A4-3: every placeholder is the SAME seed document (vendored bytes,
+ * identical on the server) - offline edits made before first server
+ * contact share the server root and MERGE instead of being wiped.
+ * load() gives this doc a fresh random actor for subsequent changes.
+ */
+function seedDoc(): Automerge.Doc<ProjectDef> {
+  return Automerge.load<ProjectDef>(seedBytes());
+}
 
 /** Automerge proxies -> plain JS (deep), for captured snapshots. */
 function plain<T>(v: T): T {
@@ -25,12 +36,7 @@ export class Project {
   private journal = new UndoJournal();
 
   constructor() {
-    // Create empty document with schema
-    this.doc = Automerge.from<ProjectDef>({
-      schemaVersion: SCHEMA_VERSION,
-      sampleRate: 48000,
-      tracks: [],
-    });
+    this.doc = seedDoc();
   }
 
   /**
@@ -41,12 +47,7 @@ export class Project {
       this.doc = Automerge.load<ProjectDef>(data);
     } catch (e) {
       console.error('Failed to load Automerge document:', e);
-      // Fallback to empty document
-      this.doc = Automerge.from<ProjectDef>({
-        schemaVersion: SCHEMA_VERSION,
-        sampleRate: 48000,
-        tracks: [],
-      });
+      this.doc = seedDoc();  // fallback: the shared seed, never a fresh root
     }
     // V1.3: the journal referenced a document that no longer exists
     this.journal.clear();
@@ -55,21 +56,23 @@ export class Project {
   /**
    * Merge a full remote document (Automerge binary) into the local one.
    *
-   * Used on reconnection: the local document is NEVER replaced, so edits
-   * made while offline survive and get reconciled by the CRDT.
+   * Used on EVERY server document (first contact included, A4-3: the
+   * shared seed makes the roots common): the local document is NEVER
+   * replaced, so edits made while offline survive and get reconciled.
    *
-   * @returns true if the merge brought anything new (heads changed)
+   * A4-2 annex: 'error' (bad bytes) is DISTINCT from 'same' (nothing
+   * new) - the caller must resync on 'error', not shrug.
    */
-  mergeRemote(data: Uint8Array): boolean {
+  mergeRemote(data: Uint8Array): 'new' | 'same' | 'error' {
     try {
       const before = Automerge.getHeads(this.doc).join(',');
       const remote = Automerge.load<ProjectDef>(data);
       this.doc = Automerge.merge(this.doc, remote);
       const after = Automerge.getHeads(this.doc).join(',');
-      return before !== after;
+      return before !== after ? 'new' : 'same';
     } catch (e) {
       console.error('Failed to merge remote document:', e);
-      return false;
+      return 'error';
     }
   }
 
@@ -84,8 +87,19 @@ export class Project {
    */
   applyChange(change: Uint8Array): boolean {
     try {
+      // A4-2, the MAIN case: Automerge buffers a change whose deps are
+      // missing WITHOUT throwing (exactly what a lagged/skipped
+      // broadcast produces). Silent buffering = silent divergence -
+      // surface it so the caller resyncs. DELTA, not absolute:
+      // documents scarred by the pre-guard server era carry historical
+      // missing deps forever; only a change that ADDS one is the case.
+      const missingBefore = Automerge.getMissingDeps(this.doc, []).length;
       const [newDoc] = Automerge.applyChanges(this.doc, [change]);
       this.doc = newDoc;
+      if (Automerge.getMissingDeps(this.doc, []).length > missingBefore) {
+        console.warn('Change buffered with missing dependencies');
+        return false;
+      }
       return true;
     } catch (e) {
       console.error('Failed to apply change:', e);

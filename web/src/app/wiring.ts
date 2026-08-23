@@ -58,11 +58,47 @@ export async function init(): Promise<void> {
   // Anti-entropy cycles still owed after a reconnection (see below)
   let resyncCycles = 0;
   serverClient.onDocument = (data) => {
-    if (!hasLoadedInitialDoc) {
-      // Very first document: adopt the server state wholesale (the local
-      // document is a pristine placeholder with no user edits)
-      ctx.project!.load(data);
-      hasLoadedInitialDoc = true;
+    // A4-3: first contact and reconnection take the SAME road - MERGE,
+    // never replace. The vendored seed gives placeholder and server the
+    // same root, so edits made before first contact reconcile instead
+    // of being wiped by load().
+    const firstContact = !hasLoadedInitialDoc;
+    hasLoadedInitialDoc = true;
+    if (!firstContact) {
+      console.log('Reconnected: merging server document into local state');
+    }
+    const hadPending = serverClient.pendingCount() > 0;
+    const merged = ctx.project!.mergeRemote(data);
+    if (merged === 'error') {
+      // A4-2 annex: bad bytes are an ERROR, not "nothing new" - pull
+      // a fresh document instead of silently diverging
+      serverClient.requestResync(500);
+      return;
+    }
+    // A3-4, the push half of anti-entropy: local novelty the server
+    // LACKS (a dead-socket flush, or edits made offline before first
+    // contact) goes back up, in causal order, on EVERY document.
+    const missing = ctx.project!.getMissingChanges(data);
+    if (missing.length > 0) {
+      console.log(`Pushing ${missing.length} change(s) the server lacks`);
+      for (const change of missing) {
+        serverClient.sendChange(change);
+      }
+    }
+    // Whenever an exchange moved anything, demand TWO consecutive
+    // no-op exchanges before stopping the verification cycles. On
+    // FIRST contact the server's novelty is EXPECTED (its doc is a
+    // superset of the placeholder) - only pushes and pending changes
+    // are anomalies there, else every page load would triple-connect.
+    if ((merged === 'new' && !firstContact) || hadPending || missing.length > 0) {
+      resyncCycles = 2;
+    } else if (resyncCycles > 0) {
+      resyncCycles--;
+    }
+    if (resyncCycles > 0) {
+      serverClient.requestResync();
+    }
+    if (firstContact) {
       // First contact via the LAUNCHER (?starter=1): offer the starter
       // choice (demo groove / start empty). Gated on the launcher flag so
       // the e2e harness - which drives raw product mechanics on empty
@@ -73,32 +109,6 @@ export async function init(): Promise<void> {
       if (!LAB_MODE && wantStarter) {
         mountStarter(document.getElementById('starter-slot')!, ctx.project!,
           sendLastChange, () => renderTracks(true));
-      }
-    } else {
-      // Reconnection: MERGE the server document into the local one -
-      // never replace it, so offline edits survive and reconcile
-      console.log('Reconnected: merging server document into local state');
-      const hadPending = serverClient.pendingCount() > 0;
-      const mergedNovelty = ctx.project!.mergeRemote(data);
-      // A3-4, the push half of anti-entropy: local novelty the server
-      // LACKS (a dead-socket flush swallows changes silently) goes back
-      // up, in causal order, on EVERY reconnection.
-      const missing = ctx.project!.getMissingChanges(data);
-      if (missing.length > 0) {
-        console.log(`Pushing ${missing.length} change(s) the server lacks`);
-        for (const change of missing) {
-          serverClient.sendChange(change);
-        }
-      }
-      // Whenever an exchange moved anything, demand TWO consecutive
-      // no-op exchanges before stopping the verification cycles.
-      if (mergedNovelty || hadPending || missing.length > 0) {
-        resyncCycles = 2;
-      } else if (resyncCycles > 0) {
-        resyncCycles--;
-      }
-      if (resyncCycles > 0) {
-        serverClient.requestResync();
       }
     }
     renderTracks();
@@ -543,6 +553,11 @@ export async function init(): Promise<void> {
   });
 
   void contentSeconds;  // (exported for future callers; silence TS 6133)
+
+  // A4-3: draw the seed placeholder BEFORE connecting - a server-less
+  // start must be an editable project, not a blank page (offline edits
+  // merge on first contact thanks to the shared seed root).
+  renderTracks(true);
 
   // ---- Connect ------------------------------------------------------------
   try {

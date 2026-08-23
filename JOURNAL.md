@@ -475,3 +475,48 @@ reference chainee sur le temporaire a segfaulte la suite entiere
 (0xC0000005 muet, stdout bufferise perdu). Moteur 25/25
 (testClipFadesRender : rampes explicites 100/50 exactes, implicite
 clampe 150, roundtrip, silence inter-clips).
+
+**2026-08-23 (ENTRELACS ouvre — critere 3 vraiment vrai, round 2) :**
+le trio deps-manquantes AUDIT-4 solde d'un bloc, plus le heartbeat.
+A4-1 : automerge-rs met en file un change a deps manquantes SANS
+erreur et save() ne serialise pas la file — le serveur croyait
+persister, jetait, et broadcastait quand meme ; desormais
+get_missing_deps() non-vide = refus bruyant, rien n'est broadcast que
+le disque ne tient (garde Rust : scenario Lagged reproduit, c2 sans c1
+refuse, dans l'ordre ca passe). A4-2 : meme silence cote JS —
+applyChanges bufferise sans exception ; applyChange lit
+getMissingDeps apres coup et rend false -> resync (garde spec :
+c2 seul = false, c1 arrive = tout s'integre). A4-3, le choix de
+conception : GRAINE DETERMINISTE PAR COPIE, pas par construction —
+make-seed.mjs genere UNE FOIS les octets Automerge (acteur fixe
+da5eed..., time 0, les 2 pistes par defaut) ; le serveur les embarque
+(include_bytes!), le web charge les memes octets en placeholder ;
+zero pari sur le determinisme inter-langages. Premier contact =
+MERGE + push (le meme chemin que la reconnexion), load() destructeur
+supprime ; un demarrage sans serveur dessine la graine et reste
+editable (le placeholder n'etait JAMAIS rendu sans serveur — attrape
+par la spec). A4-1c : echec de save du doc initial = fermeture, plus
+jamais un doc fantome. A4-4 : heartbeat applicatif serveur->clients
+(frame texte 'hb' 15 s, entrelacee au broadcast par select) + watchdog
+45 s cote onglet qui force-close le socket zombie vers la mecanique de
+reconnexion ; le moteur C++ ignore les frames texte par construction
+(msg->binary), les vieux onglets aussi — contrat verifie sur chaque
+consommateur. Gardes : cargo test 7/7 (dont refus-Lagged et
+seed-nouveau-projet), sync-resilience.spec 3 invariants (dont LE
+scenario du remede : serveur eteint, editer, serveur demarre, rien ne
+se perd, l'onglet 2 converge). Reserve du critere 3 (2 onglets) LEVEE
+dans STATUS ; les deux machines ont enfin leur fondation.
+POST-SCRIPTUM qui vaut la session : la garde neuve a EXHUME une
+corruption reelle — projects/default.am porte 3 dependances manquantes
+PERMANENTES, cicatrices de l'ere A4-1 (les changes avales par le vieux
+serveur, references par ceux qui ont suivi). La garde absolue
+(missing != 0 = refus) mettait ces vieux docs en boucle de resync
+INFINIE des deux cotes (le serveur refusait meme la graine poussee,
+l'onglet refusait chaque broadcast). Regle finale gravee : le refus se
+mesure en DELTA — un change qui AJOUTE des deps manquantes est le cas
+Lagged ; les cicatrices historiques se tolerent. Et l'auto-guerison
+marche : au premier contact d'un vieux projet, l'onglet pousse la
+graine (une fois), le serveur l'adopte — default.am est desormais
+seed-racine, plus un churn. Raffinement au passage : au premier
+contact la nouveaute du serveur est ATTENDUE (sinon chaque ouverture
+d'onglet payait 3 connexions de verification).

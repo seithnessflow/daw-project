@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //! WebSocket handler for Automerge sync.
 
-use automerge::{transaction::Transactable, AutoCommit, ObjType, ROOT};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -24,35 +23,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 
-/// Create a default document with 2 test tracks.
-fn create_default_document() -> AutoCommit {
-    let mut doc = AutoCommit::new();
-
-    // Set schema version
-    doc.put(ROOT, "schemaVersion", 1i64).unwrap();
-    doc.put(ROOT, "sampleRate", 48000i64).unwrap();
-
-    // Create tracks array
-    let tracks = doc.put_object(ROOT, "tracks", ObjType::List).unwrap();
-
-    // Track 1
-    let track1 = doc.insert_object(&tracks, 0, ObjType::Map).unwrap();
-    doc.put(&track1, "id", "track-1").unwrap();
-    doc.put(&track1, "name", "Track 1").unwrap();
-    doc.put(&track1, "gain", 1.0f64).unwrap();
-    doc.put_object(&track1, "clips", ObjType::List).unwrap();
-    doc.put_object(&track1, "chain", ObjType::List).unwrap();
-
-    // Track 2
-    let track2 = doc.insert_object(&tracks, 1, ObjType::Map).unwrap();
-    doc.put(&track2, "id", "track-2").unwrap();
-    doc.put(&track2, "name", "Track 2").unwrap();
-    doc.put(&track2, "gain", 0.75f64).unwrap();
-    doc.put_object(&track2, "clips", ObjType::List).unwrap();
-    doc.put_object(&track2, "chain", ObjType::List).unwrap();
-
-    doc
-}
+use crate::document::SEED_DOC;
 
 /// A project id is a FILE STEM: it becomes `<id>.am` under ./projects.
 /// Validate BEFORE any FS join (audit C1: `..\..\evil` on Windows was an
@@ -109,12 +80,14 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
     let doc_data = match state.store.load(&project_id).await {
         Ok(Some(data)) => data,
         Ok(None) => {
-            // Create default document with 2 tracks
-            let mut doc = create_default_document();
-            let data = doc.save();
-            // Persist the new document
+            // New project: persist the SEED (A4-3). A4-1c: a failed save
+            // CLOSES the connection - continuing with a never-persisted
+            // document meant every later change was applied to a doc the
+            // disk did not have, then lost on the next load.
+            let data = SEED_DOC.to_vec();
             if let Err(e) = state.store.save(&project_id, &data).await {
-                tracing::error!("Failed to save default document: {}", e);
+                tracing::error!("Failed to save seed document, closing: {}", e);
+                return;
             }
             data
         }
@@ -131,34 +104,49 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
         return;
     }
 
-    // Spawn task to forward broadcasts to this client
+    // Spawn task to forward broadcasts to this client.
+    // A4-4: interleaved with a 15 s application heartbeat (text "hb") -
+    // JS cannot see WS pings, so the tab's zombie-socket watchdog needs
+    // traffic it can observe. A failed heartbeat send also unmasks a
+    // dead client here, closing the session.
     let session_id_clone = session_id;
     let mut send_task = tokio::spawn(async move {
         let mut msg_count = 0u64;
+        let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(15));
+        heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        heartbeat.tick().await; // first tick fires immediately - consume it
         loop {
-            match rx.recv().await {
-                Ok(msg) => {
-                    let msg_len = msg.len();
-                    match sender.send(Message::Binary(msg)).await {
-                        Ok(_) => {
-                            msg_count += 1;
-                            tracing::info!("Session {}: Forwarded {} bytes to client (total: {})", session_id_clone, msg_len, msg_count);
-                        }
-                        Err(e) => {
-                            tracing::info!("Session {}: WebSocket send failed: {}, closing", session_id_clone, e);
-                            break;
+            tokio::select! {
+                received = rx.recv() => match received {
+                    Ok(msg) => {
+                        let msg_len = msg.len();
+                        match sender.send(Message::Binary(msg)).await {
+                            Ok(_) => {
+                                msg_count += 1;
+                                tracing::info!("Session {}: Forwarded {} bytes to client (total: {})", session_id_clone, msg_len, msg_count);
+                            }
+                            Err(e) => {
+                                tracing::info!("Session {}: WebSocket send failed: {}, closing", session_id_clone, e);
+                                break;
+                            }
                         }
                     }
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    // Receiver fell behind, skip missed messages and continue
-                    tracing::warn!("Session {}: Broadcast receiver lagged by {} messages", session_id_clone, n);
-                    continue;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    // Channel closed (project removed)
-                    tracing::info!("Session {}: Broadcast channel closed (project removed?)", session_id_clone);
-                    break;
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        // Receiver fell behind, skip missed messages and continue
+                        tracing::warn!("Session {}: Broadcast receiver lagged by {} messages", session_id_clone, n);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        // Channel closed (project removed)
+                        tracing::info!("Session {}: Broadcast channel closed (project removed?)", session_id_clone);
+                        break;
+                    }
+                },
+                _ = heartbeat.tick() => {
+                    if let Err(e) = sender.send(Message::Text("hb".to_string())).await {
+                        tracing::info!("Session {}: heartbeat send failed: {}, closing", session_id_clone, e);
+                        break;
+                    }
                 }
             }
         }

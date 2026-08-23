@@ -32,6 +32,18 @@ export class ServerClient {
   // any message-type prefix.
   private awaitingInitialDoc = true;
 
+  // A4-4: dead-peer detection. The server heartbeats every 15 s (text
+  // "hb"); ANY message resets the clock. A half-open socket (sleep,
+  // cable pull) keeps readyState OPEN forever while sendChange writes
+  // into a dead buffer - the watchdog force-closes it, which routes
+  // into the normal reconnect + outbox + anti-entropy machinery.
+  private lastActivity = 0;
+  private watchdogTimer: number | null = null;
+  private static readonly WATCHDOG_INTERVAL_MS = 10_000;
+  private static readonly WATCHDOG_TIMEOUT_MS = 45_000;
+  /** Test/telemetry hook: epoch ms of the last server message. */
+  lastActivityAt(): number { return this.lastActivity; }
+
   // Outbox: changes emitted while disconnected (or before the initial
   // document arrives) accumulate here and are sent, in order, once the
   // initial document of the (re)connection has been delivered.
@@ -71,12 +83,14 @@ export class ServerClient {
         this.ws.onopen = () => {
           console.log('Server WebSocket connected');
           this.awaitingInitialDoc = true;
+          this.startWatchdog();
           this.onConnect?.();
           resolve();
         };
 
         this.ws.onclose = () => {
           console.log('Server WebSocket closed');
+          this.stopWatchdog();
           this.onDisconnect?.();
           this.scheduleReconnect();
         };
@@ -87,6 +101,9 @@ export class ServerClient {
         };
 
         this.ws.onmessage = (event) => {
+          this.lastActivity = Date.now();
+          // A4-4: text frames are heartbeats - never Automerge data
+          if (typeof event.data === 'string') return;
           if (event.data instanceof ArrayBuffer) {
             const data = new Uint8Array(event.data);
             // First message of each connection is the full document,
@@ -113,7 +130,28 @@ export class ServerClient {
   /**
    * Disconnect from the server.
    */
+  private startWatchdog(): void {
+    this.lastActivity = Date.now();
+    if (this.watchdogTimer !== null) return;
+    this.watchdogTimer = window.setInterval(() => {
+      if (Date.now() - this.lastActivity > ServerClient.WATCHDOG_TIMEOUT_MS) {
+        console.warn('Server silent beyond watchdog: closing zombie socket');
+        this.stopWatchdog();
+        // close() fires onclose -> reconnect machinery takes over
+        this.ws?.close();
+      }
+    }, ServerClient.WATCHDOG_INTERVAL_MS);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogTimer !== null) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
   disconnect(): void {
+    this.stopWatchdog();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
