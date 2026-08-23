@@ -571,3 +571,19 @@ Audit du parc : ma-piece INTACTE (203 clips, zero conflit), beat/beat2
 sains, default.am laisse en l'etat (son « perdant » est un monstre de
 1246 pistes de tests — la vue graine est plus saine). Les specs
 offline/criterion3/devices re-vertes apres le fix.
+
+**2026-08-23 (refonte du site, tranches 1-2 — directive utilisateur
+« le site refait completement au fur et a mesure ») :** programme de
+refonte grave au TODO (6 tranches, une par session, chaque tranche
+VISIBLE dans l'onglet ouvert par HMR). Tranche 1, la fondation :
+rampe de profondeur chaude (les surfaces deviennent des COUCHES,
+--surface-4), texte contenu eclairci vs chrome assombri, accent
+POTION violet (titre en degrade, focus, selection) a cote de l'ambre
+d'etat, boutons en vrai relief (hairline + lumiere interne + presse),
+vignette de scene, scrollbars raffinees. Tranche 2, la topbar : barre
+reelle sur surface encadree, transport en CLUSTER encastre (le cadre
+au groupe, pas a chaque touche), horloge phosphore (lueur + lunette),
+statuts en pilules a halo. CSS pur les deux fois — zero DOM, les
+specs sensibles a la geometrie re-vertes (l'unique rouge etait la
+collision de port 47821 documentee, pas la CSS). Traces :
+traces/refonte-t1/.

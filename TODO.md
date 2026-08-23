@@ -27,8 +27,9 @@ avant refonte, trace visuelle par tranche). Ordre des tranches :
        contenu clair vs chrome sombre, accent POTION violet (titre,
        focus, selection) a cote de l'ambre d'etat, boutons en relief,
        vignette de scene. CSS pur, specs geometrie re-vertes.
-2. [ ] TOPBAR + TRANSPORT : hierarchie claire (transport | master |
-       horloge | statuts), etats visibles.
+2. [x] TOPBAR + TRANSPORT — FAIT 2026-08-23 (12c52f3) : barre reelle
+       (surface encadree), cluster transport encastre, horloge
+       phosphore lueur+lunette, statuts en pilules avec halo connecte.
 3. [ ] ZONE PISTES : headers de piste, clips (waveforms, selection,
        fades), regle temporelle.
 4. [ ] PANNEAU DEVICES : chaine lisible, etat/badges, add/remove.
