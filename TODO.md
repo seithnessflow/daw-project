@@ -22,9 +22,11 @@ En PARALLELE du programme : chaque session livre une tranche VISIBLE
 de refonte UI, directement observable dans l'onglet ouvert (HMR).
 Regles inchangees (boucle snap/grille, invariants Playwright verrouilles
 avant refonte, trace visuelle par tranche). Ordre des tranches :
-1. [ ] FONDATION VISUELLE : systeme de couleurs/typo/espacements
-       (tokens CSS), lisibilite generale — la tranche qui change la
-       perception de tout le reste.
+1. [x] FONDATION VISUELLE — FAIT 2026-08-23 (5bc6114) : rampe de
+       profondeur chaude (surfaces = couches, --surface-4), texte
+       contenu clair vs chrome sombre, accent POTION violet (titre,
+       focus, selection) a cote de l'ambre d'etat, boutons en relief,
+       vignette de scene. CSS pur, specs geometrie re-vertes.
 2. [ ] TOPBAR + TRANSPORT : hierarchie claire (transport | master |
        horloge | statuts), etats visibles.
 3. [ ] ZONE PISTES : headers de piste, clips (waveforms, selection,

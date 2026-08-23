@@ -1,9 +1,14 @@
-/* ---- Control bar ---------------------------------------------- */
+/* ---- Control bar (refonte tranche 2: grouped hierarchy) --------- */
 .topbar {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 10px;
+  padding: 6px 10px;
+  background: linear-gradient(rgba(255, 255, 255, 0.02), transparent),
+    var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  border-radius: var(--r);
 }
 h1 {
   margin: 0;
@@ -19,6 +24,10 @@ h1 {
 .transport {
   display: flex;
   gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border-radius: var(--r);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .transport button {
   width: 34px;
@@ -26,13 +35,17 @@ h1 {
   padding: 0;
   font-size: 11px;
   line-height: 26px;
+  box-shadow: none; /* the CLUSTER carries the frame, not each key */
 }
 .position {
   font-family: 'Cascadia Code', Consolas, monospace;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 1px;
   color: #b7d9a8;
-  background: #0d0f0c;
+  text-shadow: 0 0 8px rgba(140, 200, 120, 0.25);
+  background: #0b0d0a;
+  box-shadow: inset 0 0 0 1px rgba(140, 200, 120, 0.12),
+    inset 0 2px 5px rgba(0, 0, 0, 0.5);
   border-radius: var(--r);
   padding: 4px 14px 3px;
 }
@@ -76,7 +89,7 @@ h1 {
 
 .status {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   margin-left: auto;
   font-size: 10px;
   text-transform: lowercase;
@@ -87,14 +100,19 @@ h1 {
   display: flex;
   align-items: center;
   gap: 5px;
+  padding: 2px 8px;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px var(--hair);
 }
 .status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #3d3d3d;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
 }
 .status-dot.connected {
   background: var(--green);
+  box-shadow: 0 0 6px rgba(88, 179, 104, 0.55);
 }
 
