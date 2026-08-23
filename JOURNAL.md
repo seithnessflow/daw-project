@@ -615,6 +615,27 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (LE JAM TRAVERSE — deux machines, deux reseaux, 37 ms) :**
+la sonde pilotee des deux cotes : tour (Ethernet/box) diffuse, portable
+(hotspot telephone) ecoute — connected/connected, track distant
+live/UNMUTED (les frames RTP coulent), latence ping mesuree 37 ms cote
+portable / 46 ms cote tour. STUN A SUFFI : pas de TURN pour ce couple
+de NAT (le risque n1 du dossier tombe pour ce foyer ; TURN reste la
+dette datee pour les NAT stricts). LA TRANCHE DIFFERENCIATEUR EST
+INTEGRALEMENT VIVANTE EN REEL : stems (critere 6 vert, octets +
+oreilles) + streaming (P2P, latence affichee). Le chemin du debug a
+paye deux lecons d'outillage durables : (1) le relay MOURAIT EN
+SILENCE — un client avortant pendant le handshake du tunnel faisait
+jeter handleUpgrade hors de tout catch (guards process-level + skip
+sur socket detruit, commit 0549af0) ; (2) SSHD WINDOWS TUE LES
+PROCESSUS DE SA SESSION a la deconnexion, Start-Process compris — le
+relay renaissait et remourait a chaque session ; remede : spawn par
+WMI (Invoke-CimMethod Win32_Process), survit prouve. Et la sonde qui
+accusait le reseau etait deux fois coupable avant lui (send sur
+CONNECTING sans attendre connected ; fermeture avant le flush).
+Reste la MANIP UTILISATEUR a l'oreille : cliquer JAM sur duo cote
+tour, ecouter le portable.
+
 **2026-08-24 (S8c — l'audio DANS le tuyau : la tranche streaming est
 fonctionnellement complete en local) :** le diffuseur nourrit un
 AudioWorklet tap-player (FIFO bornee 50 blocs, en retard = drop du

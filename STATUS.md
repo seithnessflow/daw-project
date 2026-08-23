@@ -9,8 +9,12 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 **Un pair qui n'a pas le plugin installe entend le resultat du plugin.**
 Etat : **VERT** (smoke S7 deux machines, 2026-08-23) — le portable, sans
 aucun module VST3, a rendu l'octet-pour-octet de la tour a travers le
-store et l'a JOUE dans ses haut-parleurs. Details : critere 6. Reste de
-la tranche : streaming P2P du jam, badge fraicheur, vrais plugins.
+store et l'a JOUE dans ses haut-parleurs. Details : critere 6.
+STREAMING JAM (S8, 2026-08-24) : COMPLET ET PROUVE EN REEL — tour
+diffuse, portable ecoute a travers deux NAT (hotspot/box), frames RTP
+mesurees (track unmuted), latence 37-46 ms affichee, STUN seul (TURN
+= dette datee pour NAT stricts). Manip a l'oreille : bouton JAM.
+Reste de la tranche : badge fraicheur (arbitrage), vrais plugins.
 
 ## Architecture
 
