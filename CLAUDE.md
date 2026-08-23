@@ -167,6 +167,10 @@ doit laisser un chemin de selection au clic simple — la branche
 « clic sans mouvement » existe pour CHAQUE poignee, jamais implicite.
 Cette classe de bug se reproduira sur les fades, l'automation, les
 marqueurs : verifier a chaque nouvelle poignee introduite.
+**Corollaire (2e passe, meme jour) : une action qui produit plusieurs
+effets doit les montrer TOUS** — un effet de bord non annonce est la
+cause du sentiment que le logiciel agit tout seul (precedent : le clic
+de couloir a trois effets, aucun annonce).
 
 ## Trace visuelle (demande utilisateur 2026-08-23, habitude)
 

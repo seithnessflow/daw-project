@@ -54,13 +54,23 @@ dedouble). Ordre :
           selection poignee, deselection visible, Delete agit DOM+doc,
           Delete sans selection = no-op heads stables). Suite 16/16.
           Trace visuelle livree (halo prouve sur un clip de 2 px).
-       C. [ ] RENDRE DECOUVRABLE (retreci 2026-08-23, 2e passe : plus
-          de modele a concevoir, la lecture Ableton ATTEND). La gene
-          n.1 de la seance n'etait pas un manque mais de l'INVISIBLE :
-          Ctrl+D duplicate et zoom +/- existaient, jamais trouves.
-          Perimetre : donner une affordance a l'existant (inventaire
-          des 16 caches fait en session, voir JOURNAL 2026-08-23) —
-          pas de nouvelle mecanique.
+       C. [ ] RENDRE VISIBLE (perimetre FINAL arbitre 2026-08-23,
+          3e passe — session UNIQUE et BORNEE, APRES 1pre et 1bis,
+          pas avant). Constat acte : le DAW est plus capable qu'on ne
+          le croyait (16 capacites cachees, JOURNAL), rien n'en est
+          visible. Contenu, dans l'ordre de valeur :
+          1. DESSINER LA GRILLE DE SNAP, y compris son raffinement au
+             zoom — une regle invisible et variable est pire que pas
+             de regle.
+          2. RENDRE VISIBLES LES TROIS EFFETS du clic de couloir
+             (selection piste + marqueur d'insertion + pause Follow) —
+             pas de la decouvrabilite : un effet de bord non annonce,
+             la cause du « logiciel qui agit tout seul ».
+          3. LEGENDER les quatre glyphes nus (⇥, A, B, C) + une aide
+             raccourcis (?) listant les huit touches.
+          TOUT LE RESTE de l'inventaire ATTEND. Pas de refonte d'UI,
+          pas de lecture Ableton : les capacites existent, il s'agit
+          de les montrer.
        D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
           trou le plus visible du chemin produit, et c'est le chemin
           du differenciateur.
