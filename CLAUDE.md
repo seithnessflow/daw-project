@@ -205,6 +205,17 @@ l'utilisateur de tester ce que je peux voir moi-meme.
    toujours verifier « qui fait quoi » AVANT d'accuser le reseau (la
    sonde est deux fois coupable avant lui) ; exposer les etats de
    test sur window.__daw* est ce qui rend tout ceci possible.
+4. SESSION 0 : TOUT process GUI lance a travers sshd (Start-Process,
+   WMI) vit en session 0 — fenetres INVISIBLES pour l'humain, audio
+   incertain. Pour ouvrir une fenetre sur le VRAI bureau distant :
+   tache planifiee INTERACTIVE (schtasks /IT via un .cmd, puis /Run).
+   Un « onglet ouvert » par ssh que l'utilisateur ne voit pas n'existe
+   pas pour lui — le dire, pas le supposer.
+5. CRITIQUE PERMANENTE (directive utilisateur 2026-08-24) : chaque
+   passage dans l'interface — pilote ou non — est une occasion de
+   critique ergonomie/fonctionnalites, au fil de l'eau, avec la
+   grille existante (1 casse / 2 ergonomie : corriger seul ;
+   3 concept : proposer ; 4 gout : ne pas trancher).
 
 ## Outillage UI/audio — les yeux et l'oreille (chantier UI)
 
