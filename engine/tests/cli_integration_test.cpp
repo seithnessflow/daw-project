@@ -12,6 +12,7 @@
 #include "../src/graph/clip_player.h"
 #include "../src/graph/plugin_registry.h"
 #include "../src/render/offline_render.h"
+#include "../src/render/stem_render.h"
 #include "../src/audio/audio_callback.h"
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
@@ -1151,6 +1152,134 @@ bool testPluginStateRoundtrip() {
 
     std::cout << "OK (" << blob.size()
               << " bytes, exact 0.25x from state alone, stable)\n";
+    return true;
+}
+
+/**
+ * S7 - THE INVARIANT: a machine WITHOUT the plugin hears the plugin's
+ * result, proven BY SAMPLES through the store.
+ * Machine A (has AGain): renders the reference AND publishes the stem
+ * (float32 = lossless truth). Machine B (NO module mapping at all):
+ * renders the same document - the stem substitutes - and produces the
+ * BYTE-IDENTICAL 16-bit WAV.
+ */
+bool testStemInvariant() {
+    std::cout << "Test: STEM invariant S7 (peer without plugin)... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-stem-s7-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Deterministic source clip
+    std::vector<int16_t> in(4096 * 2);
+    for (size_t i = 0; i < 4096; ++i) {
+        const int16_t v = static_cast<int16_t>((static_cast<int>(i) * 53) % 30000 - 15000);
+        in[i * 2] = v;
+        in[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    if (!writeWav16((dir / "stemsrc.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: cannot write asset\n";
+        return false;
+    }
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: doc create\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "stem track";
+    track.gain = 0.8f;  // stays LIVE outside the stem
+    daw::document::ClipDef clip;
+    clip.id = "c1";
+    clip.asset_hash = "stemsrc";
+    clip.start_sample = 0;
+    clip.length_samples = 4096;
+    track.clips.push_back(clip);
+    daw::document::ProcessorDef proc;
+    proc.id = "p1";
+    proc.type = "vst3";
+    proc.uid = kAGainAudioUid;
+    proc.params["0"] = 0.5f;
+    track.chain.push_back(proc);
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack\n";
+        return false;
+    }
+
+    const std::map<std::string, std::string> modules{
+        {kAGainAudioUid, fixtureModulePath()}};
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+
+    // MACHINE A: reference render WITH the plugin
+    daw::render::OfflineRenderer withPlugin;
+    withPlugin.setVst3Modules(modules, DAW_PLUGIN_HOST_EXE);
+    const std::string ref_path = (dir / "ref.wav").string();
+    auto ref = withPlugin.render(doc, ref_path, dir.string(), config);
+    if (!ref.success) {
+        std::cout << "FAILED: reference render: " << ref.error << "\n";
+        return false;
+    }
+
+    // MACHINE A: publish the stem
+    const auto stem = daw::render::renderTrackStem(
+        doc.getDocument(), "t1", "p1", dir.string(), modules,
+        DAW_PLUGIN_HOST_EXE);
+    if (!stem.success || stem.stem_hash.empty() || stem.stem_key.empty()) {
+        std::cout << "FAILED: stem render: " << stem.error << "\n";
+        return false;
+    }
+    if (!doc.setProcessorStem("t1", "p1", stem.stem_hash, stem.stem_key,
+                              stem.latency_samples)) {
+        std::cout << "FAILED: setProcessorStem\n";
+        return false;
+    }
+
+    // MACHINE B: NO module mapping at all - the bare renderer that
+    // refused this document before S7 now plays the stem
+    daw::render::OfflineRenderer bare;
+    const std::string sub_path = (dir / "sub.wav").string();
+    auto subr = bare.render(doc, sub_path, dir.string(), config);
+    if (!subr.success) {
+        std::cout << "FAILED: substituted render: " << subr.error << "\n";
+        return false;
+    }
+
+    const auto ref_f = readWavSamples(ref_path);
+    const auto sub_f = readWavSamples(sub_path);
+    if (ref_f.empty() || ref_f.size() != sub_f.size()) {
+        std::cout << "FAILED: size mismatch " << ref_f.size() << " vs "
+                  << sub_f.size() << "\n";
+        return false;
+    }
+    for (size_t i = 0; i < ref_f.size(); ++i) {
+        if (ref_f[i] != sub_f[i]) {
+            std::cout << "FAILED: sample " << i << " differs: " << ref_f[i]
+                      << " vs " << sub_f[i] << "\n";
+            return false;
+        }
+    }
+    if (ref.peak_left <= 0.05) {
+        std::cout << "FAILED: near-silent proof proves nothing\n";
+        return false;
+    }
+
+    // Freshness: touching a param must stale the key
+    const auto snap = doc.getDocument();
+    auto changed = snap.tracks[0];
+    changed.chain[0].params["0"] = 0.7f;
+    if (daw::render::computeStemKey(changed, 0, 48000) == stem.stem_key) {
+        std::cout << "FAILED: key blind to a param change\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (byte-identical without the plugin, peak "
+              << ref.peak_left << ", key stales on param change)\n";
     return true;
 }
 
@@ -2362,6 +2491,7 @@ int main(int argc, char* argv[]) {
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);
+    run(testStemInvariant);
     run(testDocumentChainRender);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";

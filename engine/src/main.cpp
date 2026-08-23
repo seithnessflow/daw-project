@@ -18,6 +18,7 @@
 #include "graph/clip_player.h"
 #include "graph/graph_common.h"
 #include "graph/plugin_registry.h"
+#include "render/stem_render.h"
 #include "host/plugin_bridge.h"
 #include "host/proxy_node.h"
 #include "network/server_client.h"
@@ -667,6 +668,32 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         track.name = track_def.name;
         track.gain.store(track_def.gain, std::memory_order_relaxed);
 
+        // S7: THE INVARIANT's reading half. Pre-fetch an unresolved
+        // node's stem from the store (the asset road), then let the
+        // SHARED decision (graph_common) substitute.
+        for (const auto& p : track_def.chain) {
+            if (p.type == "vst3" && !p.stem_hash.empty() &&
+                opts.vst3_modules.find(p.uid) == opts.vst3_modules.end() &&
+                !opts.server_url.empty()) {
+                const std::string stem_path =
+                    assets_dir + "/" + p.stem_hash + ".wav";
+                if (!asset_cache.loadOrGet(stem_path)) {
+                    fetchAssetFromServer(opts.server_url, p.stem_hash, assets_dir);
+                }
+            }
+        }
+        auto sub = daw::graph::resolveStemSubstitution(
+            track_def,
+            [&](const std::string& uid) {
+                return opts.vst3_modules.find(uid) != opts.vst3_modules.end();
+            },
+            assets_dir, asset_cache);
+        if (sub.active) {
+            std::cout << "Track " << track_def.id << ": playing STEM "
+                      << sub.stem_hash.substr(0, 8)
+                      << "... for an unresolved plugin\n";
+            track.clips.push_back(std::move(sub.stem_player));
+        } else {
         // Load clips. Server mode: on a local miss, pull from the store
         // (2.3b) so the file exists on disk BEFORE the shared builder
         // runs - then both live and offline paths call the identical
@@ -683,9 +710,12 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                 daw::graph::makeClipPlayer(clip_def, assets_dir, asset_cache,
                                            sample_rate));
         }
+        }
 
-        // Create processors
-        for (const auto& proc_def : track_def.chain) {
+        // Create processors (after the governing node when substituted)
+        for (size_t proc_i = sub.active ? sub.resume_index : 0;
+             proc_i < track_def.chain.size(); ++proc_i) {
+            const auto& proc_def = track_def.chain[proc_i];
             if (proc_def.type == daw::graph::GainNode::TYPE) {
                 if (proc_def.bypass) continue;  // zero-latency node: bypass = omission
                 track.chain.push_back(daw::graph::makeGainNode(proc_def));  // S3 shared
@@ -1238,6 +1268,55 @@ int doPlayWithServer(const Options& opts) {
                     std::cout << "State captured for node " << p.id << ": "
                               << sha.substr(0, 8) << "... (v"
                               << (p.state_version + 1) << ")\n";
+                }
+            }
+
+            // S7: publish STEMS for the nodes THIS machine resolves -
+            // the writing half of the invariant. Key unchanged = fresh,
+            // nothing to do (the settle condition of the debounce loop).
+            // Control-thread offline render: A4-7 family debt, accepted.
+            for (const auto& t : snap.tracks) {
+                for (size_t ni = 0; ni < t.chain.size(); ++ni) {
+                    const auto& p = t.chain[ni];
+                    if (p.type != "vst3" || p.bypass) continue;
+                    if (opts.vst3_modules.find(p.uid) == opts.vst3_modules.end())
+                        continue;  // not ours to render
+                    if (t.clips.empty()) continue;  // no audio upstream
+                    const std::string key = daw::render::computeStemKey(
+                        t, ni, snap.sample_rate);
+                    if (key == p.stem_key) continue;  // fresh
+                    auto stem = daw::render::renderTrackStem(
+                        snap, t.id, p.id, opts.assets_dir,
+                        opts.vst3_modules, hostExePath(opts));
+                    if (!stem.success) {
+                        std::cerr << "Stem render failed for node " << p.id
+                                  << ": " << stem.error << "\n";
+                        continue;
+                    }
+                    if (!opts.server_url.empty()) {
+                        std::vector<uint8_t> bytes;
+                        {
+                            std::ifstream f(fs::path(opts.assets_dir) /
+                                                (stem.stem_hash + ".wav"),
+                                            std::ios::binary);
+                            bytes.assign(std::istreambuf_iterator<char>(f),
+                                         std::istreambuf_iterator<char>());
+                        }
+                        if (!bytes.empty()) {
+                            putAssetToServer(opts.server_url, stem.stem_hash, bytes);
+                        }
+                    }
+                    {
+                        std::lock_guard<std::mutex> lock(doc_mutex);
+                        if (doc.setProcessorStem(t.id, p.id, stem.stem_hash,
+                                                 stem.stem_key,
+                                                 stem.latency_samples)) {
+                            const auto change = doc.getLastLocalChange();
+                            if (!change.empty()) server_client.sendChange(change);
+                        }
+                    }
+                    std::cout << "Stem published for node " << p.id << ": "
+                              << stem.stem_hash.substr(0, 8) << "...\n";
                 }
             }
         }

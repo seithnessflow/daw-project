@@ -617,6 +617,17 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          code mort/hygiene web/discipline de test) — declencheurs dans
          AUDIT-4.md.
 
+- [x] STEMS S7 — LE JALON PROUVE 2026-08-23, le meme soir :
+      testStemInvariant = machine B SANS AUCUN module rend le document
+      OCTET POUR OCTET comme la machine A qui a AGain (stem float32
+      IEEE au store, cle de cache d'entrees, substitution partagee
+      live/offline dans graph_common, publication AUTO par le moteur
+      au meme debounce que l'etat, badge STEM violet UI). Moteur
+      28/28. RESTE pour le critere 6 ✅ : le smoke S7 DEUX MACHINES
+      (portable, store serveur reel) — premiere session portable.
+      DETTES DATEES : version du plugin dans la cle (vide) ; badge de
+      FRAICHEUR (cle perimee -> orange) ; geste « figer » manuel.
+
 - [x] 2.5-ETAT FAIT 2026-08-23 (sessions A+B le meme soir).
       A : l'etat traverse la frontiere de process — ring v4
       (state_request/ready_seq), blob par fichier `<segment>.state`

@@ -20,6 +20,7 @@
 // Forward declare automerge-c types
 struct AMdoc;
 struct AMresult;
+struct AMobjId;
 
 namespace daw::document {
 
@@ -136,6 +137,16 @@ public:
                            int64_t state_version);
 
     /**
+     * S7: write a chain node's STEM reference (rendered truth in the
+     * store). Engine-authored, same family as setProcessorState.
+     */
+    bool setProcessorStem(const std::string& track_id,
+                          const std::string& node_id,
+                          const std::string& stem_hash,
+                          const std::string& stem_key,
+                          int64_t stem_latency_samples);
+
+    /**
      * Bytes of the LAST local change (empty when none) - what the
      * engine ships to the server after authoring. Mirrors the web's
      * getLastLocalChange contract.
@@ -179,6 +190,10 @@ public:
     bool addTrack(const TrackDef& track);
 
 private:
+    /** Shared walk for the engine-authored chain-node writers. */
+    bool withChainNode(const std::string& track_id, const std::string& node_id,
+                       const std::function<bool(const ::AMobjId*)>& write);
+
     AMdoc* doc_ = nullptr;
     AMresult* doc_result_ = nullptr;  // Owns the document memory
     std::string last_error_;

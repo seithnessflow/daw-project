@@ -110,6 +110,9 @@ private:
     std::string host_exe_;
     std::vector<std::unique_ptr<host::PluginBridge>> bridges_;
     std::vector<host::SyncProxyNode*> sync_nodes_;  // owned by the graph
+    // S7: chain nodes legitimately ABSENT from the built graph because a
+    // stem carries their truth (the R5 completeness guard subtracts them)
+    size_t stem_substituted_nodes_ = 0;
 
     /**
      * Build audio graph from document.

@@ -510,6 +510,32 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                             }
                                             if (cr) AMresultFree(cr);
 
+                                            // S7 stems: additive (absent = none)
+                                            cr = AMmapGet(doc_, procObjId, AMstr("stemHash"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.stem_hash.assign(
+                                                    reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("stemKey"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.stem_key.assign(
+                                                    reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("stemLatencySamples"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                int64_t latVal = 0;
+                                                if (AMitemToInt(AMresultItem(cr), &latVal)) {
+                                                    proc.stem_latency_samples = latVal;
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
+
                                             cr = AMmapGet(doc_, procObjId, AMstr("params"), nullptr);
                                             if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
                                                 const AMobjId* paramsId = AMitemObjId(AMresultItem(cr));
@@ -733,13 +759,12 @@ bool AutomergeDocument::setMasterGain(float gain) {
     return ok;
 }
 
-bool AutomergeDocument::setProcessorState(const std::string& track_id,
-                                          const std::string& node_id,
-                                          const std::string& state_hash,
-                                          int64_t state_version) {
-    // 2.5-etat. THE engine-authored field pair: only the machine that
-    // hosts the plugin can serialize its state. Navigation mirrors the
-    // reader (id-matched, never index-assumed).
+bool AutomergeDocument::withChainNode(
+    const std::string& track_id, const std::string& node_id,
+    const std::function<bool(const AMobjId*)>& write) {
+    // Shared navigation for the ENGINE-AUTHORED chain-node fields
+    // (2.5-etat, S7 stems): id-matched, never index-assumed. The twins
+    // rule: two authoring APIs, ONE walk.
     if (!doc_) {
         last_error_ = "No document loaded";
         return false;
@@ -790,16 +815,7 @@ bool AutomergeDocument::setProcessorState(const std::string& track_id,
                                     AMitemObjId(AMresultItem(procResult));
                                 std::string pid;
                                 if (readStr(procObj, "id", pid) && pid == node_id) {
-                                    AMresult* r1 = AMmapPutStr(
-                                        doc_, procObj, AMstr("stateHash"),
-                                        AMstr(state_hash.c_str()));
-                                    AMresult* r2 = AMmapPutInt(
-                                        doc_, procObj, AMstr("stateVersion"),
-                                        state_version);
-                                    written = checkResult(r1, "set stateHash") &&
-                                              checkResult(r2, "set stateVersion");
-                                    if (r1) AMresultFree(r1);
-                                    if (r2) AMresultFree(r2);
+                                    written = write(procObj);
                                 }
                             }
                             if (procResult) AMresultFree(procResult);
@@ -814,10 +830,52 @@ bool AutomergeDocument::setProcessorState(const std::string& track_id,
     if (tracksResult) AMresultFree(tracksResult);
 
     if (!written) {
-        last_error_ = "setProcessorState: node not found (" + track_id + "/" +
-                      node_id + ")";
+        last_error_ = "chain node not found (" + track_id + "/" + node_id + ")";
     }
     return written;
+}
+
+bool AutomergeDocument::setProcessorState(const std::string& track_id,
+                                          const std::string& node_id,
+                                          const std::string& state_hash,
+                                          int64_t state_version) {
+    // 2.5-etat. THE engine-authored field pair: only the machine that
+    // hosts the plugin can serialize its state.
+    return withChainNode(track_id, node_id, [&](const AMobjId* procObj) {
+        AMresult* r1 = AMmapPutStr(doc_, procObj, AMstr("stateHash"),
+                                   AMstr(state_hash.c_str()));
+        AMresult* r2 = AMmapPutInt(doc_, procObj, AMstr("stateVersion"),
+                                   state_version);
+        const bool ok = checkResult(r1, "set stateHash") &&
+                        checkResult(r2, "set stateVersion");
+        if (r1) AMresultFree(r1);
+        if (r2) AMresultFree(r2);
+        return ok;
+    });
+}
+
+bool AutomergeDocument::setProcessorStem(const std::string& track_id,
+                                         const std::string& node_id,
+                                         const std::string& stem_hash,
+                                         const std::string& stem_key,
+                                         int64_t stem_latency_samples) {
+    // S7: the stem reference - engine-authored like the state (only
+    // the machine WITH the plugin can render its truth).
+    return withChainNode(track_id, node_id, [&](const AMobjId* procObj) {
+        AMresult* r1 = AMmapPutStr(doc_, procObj, AMstr("stemHash"),
+                                   AMstr(stem_hash.c_str()));
+        AMresult* r2 = AMmapPutStr(doc_, procObj, AMstr("stemKey"),
+                                   AMstr(stem_key.c_str()));
+        AMresult* r3 = AMmapPutInt(doc_, procObj, AMstr("stemLatencySamples"),
+                                   stem_latency_samples);
+        const bool ok = checkResult(r1, "set stemHash") &&
+                        checkResult(r2, "set stemKey") &&
+                        checkResult(r3, "set stemLatencySamples");
+        if (r1) AMresultFree(r1);
+        if (r2) AMresultFree(r2);
+        if (r3) AMresultFree(r3);
+        return ok;
+    });
 }
 
 std::vector<uint8_t> AutomergeDocument::getLastLocalChange() {
@@ -973,6 +1031,19 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
             if (cr) results_to_free.push_back(cr);
             cr = AMmapPutInt(doc_, procObjId, AMstr("stateVersion"),
                              proc.state_version);
+            if (cr) results_to_free.push_back(cr);
+        }
+
+        // S7 stems: only written when present (additive fields)
+        if (!proc.stem_hash.empty()) {
+            cr = AMmapPutStr(doc_, procObjId, AMstr("stemHash"),
+                             AMstr(proc.stem_hash.c_str()));
+            if (cr) results_to_free.push_back(cr);
+            cr = AMmapPutStr(doc_, procObjId, AMstr("stemKey"),
+                             AMstr(proc.stem_key.c_str()));
+            if (cr) results_to_free.push_back(cr);
+            cr = AMmapPutInt(doc_, procObjId, AMstr("stemLatencySamples"),
+                             proc.stem_latency_samples);
             if (cr) results_to_free.push_back(cr);
         }
 

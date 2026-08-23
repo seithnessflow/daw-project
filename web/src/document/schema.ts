@@ -41,6 +41,12 @@ export interface ProcessorDef {
    *  writes these - only the machine hosting the plugin can. */
   stateHash?: string;
   stateVersion?: number;
+  /** S7 stems (additive, ENGINE-authored): the node's rendered truth.
+   *  A peer without the plugin plays stemHash; stemKey is the
+   *  input-cache freshness key (stale = UI state, never a block). */
+  stemHash?: string;
+  stemKey?: string;
+  stemLatencySamples?: number;
 }
 
 export interface TrackDef {

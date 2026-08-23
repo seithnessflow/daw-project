@@ -38,6 +38,51 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
     return player;
 }
 
+StemSubstitution resolveStemSubstitution(
+    const document::TrackDef& track_def,
+    const std::function<bool(const std::string& uid)>& resolvable,
+    const std::string& assets_dir,
+    AssetCache& asset_cache) {
+    StemSubstitution out;
+
+    // The LAST unresolvable vst3 node governs (design S7): its stem
+    // covers everything upstream of it.
+    size_t governing = SIZE_MAX;
+    for (size_t i = 0; i < track_def.chain.size(); ++i) {
+        const auto& p = track_def.chain[i];
+        // bypassed = identity: an unresolvable BYPASSED node needs no
+        // stem (the builders already play it dry)
+        if (p.type == "vst3" && !p.bypass && !resolvable(p.uid)) {
+            governing = i;
+        }
+    }
+    if (governing == SIZE_MAX) return out;  // everything resolvable
+
+    const auto& node = track_def.chain[governing];
+    if (node.stem_hash.empty()) return out;  // no stem: current behavior
+                                             // (node skipped, signaled)
+
+    const std::string stem_path = assets_dir + "/" + node.stem_hash + ".wav";
+    const AudioAsset* asset = asset_cache.loadOrGet(stem_path);
+    if (!asset || !asset->isValid()) return out;  // blob unavailable
+
+    ClipInfo info;
+    info.id = "stem:" + node.id;
+    info.asset_hash = node.stem_hash;
+    info.start_sample = 0;
+    info.length_samples = static_cast<int64_t>(asset->frame_count);
+    info.offset_samples = 0;
+    // fades stay 0: render() only ramps when > 0 - the finished mix
+    // plays untouched (the implicit anti-click lives in makeClipPlayer,
+    // deliberately NOT here)
+    out.stem_player.setClip(info);
+    out.stem_player.setAsset(asset);
+    out.active = true;
+    out.resume_index = governing + 1;
+    out.stem_hash = node.stem_hash;
+    return out;
+}
+
 std::unique_ptr<GainNode> makeGainNode(const document::ProcessorDef& proc_def) {
     float gain = 1.0f;
     auto it = proc_def.params.find("gain");

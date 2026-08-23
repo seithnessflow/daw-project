@@ -411,6 +411,16 @@ function createDevicePanel(
     state.title = `Etat du plugin capture par l'hote (blob ${proc.stateHash.slice(0, 8)}..., version ${proc.stateVersion ?? 0})`;
     title.appendChild(state);
   }
+  // S7: the stem badge - THE invariant made visible. A peer without
+  // this plugin plays exactly this rendered truth.
+  if (proc.stemHash) {
+    const stem = document.createElement('span');
+    stem.className = 'device-stem';
+    stem.dataset.role = 'device-stem';
+    stem.textContent = `STEM ${proc.stemHash.slice(0, 8)}`;
+    stem.title = `Stem publie (${proc.stemHash.slice(0, 8)}...) : un pair sans ce plugin entend ce rendu`;
+    title.appendChild(stem);
+  }
 
   // V1.5: removal is a TWO-STEP button (armed on first click, fires on
   // the second, disarms after 3 s or on Escape) - keyboard-safe, no
@@ -525,6 +535,17 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
         panel.querySelector('.device-title')?.appendChild(badge);
       }
       badge.textContent = `✓ ${proc.stateHash.slice(0, 8)} v${proc.stateVersion ?? 0}`;
+    }
+    // S7: the stem badge settles in place too
+    if (proc.stemHash) {
+      let stemBadge = panel.querySelector('[data-role="device-stem"]') as HTMLElement | null;
+      if (!stemBadge) {
+        stemBadge = document.createElement('span');
+        stemBadge.className = 'device-stem';
+        stemBadge.dataset.role = 'device-stem';
+        panel.querySelector('.device-title')?.appendChild(stemBadge);
+      }
+      stemBadge.textContent = `STEM ${proc.stemHash.slice(0, 8)}`;
     }
     for (const p of proc.params) {
       const slider = panel.querySelector(

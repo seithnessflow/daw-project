@@ -98,6 +98,17 @@
   color: var(--red, #d9534f);
 }
 
+/* ---- S7: published-stem badge (the invariant, visible) ----------- */
+.device-stem {
+  font-size: 9px;
+  font-family: Consolas, monospace;
+  color: var(--potion);
+  background: rgba(141, 122, 230, 0.12);
+  border-radius: var(--r);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
 /* ---- 2.5-etat: captured-state badge ------------------------------ */
 .device-state {
   font-size: 9px;

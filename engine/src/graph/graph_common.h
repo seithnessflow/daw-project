@@ -22,6 +22,7 @@
 #include "gain_node.h"
 #include "../document/schema.h"
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -51,5 +52,33 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
  * node with the document's gain param (default 1.0 when absent).
  */
 std::unique_ptr<GainNode> makeGainNode(const document::ProcessorDef& proc_def);
+
+/**
+ * S7 STEM SUBSTITUTION - the INVARIANT's reading half, decided in ONE
+ * place for both builders (live and offline; the decision is exactly
+ * the kind of twin that would drift).
+ *
+ * When a track's chain holds a vst3 node this machine cannot resolve
+ * AND the LAST such node carries a stem, the track plays the stem:
+ * clips are replaced by a single player over the rendered WAV (start
+ * 0, NO implicit fade - the stem is a finished mix, its clip fades
+ * are already baked; an extra edge ramp would betray the render), and
+ * only the chain AFTER that node stays live.
+ *
+ * @param resolvable  can this machine instantiate the uid?
+ * @return active=false when nothing needs (or can get) substitution;
+ *         resume_index = first chain index that stays live.
+ */
+struct StemSubstitution {
+    bool active = false;
+    size_t resume_index = 0;
+    ClipPlayer stem_player;
+    std::string stem_hash;  // for logs/telemetry
+};
+StemSubstitution resolveStemSubstitution(
+    const document::TrackDef& track_def,
+    const std::function<bool(const std::string& uid)>& resolvable,
+    const std::string& assets_dir,
+    AssetCache& asset_cache);
 
 }  // namespace daw::graph

@@ -588,6 +588,33 @@ specs sensibles a la geometrie re-vertes (l'unique rouge etait la
 collision de port 47821 documentee, pas la CSS). Traces :
 traces/refonte-t1/.
 
+**2026-08-23 (S7 — LE JALON : un pair sans le plugin entend le
+plugin) :** l'invariant produit passe de zero ligne (constat du
+recadrage) a PROUVE PAR ECHANTILLONS. Producteur : renderTrackStem —
+document reduit (clips + chaine jusqu'au noeud INCLUS, gain de piste
+et master forces a 1.0, ils restent VIVANTS cote lecteur), rendu
+offline en FLOAT32 IEEE (decision : le WAV 32 bits passe du int32 au
+float — sans perte pour ce pipeline, la classe INT_MIN d'A4-12 meurt
+pour cette profondeur ; float non clampe, le flag clip rapporte),
+sha256 -> assets/store, stemKey = cle de cache d'entrees calculable
+SANS rendre (uid, etat, params, samplerate, geometrie+hashes+fades
+des clips, chaine amont ; version du plugin = dette datee). Lecteur :
+resolveStemSubstitution DANS graph_common (le meme code pour les deux
+batisseurs — la decision est exactement le genre de jumeau qui
+derive) : le DERNIER vst3 non-resoluble et non-bypasse gouverne, le
+stem remplace clips+amont (ClipPlayer construit SANS le fade implicite
+— une rampe de plus trahirait le rendu), la chaine d'apres reste
+vive. Publication AUTOMATIQUE par le moteur (meme debounce que l'etat,
+cle fraiche = repos) ; badge STEM violet au panneau devices. Garde :
+testStemInvariant — machine A rend la reference AVEC AGain et publie ;
+machine B, SANS AUCUN mapping de module, rend le meme document OCTET
+POUR OCTET IDENTIQUE, et la cle perime sur un changement de param.
+Le rendu offline honore aussi l'etat capture (setPendingState avant
+le spawn des bridges offline). Lecon d'outillage : rebuild_msvc.bat
+avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
+binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
+de croire un compte de tests.
+
 **2026-08-23 (refonte, tranches 3-6 — la premiere passe complete) :**
 t3 zone pistes (heads en couches, selection teintee potion, faders a
 gorge et curseur eclaire, vumetres a lunette, clips decolles du

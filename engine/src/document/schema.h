@@ -42,6 +42,14 @@ struct ProcessorDef {
     // hashes have no order; binary states cannot merge).
     std::string state_hash;      // sha256 hex of the state blob; empty = none
     int64_t state_version = 0;
+    // S7 STEMS (ADDITIF, SCHEMA-V2-DESIGN 3): the rendered TRUTH of
+    // this node and everything upstream of it (clips + chain up to and
+    // including this node, PRE track gain). A peer that cannot resolve
+    // the uid plays the stem instead - the INVARIANT. stem_key is the
+    // input-cache key (freshness is UI state, never a playback block).
+    std::string stem_hash;            // sha256 of the rendered WAV in the store
+    std::string stem_key;             // sha256 of the render INPUTS
+    int64_t stem_latency_samples = 0; // declared PDC at render time
 };
 
 /**

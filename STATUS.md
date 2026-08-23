@@ -7,9 +7,11 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 ## L'INVARIANT PRODUIT (ADR-019)
 
 **Un pair qui n'a pas le plugin installe entend le resultat du plugin.**
-Etat : NON IMPLEMENTE — zero ligne. Chemin : placement dans le document
-+ stems rendus via le store d'assets (verite de lecture) + streaming
-P2P (canal ephemere du jam). C'est le cap ; tout le reste le sert.
+Etat : PROUVE PAR ECHANTILLONS EN LOCAL (S7, 2026-08-23) — publication
+automatique des stems par le moteur, substitution partagee live/offline,
+octet-pour-octet identique sans le module (details : critere 6). Reste :
+la preuve deux-machines a travers le store serveur (smoke S7 avec le
+portable) et le streaming P2P du jam.
 
 ## Architecture
 
@@ -38,7 +40,7 @@ interdisait le produit).
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 27/27 |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 28/28 |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 7/7 |
 | Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 29/29 |
@@ -50,11 +52,11 @@ interdisait le produit).
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `56729beb61993cd7` (fixture reel 2 pistes, MSVC verifie; GCC via CI ; recalcule 2026-08-23 V1.6 fades implicites — historique et justification dans docs/DECISIONS.md) |
-| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 27/27 |
+| 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 28/28 |
 | 3 | Convergence DEUX MACHINES, deux reseaux, un projet (redefini ADR-019) | ⛔ JAMAIS TESTE | La version 2-onglets (sous-ensemble) : ✅ RESERVE LEVEE 2026-08-23 — le trio deps-manquantes A4-1/2/3 est solde (serveur refuse bruyamment les deps manquantes + graine commune vendored + merge au premier contact + heartbeat 15 s / watchdog 45 s) avec gardes : 2 tests Rust (refus Lagged, seed nouveau projet) + sync-resilience.spec 3 invariants (deps surfacees, heartbeat recu, edition hors-ligne survivante). Historique : JOURNAL.md |
 | 4 | LNA HTTPS→WS local | ✅ VALIDE — formulation exacte : l'acces au moteur local depuis une origine HTTPS publique fonctionne sur Chrome 151/Windows 11 (2026-08-23), sous reserve d'autorisation utilisateur, avec etat lisible par API. SCEAU pose dans le navigateur de l'utilisateur : sonde granted, canari 4 ms, onopen 3 ms, AUTH OK + telemetrie 23 ms (version relevee sur le binaire installe 151.0.7922.170 ; champ UA non transcrit) | ETABLI (campagne 2026-08-23, oracle temporel automatise sur le VRAI Chrome 151, profils vierges) : (1) invite Chrome apparue et autorisee -> WS connecte (test des mains du matin) ; (2) fetch ET WebSocket sont TOUS DEUX soumis au LNA et savent declencher la demande (etat prompt -> les deux pendent en attente de decision ; AUCUN echec immediat : le pire cas « subit sans pouvoir demander » est ECARTE) ; (3) ZERO GESTE : une connexion lancee au chargement de page declenche l'invite — l'onboarding « connexion au chargement » est viable ; (4) permissions.query('local-network-access' et 'local-network') expose l'etat (prompt/granted lus en reel) -> l'UI n'a jamais a deviner ; feature-detection obligatoire (Firefox/Safari sans API) ; (5) auth prouvee de bout en bout quand permis (AUTH OK + telemetrie ; token perime -> close 4001, signature distincte de 1006). Mecanisme : carve-out loopback (le tunnel ne sert que la page ; l'URL WS est 127.0.0.1). INCONNUS DATES 2026-08-23 (documentation, pas bloquants) : texte exact de l'invite, semantique dismissal (Echap) et refus explicite (clic Bloquer), duree de memorisation, Firefox/Safari, --allow-origin en prod (design 1pre), audio/telemetrie soutenus a travers ce chemin. Canari fetch mode cors NON CONCLUSIF sur ce moteur (400 sans CORS = « Failed to fetch » meme reseau ouvert) — garder ecrit. Le moteur ne loggue pas les connexions acceptees (a corriger) |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns (2026-08-20, ZenGo SC 48kHz/512) mais **sans charge CPU** — procedure ci-dessous |
-| 6 | L'INVARIANT : un pair sans le plugin entend le resultat du plugin (ADR-019) | ⛔ NON IMPLEMENTE | Placement + stems rendus + streaming jam (TRANCHE 3). Preuve attendue : par echantillons, a travers le store |
+| 6 | L'INVARIANT : un pair sans le plugin entend le resultat du plugin (ADR-019) | ⚠️ PROUVE PAR ECHANTILLONS (local) | S7 2026-08-23 : testStemInvariant — machine A rend la reference AVEC AGain et publie le stem (float32, store d'assets) ; machine B SANS AUCUN module rend le meme document OCTET POUR OCTET IDENTIQUE. Publication automatique cablee au moteur (debounce, cle de cache d'entrees), substitution partagee live/offline (graph_common), badge STEM au panneau devices. RESTE pour le ✅ : la meme preuve DEUX MACHINES a travers le store SERVEUR reel (le portable joue AGain qu'il n'a pas — smoke S7), et le streaming jam (TRANCHE 3 suite) |
 
 ## Commandes utiles
 

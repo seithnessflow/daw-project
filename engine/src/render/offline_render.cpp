@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 
@@ -43,10 +45,12 @@ RenderResult OfflineRenderer::render(
     }
 
     // AUDIT R5: an unknown node type or an unresolvable/unspawnable vst3
-    // node must FAIL the render, never silently change the sound
+    // node must FAIL the render, never silently change the sound. S7:
+    // nodes whose truth a STEM carries are accounted for, not missing.
     {
         size_t doc_nodes = 0;
         for (const auto& t : doc.tracks) doc_nodes += t.chain.size();
+        doc_nodes -= (std::min)(stem_substituted_nodes_, doc_nodes);
         size_t built_nodes = 0;
         for (size_t i = 0; i < graph->getTrackCount(); ++i) {
             built_nodes += graph->getTrack(i)->chain.size();
@@ -196,6 +200,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
 ) {
     auto graph_ptr = std::make_unique<graph::AudioGraph>();
     graph_ptr->setSampleRate(sample_rate);
+    stem_substituted_nodes_ = 0;  // per-build accounting (S7 / R5)
 
     const auto& doc = document.getDocument();
     graph_ptr->setMasterGain(doc.master_gain);  // V1.2: same stage as live
@@ -206,15 +211,32 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         track.name = track_def.name;
         track.gain = track_def.gain;
 
-        // Load clips (shared geometry+asset builder, S3)
-        for (const auto& clip_def : track_def.clips) {
-            track.clips.push_back(
-                graph::makeClipPlayer(clip_def, asset_dir, asset_cache_,
-                                      sample_rate));
+        // S7: THE INVARIANT's reading half - an unresolvable plugin
+        // with a stem plays its rendered truth (decision shared with
+        // the live builder in graph_common).
+        auto sub = graph::resolveStemSubstitution(
+            track_def,
+            [&](const std::string& uid) { return vst3_modules_.count(uid) > 0; },
+            asset_dir, asset_cache_);
+        if (sub.active) {
+            std::cout << "Track " << track_def.id << ": playing STEM "
+                      << sub.stem_hash.substr(0, 8)
+                      << "... for an unresolved plugin\n";
+            track.clips.push_back(std::move(sub.stem_player));
+            stem_substituted_nodes_ += sub.resume_index;  // R5 accounting
+        } else {
+            // Load clips (shared geometry+asset builder, S3)
+            for (const auto& clip_def : track_def.clips) {
+                track.clips.push_back(
+                    graph::makeClipPlayer(clip_def, asset_dir, asset_cache_,
+                                          sample_rate));
+            }
         }
 
-        // Create processors
-        for (const auto& proc_def : track_def.chain) {
+        // Create processors (after the governing node when substituted)
+        for (size_t proc_i = sub.active ? sub.resume_index : 0;
+             proc_i < track_def.chain.size(); ++proc_i) {
+            const auto& proc_def = track_def.chain[proc_i];
             if (proc_def.type == graph::GainNode::TYPE) {
                 if (proc_def.bypass) {
                     // zero-latency node: bypass = omission; the chain-count
@@ -244,6 +266,19 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                     continue;  // caught by chain-count check in render()
                 }
                 auto bridge = std::make_unique<host::PluginBridge>();
+                // 2.5-etat: the offline render honors captured state too
+                // (blob by hash from the assets dir, ceremony-restored)
+                if (!proc_def.state_hash.empty()) {
+                    const auto blob_path = std::filesystem::path(asset_dir) /
+                                           (proc_def.state_hash + ".wav");
+                    std::ifstream bf(blob_path, std::ios::binary);
+                    if (bf) {
+                        std::vector<uint8_t> blob(
+                            (std::istreambuf_iterator<char>(bf)),
+                            std::istreambuf_iterator<char>());
+                        if (!blob.empty()) bridge->setPendingState(std::move(blob));
+                    }
+                }
                 if (!bridge->start(host_exe_, module_it->second, proc_def.uid,
                                    sample_rate)) {
                     std::cerr << "Render: plugin child failed for node "
@@ -296,7 +331,10 @@ bool OfflineRenderer::writeWavHeader(
     uint32_t fmt_size = 16;
     file.write(reinterpret_cast<const char*>(&fmt_size), 4);
 
-    uint16_t audio_format = 1;  // PCM
+    // S7: 32-bit output is IEEE FLOAT (format 3), the DAW standard -
+    // lossless for this float pipeline (stems depend on it), and it
+    // retires the A4-12 INT_MIN class for this depth. 16/24 stay PCM.
+    uint16_t audio_format = (bit_depth == 32) ? 3 : 1;
     file.write(reinterpret_cast<const char*>(&audio_format), 2);
 
     uint16_t num_channels = static_cast<uint16_t>(channels);
@@ -339,13 +377,15 @@ void OfflineRenderer::convertSamples(
                 peak_right = abs_sample;
             }
 
-            // Clip detection
+            // Clip detection. Float32 output (S7 stems) stays UNCLAMPED:
+            // IEEE float WAV legally exceeds 1.0 and the stem must be the
+            // EXACT chain output - the flag still reports.
             if (sample > 1.0f || sample < -1.0f) {
                 clipped = true;
-                sample = std::clamp(sample, -1.0f, 1.0f);
+                if (bit_depth != 32) sample = std::clamp(sample, -1.0f, 1.0f);
             }
 
-            // Convert to integer format
+            // Convert to output format
             if (bit_depth == 16) {
                 int16_t int_sample = static_cast<int16_t>(sample * 32767.0f);
                 output[(i * channels + ch) * 2]     = static_cast<uint8_t>(int_sample & 0xFF);
@@ -356,11 +396,13 @@ void OfflineRenderer::convertSamples(
                 output[(i * channels + ch) * 3 + 1] = static_cast<uint8_t>((int_sample >> 8) & 0xFF);
                 output[(i * channels + ch) * 3 + 2] = static_cast<uint8_t>((int_sample >> 16) & 0xFF);
             } else if (bit_depth == 32) {
-                int32_t int_sample = static_cast<int32_t>(sample * 2147483647.0f);
-                output[(i * channels + ch) * 4]     = static_cast<uint8_t>(int_sample & 0xFF);
-                output[(i * channels + ch) * 4 + 1] = static_cast<uint8_t>((int_sample >> 8) & 0xFF);
-                output[(i * channels + ch) * 4 + 2] = static_cast<uint8_t>((int_sample >> 16) & 0xFF);
-                output[(i * channels + ch) * 4 + 3] = static_cast<uint8_t>((int_sample >> 24) & 0xFF);
+                // IEEE float, byte-exact passthrough
+                uint32_t bits;
+                std::memcpy(&bits, &sample, 4);
+                output[(i * channels + ch) * 4]     = static_cast<uint8_t>(bits & 0xFF);
+                output[(i * channels + ch) * 4 + 1] = static_cast<uint8_t>((bits >> 8) & 0xFF);
+                output[(i * channels + ch) * 4 + 2] = static_cast<uint8_t>((bits >> 16) & 0xFF);
+                output[(i * channels + ch) * 4 + 3] = static_cast<uint8_t>((bits >> 24) & 0xFF);
             }
         }
     }
