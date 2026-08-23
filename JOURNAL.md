@@ -615,6 +615,22 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (S8a — le robinet du jam : moteur -> onglet) :**
+l'arbitrage streaming delegue (« propre et performant ») -> WebRTC
+navigateur ratifie (dossier docs/STREAMING-DESIGN.md), et la premiere
+tranche LIVREE : le PCM post-master quitte le thread sacre par un
+TapRing lock-free SPSC (64 blocs, drop-newest cote audio — l'audio
+n'attend JAMAIS ; etage d'accumulation pour les sous-blocs partiels
+du wrap : zero trou dans le flux), la boucle de controle le pompe a
+CHAQUE tour (pas au rythme telemetrie — la route jam veut les blocs
+frais), le WS l'expedie par lots AudioTap {first_seq, blocs, drops}
+aux abonnes (TapControl par client, le ring ne chauffe que si
+quelqu'un ecoute). Onglet : ?tap=1 s'abonne (re-asserte par connexion
+comme le loop), badge « tap Ns continu/N trous » dans la barre de
+statut. Garde tap.spec : moteur reel, ~375 blocs en 2 s, sequences
+CONTIGUES, zero drop, badge « continu ». Moteur 29/29. Prochain
+troncon : S8b, la traversee WebRTC (signaling par le serveur).
+
 **2026-08-24 (LE PREMIER PLUGIN MOINS GENTIL — mda, sans rien
 installer) :** la suite mda du SDK vendored (30 vrais effets
 multi-classes) etait a un `ninja mda-vst3` de distance. En UNE session,

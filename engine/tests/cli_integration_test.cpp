@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file cli_integration_test.cpp
  * @brief Integration tests for DAW engine.
@@ -845,17 +845,20 @@ int runPluginHostProcess(const std::string& uid, const std::string& in_wav,
 // is the single module file named again.vst3; on Linux it is the .so
 // INSIDE the bundle (.../again.vst3/Contents/x86_64-linux/again.so) and
 // the SDK's module loader wants the BUNDLE root. Walk up to it.
-static std::string fixtureModulePath() {
-    // ONE convention on both OSes: the BUNDLE ROOT DIRECTORY (again.vst3/).
-    // $<TARGET_FILE:again> is the module file INSIDE the bundle (which can
-    // itself be named .vst3 on Windows): walk up to the ancestor DIRECTORY
-    // ending in .vst3 - Linux requires it, Windows accepts it.
-    const fs::path p = DAW_AGAIN_VST3;
+// ONE convention on both OSes: the BUNDLE ROOT DIRECTORY (<name>.vst3/).
+// $<TARGET_FILE:...> is the module file INSIDE the bundle (which can
+// itself be named .vst3 on Windows): walk up to the ancestor DIRECTORY
+// ending in .vst3 - Linux requires it, Windows accepts it.
+static std::string bundleRootOf(const char* target_file) {
+    const fs::path p = target_file;
     for (fs::path q = p.parent_path(); !q.empty() && q != q.root_path(); q = q.parent_path()) {
         if (q.extension() == ".vst3" && fs::is_directory(q)) return q.string();
     }
     return p.string();
 }
+
+static std::string fixtureModulePath() { return bundleRootOf(DAW_AGAIN_VST3); }
+static std::string mdaModulePath() { return bundleRootOf(DAW_MDA_VST3); }
 
 // AGain sample constants (stable per SDK release, verified by test 11)
 constexpr const char* kAGainAudioUid = "84E8DE5F92554F5396FAE4133C935A18";
@@ -1181,7 +1184,7 @@ bool testRealPluginMda() {
 
     // 1. Burst vs slow: same resulting STATE
     daw::host::PluginBridge burst;
-    if (!burst.start(DAW_PLUGIN_HOST_EXE, DAW_MDA_VST3, kOverdriveUid, 48000)) {
+    if (!burst.start(DAW_PLUGIN_HOST_EXE, mdaModulePath(), kOverdriveUid, 48000)) {
         std::cout << "FAILED: mda bridge start: " << burst.error() << "\n";
         return false;
     }
@@ -1205,7 +1208,7 @@ bool testRealPluginMda() {
     burst.stop();
 
     daw::host::PluginBridge slow;
-    if (!slow.start(DAW_PLUGIN_HOST_EXE, DAW_MDA_VST3, kOverdriveUid, 48000)) {
+    if (!slow.start(DAW_PLUGIN_HOST_EXE, mdaModulePath(), kOverdriveUid, 48000)) {
         std::cout << "FAILED: slow bridge start: " << slow.error() << "\n";
         return false;
     }
@@ -1272,7 +1275,7 @@ bool testRealPluginMda() {
         return false;
     }
 
-    const std::map<std::string, std::string> modules{{kOverdriveUid, DAW_MDA_VST3}};
+    const std::map<std::string, std::string> modules{{kOverdriveUid, mdaModulePath()}};
     daw::render::RenderConfig config;
     config.sample_rate = 48000;
     config.bit_depth = 16;

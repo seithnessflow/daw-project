@@ -174,6 +174,11 @@ export async function init(): Promise<void> {
     // V1.1: loop is PERFORMANCE state - re-assert the local choice on
     // every (re)connection so an engine restart does not silently drop it.
     engineClient.setLoop(els.loopBtn.getAttribute('aria-pressed') === 'true');
+    // S8a: ?tap=1 subscribes to the master tap (the jam road's first
+    // meter; re-asserted per connection like the loop)
+    if (new URLSearchParams(window.location.search).get('tap') === '1') {
+      engineClient.setTap(true);
+    }
     console.log('Connected to engine');
   };
   engineClient.onDisconnect = () => {
@@ -203,6 +208,32 @@ export async function init(): Promise<void> {
     sendLastChange();
     els.masterDb.textContent = formatGain(Number(els.masterGain.value));
   });
+
+  // S8a: the tap badge - blocks/s, sequence continuity, drops. The
+  // meter that says "the jam road's first leg is flowing".
+  let tapBlocks = 0;
+  let tapNextSeq = -1;
+  let tapGaps = 0;
+  let tapBadge: HTMLElement | null = null;
+  engineClient.onAudioTap = (firstSeq, blockCount, _samples, dropped) => {
+    if (tapNextSeq >= 0 && firstSeq !== tapNextSeq) tapGaps++;
+    tapNextSeq = firstSeq + blockCount;
+    tapBlocks += blockCount;
+    if (!tapBadge) {
+      tapBadge = document.createElement('div');
+      tapBadge.className = 'status-item';
+      tapBadge.id = 'tap-status';
+      tapBadge.dataset.state = 'active';
+      document.querySelector('.status')?.prepend(tapBadge);
+    }
+    (window as any).__dawTap = { blocks: tapBlocks, gaps: tapGaps, dropped };
+  };
+  window.setInterval(() => {
+    if (tapBadge) {
+      tapBadge.textContent =
+        `tap ${tapBlocks * 256 / 48000 | 0}s ${tapGaps === 0 ? 'continu' : tapGaps + ' trous'}`;
+    }
+  }, 1000);
 
   // V1.1: loop toggle - local performance state, pushed to the engine
   els.loopBtn.addEventListener('click', () => {

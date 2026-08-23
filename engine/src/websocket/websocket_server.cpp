@@ -162,6 +162,11 @@ void WebSocketServer::handleMessage(
             std::lock_guard<std::mutex> lock(connections_mutex_);
             connections_.erase(&webSocket);
             pending_auth_.erase(&webSocket);
+            // S8a: a vanished subscriber must not keep the tap warm
+            tap_subscribers_.erase(&webSocket);
+            if (tap_ring_ && tap_subscribers_.empty()) {
+                tap_ring_->enabled.store(false, std::memory_order_release);
+            }
             break;
         }
 
@@ -228,6 +233,9 @@ void WebSocketServer::handleMessage(
                 case protocol::Message::kSetMonitor:
                     handleSetMonitor(message.set_monitor());
                     break;
+                case protocol::Message::kTapControl:
+                    handleTapControl(&webSocket, message.tap_control());
+                    break;
                 default:
                     break;
             }
@@ -269,6 +277,53 @@ void WebSocketServer::handleTransportCommand(const protocol::TransportCommand& c
     }
 
     device_->sendCommand(audio_cmd);
+}
+
+void WebSocketServer::handleTapControl(ix::WebSocket* ws,
+                                       const protocol::TapControl& cmd) {
+    if (!tap_ring_) return;
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    if (cmd.enabled()) {
+        tap_subscribers_.insert(ws);
+    } else {
+        tap_subscribers_.erase(ws);
+    }
+    tap_ring_->enabled.store(!tap_subscribers_.empty(),
+                             std::memory_order_release);
+    std::cout << "Master tap: " << tap_subscribers_.size()
+              << " subscriber(s)" << std::endl;
+}
+
+void WebSocketServer::pumpTap() {
+    if (!tap_ring_) return;
+    audio::TapRing& ring = *tap_ring_;
+    uint64_t r = ring.read_idx.load(std::memory_order_relaxed);
+    const uint64_t w = ring.write_idx.load(std::memory_order_acquire);
+    if (r == w) return;
+
+    // Batch everything pending into ONE message (at a ~1 ms pump the
+    // batch is 1-2 blocks; after a stall it catches up whole).
+    protocol::Message msg;
+    auto* tap = msg.mutable_audio_tap();
+    tap->set_first_seq(r);
+    std::string* bytes = tap->mutable_samples();
+    uint32_t count = 0;
+    while (r < w && count < audio::TapRing::kSlots) {
+        bytes->append(
+            reinterpret_cast<const char*>(ring.blocks[r % audio::TapRing::kSlots]),
+            audio::TapRing::kBlockSamples * sizeof(float));
+        ++r;
+        ++count;
+    }
+    ring.read_idx.store(r, std::memory_order_release);
+    tap->set_block_count(count);
+    tap->set_dropped_blocks(ring.dropped.load(std::memory_order_relaxed));
+
+    const std::string data = serializeWithLength(msg);
+    std::lock_guard<std::mutex> lock(connections_mutex_);
+    for (auto* ws : tap_subscribers_) {
+        ws->sendBinary(data);
+    }
 }
 
 void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {

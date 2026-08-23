@@ -43,6 +43,7 @@
  */
 
 #include "ring_buffer.h"
+#include "tap_ring.h"
 #include "../graph/audio_graph.h"
 #include "../transport/transport_state.h"
 
@@ -100,6 +101,10 @@ struct AudioCallbackContext {
     // Ring buffers for thread communication
     CommandRingBuffer* command_buffer = nullptr;
     TelemetryRingBuffer* telemetry_buffer = nullptr;
+
+    // S8a: the master tap (post-master PCM out to the local tab).
+    // Plain pointer set before device start; may stay null (CLI mode).
+    TapRing* tap_ring = nullptr;
 
     // Atomic slot holding the current audio graph, RAW pointer. The callback
     // must stay lock-free and std::atomic<std::shared_ptr> is NOT lock-free

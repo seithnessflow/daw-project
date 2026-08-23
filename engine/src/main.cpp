@@ -1013,6 +1013,11 @@ int doPlayWithServer(const Options& opts) {
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
+    // S8a: the master tap - wired BEFORE initialize (the callback reads
+    // the pointer unsynchronized). Static: outlives everything here.
+    static daw::audio::TapRing tap_ring;
+    device.setTapRing(&tap_ring);
+
     if (!device.initialize(config)) {
         std::cerr << "Failed to initialize audio device\n";
         return 1;
@@ -1108,6 +1113,7 @@ int doPlayWithServer(const Options& opts) {
     ws_config.allowed_origins.insert(ws_config.allowed_origins.end(),
                                      opts.allow_origins.begin(), opts.allow_origins.end());
     wirePluginTelemetry(ws_server, plugin_registry);
+    ws_server.setTapRing(&tap_ring);  // S8a
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
@@ -1335,6 +1341,12 @@ int doPlayWithServer(const Options& opts) {
                 std::cout << "Evicted " << evicted
                           << " plugin child(ren) removed from the document\n";
             }
+        }
+
+        // S8a: pump the master tap EVERY tick (freshest blocks for the
+        // jam road; free when nobody subscribes)
+        if (ws_server.isRunning()) {
+            ws_server.pumpTap();
         }
 
         // Broadcast telemetry at configured rate

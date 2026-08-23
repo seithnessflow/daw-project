@@ -73,6 +73,14 @@ export interface SetMonitor {
   mute: boolean;
 }
 
+/**
+ * S8a: subscribe/unsubscribe this client to the master tap (the jam
+ * road: engine -> LOCAL tab over loopback; the tab ships it P2P)
+ */
+export interface TapControl {
+  enabled: boolean;
+}
+
 /** Transport position (sent at 30 Hz) */
 export interface TransportPosition {
   positionSamples: number;
@@ -109,6 +117,21 @@ export interface EngineState {
   pluginChildAlive: boolean;
   /** c-2: cold restart attempts (budget 3) */
   pluginChildRestarts: number;
+}
+
+/**
+ * S8a: a batch of post-master audio blocks for the subscribed tab.
+ * first_seq counts 256-frame blocks since tap start; a seq gap = the
+ * control thread fell behind and the ring dropped (counted, visible).
+ * Samples are interleaved stereo float32, little-endian.
+ */
+export interface AudioTap {
+  firstSeq: number;
+  blockCount: number;
+  /** block_count * 256 * 2 * 4 bytes */
+  samples: Uint8Array;
+  /** cumulative ring overruns */
+  droppedBlocks: number;
 }
 
 /** Error from engine */
@@ -165,11 +188,19 @@ export interface Message {
   setMonitor?:
     | SetMonitor
     | undefined;
+  /** S8a */
+  tapControl?:
+    | TapControl
+    | undefined;
   /** Engine -> Client */
   position?: TransportPosition | undefined;
   meters?: Meters | undefined;
   engineState?: EngineState | undefined;
-  error?: Error | undefined;
+  error?:
+    | Error
+    | undefined;
+  /** S8a */
+  audioTap?: AudioTap | undefined;
 }
 
 function createBaseTransportCommand(): TransportCommand {
@@ -382,6 +413,73 @@ export const SetMonitor: MessageFns<SetMonitor> = {
     message.trackId = object.trackId ?? "";
     message.solo = object.solo ?? false;
     message.mute = object.mute ?? false;
+    return message;
+  },
+};
+
+function createBaseTapControl(): TapControl {
+  return { enabled: false };
+}
+
+export const TapControl: MessageFns<TapControl> = {
+  encode(message: TapControl, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.enabled !== false) {
+      writer.uint32(8).bool(message.enabled);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TapControl {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseTapControl();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.enabled = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): TapControl {
+    return { enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false };
+  },
+
+  toJSON(message: TapControl): unknown {
+    const obj: any = {};
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TapControl>, I>>(base?: I): TapControl {
+    return TapControl.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TapControl>, I>>(object: I): TapControl {
+    const message = createBaseTapControl();
+    message.enabled = object.enabled ?? false;
     return message;
   },
 };
@@ -881,6 +979,135 @@ export const EngineState: MessageFns<EngineState> = {
   },
 };
 
+function createBaseAudioTap(): AudioTap {
+  return { firstSeq: 0, blockCount: 0, samples: new Uint8Array(0), droppedBlocks: 0 };
+}
+
+export const AudioTap: MessageFns<AudioTap> = {
+  encode(message: AudioTap, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.firstSeq !== 0) {
+      writer.uint32(8).uint64(message.firstSeq);
+    }
+    if (message.blockCount !== 0) {
+      writer.uint32(16).uint32(message.blockCount);
+    }
+    if (message.samples.length !== 0) {
+      writer.uint32(26).bytes(message.samples);
+    }
+    if (message.droppedBlocks !== 0) {
+      writer.uint32(32).uint64(message.droppedBlocks);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AudioTap {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAudioTap();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.firstSeq = longToNumber(reader.uint64());
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.blockCount = reader.uint32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.samples = reader.bytes();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.droppedBlocks = longToNumber(reader.uint64());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AudioTap {
+    return {
+      firstSeq: isSet(object.firstSeq)
+        ? globalThis.Number(object.firstSeq)
+        : isSet(object.first_seq)
+        ? globalThis.Number(object.first_seq)
+        : 0,
+      blockCount: isSet(object.blockCount)
+        ? globalThis.Number(object.blockCount)
+        : isSet(object.block_count)
+        ? globalThis.Number(object.block_count)
+        : 0,
+      samples: isSet(object.samples) ? bytesFromBase64(object.samples) : new Uint8Array(0),
+      droppedBlocks: isSet(object.droppedBlocks)
+        ? globalThis.Number(object.droppedBlocks)
+        : isSet(object.dropped_blocks)
+        ? globalThis.Number(object.dropped_blocks)
+        : 0,
+    };
+  },
+
+  toJSON(message: AudioTap): unknown {
+    const obj: any = {};
+    if (message.firstSeq !== 0) {
+      obj.firstSeq = Math.round(message.firstSeq);
+    }
+    if (message.blockCount !== 0) {
+      obj.blockCount = Math.round(message.blockCount);
+    }
+    if (message.samples.length !== 0) {
+      obj.samples = base64FromBytes(message.samples);
+    }
+    if (message.droppedBlocks !== 0) {
+      obj.droppedBlocks = Math.round(message.droppedBlocks);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AudioTap>, I>>(base?: I): AudioTap {
+    return AudioTap.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AudioTap>, I>>(object: I): AudioTap {
+    const message = createBaseAudioTap();
+    message.firstSeq = object.firstSeq ?? 0;
+    message.blockCount = object.blockCount ?? 0;
+    message.samples = object.samples ?? new Uint8Array(0);
+    message.droppedBlocks = object.droppedBlocks ?? 0;
+    return message;
+  },
+};
+
 function createBaseError(): Error {
   return { severity: 0, code: "", message: "" };
 }
@@ -986,10 +1213,12 @@ function createBaseMessage(): Message {
   return {
     transport: undefined,
     setMonitor: undefined,
+    tapControl: undefined,
     position: undefined,
     meters: undefined,
     engineState: undefined,
     error: undefined,
+    audioTap: undefined,
   };
 }
 
@@ -1000,6 +1229,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.setMonitor !== undefined) {
       SetMonitor.encode(message.setMonitor, writer.uint32(18).fork()).join();
+    }
+    if (message.tapControl !== undefined) {
+      TapControl.encode(message.tapControl, writer.uint32(58).fork()).join();
     }
     if (message.position !== undefined) {
       TransportPosition.encode(message.position, writer.uint32(26).fork()).join();
@@ -1012,6 +1244,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.error !== undefined) {
       Error.encode(message.error, writer.uint32(50).fork()).join();
+    }
+    if (message.audioTap !== undefined) {
+      AudioTap.encode(message.audioTap, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -1043,6 +1278,14 @@ export const Message: MessageFns<Message> = {
             }
 
             message.setMonitor = SetMonitor.decode(reader, reader.uint32());
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.tapControl = TapControl.decode(reader, reader.uint32());
             continue;
           }
           case 3: {
@@ -1077,6 +1320,14 @@ export const Message: MessageFns<Message> = {
             message.error = Error.decode(reader, reader.uint32());
             continue;
           }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.audioTap = AudioTap.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1097,6 +1348,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.set_monitor)
         ? SetMonitor.fromJSON(object.set_monitor)
         : undefined,
+      tapControl: isSet(object.tapControl)
+        ? TapControl.fromJSON(object.tapControl)
+        : isSet(object.tap_control)
+        ? TapControl.fromJSON(object.tap_control)
+        : undefined,
       position: isSet(object.position) ? TransportPosition.fromJSON(object.position) : undefined,
       meters: isSet(object.meters) ? Meters.fromJSON(object.meters) : undefined,
       engineState: isSet(object.engineState)
@@ -1105,6 +1361,11 @@ export const Message: MessageFns<Message> = {
         ? EngineState.fromJSON(object.engine_state)
         : undefined,
       error: isSet(object.error) ? Error.fromJSON(object.error) : undefined,
+      audioTap: isSet(object.audioTap)
+        ? AudioTap.fromJSON(object.audioTap)
+        : isSet(object.audio_tap)
+        ? AudioTap.fromJSON(object.audio_tap)
+        : undefined,
     };
   },
 
@@ -1115,6 +1376,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.setMonitor !== undefined) {
       obj.setMonitor = SetMonitor.toJSON(message.setMonitor);
+    }
+    if (message.tapControl !== undefined) {
+      obj.tapControl = TapControl.toJSON(message.tapControl);
     }
     if (message.position !== undefined) {
       obj.position = TransportPosition.toJSON(message.position);
@@ -1127,6 +1391,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.error !== undefined) {
       obj.error = Error.toJSON(message.error);
+    }
+    if (message.audioTap !== undefined) {
+      obj.audioTap = AudioTap.toJSON(message.audioTap);
     }
     return obj;
   },
@@ -1142,6 +1409,9 @@ export const Message: MessageFns<Message> = {
     message.setMonitor = (object.setMonitor !== undefined && object.setMonitor !== null)
       ? SetMonitor.fromPartial(object.setMonitor)
       : undefined;
+    message.tapControl = (object.tapControl !== undefined && object.tapControl !== null)
+      ? TapControl.fromPartial(object.tapControl)
+      : undefined;
     message.position = (object.position !== undefined && object.position !== null)
       ? TransportPosition.fromPartial(object.position)
       : undefined;
@@ -1152,9 +1422,37 @@ export const Message: MessageFns<Message> = {
       ? EngineState.fromPartial(object.engineState)
       : undefined;
     message.error = (object.error !== undefined && object.error !== null) ? Error.fromPartial(object.error) : undefined;
+    message.audioTap = (object.audioTap !== undefined && object.audioTap !== null)
+      ? AudioTap.fromPartial(object.audioTap)
+      : undefined;
     return message;
   },
 };
+
+function bytesFromBase64(b64: string): Uint8Array {
+  if ((globalThis as any).Buffer) {
+    return Uint8Array.from((globalThis as any).Buffer.from(b64, "base64"));
+  } else {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+      arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+  }
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  if ((globalThis as any).Buffer) {
+    return (globalThis as any).Buffer.from(arr).toString("base64");
+  } else {
+    const bin: string[] = [];
+    arr.forEach((byte) => {
+      bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+  }
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

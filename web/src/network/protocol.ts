@@ -12,24 +12,27 @@ import {
   type TransportPosition,
   type Meters,
   type EngineState,
+  type AudioTap,
   type Error as ProtoError,
 } from '../proto/messages';
 
 // Re-export types for convenience
 export { TransportCommand_Action as TransportAction };
-export type { EngineState, Meters, TransportPosition };
+export type { EngineState, Meters, TransportPosition, AudioTap };
 
 // Decoded message types for the client
 export type DecodedMessage =
   | { type: 'position'; data: TransportPosition }
   | { type: 'meters'; data: Meters }
   | { type: 'state'; data: EngineState }
+  | { type: 'audioTap'; data: AudioTap }
   | { type: 'error'; data: ProtoError };
 
 // Encode message types
 export type EncodeMessage =
   | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean } }
-  | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } };
+  | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
+  | { type: 'tapControl'; data: { enabled: boolean } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -54,6 +57,11 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
           solo: msg.data.solo,
           mute: msg.data.mute,
         },
+      };
+      break;
+    case 'tapControl':
+      protoMessage = {
+        tapControl: { enabled: msg.data.enabled },
       };
       break;
   }
@@ -106,6 +114,9 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
     }
     if (msg.engineState !== undefined) {
       return { type: 'state', data: msg.engineState };
+    }
+    if (msg.audioTap !== undefined) {
+      return { type: 'audioTap', data: msg.audioTap };
     }
     if (msg.error !== undefined) {
       return { type: 'error', data: msg.error };

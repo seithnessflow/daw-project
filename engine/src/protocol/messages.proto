@@ -27,6 +27,12 @@ message SetMonitor {
     bool mute = 3;
 }
 
+// S8a: subscribe/unsubscribe this client to the master tap (the jam
+// road: engine -> LOCAL tab over loopback; the tab ships it P2P)
+message TapControl {
+    bool enabled = 1;
+}
+
 // =============================================================================
 // Engine -> Client Messages
 // =============================================================================
@@ -61,6 +67,17 @@ message EngineState {
     uint32 plugin_child_restarts = 6;  // c-2: cold restart attempts (budget 3)
 }
 
+// S8a: a batch of post-master audio blocks for the subscribed tab.
+// first_seq counts 256-frame blocks since tap start; a seq gap = the
+// control thread fell behind and the ring dropped (counted, visible).
+// Samples are interleaved stereo float32, little-endian.
+message AudioTap {
+    uint64 first_seq = 1;
+    uint32 block_count = 2;
+    bytes samples = 3;         // block_count * 256 * 2 * 4 bytes
+    uint64 dropped_blocks = 4; // cumulative ring overruns
+}
+
 // Error from engine
 message Error {
     enum Severity {
@@ -82,11 +99,13 @@ message Message {
         // Client -> Engine
         TransportCommand transport = 1;
         SetMonitor set_monitor = 2;
+        TapControl tap_control = 7;   // S8a
 
         // Engine -> Client
         TransportPosition position = 3;
         Meters meters = 4;
         EngineState engine_state = 5;
         Error error = 6;
+        AudioTap audio_tap = 8;       // S8a
     }
 }

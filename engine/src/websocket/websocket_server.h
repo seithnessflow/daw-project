@@ -11,6 +11,7 @@
  */
 
 #include "../audio/audio_device.h"
+#include "../audio/tap_ring.h"
 #include "../graph/audio_graph.h"
 #include "messages.pb.h"
 
@@ -125,6 +126,20 @@ public:
         plugin_child_restarts_ = restarts;
     }
 
+    /**
+     * S8a: attach the master tap ring (owned by the caller, written by
+     * the audio callback). The ring's `enabled` flag follows the
+     * subscriber count.
+     */
+    void setTapRing(audio::TapRing* ring) { tap_ring_ = ring; }
+
+    /**
+     * S8a: drain pending tap blocks to the subscribed clients. Called
+     * EVERY main-loop tick (not at telemetry rate - the jam road wants
+     * the freshest blocks). No subscribers or no ring = free.
+     */
+    void pumpTap();
+
 private:
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
@@ -132,6 +147,7 @@ private:
                        const ix::WebSocketMessagePtr& msg);
     void handleTransportCommand(const protocol::TransportCommand& cmd);
     void handleSetMonitor(const protocol::SetMonitor& cmd);
+    void handleTapControl(ix::WebSocket* ws, const protocol::TapControl& cmd);
 
     // Send helpers
     void sendToAll(const protocol::Message& msg);
@@ -169,6 +185,10 @@ private:
     const std::atomic<uint64_t>* plugin_blocks_missed_ = nullptr;
     const std::atomic<bool>* plugin_child_alive_ = nullptr;
     const std::atomic<uint32_t>* plugin_child_restarts_ = nullptr;
+
+    // S8a: master tap (owned by main; audio-thread writer)
+    audio::TapRing* tap_ring_ = nullptr;
+    std::set<ix::WebSocket*> tap_subscribers_;  // guarded by connections_mutex_
 
     // Telemetry
     uint32_t telemetry_hz_ = 30;

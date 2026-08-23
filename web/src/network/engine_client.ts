@@ -46,6 +46,9 @@ export class EngineClient {
   onMeters: ((meters: MeterData[], masterLeft: number, masterRight: number) => void) | null = null;
   onState: ((state: EngineState) => void) | null = null;
   onError: ((message: string) => void) | null = null;
+  /** S8a: post-master PCM batches from the tap (firstSeq, f32 bytes). */
+  onAudioTap: ((firstSeq: number, blockCount: number, samples: Uint8Array,
+                droppedBlocks: number) => void) | null = null;
 
   constructor(config: EngineConfig = {}) {
     this.address = config.address ?? '127.0.0.1';
@@ -167,6 +170,14 @@ export class EngineClient {
   /**
    * V1.1: toggle transport looping (performance state, never the CRDT).
    */
+  /** S8a: subscribe/unsubscribe to the engine's master tap. */
+  setTap(enabled: boolean): void {
+    const message = encodeMessage({ type: 'tapControl', data: { enabled } });
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(message);
+    }
+  }
+
   setLoop(enabled: boolean): void {
     const message = encodeMessage({
       type: 'transport',
@@ -255,6 +266,11 @@ export class EngineClient {
         break;
       case 'state':
         this.onState?.(msg.data);
+        break;
+      case 'audioTap':
+        this.onAudioTap?.(
+          Number(msg.data.firstSeq), msg.data.blockCount,
+          msg.data.samples, Number(msg.data.droppedBlocks));
         break;
       case 'error':
         this.onError?.(msg.data.message);

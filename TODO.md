@@ -634,14 +634,15 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 ## simple, faux si producteur hors-ligne ; (c) timestamps —
 ## approximatif. PROPOSITION : (b) + mention « fraicheur inconnue »
 ## quand le producteur est absent] ;
-## 6. streaming jam — CADRAGE ECRIT (docs/STREAMING-DESIGN.md,
-## 2026-08-24) : PROPOSITION A RATIFIER = WebRTC navigateur-a-
-## navigateur (zero dependance native, Opus/jitter/NAT integres),
-## robinet moteur->onglet en WS loopback, signaling par le serveur
-## (pur texte), PAS de TURN au v1 (echec propre affiche). Latence
-## 30-80 ms attendue, MESUREE ET AFFICHEE, jamais promise. Decoupage
-## S8a robinet / S8b traversee / S8c ecoute. AUCUNE ligne avant
-## l'arbitrage utilisateur. (c'est LUI qu'on coupe s'il deborde.)
+## 6. streaming jam — RATIFIE par delegation utilisateur (« propre et
+## performant ») : WebRTC navigateur (docs/STREAMING-DESIGN.md).
+## S8a FAIT 2026-08-24 : TapRing lock-free (drop-newest, etage
+## d'accumulation anti-trous), pumpTap chaque tour, AudioTap/TapControl
+## au protocole, ?tap=1 + badge continuite, garde tap.spec (~375
+## blocs/2s contigus, zero drop). RESTE : S8b traversee (signaling
+## serveur + RTCPeerConnection, STUN sans TURN, echec propre),
+## S8c ecoute (WebAudio + tranche JAM + latence AFFICHEE).
+## (c'est LUI qu'on coupe s'il deborde.)
 ## Rappel de la revue : la preuve est calibree sur le plugin le plus
 ## gentil du monde — latence nulle, etat minuscule, deterministe,
 ## sans GUI : quatre endroits ou le premier vrai plugin cassera.

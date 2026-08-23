@@ -136,6 +136,13 @@ void audioCallback(
             std::memset(chunk_output, 0, chunk * 2 * sizeof(float));
         }
 
+        // S8a: the master tap hears exactly what the device hears
+        // (post-master, silence-on-failure included). Lock-free push,
+        // drop-newest on overrun - the sacred thread never waits.
+        if (ctx->tap_ring) {
+            ctx->tap_ring->pushSamples(chunk_output, chunk);
+        }
+
         position += static_cast<int64_t>(chunk);
         frames_written += chunk;
     }

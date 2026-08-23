@@ -225,6 +225,14 @@ private:
 
     // Callback context (passed to audio thread)
     AudioCallbackContext callback_context_;
+
+public:
+    /**
+     * S8a: attach the master tap ring. MUST be called before
+     * initialize()/start() - the pointer is read by the audio callback
+     * without synchronization.
+     */
+    void setTapRing(TapRing* ring) { callback_context_.tap_ring = ring; }
 };
 
 }  // namespace daw::audio
