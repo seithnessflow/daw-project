@@ -35,7 +35,9 @@ avant refonte, trace visuelle par tranche). Ordre des tranches :
        vumetres a lunette, clips decolles du couloir, halo de
        selection potion A INTENSITE EGALE (loi session B intacte),
        seek hover potion.
-4. [ ] PANNEAU DEVICES : chaine lisible, etat/badges, add/remove.
+4. [x] PANNEAU DEVICES — FAIT 2026-08-23 (055261f) : cartes en
+       couches, barres de titre eclairees, bypass = LAMPE (ambre
+       allumee avec halo / enfoncee eteinte).
 5. [ ] PALETTE/KIT + OVERLAYS (aide, starter, messages d'etat).
 6. [ ] MICRO-INTERACTIONS : hover/focus/transitions, coherence des
        curseurs, feedbacks de geste.
