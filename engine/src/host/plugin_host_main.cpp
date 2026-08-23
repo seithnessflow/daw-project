@@ -551,7 +551,6 @@ int runServe(const std::string& segment_path, const std::string& module_path,
               << ring->sample_rate << " Hz" << std::endl;
 
     uint64_t last_in = 0;
-    uint64_t last_param = 0;
     uint64_t beats = 1;
     uint64_t idle_spins = 0;
 
@@ -610,32 +609,30 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         const uint64_t seq = s;
         const uint32_t slot = static_cast<uint32_t>(seq % daw::host::kRingSlots);
 
+        // v5 FIFO drain (see shared_audio_ring.h): EVERY pending pair
+        // lands in this block's IParameterChanges - a rebuild's burst of
+        // N params arrives whole, not just its last survivor.
         Vst::ParameterChanges param_changes;
-        param_changes.setMaxParameters(1);
-        // Odd/even seqlock read (see shared_audio_ring.h): bounded retries,
-        // a torn or in-progress read is simply deferred to the next block -
-        // latest wins either way
-        for (int attempt = 0; attempt < 4; ++attempt) {
-            const uint64_t s1 = ring->param_seq.load(std::memory_order_acquire);
-            if (s1 == last_param) break;          // nothing new
-            if (s1 & 1) {                         // write in progress
-                std::this_thread::yield();
-                continue;
+        param_changes.setMaxParameters(daw::host::kParamQueueSlots);
+        while (true) {
+            uint64_t r = ring->param_read_idx.load(std::memory_order_relaxed);
+            if (r >= ring->param_write_idx.load(std::memory_order_acquire)) break;
+            const uint32_t qslot = static_cast<uint32_t>(r % daw::host::kParamQueueSlots);
+            const uint32_t id = ring->param_ids[qslot];
+            const double value = ring->param_values[qslot];
+            // Claim the slot BEFORE trusting the pair: if the writer
+            // overwrote it mid-read (full-queue race), the CAS fails and
+            // the fresh value follows on the next iteration.
+            if (!ring->param_read_idx.compare_exchange_strong(
+                    r, r + 1, std::memory_order_acq_rel)) {
+                continue;  // writer advanced us past an overwritten slot
             }
-            const uint32_t id = ring->param_id.load(std::memory_order_relaxed);
-            const double value = ring->param_value.load(std::memory_order_relaxed);
-            std::atomic_thread_fence(std::memory_order_acquire);
-            if (ring->param_seq.load(std::memory_order_relaxed) != s1) {
-                continue;                         // torn: pairing not trusted
-            }
-            last_param = s1;
             int32 queue_index = 0;
             auto* queue = param_changes.addParameterData(id, queue_index);
             if (queue) {
                 int32 point_index = 0;
                 queue->addPoint(0, value, point_index);
             }
-            break;
         }
 
         // Zero-copy: VST3 channel pointers aim straight into the segment

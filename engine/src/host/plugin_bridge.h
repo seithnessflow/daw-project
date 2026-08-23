@@ -21,6 +21,7 @@
 #include "shared_audio_ring.h"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -127,6 +128,11 @@ private:
     // 2.5-etat: blob staged for the next spawn (written to statePath()
     // just before the child starts; empty = nothing staged)
     std::vector<uint8_t> pending_state_;
+
+    // v5: latest value per param id, control-side. The FIFO is CONSUMED
+    // by the child, so a cold restart replays from this cache (the old
+    // single slot survived restarts by accident; the queue cannot).
+    std::map<uint32_t, double> last_params_;
 
     // Opaque platform handles (Windows: HANDLE file/mapping/process;
     // POSIX: fd + pid)

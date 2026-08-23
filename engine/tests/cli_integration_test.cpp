@@ -1163,6 +1163,208 @@ bool testPluginStateRoundtrip() {
  * renders the same document - the stem substitutes - and produces the
  * BYTE-IDENTICAL 16-bit WAV.
  */
+/**
+ * THE FIRST LESS-KIND PLUGIN (external review: every contact with the
+ * real is worth ten sessions of building). mda Overdrive: REAL DSP
+ * (non-linear), MULTIPLE params - the exact shape that broke the old
+ * single-slot param channel (a rebuild burst kept only the last one).
+ * Proves, against a real plugin:
+ * 1. The v5 param FIFO delivers a BURST whole: a burst-configured
+ *    child and a one-param-per-block child save the SAME state.
+ * 2. Block-wise render determinism (two renders, identical bytes).
+ * 3. The full stem invariant: a machine without mda renders the
+ *    byte-identical WAV from the stem.
+ */
+bool testRealPluginMda() {
+    std::cout << "Test: real plugin mda (param burst, stem)... ";
+    const char* kOverdriveUid = "5653546D64614F6D6461206F76657264";
+
+    // 1. Burst vs slow: same resulting STATE
+    daw::host::PluginBridge burst;
+    if (!burst.start(DAW_PLUGIN_HOST_EXE, DAW_MDA_VST3, kOverdriveUid, 48000)) {
+        std::cout << "FAILED: mda bridge start: " << burst.error() << "\n";
+        return false;
+    }
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    std::vector<float> in_l(kBlock, 0.25f), in_r(kBlock, 0.25f);
+    std::vector<float> out_l(kBlock), out_r(kBlock);
+    // Overdrive params: 0=drive, 1=muffle, 2=output - a burst of three
+    burst.setParam(0, 0.9);
+    burst.setParam(1, 0.3);
+    burst.setParam(2, 0.7);
+    if (!burst.processBlockSync(in_l.data(), in_r.data(),
+                                out_l.data(), out_r.data(), kBlock)) {
+        std::cout << "FAILED: burst process: " << burst.error() << "\n";
+        return false;
+    }
+    std::vector<uint8_t> burst_state;
+    if (!burst.saveState(burst_state) || burst_state.empty()) {
+        std::cout << "FAILED: burst saveState: " << burst.error() << "\n";
+        return false;
+    }
+    burst.stop();
+
+    daw::host::PluginBridge slow;
+    if (!slow.start(DAW_PLUGIN_HOST_EXE, DAW_MDA_VST3, kOverdriveUid, 48000)) {
+        std::cout << "FAILED: slow bridge start: " << slow.error() << "\n";
+        return false;
+    }
+    for (uint32_t id = 0; id < 3; ++id) {
+        slow.setParam(id, id == 0 ? 0.9 : (id == 1 ? 0.3 : 0.7));
+        if (!slow.processBlockSync(in_l.data(), in_r.data(),
+                                   out_l.data(), out_r.data(), kBlock)) {
+            std::cout << "FAILED: slow process " << id << "\n";
+            return false;
+        }
+    }
+    std::vector<uint8_t> slow_state;
+    if (!slow.saveState(slow_state)) {
+        std::cout << "FAILED: slow saveState: " << slow.error() << "\n";
+        return false;
+    }
+    slow.stop();
+    if (burst_state != slow_state) {
+        std::cout << "FAILED: a burst of 3 params != the same 3 sent slowly ("
+                  << burst_state.size() << " vs " << slow_state.size()
+                  << " bytes) - the param channel still drops\n";
+        return false;
+    }
+
+    // 2+3. Determinism and the stem invariant, against the real plugin
+    const fs::path dir = fs::temp_directory_path() / "daw-mda-stem-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+    std::vector<int16_t> in(4096 * 2);
+    for (size_t i = 0; i < 4096; ++i) {
+        const int16_t v = static_cast<int16_t>((static_cast<int>(i) * 41) % 24000 - 12000);
+        in[i * 2] = v;
+        in[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    if (!writeWav16((dir / "mdasrc.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: cannot write asset\n";
+        return false;
+    }
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: doc create\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "mda track";
+    daw::document::ClipDef clip;
+    clip.id = "c1";
+    clip.asset_hash = "mdasrc";
+    clip.start_sample = 0;
+    clip.length_samples = 4096;
+    track.clips.push_back(clip);
+    daw::document::ProcessorDef proc;
+    proc.id = "p1";
+    proc.type = "vst3";
+    proc.uid = kOverdriveUid;
+    proc.params["0"] = 0.8f;
+    proc.params["1"] = 0.2f;
+    proc.params["2"] = 0.6f;
+    track.chain.push_back(proc);
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack\n";
+        return false;
+    }
+
+    const std::map<std::string, std::string> modules{{kOverdriveUid, DAW_MDA_VST3}};
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+
+    daw::render::OfflineRenderer withPlugin;
+    withPlugin.setVst3Modules(modules, DAW_PLUGIN_HOST_EXE);
+    auto r1 = withPlugin.render(doc, (dir / "r1.wav").string(), dir.string(), config);
+    daw::render::OfflineRenderer withPlugin2;
+    withPlugin2.setVst3Modules(modules, DAW_PLUGIN_HOST_EXE);
+    auto r2 = withPlugin2.render(doc, (dir / "r2.wav").string(), dir.string(), config);
+    if (!r1.success || !r2.success) {
+        std::cout << "FAILED: mda render: " << r1.error << " / " << r2.error << "\n";
+        return false;
+    }
+    // THE THIRD-PARTY REALITY, met on day one: mda Overdrive never
+    // initializes filt1/filt2 (a Steinberg SAMPLE bug) - every spawn
+    // starts from random heap and converges within ~100 samples. So
+    // NO bit-equality across spawns (exactly why the stem key is an
+    // input-cache key, never a bit-exactness promise). Asserted
+    // honestly: the BODY (past a bounded transient) is identical.
+    const auto f1 = readWavSamples((dir / "r1.wav").string());
+    const auto f2 = readWavSamples((dir / "r2.wav").string());
+    const size_t kTransient = 512 * 2;  // frames*channels
+    if (f1.empty() || f1.size() != f2.size() || f1.size() <= kTransient) {
+        std::cout << "FAILED: mda render sizes " << f1.size() << "/"
+                  << f2.size() << "\n";
+        return false;
+    }
+    for (size_t i = kTransient; i < f1.size(); ++i) {
+        if (f1[i] != f2[i]) {
+            std::cout << "FAILED: mda renders differ PAST the transient at "
+                      << i << " (" << f1[i] << " vs " << f2[i] << ")\n";
+            return false;
+        }
+    }
+    if (r1.peak_left <= 0.05) {
+        std::cout << "FAILED: near-silent mda render proves nothing\n";
+        return false;
+    }
+
+    const auto stem = daw::render::renderTrackStem(
+        doc.getDocument(), "t1", "p1", dir.string(), modules, DAW_PLUGIN_HOST_EXE);
+    if (!stem.success) {
+        std::cout << "FAILED: mda stem render: " << stem.error << "\n";
+        return false;
+    }
+    if (!doc.setProcessorStem("t1", "p1", stem.stem_hash, stem.stem_key,
+                              stem.latency_samples)) {
+        std::cout << "FAILED: setProcessorStem\n";
+        return false;
+    }
+    daw::render::OfflineRenderer bare;
+    auto sub = bare.render(doc, (dir / "sub.wav").string(), dir.string(), config);
+    if (!sub.success) {
+        std::cout << "FAILED: mda substituted render: " << sub.error << "\n";
+        return false;
+    }
+    // The stem IS the reading truth: the plugin-less machine must
+    // reproduce THE STEM exactly (not the producer's random transient
+    // of another spawn). Expected = the stem's own float samples
+    // through the same 16-bit write/read pipeline.
+    const auto fs_ = readWavSamples((dir / "sub.wav").string());
+    // The stem is FLOAT32: read it through the REAL reader (ClipPlayer's
+    // dr_wav road - the exact same one the substitution plays through)
+    const auto stem_asset = daw::graph::ClipPlayer::loadWav(
+        (dir / (stem.stem_hash + ".wav")).string());
+    if (!stem_asset.isValid() ||
+        fs_.size() != stem_asset.frame_count * 2 || fs_.empty()) {
+        std::cout << "FAILED: substituted size " << fs_.size() << " vs stem "
+                  << stem_asset.frame_count * 2 << "\n";
+        return false;
+    }
+    for (size_t i = 0; i < fs_.size(); ++i) {
+        float s = stem_asset.samples[i];
+        if (s > 1.0f) s = 1.0f;
+        if (s < -1.0f) s = -1.0f;
+        const int16_t written = static_cast<int16_t>(s * 32767.0f);
+        const float expected = static_cast<float>(written) / 32768.0f;
+        if (fs_[i] != expected) {
+            std::cout << "FAILED: substituted output != the stem at " << i
+                      << " (" << fs_[i] << " vs " << expected << ")\n";
+            return false;
+        }
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (burst==slow state " << burst_state.size()
+              << " bytes, body deterministic past transient, substituted"
+              << " == the stem exactly, peak " << r1.peak_left << ")\n";
+    return true;
+}
+
 bool testStemInvariant() {
     std::cout << "Test: STEM invariant S7 (peer without plugin)... ";
 
@@ -2592,6 +2794,7 @@ int main(int argc, char* argv[]) {
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);
     run(testStemInvariant);
+    run(testRealPluginMda);
     run(testDocumentChainRender);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";

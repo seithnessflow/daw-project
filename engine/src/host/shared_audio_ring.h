@@ -43,7 +43,8 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 4;       // v4: state side-channel (v3: param seqlock)
+inline constexpr uint32_t kLayoutVersion = 5;       // v5: param FIFO (v4: state side-channel)
+inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
 inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
@@ -61,20 +62,25 @@ struct SharedAudioRing {
     // Child: publishes after writing the matching output slot
     std::atomic<uint64_t> output_seq;
 
-    // ---- Parameter channel: latest value wins (the graph policy, here) ----
-    // ODD/EVEN SEQLOCK (v3, hardened as c-2's first gesture - c-2 puts
-    // MULTIPLE params through this channel and the previous trio allowed a
-    // fresh id to pair with a stale value):
-    //   writer (single, control thread): seq+1 (-> ODD, write in progress),
-    //     store id, store value, seq+1 (-> EVEN, published version).
-    //   reader (child, per block): s1 = seq; if odd or == last applied,
-    //     skip/retry (bounded - a torn read is simply deferred one block,
-    //     latest wins either way); load id+value; acquire fence; re-check
-    //     seq == s1 or discard.
-    // The individual atomics never tear; the seqlock protects the PAIRING.
-    std::atomic<uint64_t> param_seq;
-    std::atomic<uint32_t> param_id;
-    std::atomic<double> param_value;    // normalized 0..1
+    // ---- Parameter channel (v5): SPSC FIFO ---------------------------------
+    // The v3/v4 single seqlock SLOT lost every param but the last of a
+    // burst (one read per block, latest-wins) - invisible with AGain's
+    // single param, immediate with any REAL multi-param plugin (mda):
+    // a rebuild re-sends the document's params back-to-back and N-1
+    // vanished. Now a FIFO: single writer (control thread) pushes
+    // {id, value} pairs; single reader (child) DRAINS everything
+    // pending into one block's IParameterChanges.
+    //   writer: if full, overwrite the OLDEST (advance read_idx) - a
+    //   64-deep burst degrades to latest-wins per id, never a stall
+    //   on the control thread.
+    //   reader: while read_idx != write_idx (acquire), read pair at
+    //   read_idx, then advance read_idx (release).
+    // Slot fields are plain (not atomic): the indices order them - a
+    // slot is only read after write_idx is published past it.
+    std::atomic<uint64_t> param_write_idx;
+    std::atomic<uint64_t> param_read_idx;
+    uint32_t param_ids[kParamQueueSlots];
+    double param_values[kParamQueueSlots];
 
     // ---- Lifecycle ----
     std::atomic<uint32_t> shutdown;     // engine sets 1; child exits cleanly
@@ -112,16 +118,19 @@ static_assert(offsetof(SharedAudioRing, block_size) == 8);
 static_assert(offsetof(SharedAudioRing, sample_rate) == 12);
 static_assert(offsetof(SharedAudioRing, input_seq) == 16);
 static_assert(offsetof(SharedAudioRing, output_seq) == 24);
-static_assert(offsetof(SharedAudioRing, param_seq) == 32);
-static_assert(offsetof(SharedAudioRing, param_id) == 40);
-static_assert(offsetof(SharedAudioRing, param_value) == 48);
-static_assert(offsetof(SharedAudioRing, shutdown) == 56);
-static_assert(offsetof(SharedAudioRing, child_heartbeat) == 64);
-static_assert(offsetof(SharedAudioRing, state_request_seq) == 72);
-static_assert(offsetof(SharedAudioRing, state_ready_seq) == 80);
-static_assert(offsetof(SharedAudioRing, in) == 88);
-static_assert(offsetof(SharedAudioRing, out) == 88 + kRingSlots * kRingChannels * kRingBlockSize * 4);
-static_assert(sizeof(SharedAudioRing) == 88 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
+static_assert(offsetof(SharedAudioRing, param_write_idx) == 32);
+static_assert(offsetof(SharedAudioRing, param_read_idx) == 40);
+static_assert(offsetof(SharedAudioRing, param_ids) == 48);
+static_assert(offsetof(SharedAudioRing, param_values) == 48 + kParamQueueSlots * 4);
+static_assert(offsetof(SharedAudioRing, shutdown) == 48 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, child_heartbeat) == 56 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, state_request_seq) == 64 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, state_ready_seq) == 72 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, in) == 80 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, out) ==
+              80 + kParamQueueSlots * 12 + kRingSlots * kRingChannels * kRingBlockSize * 4);
+static_assert(sizeof(SharedAudioRing) ==
+              80 + kParamQueueSlots * 12 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 
 }  // namespace daw::host

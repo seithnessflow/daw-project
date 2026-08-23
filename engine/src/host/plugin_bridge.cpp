@@ -230,13 +230,21 @@ bool PluginBridge::restartChild(uint32_t timeout_ms) {
     // The old life's beats must not fake readiness; nobody else writes
     // here once the child is dead
     ring_->child_heartbeat.store(0, std::memory_order_release);
-    // 2.5-etat: refresh the staged blob for the new life (the ring's
-    // param channel already survives; the STATE now does too)
+    // 2.5-etat: refresh the staged blob for the new life
     if (!pending_state_.empty()) {
         if (!writeStateFile(statePath(), pending_state_)) {
             error_ = "cannot write pending state file";
             return false;
         }
+    }
+    // v5: the FIFO was consumed by the old life - replay the latest
+    // value of every param BEFORE the spawn (the queue lives in the
+    // shared ring and waits for the child), so even the new life's
+    // FIRST block - backlog included - hears what the old one did.
+    // The old single slot survived restarts by accident; this is the
+    // deliberate version, without the dry window.
+    for (const auto& [id, value] : last_params_) {
+        setParam(id, value);
     }
     if (!spawnChild(host_exe_, module_path_, class_uid_)) {
         return false;
@@ -311,12 +319,20 @@ bool PluginBridge::saveState(std::vector<uint8_t>& out, uint32_t timeout_ms) {
 
 void PluginBridge::setParam(uint32_t param_id, double normalized) {
     if (!ring_) return;
-    // Odd/even seqlock write (single writer, see shared_audio_ring.h):
-    // odd = write in progress, next even = published version
-    ring_->param_seq.fetch_add(1, std::memory_order_acq_rel);
-    ring_->param_id.store(param_id, std::memory_order_relaxed);
-    ring_->param_value.store(normalized, std::memory_order_relaxed);
-    ring_->param_seq.fetch_add(1, std::memory_order_release);
+    last_params_[param_id] = normalized;  // restart replay cache (v5)
+    // v5 FIFO write (single writer, see shared_audio_ring.h). Full =
+    // overwrite the OLDEST (advance read_idx): a >64 burst degrades to
+    // latest-wins, the control thread never stalls.
+    const uint64_t w = ring_->param_write_idx.load(std::memory_order_relaxed);
+    uint64_t r = ring_->param_read_idx.load(std::memory_order_acquire);
+    if (w - r >= kParamQueueSlots) {
+        ring_->param_read_idx.compare_exchange_strong(
+            r, r + 1, std::memory_order_acq_rel);
+    }
+    const uint32_t slot = static_cast<uint32_t>(w % kParamQueueSlots);
+    ring_->param_ids[slot] = param_id;
+    ring_->param_values[slot] = normalized;
+    ring_->param_write_idx.store(w + 1, std::memory_order_release);
 }
 
 bool PluginBridge::processBlockSync(const float* in_l, const float* in_r,

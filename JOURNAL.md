@@ -615,6 +615,33 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (LE PREMIER PLUGIN MOINS GENTIL — mda, sans rien
+installer) :** la suite mda du SDK vendored (30 vrais effets
+multi-classes) etait a un `ninja mda-vst3` de distance. En UNE session,
+le reel a paye trois fois, exactement comme la revue le predisait :
+(1) LE CANAL PARAM PERDAIT LES RAFALES — par construction : un SLOT
+seqlock latest-wins, une lecture par bloc ; une rafale de N params de
+rebuild n'en gardait qu'UN. Invisible avec AGain (1 param), certain
+avec mda. Ring v5 : le slot devient une FILE SPSC de 64 (writer
+control-thread, plein = ecrase le plus ancien ; le child DRAINE tout
+dans les IParameterChanges du bloc). Garde : burst de 3 params ==
+les memes 3 envoyes lentement, prouve sur l'ETAT mda (240 octets).
+(2) LA FILE A CASSE LA PROMESSE DU RESTART — l'ancien slot survivait
+au crash PAR ACCIDENT (relu par la nouvelle vie) ; la file est
+consommee. Version deliberee : cache latest-par-param cote bridge,
+rejoue AVANT le spawn (la file attend dans le ring partage) — zero
+fenetre seche, testChildCrashRecovery re-vert.
+(3) LES TIERS NE SONT PAS BIT-REPRODUCTIBLES, MEME SPAWN-A-SPAWN :
+flake capture par le diagnostic (104 echantillons divergents des le
+sample 0 puis convergence totale) -> source lue : mda Overdrive
+N'INITIALISE JAMAIS filt1/filt2 (bug du sample Steinberg) — heap
+aleatoire, transitoire ~100 samples. La doctrine du premier jour
+(cle de cache, JAMAIS de promesse bit-exacte inter-tiers) etait le
+bon design ; c'est l'ASSERTION du test qui etait naive. Reecrite
+honnetement : le corps est identique passe un transitoire borne, et
+le pair sans plugin reproduit LE STEM exactement (la verite de
+lecture), pas le transitoire aleatoire du producteur.
+
 **2026-08-23 (SMOKE S7 DEUX MACHINES — LE CRITERE 6 EST VERT) :**
 64EC2954CAAA... == 64EC2954CAAA... — le verdict seul sur sa ligne,
 comme la regle l'exige. Le montage : fixe (Ethernet) avec AGain, moteur

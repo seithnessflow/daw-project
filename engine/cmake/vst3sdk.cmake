@@ -40,12 +40,14 @@ if(EXISTS "${VST3_SDK_DIR}/CMakeLists.txt")
     # C++20 need - it is a separate process, not engine code.
     set_target_properties(plugin_host PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
-    # The integration tests spawn plugin_host against the built AGain
+    # The integration tests spawn plugin_host against the built AGain,
+    # and against mda (the first REAL multi-param plugin family)
     target_compile_definitions(daw_engine_test PRIVATE
         DAW_PLUGIN_HOST_EXE="$<TARGET_FILE:plugin_host>"
         DAW_AGAIN_VST3="$<TARGET_FILE:again>"
+        DAW_MDA_VST3="$<TARGET_FILE:mda-vst3>"
     )
-    add_dependencies(daw_engine_test plugin_host again)
+    add_dependencies(daw_engine_test plugin_host again mda-vst3)
 
     message(STATUS "VST3 SDK found: plugin_host + AGain fixture enabled")
 else()
