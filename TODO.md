@@ -7,7 +7,13 @@ Ordre grave : VAGUE 1 (habitabilite, 6 sessions : V1.1 boucle+arret,
 V1.2 master, V1.3 undo/redo, V1.4 session C visible, V1.5 session D
 devices+eviction A4-5, V1.6 fades) -> ENTRELACS DIFFERENCIATEUR
 (critere-3-vrai A4-1/2/3, placement+clips-MIDI co-designes, 2.5-etat,
-STEMS S7, streaming) -> VAGUE 2 TEMPO (cadrage puis migration) ->
+STEMS S7, streaming) -> SYNC TRANSPORT INTER-MACHINES [AJOUT
+2026-08-24, constat utilisateur « les deux sites sont pas
+synchronises » : chaque moteur a SON transport, le doc converge mais
+la POSITION non — la reponse produit = ABLETON LINK (notes
+docs/ABLETON-*), session de CADRAGE dediee avant toute ligne :
+phase/tempo partages, election du maitre, rapport au jam S8] ->
+VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
 determinisme). Hors programme : Session View, macros, M4L, alea sans
