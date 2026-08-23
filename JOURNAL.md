@@ -615,6 +615,24 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-23 (revue externe post-S7, executee seance tenante) :** le
+verdict — « la premiere fois que ton produit existe » — accompagne
+d'UNE question : le test echoue-t-il quand le mecanisme est retire ?
+Reponse apportee dans la meme session, par le code : (1) SANS stem
+publie, la machine B REFUSE bruyamment (Chain incomplete, asserte —
+un vert ici aurait annule toute la preuve) ; (2) stem CORROMPU =
+refus bruyant, jamais un faux vert (asserte) ; (3) le skip silencieux
+n'existe pas (la garde R5 compte chaque noeud : construit, substitue,
+ou echec du rendu). La cle desaccordee JOUE — design arbitre (stem
+perime = etat d'UI). Et les deux corrections d'avant-smoke : la
+VERSION DU PLUGIN entre dans la cle (sha256 du binaire du module,
+bundles marches tries — deux builds = deux cles, le piege
+multi-machine nomme par la revue ; asserte), et default.am purge de
+ses 1246 pistes de dechets (backup). Moteur 28/28 : « no-stem
+refused, byte-identical, corrupted refused, key stales on param and
+on build ». Prochain contact avec le reel : le smoke S7 deux machines
+(premiere session portable) — chaque contact vaut dix sessions.
+
 **2026-08-23 (refonte, tranches 3-6 — la premiere passe complete) :**
 t3 zone pistes (heads en couches, selection teintee potion, faders a
 gorge et curseur eclaire, vumetres a lunette, clips decolles du
