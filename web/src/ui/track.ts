@@ -233,6 +233,8 @@ export function createDeviceView(
   track: TrackDef | null,
   onBypassToggle: (procId: string, bypass: boolean) => void,
   onParamChange: (procId: string, key: string, value: number) => void,
+  onAddDevice?: (proc: ProcessorDef) => void,
+  onRemoveDevice?: (procId: string) => void,
 ): HTMLElement {
   const view = document.createElement('div');
   view.className = 'device-view';
@@ -240,7 +242,12 @@ export function createDeviceView(
 
   const header = document.createElement('div');
   header.className = 'device-view-title';
-  header.textContent = track ? `Devices — ${track.name}` : 'Devices';
+  const titleText = document.createElement('span');
+  titleText.textContent = track ? `Devices — ${track.name}` : 'Devices';
+  header.appendChild(titleText);
+  if (track && onAddDevice) {
+    header.appendChild(createAddDeviceMenu(onAddDevice));
+  }
   view.appendChild(header);
 
   const chainEl = document.createElement('div');
@@ -250,7 +257,8 @@ export function createDeviceView(
   if (!track) return view;
 
   for (const proc of track.chain) {
-    chainEl.appendChild(createDevicePanel(proc, onBypassToggle, onParamChange));
+    chainEl.appendChild(
+      createDevicePanel(proc, onBypassToggle, onParamChange, onRemoveDevice));
   }
   if (track.chain.length === 0) {
     const empty = document.createElement('div');
@@ -261,10 +269,93 @@ export function createDeviceView(
   return view;
 }
 
+/** AGain (the vendored debug plugin) - the natural prefill for the uid field. */
+const AGAIN_UID = '84E8DE5F92554F5396FAE4133C935A18';
+const VST3_UID_RE = /^[0-9A-Fa-f]{32}$/;
+
+/**
+ * V1.5: the `+ device` control. Click opens a small inline menu:
+ * builtin.gain adds instantly; vst3 reveals a uid field (32 hex,
+ * AGain prefilled) validated BEFORE anything touches the document.
+ */
+function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'device-add';
+
+  const btn = document.createElement('button');
+  btn.id = 'add-device-btn';
+  btn.className = 'device-add-btn';
+  btn.textContent = '+ device';
+  btn.setAttribute('aria-expanded', 'false');
+  wrap.appendChild(btn);
+
+  const menu = document.createElement('div');
+  menu.className = 'device-add-menu';
+  menu.id = 'device-add-menu';
+  menu.hidden = true;
+  wrap.appendChild(menu);
+
+  const gainBtn = document.createElement('button');
+  gainBtn.dataset.role = 'add-gain';
+  gainBtn.textContent = 'gain (builtin)';
+  menu.appendChild(gainBtn);
+
+  const vstRow = document.createElement('div');
+  vstRow.className = 'device-add-vst';
+  const uidInput = document.createElement('input');
+  uidInput.type = 'text';
+  uidInput.id = 'vst3-uid-input';
+  uidInput.value = AGAIN_UID;
+  uidInput.spellcheck = false;
+  uidInput.setAttribute('aria-label', 'VST3 class uid (32 hex)');
+  vstRow.appendChild(uidInput);
+  const vstBtn = document.createElement('button');
+  vstBtn.dataset.role = 'add-vst3';
+  vstBtn.textContent = 'vst3';
+  vstRow.appendChild(vstBtn);
+  menu.appendChild(vstRow);
+
+  const close = () => {
+    menu.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  btn.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+    if (!menu.hidden) uidInput.classList.remove('invalid');
+  });
+  gainBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.gain', bypass: false,
+      params: [{ key: 'gain', value: 1 }],
+    });
+    close();
+  });
+  vstBtn.addEventListener('click', () => {
+    const uid = uidInput.value.trim();
+    if (!VST3_UID_RE.test(uid)) {
+      // Invalid uid never reaches the document (peers would spawn a
+      // child toward a module that cannot resolve)
+      uidInput.classList.add('invalid');
+      uidInput.title = '32 caracteres hexadecimaux attendus';
+      return;
+    }
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'vst3', uid: uid.toUpperCase(),
+      bypass: false, params: [],
+    });
+    close();
+  });
+  uidInput.addEventListener('input', () => uidInput.classList.remove('invalid'));
+
+  return wrap;
+}
+
 function createDevicePanel(
   proc: ProcessorDef,
   onBypassToggle: (procId: string, bypass: boolean) => void,
   onParamChange: (procId: string, key: string, value: number) => void,
+  onRemoveDevice?: (procId: string) => void,
 ): HTMLElement {
   const panel = document.createElement('div');
   panel.className = 'device';
@@ -289,6 +380,39 @@ function createDevicePanel(
   name.className = 'device-name';
   name.textContent = proc.type === 'vst3' ? 'AGain (vst3)' : proc.type;
   title.appendChild(name);
+
+  // V1.5: removal is a TWO-STEP button (armed on first click, fires on
+  // the second, disarms after 3 s or on Escape) - keyboard-safe, no
+  // blocking dialog; Ctrl+Z restores the device anyway.
+  if (onRemoveDevice) {
+    const rm = document.createElement('button');
+    rm.className = 'device-remove';
+    rm.dataset.role = 'remove-device';
+    rm.dataset.procId = proc.id;
+    rm.textContent = '✕';
+    rm.setAttribute('aria-label', `Retirer ${proc.type}`);
+    let disarmTimer: number | undefined;
+    const disarm = () => {
+      rm.classList.remove('armed');
+      rm.textContent = '✕';
+      if (disarmTimer !== undefined) { clearTimeout(disarmTimer); disarmTimer = undefined; }
+    };
+    rm.addEventListener('click', () => {
+      if (rm.classList.contains('armed')) {
+        disarm();
+        onRemoveDevice(proc.id);
+      } else {
+        rm.classList.add('armed');
+        rm.textContent = 'sur ?';
+        disarmTimer = window.setTimeout(disarm, 3000);
+      }
+    });
+    rm.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { disarm(); e.stopPropagation(); }
+    });
+    rm.addEventListener('blur', disarm);
+    title.appendChild(rm);
+  }
   panel.appendChild(title);
 
   // Generic parameter body: labeled horizontal sliders (the universal

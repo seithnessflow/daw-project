@@ -11,7 +11,7 @@
  */
 
 import * as Automerge from '@automerge/automerge';
-import { ProjectDef, TrackDef, ClipDef, SCHEMA_VERSION } from './schema';
+import { ProjectDef, TrackDef, ClipDef, ProcessorDef, SCHEMA_VERSION } from './schema';
 import { UndoJournal, type InverseOp } from './undo';
 
 /** Automerge proxies -> plain JS (deep), for captured snapshots. */
@@ -165,6 +165,8 @@ export class Project {
         case 'deleteClip': this.deleteClip(op.trackId, op.clipId); break;
         case 'addTrack': this.addTrack(op.track); break;
         case 'deleteTrack': this.deleteTrack(op.trackId); break;
+        case 'addProcessor': this.addProcessor(op.trackId, op.proc, op.index); break;
+        case 'removeProcessor': this.removeProcessor(op.trackId, op.processorId); break;
       }
       emit?.();
     }
@@ -372,6 +374,49 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       const i = d.tracks.findIndex((t) => t.id === trackId);
       if (i >= 0) d.tracks.splice(i, 1);
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * V1.5: add a device to a track's chain. `index` (optional) inserts at
+   * a position - undo of a removal puts the device BACK WHERE IT WAS
+   * (a chain is a pipeline, order is meaning).
+   */
+  addProcessor(trackId: string, proc: ProcessorDef, index?: number): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    if (track.chain.some((p) => p.id === proc.id)) return;  // id collision: no-op
+    this.journal.capture({ type: 'removeProcessor', trackId, processorId: proc.id });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (!t) return;
+      if (index !== undefined && index >= 0 && index <= t.chain.length) {
+        t.chain.splice(index, 0, proc);
+      } else {
+        t.chain.push(proc);
+      }
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * V1.5: remove a device from a track's chain. Inverse = re-add the FULL
+   * captured ProcessorDef (params included) at its original index.
+   */
+  removeProcessor(trackId: string, processorId: string): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    const index = track ? track.chain.findIndex((p) => p.id === processorId) : -1;
+    if (!track || index < 0) return;
+    this.journal.capture({
+      type: 'addProcessor', trackId,
+      proc: plain(track.chain[index]) as ProcessorDef, index,
+    });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (!t) return;
+      const i = t.chain.findIndex((p) => p.id === processorId);
+      if (i >= 0) t.chain.splice(i, 1);
     });
     this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }

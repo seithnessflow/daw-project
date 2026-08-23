@@ -71,6 +71,31 @@ public:
         }
     }
 
+    /**
+     * V1.5 / AUDIT-4 A4-5: evict every instance whose node id is not in
+     * `keep`. Without this, a vst3 node removed from the document left
+     * its child ZOMBIE: yield-spinning at 100% of a core forever, and
+     * resurrected by the liveness poll if it died. stop() ends the child
+     * before the handle (and its ring) is destroyed.
+     *
+     * @param keep predicate: true = this node id is still in the document
+     * @return number of instances evicted
+     */
+    template <typename Keep>
+    std::size_t evictMissing(Keep&& keep) {
+        std::size_t evicted = 0;
+        for (auto it = instances_.begin(); it != instances_.end();) {
+            if (!keep(it->first)) {
+                if (it->second.bridge) it->second.bridge->stop();
+                it = instances_.erase(it);
+                ++evicted;
+            } else {
+                ++it;
+            }
+        }
+        return evicted;
+    }
+
 private:
     std::map<std::string, PluginInstanceHandle> instances_;
 };

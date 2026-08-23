@@ -480,10 +480,12 @@ void wirePluginTelemetry(daw::websocket::WebSocketServer& ws_server,
             if (!chosen && handle.bridge) chosen = &handle;
         });
     }
-    if (chosen) {
-        ws_server.setPluginBlocksMissed(&chosen->blocks_missed);
-        ws_server.setPluginChildState(&chosen->child_alive, &chosen->child_restarts);
-    }
+    // V1.5: ALWAYS set (nullptr clears). Eviction can destroy the handle
+    // telemetry pointed at; leaving the old pointers in place would be a
+    // dangling read on the next broadcast. nullptr is the wire's rest state.
+    ws_server.setPluginBlocksMissed(chosen ? &chosen->blocks_missed : nullptr);
+    ws_server.setPluginChildState(chosen ? &chosen->child_alive : nullptr,
+                                  chosen ? &chosen->child_restarts : nullptr);
 }
 
 /**
@@ -925,6 +927,14 @@ int doPlayWithServer(const Options& opts) {
     uint64_t last_built_version = 0;
     bool playback_started = false;
 
+    // V1.5 / A4-5: eviction is STAGED at rebuild and EXECUTED only once
+    // the retirement queue is empty - a retired graph's ProxyNode still
+    // reads the bridge ring until the generation gate proves release, so
+    // destroying the bridge earlier would be a use-after-free. Overwritten
+    // by every rebuild (last state wins, like the builder itself).
+    std::set<std::string> eviction_keep;
+    bool eviction_pending = false;
+
     // Connect to sync server
     daw::network::ServerClient server_client;
     daw::network::ServerConfig server_config;
@@ -1041,6 +1051,17 @@ int doPlayWithServer(const Options& opts) {
                 }
                 device.getTransport().setLoopPoints(0, content_end);
 
+                // V1.5 / A4-5: stage eviction of children whose node id
+                // left the document (executed below, once retirement-safe).
+                eviction_keep.clear();
+                eviction_keep.insert(kDebugProxyNodeId);
+                for (const auto& t : snapshot.tracks) {
+                    for (const auto& p : t.chain) {
+                        if (p.type == "vst3") eviction_keep.insert(p.id);
+                    }
+                }
+                eviction_pending = true;
+
                 if (!playback_started) {
                     playback_started = true;
                     if (device.getState() != daw::audio::AudioDeviceState::Running) {
@@ -1076,6 +1097,20 @@ int doPlayWithServer(const Options& opts) {
                                return device.isRetireSafe(r) && r.graph.use_count() == 1;
                            }),
             retired_graphs.end());
+
+        // V1.5 / A4-5: the staged eviction fires once NO retired graph can
+        // still touch a bridge ring. Telemetry is re-wired IMMEDIATELY (the
+        // evicted handle may be the one it pointed at).
+        if (eviction_pending && retired_graphs.empty()) {
+            const std::size_t evicted = plugin_registry.evictMissing(
+                [&](const std::string& id) { return eviction_keep.count(id) > 0; });
+            eviction_pending = false;
+            if (evicted > 0) {
+                wirePluginTelemetry(ws_server, plugin_registry);
+                std::cout << "Evicted " << evicted
+                          << " plugin child(ren) removed from the document\n";
+            }
+        }
 
         // Broadcast telemetry at configured rate
         if (now - last_telemetry >= telemetry_interval) {

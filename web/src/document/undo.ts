@@ -16,7 +16,7 @@
  * Outside replay, any local op clears redo.
  */
 
-import type { ClipDef, TrackDef } from './schema';
+import type { ClipDef, TrackDef, ProcessorDef } from './schema';
 
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
@@ -30,7 +30,11 @@ export type InverseOp =
   | { type: 'addClip'; trackId: string; clip: ClipDef }
   | { type: 'deleteClip'; trackId: string; clipId: string }
   | { type: 'addTrack'; track: TrackDef }
-  | { type: 'deleteTrack'; trackId: string };
+  | { type: 'deleteTrack'; trackId: string }
+  // V1.5: index restores the chain ORDER (a chain is a pipeline - putting
+  // a device back at the end is not putting it back)
+  | { type: 'addProcessor'; trackId: string; proc: ProcessorDef; index: number }
+  | { type: 'removeProcessor'; trackId: string; processorId: string };
 
 interface UndoGroup {
   ops: InverseOp[];
@@ -52,6 +56,8 @@ function targetKey(op: InverseOp): string {
     case 'deleteClip': return `clip:${op.trackId}:${op.clipId}`;
     case 'addTrack': return `track:${op.track.id}`;
     case 'deleteTrack': return `track:${op.trackId}`;
+    case 'addProcessor': return `proc:${op.trackId}:${op.proc.id}`;
+    case 'removeProcessor': return `proc:${op.trackId}:${op.processorId}`;
   }
 }
 

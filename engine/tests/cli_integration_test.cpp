@@ -10,6 +10,7 @@
 #include "../src/document/schema.h"
 #include "../src/graph/audio_graph.h"
 #include "../src/graph/clip_player.h"
+#include "../src/graph/plugin_registry.h"
 #include "../src/render/offline_render.h"
 #include "../src/audio/audio_callback.h"
 #include "../src/audio/ring_buffer.h"
@@ -1990,6 +1991,53 @@ bool testMasterGainRender() {
     return true;
 }
 
+/**
+ * V1.5 / A4-5: registry eviction. A node id removed from the document
+ * must take its registry handle with it (bridge stopped, entry erased),
+ * and only that one - survivors keep their ADDRESS (rebuilds re-attach
+ * ProxyNodes to the same handle; a moved handle would dangle).
+ * Bridge-less handles keep this a pure control-side unit test.
+ */
+bool testRegistryEviction() {
+    std::cout << "Test: registry eviction (A4-5)... ";
+
+    daw::graph::PluginInstanceRegistry registry;
+    registry.ensure("node-a");
+    auto* kept = &registry.ensure("node-b");
+    registry.ensure("node-c");
+    if (registry.size() != 3) {
+        std::cout << "FAILED: expected 3 instances, got " << registry.size() << "\n";
+        return false;
+    }
+
+    std::size_t evicted = registry.evictMissing(
+        [](const std::string& id) { return id == "node-b"; });
+    if (evicted != 2 || registry.size() != 1) {
+        std::cout << "FAILED: evicted " << evicted << ", size "
+                  << registry.size() << " (expected 2 evicted, 1 left)\n";
+        return false;
+    }
+    if (registry.find("node-a") || registry.find("node-c")) {
+        std::cout << "FAILED: evicted node still findable\n";
+        return false;
+    }
+    if (registry.find("node-b") != kept) {
+        std::cout << "FAILED: survivor moved or lost (handle address changed)\n";
+        return false;
+    }
+
+    // Idempotent: nothing left to evict
+    evicted = registry.evictMissing(
+        [](const std::string& id) { return id == "node-b"; });
+    if (evicted != 0 || registry.size() != 1) {
+        std::cout << "FAILED: second pass evicted " << evicted << "\n";
+        return false;
+    }
+
+    std::cout << "OK (2 evicted, survivor stable, idempotent)\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -2024,6 +2072,7 @@ int main(int argc, char* argv[]) {
     run(testMasterGainRender);
     run(testAudioThreadLockFreedom);
     run(testTransportLoopAndStop);
+    run(testRegistryEviction);
     run(testWebSocketAuth);
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);

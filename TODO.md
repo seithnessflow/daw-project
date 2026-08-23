@@ -86,9 +86,23 @@ dedouble). Ordre :
           TOUT LE RESTE de l'inventaire ATTEND. Pas de refonte d'UI,
           pas de lecture Ableton : les capacites existent, il s'agit
           de les montrer.
-       D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
-          trou le plus visible du chemin produit, et c'est le chemin
-          du differenciateur.
+       D. [x] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI — FAIT 2026-08-23
+          (V1.5). Bouton `+ device` (builtin.gain | vst3 par uid valide
+          ^[0-9A-Fa-f]{32}$, AGain pre-rempli), retrait ARME en deux
+          clics (clavier-safe, pas de dialog bloquant), les deux
+          journalises undo (l'inverse d'un retrait re-insere le
+          ProcessorDef COMPLET a son index — l'ordre d'une chaine est
+          un sens). ET l'eviction A4-5 moteur : au rebuild, les enfants
+          dont le node_id a quitte le document sont stop()+evinces —
+          DIFFEREE jusqu'a vidage de la file des graphes retires (un
+          ProxyNode retire lit encore le ring : evincer avant la
+          barriere generationnelle = use-after-free), telemetrie
+          re-cablee (pointeurs bruts vers le handle detruit).
+          Gardes : devices.spec (5 invariants dont convergence 2
+          onglets et undo-restaure-l'ordre), gtest testRegistryEviction
+          (2 evinces, survivant a la MEME adresse, idempotent).
+          Bug attrape par la spec : display:flex ecrasait [hidden] —
+          le menu invisible-cense interceptait tous les clics.
        Le reste de la liste ATTEND (fades = candidats au degel, PAS
        degeles ; grille, master meter, renommage, tempo).
 1pre. [x] MECANISME DE LIVRAISON DU TOKEN — FAIT 2026-08-23 (etage

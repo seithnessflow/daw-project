@@ -15,6 +15,99 @@
   margin-bottom: 6px;
   letter-spacing: 1.2px;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---- V1.5: + device -------------------------------------------- */
+.device-add {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.device-add-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text-2);
+  letter-spacing: normal;
+  text-transform: none;
+}
+.device-add-btn:hover {
+  background: #333;
+  color: var(--text);
+}
+.device-add-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  background: #222;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 300px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.device-add-menu button {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+}
+.device-add-menu button:hover {
+  background: #383838;
+}
+/* display:flex above would defeat the hidden attribute (UA display:none
+   loses the specificity fight) - restate it */
+.device-add-menu[hidden] {
+  display: none;
+}
+.device-add-vst {
+  display: flex;
+  gap: 6px;
+}
+.device-add-vst input {
+  flex: 1;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+  background: #161616;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--r);
+  padding: 3px 6px;
+}
+.device-add-vst input.invalid {
+  border-color: var(--red, #d9534f);
+  color: var(--red, #d9534f);
+}
+
+/* ---- V1.5: remove (two-step armed button) ----------------------- */
+.device-remove {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text-3);
+}
+.device-remove:hover {
+  color: var(--text);
+  background: #3a2626;
+}
+.device-remove.armed {
+  background: var(--red, #d9534f);
+  color: #fff;
 }
 .device-chain {
   display: flex;

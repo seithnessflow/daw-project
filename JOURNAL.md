@@ -427,3 +427,23 @@ coupe le streaming, jamais les stems). Ordre corrige : SMOKE DEUX
 MACHINES hoiste en 1bis, avant le placement — valider l'hypothese qui
 porte tout AVANT de construire dessus. Correction item 2 (fondation
 multi-machine) et 2.5-etat-prerequis ACCEPTEES par le reviewer.
+
+**2026-08-23 (V1.5 — devices depuis l'UI + eviction A4-5) :** le panneau
+DEVICES gagne `+ device` (builtin.gain | vst3 par uid 32-hex valide,
+AGain pre-rempli — un uid invalide n'atteint JAMAIS le document) et un
+retrait ARME en deux clics (clavier-safe ; Ctrl+Z restaure de toute
+facon). addProcessor/removeProcessor journalises : l'inverse d'un
+retrait re-insere le ProcessorDef complet A SON INDEX (une chaine est
+un pipeline, l'ordre est un sens — la spec l'asserte). Cote moteur,
+l'eviction A4-5 : au rebuild, les enfants dont le node_id a quitte le
+document sont stop()+evinces, mais DIFFERES jusqu'au vidage de la file
+des graphes retires (un ProxyNode retire lit encore le ring — evincer
+avant la barriere generationnelle serait un use-after-free), et la
+telemetrie est re-cablee immediatement (elle tenait des pointeurs bruts
+dans le handle detruit ; wirePluginTelemetry sait desormais poser
+nullptr). Bug attrape par la spec, pas par mes yeux : display:flex du
+menu ecrasait l'attribut [hidden] — le menu « ferme » interceptait
+tous les clics du panneau. Moteur 24/24 (testRegistryEviction :
+2 evinces, survivant a la meme adresse, idempotent), devices.spec
+5 invariants avec convergence 2 onglets. Seance conduite moteur duo
+MUET (ordre utilisateur : film en cours).

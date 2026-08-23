@@ -141,6 +141,17 @@ export function renderTracks(force = false): void {
       ctx.project!.setProcessorParam(ctx.selectedTrackId!, procId, key, value);
       sendLastChange();
     },
+    // V1.5: add/remove devices (document ops, undo-journaled)
+    (proc) => {
+      ctx.project!.addProcessor(ctx.selectedTrackId!, proc);
+      sendLastChange();
+      renderTracks(true);
+    },
+    (procId) => {
+      ctx.project!.removeProcessor(ctx.selectedTrackId!, procId);
+      sendLastChange();
+      renderTracks(true);
+    },
   ));
 
   // Waveforms inside the freshly built clips (cached peaks draw
