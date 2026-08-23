@@ -7,11 +7,10 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 ## L'INVARIANT PRODUIT (ADR-019)
 
 **Un pair qui n'a pas le plugin installe entend le resultat du plugin.**
-Etat : PROUVE PAR ECHANTILLONS EN LOCAL (S7, 2026-08-23) — publication
-automatique des stems par le moteur, substitution partagee live/offline,
-octet-pour-octet identique sans le module (details : critere 6). Reste :
-la preuve deux-machines a travers le store serveur (smoke S7 avec le
-portable) et le streaming P2P du jam.
+Etat : **VERT** (smoke S7 deux machines, 2026-08-23) — le portable, sans
+aucun module VST3, a rendu l'octet-pour-octet de la tour a travers le
+store et l'a JOUE dans ses haut-parleurs. Details : critere 6. Reste de
+la tranche : streaming P2P du jam, badge fraicheur, vrais plugins.
 
 ## Architecture
 
@@ -56,7 +55,7 @@ interdisait le produit).
 | 3 | Convergence DEUX MACHINES, deux reseaux, un projet (redefini ADR-019) | ⛔ JAMAIS TESTE | La version 2-onglets (sous-ensemble) : ✅ RESERVE LEVEE 2026-08-23 — le trio deps-manquantes A4-1/2/3 est solde (serveur refuse bruyamment les deps manquantes + graine commune vendored + merge au premier contact + heartbeat 15 s / watchdog 45 s) avec gardes : 2 tests Rust (refus Lagged, seed nouveau projet) + sync-resilience.spec 3 invariants (deps surfacees, heartbeat recu, edition hors-ligne survivante). Historique : JOURNAL.md |
 | 4 | LNA HTTPS→WS local | ✅ VALIDE — formulation exacte : l'acces au moteur local depuis une origine HTTPS publique fonctionne sur Chrome 151/Windows 11 (2026-08-23), sous reserve d'autorisation utilisateur, avec etat lisible par API. SCEAU pose dans le navigateur de l'utilisateur : sonde granted, canari 4 ms, onopen 3 ms, AUTH OK + telemetrie 23 ms (version relevee sur le binaire installe 151.0.7922.170 ; champ UA non transcrit) | ETABLI (campagne 2026-08-23, oracle temporel automatise sur le VRAI Chrome 151, profils vierges) : (1) invite Chrome apparue et autorisee -> WS connecte (test des mains du matin) ; (2) fetch ET WebSocket sont TOUS DEUX soumis au LNA et savent declencher la demande (etat prompt -> les deux pendent en attente de decision ; AUCUN echec immediat : le pire cas « subit sans pouvoir demander » est ECARTE) ; (3) ZERO GESTE : une connexion lancee au chargement de page declenche l'invite — l'onboarding « connexion au chargement » est viable ; (4) permissions.query('local-network-access' et 'local-network') expose l'etat (prompt/granted lus en reel) -> l'UI n'a jamais a deviner ; feature-detection obligatoire (Firefox/Safari sans API) ; (5) auth prouvee de bout en bout quand permis (AUTH OK + telemetrie ; token perime -> close 4001, signature distincte de 1006). Mecanisme : carve-out loopback (le tunnel ne sert que la page ; l'URL WS est 127.0.0.1). INCONNUS DATES 2026-08-23 (documentation, pas bloquants) : texte exact de l'invite, semantique dismissal (Echap) et refus explicite (clic Bloquer), duree de memorisation, Firefox/Safari, --allow-origin en prod (design 1pre), audio/telemetrie soutenus a travers ce chemin. Canari fetch mode cors NON CONCLUSIF sur ce moteur (400 sans CORS = « Failed to fetch » meme reseau ouvert) — garder ecrit. Le moteur ne loggue pas les connexions acceptees (a corriger) |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns (2026-08-20, ZenGo SC 48kHz/512) mais **sans charge CPU** — procedure ci-dessous |
-| 6 | L'INVARIANT : un pair sans le plugin entend le resultat du plugin (ADR-019) | ⚠️ PROUVE PAR ECHANTILLONS (local) | S7 2026-08-23 : testStemInvariant — machine A rend la reference AVEC AGain et publie le stem (float32, store d'assets) ; machine B SANS AUCUN module rend le meme document OCTET POUR OCTET IDENTIQUE. Publication automatique cablee au moteur (debounce, cle de cache d'entrees), substitution partagee live/offline (graph_common), badge STEM au panneau devices. RESTE pour le ✅ : la meme preuve DEUX MACHINES a travers le store SERVEUR reel (le portable joue AGain qu'il n'a pas — smoke S7), et le streaming jam (TRANCHE 3 suite) |
+| 6 | L'INVARIANT : un pair sans le plugin entend le resultat du plugin (ADR-019) | ✅ VERT — DEUX MACHINES, DEUX RESEAUX, A TRAVERS LE STORE (smoke S7 2026-08-23) | Fixe (Ethernet) avec AGain : rendu de reference sha256 64EC2954CAAA... et stem publie automatiquement au store (3fd099d4, float32). Portable TX15 (hotspot, deux NAT, tunnel+relay) SANS AUCUN module VST3 : doc recu par WS, 5 objets par le STORE HTTP, rendu sha256 64EC2954CAAA... — IDENTIQUE OCTET POUR OCTET. Contre-preuve sur place : stem retire -> « Render failed: Chain incomplete » (jamais un faux vert). Et la preuve AUDIBLE : le portable a JOUE le stem dans ses haut-parleurs (« playing STEM 3fd099d4... for an unresolved plugin », Senary Audio 48 kHz). Gtest local testStemInvariant en CI (contre-controles inclus). RESTE (n'empeche pas le vert, tranche 3 suite) : streaming jam P2P, badge fraicheur (arbitrage TODO), vrais plugins tiers |
 
 ## Commandes utiles
 

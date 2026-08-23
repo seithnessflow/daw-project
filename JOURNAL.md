@@ -615,6 +615,28 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-23 (SMOKE S7 DEUX MACHINES — LE CRITERE 6 EST VERT) :**
+64EC2954CAAA... == 64EC2954CAAA... — le verdict seul sur sa ligne,
+comme la regle l'exige. Le montage : fixe (Ethernet) avec AGain, moteur
+smoke-s7 mute qui PUBLIE tout seul (etat 480376c6 v1, stem 3fd099d4
+float32 6,9 Mo au store) ; rendu de reference sha256 64EC2954. Portable
+TX15 (hotspot telephone, deux NAT) : canal SSH d'hier ENCORE VIVANT,
+git a 7a84cb2, rebuild moteur (le vcvars du fixe n'existe pas la-bas —
+bat ecrit sur place apres une guerre de quoting ssh->cmd->powershell
+reglee par -EncodedCommand, la lecon d'outillage de la nuit), relais
+ws vers le tunnel (un VIEUX relais d'hier squattait le port 3000 —
+tue PAR PID via le port, jamais par nom), doc recu par WS (950
+octets), les 5 objets par le STORE HTTP, puis LE RENDU SANS AUCUN
+--vst3-module : sha256 64EC2954CAAA... IDENTIQUE. Contre-preuve sur
+place : stem cache -> « Render failed: Chain incomplete », jamais un
+faux vert. Et la preuve pour les oreilles : moteur portable AUDIBLE
+detache (annonce), « playing STEM 3fd099d4... for an unresolved
+plugin », kick a 4 s dans les haut-parleurs Senary — le portable joue
+un plugin qu'il n'a pas installe. La demo de trente secondes du tout
+premier pitch existe. Ce qui reste de la tranche (n'empeche pas le
+vert) : streaming jam, badge fraicheur (arbitrage), vrais plugins
+tiers — les quatre gentillesses d'AGain restent l'avertissement grave.
+
 **2026-08-23 (revue externe post-S7, executee seance tenante) :** le
 verdict — « la premiere fois que ton produit existe » — accompagne
 d'UNE question : le test echoue-t-il quand le mecanisme est retire ?
