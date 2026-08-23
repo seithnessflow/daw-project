@@ -178,8 +178,14 @@ export async function init(): Promise<void> {
     els.stopBtn.disabled = false;
     els.loopBtn.disabled = false;
     // V1.1: loop is PERFORMANCE state - re-assert the local choice on
-    // every (re)connection so an engine restart does not silently drop it.
-    engineClient.setLoop(els.loopBtn.getAttribute('aria-pressed') === 'true');
+    // every (re)connection so an engine restart does not silently drop
+    // it. ONLY the explicit ON is asserted: pushing the DEFAULT off
+    // meant every fresh tab silently killed the server-mode keepalive
+    // loop and the engine died at end-of-song (the night's stealth
+    // silence: position frozen at 24.57).
+    if (els.loopBtn.getAttribute('aria-pressed') === 'true') {
+      engineClient.setLoop(true);
+    }
     // S8a: ?tap=1 subscribes to the master tap (the jam road's first
     // meter). Re-asserted per connection like the loop - AND for an
     // active broadcaster: setTap at page load raced the engine socket
