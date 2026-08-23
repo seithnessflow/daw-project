@@ -228,6 +228,16 @@ dates (documentation, pas bloquants) : texte de l'invite, semantique
 dismissal/refus explicite, memorisation, FF/Safari. Reste UN geste
 humain : le sceau vert (AUTH OK) dans le navigateur de l'utilisateur.
 
+**2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
+l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
+« NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie
+(13 octets) a 23 ms. Formulation gravee au critere : l'acces au moteur
+local depuis une origine HTTPS publique fonctionne sur Chrome 151/
+Windows 11, sous reserve d'autorisation utilisateur, avec etat lisible
+par API. Les inconnus restent dates (texte de l'invite, dismissal,
+refus explicite, memorisation, FF/Safari). Cap suivant : 1pre
+(mecanisme du token) puis 1bis (smoke deux machines).
+
 **2026-08-23 (retour du pair reviewer sur l'execution, consigne le jour
 meme) :** verdict LNA requalifie ⚠️ TIENT SOUS CONDITIONS (le mecanisme
 est la carve-out loopback — le tunnel n'a servi que la page, l'URL WS
