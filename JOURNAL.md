@@ -615,6 +615,23 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (« c'est bon les deux marchent » — LE JAM VALIDE A
+L'OREILLE, la tranche differenciateur est close) :** apres la
+brochette de la nuit (le tueur silencieux : chaque onglet neuf
+re-assertait loop=OFF par defaut et ecrasait le keepalive — le moteur
+mourait en fin de morceau et toute la chaine se taisait en aval ;
+plus : moteur tour carrement mort une fois, setTap perdant la course
+du socket, AudioContext du diffuseur sans flag autoplay, auditeur
+abandonne sans retry, onglets ssh invisibles en session 0), la
+verification pilotee a tout demonte couche par couche jusqu'au
+verdict final : la tour joue duo dans ses enceintes, LE PORTABLE JOUE
+LE MEME DUO recu en P2P (~40 ms), et la sonde RMS mesurait
+peak 0.09 / rms 0.025 sur le flux recu a la seconde ou l'utilisateur
+ecrivait que ca marche. Stems (octets) + streaming (oreille) : les
+deux moities du differenciateur vivent en conditions reelles. La
+methode pilotee (gravee au CLAUDE.md) a paye a chaque couche — aucun
+de ces six bugs n'etait visible d'un test scripte seul.
+
 **2026-08-24 (LE JAM TRAVERSE — deux machines, deux reseaux, 37 ms) :**
 la sonde pilotee des deux cotes : tour (Ethernet/box) diffuse, portable
 (hotspot telephone) ecoute — connected/connected, track distant

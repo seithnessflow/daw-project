@@ -10,11 +10,14 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 Etat : **VERT** (smoke S7 deux machines, 2026-08-23) — le portable, sans
 aucun module VST3, a rendu l'octet-pour-octet de la tour a travers le
 store et l'a JOUE dans ses haut-parleurs. Details : critere 6.
-STREAMING JAM (S8, 2026-08-24) : COMPLET ET PROUVE EN REEL — tour
-diffuse, portable ecoute a travers deux NAT (hotspot/box), frames RTP
-mesurees (track unmuted), latence 37-46 ms affichee, STUN seul (TURN
-= dette datee pour NAT stricts). Manip a l'oreille : bouton JAM.
-Reste de la tranche : badge fraicheur (arbitrage), vrais plugins.
+STREAMING JAM (S8, 2026-08-24) : **VALIDE A L'OREILLE DE
+L'UTILISATEUR** — « c'est bon les deux marchent » : la tour joue duo
+dans ses enceintes, le portable joue le meme duo recu en P2P (~40 ms,
+deux NAT, STUN seul), sonde RMS 0.025/peak 0.09 sur le flux recu au
+meme instant. LA TRANCHE DIFFERENCIATEUR EST CLOSE : stems (critere 6
+vert) + streaming (oreille). Reste hors-tranche : badge fraicheur
+(arbitrage), vrais plugins tiers, TURN (NAT stricts), sync transport
+Link (cadrage au programme).
 
 ## Architecture
 
