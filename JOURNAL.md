@@ -309,6 +309,21 @@ Terrain du smoke : le portable de l'utilisateur — phase 1 meme reseau
 (IP LAN + regle firewall), phase 2 deux reseaux via partage de
 connexion telephone + tunnel cloudflared vers :3000 (wss).
 
+**2026-08-23 (1bis — LE SMOKE DEUX MACHINES EST TENU, les deux sens) :**
+fixe et portable TX15 (hotspot telephone = deux reseaux, NAT reel), un
+seul serveur (fixe, loopback, tunnel cloudflared), relais ws->wss cote
+portable. ALLER 16:07:26 UTC : premier-passager.wav depose cote fixe ->
+document + asset traverses jusque DANS le moteur du portable (fichier
+698e95 sur son disque, verifie par SSH). RETOUR 16:32:23 UTC :
+retour-du-portable emis du portable -> mon store (PUT 201, 76 844 o),
+mon moteur fetch + Graph updated v=4. La palette du fixe affiche les
+chips des DEUX machines. C'est la premiere fois que le produit existe
+tel que pitche : deux machines, deux reseaux, un projet. Reserves :
+geste retour au niveau document ; ecran portable atteste par son agent.
+Frictions : moteur sans --assets ecrit les fetches dans le CWD ;
+lecture sans fin (57 min au compteur). Le controle SSH inter-NAT
+(docs/deux-machines.md) a servi pour toute la verification distante.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

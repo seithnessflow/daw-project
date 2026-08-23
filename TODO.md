@@ -108,7 +108,21 @@ dedouble). Ordre :
        etape guidee AVANT toute tentative, jamais d'invite surprise ;
        feature-detection OBLIGATOIRE (les deux noms + le chemin
        TypeError : Firefox/Safari sans API = heuristique de secours).
-1bis. [ ] SMOKE DEUX MACHINES (hoiste 2026-08-23, retour reviewer :
+1bis. [x] SMOKE DEUX MACHINES — TENU 2026-08-23, LES DEUX SENS :
+       fixe (192.168.1.x) et portable TX15 (hotspot telephone 10.102.x),
+       UN serveur (fixe, loopback + tunnel cloudflared), relais ws->wss
+       cote portable. ALLER : WAV depose cote fixe (16:07:26 UTC) ->
+       clip+asset recus par le MOTEUR du portable (asset 698e95 ecrit
+       sur son disque). RETOUR : asset+clip emis du portable
+       (16:32:23 UTC, PUT 201 a travers le tunnel) -> mon moteur a
+       fetch b890b1 et rebuild (log v=4). Trace : traces/smoke/.
+       Reserves honnetes : geste retour = niveau document (pas un drag
+       UI) ; verification portable par SSH (processus+fichier disque),
+       ecran portable vu par son agent local. Frictions moissonnees :
+       moteur sans --assets ecrit les assets fetches dans le CWD
+       (build-msvc pollue, les 2 cotes) ; script retour crashe sur le
+       broadcast (load d'un change comme doc — outil jetable) ; la
+       lecture ne s'arrete jamais (57 min au compteur). (item d'origine :
        ne pas re-commettre l'erreur qu'on vient de corriger — valider
        l'hypothese qui porte tout AVANT de construire dessus) : deux
        ordinateurs, deux reseaux, un projet, un WAV depose, convergence
