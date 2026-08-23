@@ -194,3 +194,15 @@ latence de jeu via VST distant = REFUSE (RTT). Critere 3 redefini
 Parite Ableton GELEE. TRANCHE 3 ouverte en tete de TODO ; LNA passe
 premier ; ordre AUDIT-4 item 2 requalifie fondation du multi-machine ;
 2.5-etat requalifie prerequis de la cle de stem.
+
+**2026-08-23 (LNA — l'hypothese porteuse testee LE JOUR MEME, elle
+tient) :** page de test servie via tunnel trycloudflare (cloudflared
+installe, page sur node:8080), moteur --mute en lecture avec
+--allow-origin sur l'origine du tunnel. Resultat des mains : l'invite
+de permission Chrome APPARAIT, et une fois autorisee le WebSocket se
+CONNECTE depuis l'origine HTTPS publique au moteur local (onopen =
+handshake accepte, Origin passe). Le canari fetch est non conclusif
+chez nous : le moteur repond 400 sans en-tetes CORS, le navigateur
+affiche « Failed to fetch » meme quand le reseau passe — defaut de la
+page de test consigne. Reste 30 s de mains : refus/memoire/annulation.
+Observation : le moteur ne loggue pas les connexions acceptees.

@@ -9,11 +9,15 @@ deux de premiere classe dans la tranche (stems = verite de lecture,
 streaming = canal ephemere du jam ; deux fonctions, pas un chemin
 dedouble). Ordre :
 
-0. [ ] TEST LNA CHROME — MAINTENANT (hypothese porteuse : site distant
-       -> moteur local ; si elle tombe, tout le reste est a revoir).
-       Procedure dans STATUS.md, presence utilisateur requise (invite
-       de permission). Documenter : invite fetch/WS, refus, memoire du
-       refus, annulation.
+0. [x] TEST LNA CHROME — FAIT 2026-08-23, le jour meme du recadrage :
+       L'HYPOTHESE PORTEUSE TIENT. Invite Chrome apparue, autorisee ->
+       WS connecte depuis une page HTTPS publique (trycloudflare) au
+       moteur local (--allow-origin requis, prevu pour ca). Canari
+       fetch non conclusif (400 sans CORS = « Failed to fetch » meme
+       quand le reseau passe — defaut de la page de test). RESTE
+       (session courte, 30 s de mains) : comportement au refus,
+       memorisation, annulation ; + logguer les connexions acceptees
+       cote moteur (le log etait muet pendant la preuve).
 1. [ ] CRITERE 3 VRAIMENT VRAI (= ordre AUDIT-4 item 2 ci-dessous,
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
