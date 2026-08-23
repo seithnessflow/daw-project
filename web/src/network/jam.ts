@@ -72,12 +72,20 @@ export class JamChannel {
   }
 
   /** The tab listens: asks the room's broadcaster for an offer. */
+  private joinRetryTimer: number | null = null;
   startListen(): void {
     if (this.role !== 'idle') return;
     this.role = 'listening';
     this.onStateChange?.();
-    // JOIN request (empty offer): the broadcaster responds directed
+    // JOIN request (empty offer): the broadcaster responds directed.
+    // RETRIED every 5 s while unattached - a broadcaster that died
+    // mid-handshake used to strand the listener forever.
     this.send({ jam: true, from: this.server.id, kind: 'offer' });
+    this.joinRetryTimer = window.setInterval(() => {
+      if (this.role === 'listening' && this.peerCount() === 0) {
+        this.send({ jam: true, from: this.server.id, kind: 'offer' });
+      }
+    }, 5000);
   }
 
   /** Re-assert the jam state after a (re)connection: a listener's JOIN
@@ -96,6 +104,7 @@ export class JamChannel {
     this.channels.clear();
     this.latencyMs.clear();
     if (this.pingTimer !== null) { clearInterval(this.pingTimer); this.pingTimer = null; }
+    if (this.joinRetryTimer !== null) { clearInterval(this.joinRetryTimer); this.joinRetryTimer = null; }
     this.role = 'idle';
     this.onStateChange?.();
   }
@@ -166,6 +175,10 @@ export class JamChannel {
           return;
         }
         if (this.role !== 'broadcasting') return;
+        // A retried JOIN from an ALREADY-CONNECTED peer must not tear
+        // its live connection down with a fresh offer
+        const existing = this.peers.get(msg.from);
+        if (existing && existing.connectionState === 'connected') return;
         const pc = this.newPeer(msg.from);
         const ch = pc.createDataChannel('jam-ctl');
         this.channels.set(msg.from, ch);

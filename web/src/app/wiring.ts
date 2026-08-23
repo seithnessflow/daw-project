@@ -44,6 +44,7 @@ export async function init(): Promise<void> {
 
   // ---- Server (document) --------------------------------------------------
   let jamReassert: (() => void) | null = null;  // set once the jam exists
+  let jamIsBroadcasting: (() => boolean) | null = null;
   const serverClient = new ServerClient(SERVER_URL);
   ctx.serverClient = serverClient;
   serverClient.onConnect = () => {
@@ -180,8 +181,12 @@ export async function init(): Promise<void> {
     // every (re)connection so an engine restart does not silently drop it.
     engineClient.setLoop(els.loopBtn.getAttribute('aria-pressed') === 'true');
     // S8a: ?tap=1 subscribes to the master tap (the jam road's first
-    // meter; re-asserted per connection like the loop)
-    if (new URLSearchParams(window.location.search).get('tap') === '1') {
+    // meter). Re-asserted per connection like the loop - AND for an
+    // active broadcaster: setTap at page load raced the engine socket
+    // and vanished (found live: the jam carried a starving worklet's
+    // silence, tap:0 in the broadcaster instrumentation).
+    if (new URLSearchParams(window.location.search).get('tap') === '1' ||
+        jamIsBroadcasting?.()) {
       engineClient.setTap(true);
     }
     console.log('Connected to engine');
@@ -221,6 +226,7 @@ export async function init(): Promise<void> {
   (window as any).__dawJam = jam;
   (window as any).__dawJamAudio = jamAudio;
   jamReassert = () => jam.reassert();
+  jamIsBroadcasting = () => jam.role === 'broadcasting';
   const jamBtn = document.getElementById('jam-btn') as HTMLButtonElement;
   let jamBadge: HTMLElement | null = null;
   const renderJamBadge = () => {
