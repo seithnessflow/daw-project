@@ -173,4 +173,24 @@ factuelles de A4-20 (21/21, token par port dans les procedures, port
 dettes soldees cochees) ET les 4 fusions structurelles arbitrees : ce
 JOURNAL est ne (STATUS scinde etat/journal), DECISIONS racine fusionne
 dans docs/DECISIONS.md, BACKLOG fusionne dans TODO, CLAUDE.md renvoie a
-STATUS au lieu de dupliquer les criteres.
+STATUS au lieu de dupliquer les criteres. Verdict CI : VERT (run
+32635910751, seul un commentaire .h touchait le code).
+
+**2026-08-23 (LE RECADRAGE — ADR-019, le differenciateur distribue) :**
+un regard neuf (session Fable externe, rapport de passation) a constate
+que l'idee CENTRALE du produit — un pair sans le plugin entend le
+resultat du plugin — etait a zero ligne : critere 3 = deux onglets (pas
+deux machines), uid resolu par machine sans reponse pour le pair
+demuni, loi « rien de temps reel ne traverse le serveur » qui
+interdisait le produit, LNA (hypothese porteuse) jamais teste, roadmap
+= parite Ableton. Arbitrages utilisateur consignes (ADR-019) : loi
+reecrite (aucun audio TRAITE cote serveur ; P2P + signaling), placement
+dans le document (SCHEMA v2 annonce), STEMS RENDUS via le store
+(verite de lecture, reutilise determinisme + PUT verifiant) ET
+STREAMING P2P (canal ephemere du jam) tous deux de premiere classe —
+deux fonctions, pas un chemin dedouble ; monitoring d'instrument a
+latence de jeu via VST distant = REFUSE (RTT). Critere 3 redefini
+(deux machines, deux reseaux, un projet), critere 6 = l'invariant.
+Parite Ableton GELEE. TRANCHE 3 ouverte en tete de TODO ; LNA passe
+premier ; ordre AUDIT-4 item 2 requalifie fondation du multi-machine ;
+2.5-etat requalifie prerequis de la cle de stem.

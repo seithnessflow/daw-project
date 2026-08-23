@@ -23,7 +23,15 @@ Browser (TypeScript)          Server (Rust)           Engine (C++)
                                    (assets)
 ```
 
-Rien de temps reel ne traverse le serveur distant.
+**Loi (ADR-019, reecrite 2026-08-23) : aucun audio n'est TRAITE cote
+serveur ; l'audio inter-pairs voyage en P2P ; le serveur ne fait que du
+signaling (+ TURN eventuel).** L'ancienne phrase « rien de temps reel ne
+traverse le serveur distant » est abrogee.
+
+**L'INVARIANT PRODUIT : un pair qui n'a pas le plugin installe entend le
+resultat du plugin.** (ADR-019 ; etat et chemin dans STATUS.md.) La
+roadmap de parite Ableton est GELEE tant que placement + stems +
+critere 3 deux-machines ne sont pas verts.
 
 ## Structure
 

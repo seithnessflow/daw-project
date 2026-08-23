@@ -4,6 +4,14 @@
 **Format:** Automerge binary (`.am`)
 **Source of truth:** This file. All three tiers (engine, server, web) conform to it.
 
+> **v2 announced (ADR-019, 2026-08-23, design session pending):** v2
+> adds PLACEMENT — each processing node declares which peer hosts it
+> (negotiated by capability) — and rendered-stem references (stem key =
+> hash of input audio + class-uid + param state + time range) so a peer
+> WITHOUT the plugin plays the plugin's output from the asset store.
+> Nothing of this exists in v1 or in code yet; do not build against it
+> before the design session lands here.
+
 ## Schema v1
 
 ```json

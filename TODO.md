@@ -1,7 +1,55 @@
 # TODO
 
-## ROADMAP POST-MANUEL ABLETON (2026-08-22 — lecture integrale, synthese
-## dans docs/ABLETON-INTEGRALE.md ; les designs CRDT y sont acquis)
+## TRANCHE 3 — LE DIFFERENCIATEUR (ADR-019, recadrage 2026-08-23)
+
+L'invariant : un pair sans le plugin entend le resultat du plugin.
+Constat du recadrage : zero ligne, zero concept dans le depot — tout ce
+qui suit le construit. Arbitrage utilisateur : stems ET streaming, tous
+deux de premiere classe dans la tranche (stems = verite de lecture,
+streaming = canal ephemere du jam ; deux fonctions, pas un chemin
+dedouble). Ordre :
+
+0. [ ] TEST LNA CHROME — MAINTENANT (hypothese porteuse : site distant
+       -> moteur local ; si elle tombe, tout le reste est a revoir).
+       Procedure dans STATUS.md, presence utilisateur requise (invite
+       de permission). Documenter : invite fetch/WS, refus, memoire du
+       refus, annulation.
+1. [ ] CRITERE 3 VRAIMENT VRAI (= ordre AUDIT-4 item 2 ci-dessous,
+       REQUALIFIE fondation du multi-machine : le trio deps-manquantes
+       est exactement le bug que deux machines sur deux reseaux
+       declencheront en premier).
+2. [ ] DESIGN DU PLACEMENT (session dediee, SCHEMA v2) : chaque noeud
+       declare quel pair l'heberge, negocie par capacite ; reprise
+       quand le pair hebergeur part. AVANT toute nouvelle ligne de
+       timeline. Le design seul — l'implementation suit les fondations.
+3. [ ] 2.5-ETAT REQUALIFIE PREREQUIS : l'etat persiste des plugins
+       (blobs Comp/Cont, canal assets) entre dans la CLE de stem
+       (hash = entree + uid + etat + plage) — il precede le jalon
+       stems. (Decouverte et fenetrage restent derriere.)
+4. [ ] JALON STEMS PARTAGES : A rend la sortie de sa chaine VST, la
+       pousse au store (PUT verifiant existant), B la tire et la joue.
+       Preuve de l'invariant PAR ECHANTILLONS a travers le store.
+       Re-rendu sur changement de hash (bouton tourne -> stem re-rendu
+       -> B re-tire).
+5. [ ] CANAL STREAMING JAM (meme tranche, apres le premier jalon
+       stems) : P2P WebRTC/UDP, signaling par le serveur, jamais dans
+       le document (meme logique que la telemetrie). PERIMETRE REFUSE
+       (ADR-019) : monitoring d'instrument a latence de jeu via un VST
+       distant — physiquement injouable, ne pas re-litiger.
+6. [ ] CRITERE 3 NOUVELLE DEFINITION : deux machines, deux reseaux, un
+       projet — E2E reel (le serveur gagne au passage son avenir
+       explicite : identites, projets heberges, invitations, signaling
+       — etat provisoire assume, plus une loi de design).
+
+Les ordres AUDIT-4 items 3-4 (ring, cycle de vie enfants) restent des
+fondations de l'hote que les stems rendront ; items 5-6 inchanges.
+
+## ROADMAP POST-MANUEL ABLETON — **GELEE (ADR-019)** : les items 3 a 8
+## ci-dessous ne demarrent pas tant que placement + stems + critere 3
+## deux-machines ne sont pas verts. Raison ecrite : la parite d'abord =
+## un DAW mono-utilisateur mediocre et un distribue impossible a
+## retro-installer. (2026-08-22 — lecture integrale, synthese dans
+## docs/ABLETON-INTEGRALE.md ; les designs CRDT y sont acquis)
 
 Ordre grave (la confiance avant le sucre, arbitrage confirme) :
 

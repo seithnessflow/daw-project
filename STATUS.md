@@ -2,7 +2,14 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-23 (session 1 post-AUDIT-4).*
+2026-08-23 (recadrage differenciateur, ADR-019).*
+
+## L'INVARIANT PRODUIT (ADR-019)
+
+**Un pair qui n'a pas le plugin installe entend le resultat du plugin.**
+Etat : NON IMPLEMENTE — zero ligne. Chemin : placement dans le document
++ stems rendus via le store d'assets (verite de lecture) + streaming
+P2P (canal ephemere du jam). C'est le cap ; tout le reste le sert.
 
 ## Architecture
 
@@ -11,7 +18,11 @@ Triangle Browser ↔ Engine ↔ Server :
 - **Browser ↔ Server** : WebSocket pour sync document Automerge (tolerance latence)
 - **Engine ↔ Server** : HTTP pour gros transferts assets (hors bande)
 
-Rien de temps reel ne traverse le serveur distant.
+**La loi (reecrite ADR-019) : aucun audio n'est TRAITE cote serveur ;
+l'audio inter-pairs voyage en P2P ; le serveur ne fait que du signaling
+(et eventuellement du relais TURN).** L'ancienne formulation « rien de
+temps reel ne traverse le serveur distant » est abrogee (elle
+interdisait le produit).
 
 ## Versions Automerge (ADR-016)
 
@@ -40,9 +51,10 @@ Rien de temps reel ne traverse le serveur distant.
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir docs/DECISIONS.md, 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 21/21 |
-| 3 | Convergence 2 onglets | ⚠️ VALIDE AVEC RESERVE (rouverte AUDIT-4, 2026-08-23) | Push anti-entropie et resync en place (A3-4/A3-5, garde criterion3-push.spec), MAIS Automerge bufferise les changes a deps manquantes SANS erreur des deux cotes : le serveur peut jeter et broadcaster quand meme (A4-1), le client ne resync pas sur le cas principal (A4-2), et l'edition avant premier contact serveur se perd (A4-3). Remede + tests de garde : AUDIT-4.md, session TODO ordre 2. Historique des validations : JOURNAL.md |
-| 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente (procedure ci-dessous) |
+| 3 | Convergence DEUX MACHINES, deux reseaux, un projet (redefini ADR-019) | ⛔ JAMAIS TESTE | La version 2-onglets (sous-ensemble) : ⚠️ valide avec reserve (AUDIT-4 : trio deps-manquantes A4-1/2/3, remede session TODO ordre 2 — c'est la fondation que deux machines exigeront). Historique : JOURNAL.md |
+| 4 | LNA HTTPS→WS local | ⛔ NON TESTE — **HYPOTHESE PORTEUSE, PREMIER TEST du nouvel ordre** | Si un site distant ne peut pas parler au moteur local, l'architecture entiere est a revoir. Procedure ci-dessous |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns (2026-08-20, ZenGo SC 48kHz/512) mais **sans charge CPU** — procedure ci-dessous |
+| 6 | L'INVARIANT : un pair sans le plugin entend le resultat du plugin (ADR-019) | ⛔ NON IMPLEMENTE | Placement + stems rendus + streaming jam (TRANCHE 3). Preuve attendue : par echantillons, a travers le store |
 
 ## Commandes utiles
 
