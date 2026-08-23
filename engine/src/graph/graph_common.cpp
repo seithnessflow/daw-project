@@ -70,8 +70,15 @@ StemSubstitution resolveStemSubstitution(
     info.id = "stem:" + node.id;
     info.asset_hash = node.stem_hash;
     info.start_sample = 0;
-    info.length_samples = static_cast<int64_t>(asset->frame_count);
-    info.offset_samples = 0;
+    // PDC, declared (SCHEMA-V2-DESIGN 3): the stem contains the
+    // plugin's DELAYED output; playing it ADVANCED by the declared
+    // latency realigns it with what the producing host heard. 0 for
+    // the offline sync path (AGain) - the S7 byte-proof is untouched.
+    const int64_t latency = (std::min)(
+        node.stem_latency_samples < 0 ? 0 : node.stem_latency_samples,
+        static_cast<int64_t>(asset->frame_count));
+    info.offset_samples = latency;
+    info.length_samples = static_cast<int64_t>(asset->frame_count) - latency;
     // fades stay 0: render() only ramps when > 0 - the finished mix
     // plays untouched (the implicit anti-click lives in makeClipPlayer,
     // deliberately NOT here)

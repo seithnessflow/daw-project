@@ -624,8 +624,17 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 ## 3. version du plugin dans la cle (= sha256 du BINAIRE du module,
 ## bundles marches tries) + purge default.am [fait, backup
 ## .junk-1246tracks.bak] ; 4. SMOKE S7 DEUX MACHINES (le vert du
-## critere 6, premiere session portable) ; 5. PDC lecteur + badge
-## fraicheur ; 6. streaming jam (c'est LUI qu'on coupe s'il deborde).
+## critere 6, premiere session portable) ; 5. PDC lecteur [FAIT :
+## le stem joue AVANCE de la latence declaree (offset=latence),
+## gtest sub[i]==ref[i+L] exact] + badge fraicheur [ARBITRAGE REQUIS
+## avant code : un pair SANS le module ne peut pas recalculer la cle
+## (le tag de version = sha256 d'un binaire qu'il n'a pas). Options :
+## (a) cle REDUITE cote client — jumeau TS de computeStemKey,
+## contrat 2 cles ; (b) le producteur publie un booleen stemFresh —
+## simple, faux si producteur hors-ligne ; (c) timestamps —
+## approximatif. PROPOSITION : (b) + mention « fraicheur inconnue »
+## quand le producteur est absent] ;
+## 6. streaming jam (c'est LUI qu'on coupe s'il deborde).
 ## Rappel de la revue : la preuve est calibree sur le plugin le plus
 ## gentil du monde — latence nulle, etat minuscule, deterministe,
 ## sans GUI : quatre endroits ou le premier vrai plugin cassera.

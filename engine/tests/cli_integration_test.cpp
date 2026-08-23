@@ -1336,6 +1336,46 @@ bool testStemInvariant() {
         return false;
     }
 
+    // PDC reader: a stem republished with a DECLARED latency plays
+    // ADVANCED by that amount - sub2[i] must equal ref[i + L]
+    {
+        const int64_t L = 256;
+        if (!doc.setProcessorStem("t1", "p1", stem.stem_hash, stem.stem_key, L)) {
+            std::cout << "FAILED: setProcessorStem (latency)\n";
+            return false;
+        }
+        daw::render::OfflineRenderer bareLat;
+        const std::string lat_path = (dir / "lat.wav").string();
+        auto latr = bareLat.render(doc, lat_path, dir.string(), config);
+        if (!latr.success) {
+            std::cout << "FAILED: latency render: " << latr.error << "\n";
+            return false;
+        }
+        // The render length follows the DOCUMENT's clips (4096), not
+        // the shortened stem: the advanced stem plays ref[i+L] for the
+        // first frames-L frames, then exhausts into SILENCE.
+        const auto lat_f = readWavSamples(lat_path);
+        const size_t frames = lat_f.size() / 2;
+        if (frames != ref_f.size() / 2 || frames <= static_cast<size_t>(L)) {
+            std::cout << "FAILED: latency render length " << frames << "\n";
+            return false;
+        }
+        const size_t body = (frames - static_cast<size_t>(L)) * 2;
+        for (size_t i = 0; i < body; ++i) {
+            const size_t shifted = i + static_cast<size_t>(L) * 2;
+            if (lat_f[i] != ref_f[shifted]) {
+                std::cout << "FAILED: PDC misaligned at sample " << i << "\n";
+                return false;
+            }
+        }
+        for (size_t i = body; i < frames * 2; ++i) {
+            if (lat_f[i] != 0.0f) {
+                std::cout << "FAILED: PDC tail not silent at " << i << "\n";
+                return false;
+            }
+        }
+    }
+
     fs::remove_all(dir, ec);
     std::cout << "OK (no-stem refused, byte-identical without the plugin, peak "
               << ref.peak_left
