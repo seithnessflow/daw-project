@@ -163,6 +163,7 @@ enum class AudioCommand : uint8_t {
     Seek,
     UpdateGraph,
     SetGain,
+    SetLoop,  // V1.1: toggle transport looping (performance state)
 };
 
 /**
@@ -175,6 +176,7 @@ struct AudioCommandMessage {
     float gain_value = 1.0f;    // For SetGain command
     uint32_t track_index = 0;   // For track-specific commands
     void* graph_ptr = nullptr;  // For UpdateGraph (new graph pointer)
+    bool loop_enabled = false;  // For SetLoop command (V1.1)
 };
 
 static_assert(std::is_trivially_copyable_v<AudioCommandMessage>);

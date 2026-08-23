@@ -67,6 +67,7 @@ export const els = {
   position: document.getElementById('position')!,
   playBtn: document.getElementById('play-btn') as HTMLButtonElement,
   stopBtn: document.getElementById('stop-btn') as HTMLButtonElement,
+  loopBtn: document.getElementById('loop-btn') as HTMLButtonElement,
   tracks: document.getElementById('tracks')!,
   deviceViewSlot: document.getElementById('device-view-slot')!,
   addTrackBtn: document.getElementById('add-track-btn') as HTMLButtonElement,

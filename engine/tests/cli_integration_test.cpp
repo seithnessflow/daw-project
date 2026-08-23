@@ -11,6 +11,7 @@
 #include "../src/graph/audio_graph.h"
 #include "../src/graph/clip_player.h"
 #include "../src/render/offline_render.h"
+#include "../src/audio/audio_callback.h"
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
 #include "../src/host/proxy_node.h"
@@ -1814,6 +1815,89 @@ bool testWebSocketAuth() {
     return true;
 }
 
+// The callback's thread-local context - same extern the AudioDevice uses.
+namespace daw::audio {
+extern thread_local AudioCallbackContext* g_callback_context;
+}
+
+/**
+ * V1.1: loop and end-of-content stop live IN THE CALLBACK (single writer
+ * of position_ during playback). Three invariants:
+ * (a) looping: crossing the brace wraps sample-accurately;
+ * (b) no loop: transport stops with position parked EXACTLY at end;
+ * (c) end <= start (empty project): neither wrap nor stop nor hang.
+ */
+bool testTransportLoopAndStop() {
+    std::cout << "Test: transport loop and end-stop in the callback... ";
+    using namespace daw::audio;
+
+    daw::transport::TransportState transport;
+    daw::graph::AudioGraph graph;  // empty graph: position semantics only
+    graph.prepare(48000, INTERNAL_BLOCK_SIZE);
+
+    std::atomic<daw::graph::AudioGraph*> graph_slot{&graph};
+    std::atomic<uint64_t> generation{0};
+    std::atomic<uint64_t> underruns{0};
+    CommandRingBuffer commands;
+    TelemetryRingBuffer telemetry;
+
+    AudioCallbackContext ctx;
+    ctx.command_buffer = &commands;
+    ctx.telemetry_buffer = &telemetry;
+    ctx.active_graph = &graph_slot;
+    ctx.callback_generation = &generation;
+    ctx.transport = &transport;
+    ctx.buffer_underrun_count = &underruns;
+    g_callback_context = &ctx;
+
+    std::vector<float> out(1024 * 2, 0.0f);
+
+    // (a) looping across the brace: 900 + 512 over end=1000
+    // -> 100 to the end, wrap to 0, 412 past it. Exactly.
+    transport.setLoopPoints(0, 1000);
+    transport.setLooping(true);
+    transport.seek(900);
+    transport.play();
+    audioCallback(nullptr, out.data(), nullptr, 512);
+    if (transport.getPosition() != 412 || !transport.isPlaying()) {
+        std::cout << "FAILED: loop wrap gave position "
+                  << transport.getPosition() << " (expected 412), playing="
+                  << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    // (b) no loop: stop, parked exactly at end
+    transport.setLooping(false);
+    transport.seek(900);
+    audioCallback(nullptr, out.data(), nullptr, 512);
+    if (transport.getPosition() != 1000 || transport.isPlaying()) {
+        std::cout << "FAILED: end-stop gave position "
+                  << transport.getPosition() << " (expected 1000), playing="
+                  << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    // (c) empty content: end<=start must neither wrap, stop, nor hang
+    transport.setLoopPoints(0, 0);
+    transport.setLooping(true);
+    transport.seek(0);
+    transport.play();
+    audioCallback(nullptr, out.data(), nullptr, 512);
+    if (transport.getPosition() != 512 || !transport.isPlaying()) {
+        std::cout << "FAILED: empty-project guard gave position "
+                  << transport.getPosition() << " (expected 512), playing="
+                  << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    g_callback_context = nullptr;
+    std::cout << "OK\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -1846,6 +1930,7 @@ int main(int argc, char* argv[]) {
     run(testSha256AssetHash);
     runWithArg(testRenderDeterminism, fixtures_dir);
     run(testAudioThreadLockFreedom);
+    run(testTransportLoopAndStop);
     run(testWebSocketAuth);
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);

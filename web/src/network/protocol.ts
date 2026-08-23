@@ -28,7 +28,7 @@ export type DecodedMessage =
 
 // Encode message types
 export type EncodeMessage =
-  | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number } }
+  | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean } }
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } };
 
 /**
@@ -43,6 +43,7 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
         transport: {
           action: msg.data.action,
           seekPosition: msg.data.seekPosition ?? 0,
+          loopEnabled: msg.data.loopEnabled ?? false,
         },
       };
       break;

@@ -144,6 +144,10 @@ export async function init(): Promise<void> {
     els.engineStatus.dataset.state = 'connected';
     els.playBtn.disabled = false;
     els.stopBtn.disabled = false;
+    els.loopBtn.disabled = false;
+    // V1.1: loop is PERFORMANCE state - re-assert the local choice on
+    // every (re)connection so an engine restart does not silently drop it.
+    engineClient.setLoop(els.loopBtn.getAttribute('aria-pressed') === 'true');
     console.log('Connected to engine');
   };
   engineClient.onDisconnect = () => {
@@ -151,8 +155,16 @@ export async function init(): Promise<void> {
     els.engineStatus.dataset.state = 'disconnected';
     els.playBtn.disabled = true;
     els.stopBtn.disabled = true;
+    els.loopBtn.disabled = true;
     console.log('Disconnected from engine');
   };
+
+  // V1.1: loop toggle - local performance state, pushed to the engine
+  els.loopBtn.addEventListener('click', () => {
+    const on = els.loopBtn.getAttribute('aria-pressed') !== 'true';
+    els.loopBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    engineClient.setLoop(on);
+  });
   engineClient.onPosition = (samples, sampleRate) => {
     els.position.textContent = formatTime(samples, sampleRate);
     ctx.lastPlayheadSec = samples / sampleRate;

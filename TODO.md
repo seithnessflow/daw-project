@@ -1,5 +1,20 @@
 # TODO
 
+## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
+## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)
+
+Ordre grave : VAGUE 1 (habitabilite, 6 sessions : V1.1 boucle+arret,
+V1.2 master, V1.3 undo/redo, V1.4 session C visible, V1.5 session D
+devices+eviction A4-5, V1.6 fades) -> ENTRELACS DIFFERENCIATEUR
+(critere-3-vrai A4-1/2/3, placement+clips-MIDI co-designes, 2.5-etat,
+STEMS S7, streaming) -> VAGUE 2 TEMPO (cadrage puis migration) ->
+VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
+sends/groupes, enregistrement+comping, warp APRES recherche de
+determinisme). Hors programme : Session View, macros, M4L, alea sans
+seed, VST2, mobile. Details : plan approuve du 2026-08-23 (designs
+challenges : wrap sample-accurate par sous-bloc, master dans
+AudioGraph::process, undo par descripteurs types + groupes).
+
 ## TRANCHE 3 — LE DIFFERENCIATEUR (ADR-019, recadrage 2026-08-23)
 
 L'invariant : un pair sans le plugin entend le resultat du plugin.

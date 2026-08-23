@@ -796,11 +796,19 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
         return 1;
     }
 
-    // Start transport
-    device.getTransport().play();
-
     // Calculate total length
     int64_t total_length = daw::render::OfflineRenderer::calculateProjectLength(doc);
+
+    // V1.1: loop braces = the content; the CALLBACK owns wrap and
+    // end-stop now (single writer of position_ during playback).
+    // --keepalive simply plays looped forever.
+    device.getTransport().setLoopPoints(0, total_length);
+    if (opts.keepalive) {
+        device.getTransport().setLooping(true);
+    }
+
+    // Start transport
+    device.getTransport().play();
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
@@ -831,15 +839,15 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
                       << " | Underruns: " << telemetry->buffer_underruns
                       << "    " << std::flush;
 
-            // Stop if we've reached the end (--keepalive: loop instead -
-            // the test stack must not die mid-measurement; seek() is the
-            // documented lock-free control-thread API)
-            if (telemetry->position_samples >= total_length) {
-                if (opts.keepalive) {
-                    device.getTransport().seek(0);
-                } else {
-                    g_running = false;
-                }
+            // V1.1: the callback stops the transport at end of content
+            // (no loop); the CLI exits when it SEES that stop at the
+            // end. A manual browser STOP mid-piece keeps the process
+            // alive (position < end). The control thread never writes
+            // position_ anymore - the callback is its single writer.
+            if (!telemetry->is_playing &&
+                telemetry->position_samples >= total_length &&
+                total_length > 0) {
+                g_running = false;
             }
         }
 
@@ -1019,6 +1027,18 @@ int doPlayWithServer(const Options& opts) {
                     retired_graphs.push_back(std::move(retired));
                 }
                 last_built_version = target_version;
+
+                // V1.1: refresh the loop braces to the new content
+                // (loop start fixed at 0; the callback wraps/stops on
+                // these atomics - empty project => end 0, guarded there)
+                int64_t content_end = 0;
+                for (const auto& t : snapshot.tracks) {
+                    for (const auto& c : t.clips) {
+                        content_end = (std::max)(
+                            content_end, c.start_sample + c.length_samples);
+                    }
+                }
+                device.getTransport().setLoopPoints(0, content_end);
 
                 if (!playback_started) {
                     playback_started = true;

@@ -339,6 +339,23 @@ de la revue passait a la premiere lecture, refusee). tsc vert, 19/19
 local (spec token exclu : le moteur du duo tient 47821 — verdict
 complet par la CI).
 
+**2026-08-23 (V1.1 — la lecture boucle et s'arrete ; le programme
+complet est ouvert) :** plan « tout, falaises comprises » approuve
+(4 vagues + entrelacs differenciateur, designs challenges par agent).
+V1.1 livree : les atomiques loop morts deviennent vivants — wrap
+SAMPLE-ACCURATE par sous-bloc dans le callback (jamais un trou d'un
+buffer driver), arret en fin de contenu PAR le callback (position
+parquee a end exactement), ECRIVAIN UNIQUE de position_ retabli (le
+keepalive passe a setLooping, l'auto-stop du thread de controle
+supprime, la CLI sort sur is_playing=false) ; garde projet-vide
+(end<=start : ni wrap ni stop ni spin). Proto LOOP additif regen DEUX
+etages (et proto:gen remplace par un script node multiplateforme — le
+fossile POSIX A4-20.5 soldee) ; bouton loop (aria-pressed, re-assere a
+chaque reconnexion). Tests : moteur 22/22 (nouveau test callback,
+premier du genre : wrap exact 900+512 sur [0,1000) -> 412), e2e 21/21
+dont transport-loop.spec (wrap VU dans la telemetrie, gel du compteur
+apres loop OFF, moteur reel).
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write src/**/*.ts",
-    "proto:gen": "cp ../engine/src/protocol/messages.proto src/proto/ && npx protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/proto --ts_proto_opt=esModuleInterop=true,outputEncodeMethods=true src/proto/messages.proto && mv src/proto/src/proto/messages.ts src/proto/messages.ts && rm -rf src/proto/src",
+    "proto:gen": "node scripts/proto-gen.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "snap": "node scripts/ui-snap.mjs",

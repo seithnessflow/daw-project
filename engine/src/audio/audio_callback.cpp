@@ -86,15 +86,46 @@ void audioCallback(
         return;
     }
 
+    // Loop / end-of-content policy (V1.1). The braces live in the
+    // transport atomics; the control thread refreshes them at every
+    // rebuild (setLoopPoints(0, contentEnd)). All loads/stores here are
+    // lock-free - sacred-thread safe. Guard: an empty project
+    // (end <= start) neither wraps nor stops (no zero-grain spin).
+    const bool looping = ctx->transport->isLooping();
+    const int64_t loop_start = ctx->transport->getLoopStart();
+    const int64_t loop_end = ctx->transport->getLoopEnd();
+    const bool bounded = loop_end > loop_start;
+
     // Process audio in fixed-size sub-blocks
     // This decouples the driver's frame_count from our internal buffer size
     uint32_t frames_written = 0;
     bool any_failure = false;
 
     while (frames_written < frame_count) {
-        // Calculate chunk size (up to INTERNAL_BLOCK_SIZE)
+        if (bounded && position >= loop_end) {
+            if (looping) {
+                // Sample-accurate wrap BEFORE process: no rhythmic hole
+                // of up to a driver buffer at each turn of the loop.
+                position = loop_start;
+            } else {
+                // End of content, no loop: stop, park at end, silence the
+                // tail of this buffer. The CLI exits on is_playing=false
+                // in the telemetry (the control thread no longer stops).
+                ctx->transport->stop();
+                position = loop_end;
+                std::memset(out + frames_written * 2, 0,
+                            (frame_count - frames_written) * 2 * sizeof(float));
+                break;
+            }
+        }
+
+        // Calculate chunk size (up to INTERNAL_BLOCK_SIZE), bounded to the
+        // loop brace so the wrap lands exactly on loop_end.
         const uint32_t remaining = frame_count - frames_written;
-        const uint32_t chunk = std::min(INTERNAL_BLOCK_SIZE, remaining);
+        uint32_t chunk = std::min(INTERNAL_BLOCK_SIZE, remaining);
+        if (bounded && position + static_cast<int64_t>(chunk) > loop_end) {
+            chunk = static_cast<uint32_t>(loop_end - position);
+        }
 
         // Process this sub-block
         float* chunk_output = out + (frames_written * 2);  // stereo interleaved
@@ -115,8 +146,11 @@ void audioCallback(
         }
     }
 
-    // Advance transport position by total frames processed
-    ctx->transport->advancePosition(static_cast<int64_t>(frame_count));
+    // Publish the final (possibly wrapped) position. Single writer of
+    // position_ during playback: browser SEEKs arrive through the command
+    // ring (applied above in processCommands), and the control thread no
+    // longer writes it (keepalive uses setLooping, auto-stop removed).
+    ctx->transport->seek(position);
 
     // Calculate peaks over entire buffer and send telemetry
     const float peak_left = calculatePeak(out, frame_count, 0);
@@ -138,6 +172,10 @@ void processCommands(AudioCallbackContext& ctx) noexcept {
 
             case AudioCommand::Seek:
                 ctx.transport->seek(cmd->seek_position);
+                break;
+
+            case AudioCommand::SetLoop:
+                ctx.transport->setLooping(cmd->loop_enabled);
                 break;
 
             case AudioCommand::UpdateGraph:

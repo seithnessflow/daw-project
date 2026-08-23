@@ -165,6 +165,17 @@ export class EngineClient {
   }
 
   /**
+   * V1.1: toggle transport looping (performance state, never the CRDT).
+   */
+  setLoop(enabled: boolean): void {
+    const message = encodeMessage({
+      type: 'transport',
+      data: { action: TransportAction.LOOP, loopEnabled: enabled },
+    });
+    this.sendBinary(message);
+  }
+
+  /**
    * Set track monitoring state (solo/mute).
    * Note: Gain is NOT set here - it goes through the Automerge document.
    */

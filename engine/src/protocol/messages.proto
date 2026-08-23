@@ -13,9 +13,11 @@ message TransportCommand {
         PLAY = 0;
         STOP = 1;
         SEEK = 2;
+        LOOP = 3;  // V1.1: toggle looping (performance state, never CRDT)
     }
     Action action = 1;
     int64 seek_position = 2;  // Only used when action == SEEK (in samples)
+    bool loop_enabled = 3;    // Only used when action == LOOP
 }
 
 // Monitor control (solo/mute per track - local to this client)

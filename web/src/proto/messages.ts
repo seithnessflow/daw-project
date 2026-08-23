@@ -16,12 +16,16 @@ export interface TransportCommand {
   action: TransportCommand_Action;
   /** Only used when action == SEEK (in samples) */
   seekPosition: number;
+  /** Only used when action == LOOP */
+  loopEnabled: boolean;
 }
 
 export enum TransportCommand_Action {
   PLAY = 0,
   STOP = 1,
   SEEK = 2,
+  /** LOOP - V1.1: toggle looping (performance state, never CRDT) */
+  LOOP = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -36,6 +40,9 @@ export function transportCommand_ActionFromJSON(object: any): TransportCommand_A
     case 2:
     case "SEEK":
       return TransportCommand_Action.SEEK;
+    case 3:
+    case "LOOP":
+      return TransportCommand_Action.LOOP;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -51,6 +58,8 @@ export function transportCommand_ActionToJSON(object: TransportCommand_Action): 
       return "STOP";
     case TransportCommand_Action.SEEK:
       return "SEEK";
+    case TransportCommand_Action.LOOP:
+      return "LOOP";
     case TransportCommand_Action.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -160,7 +169,7 @@ export interface Message {
 }
 
 function createBaseTransportCommand(): TransportCommand {
-  return { action: 0, seekPosition: 0 };
+  return { action: 0, seekPosition: 0, loopEnabled: false };
 }
 
 export const TransportCommand: MessageFns<TransportCommand> = {
@@ -170,6 +179,9 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     }
     if (message.seekPosition !== 0) {
       writer.uint32(16).int64(message.seekPosition);
+    }
+    if (message.loopEnabled !== false) {
+      writer.uint32(24).bool(message.loopEnabled);
     }
     return writer;
   },
@@ -203,6 +215,14 @@ export const TransportCommand: MessageFns<TransportCommand> = {
             message.seekPosition = longToNumber(reader.int64());
             continue;
           }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.loopEnabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -223,6 +243,11 @@ export const TransportCommand: MessageFns<TransportCommand> = {
         : isSet(object.seek_position)
         ? globalThis.Number(object.seek_position)
         : 0,
+      loopEnabled: isSet(object.loopEnabled)
+        ? globalThis.Boolean(object.loopEnabled)
+        : isSet(object.loop_enabled)
+        ? globalThis.Boolean(object.loop_enabled)
+        : false,
     };
   },
 
@@ -234,6 +259,9 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     if (message.seekPosition !== 0) {
       obj.seekPosition = Math.round(message.seekPosition);
     }
+    if (message.loopEnabled !== false) {
+      obj.loopEnabled = message.loopEnabled;
+    }
     return obj;
   },
 
@@ -244,6 +272,7 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     const message = createBaseTransportCommand();
     message.action = object.action ?? 0;
     message.seekPosition = object.seekPosition ?? 0;
+    message.loopEnabled = object.loopEnabled ?? false;
     return message;
   },
 };

@@ -260,6 +260,10 @@ void WebSocketServer::handleTransportCommand(const protocol::TransportCommand& c
             audio_cmd.command = audio::AudioCommand::Seek;
             audio_cmd.seek_position = cmd.seek_position();
             break;
+        case protocol::TransportCommand::LOOP:
+            audio_cmd.command = audio::AudioCommand::SetLoop;
+            audio_cmd.loop_enabled = cmd.loop_enabled();
+            break;
         default:
             return;
     }
