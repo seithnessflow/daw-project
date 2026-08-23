@@ -4,8 +4,9 @@
   flex: 0 0 auto;
 }
 .device-view {
-  background: #181818;
-  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.06);
+  background: linear-gradient(rgba(255, 255, 255, 0.015), transparent 20px),
+    var(--surface);
+  box-shadow: 0 -1px 0 var(--hair-strong);
   padding: 7px 14px 10px;
   min-height: 116px;
 }
@@ -127,7 +128,9 @@
   overflow-x: auto;
 }
 .device {
-  background: var(--surface-2);
+  background: linear-gradient(rgba(255, 255, 255, 0.02), transparent),
+    var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hair), 0 1px 3px rgba(0, 0, 0, 0.35);
   border-radius: var(--r);
   min-width: 200px;
   display: flex;
@@ -138,6 +141,7 @@
   align-items: center;
   gap: 7px;
   padding: 5px 9px;
+  background: linear-gradient(rgba(255, 255, 255, 0.025), transparent);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
   font-size: 11px;
   font-weight: 600;
@@ -148,12 +152,16 @@
   padding: 0;
   border-radius: 50%;
   background: var(--amber);
+  /* active device = a LIT lamp */
+  box-shadow: 0 0 6px rgba(217, 164, 65, 0.55),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35);
 }
 .device-toggle:hover {
   background: #edbd5e;
 }
 .device-toggle[aria-pressed='true'] {
   background: #3b3b3b;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5); /* lamp off, recessed */
 }
 .device-toggle[aria-pressed='true']:hover {
   background: #4a4a4a;

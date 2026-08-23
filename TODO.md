@@ -30,8 +30,11 @@ avant refonte, trace visuelle par tranche). Ordre des tranches :
 2. [x] TOPBAR + TRANSPORT — FAIT 2026-08-23 (12c52f3) : barre reelle
        (surface encadree), cluster transport encastre, horloge
        phosphore lueur+lunette, statuts en pilules avec halo connecte.
-3. [ ] ZONE PISTES : headers de piste, clips (waveforms, selection,
-       fades), regle temporelle.
+3. [x] ZONE PISTES — FAIT 2026-08-23 (9c61786) : heads en couches
+       (selection teintee potion), faders gorge+curseur eclaire,
+       vumetres a lunette, clips decolles du couloir, halo de
+       selection potion A INTENSITE EGALE (loi session B intacte),
+       seek hover potion.
 4. [ ] PANNEAU DEVICES : chaine lisible, etat/badges, add/remove.
 5. [ ] PALETTE/KIT + OVERLAYS (aide, starter, messages d'etat).
 6. [ ] MICRO-INTERACTIONS : hover/focus/transitions, coherence des
