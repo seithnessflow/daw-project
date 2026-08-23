@@ -19,15 +19,20 @@
   position: sticky;
   left: 0;
   z-index: 2;
-  background: var(--surface-2);
+  background: linear-gradient(rgba(255, 255, 255, 0.015), transparent),
+    var(--surface-2);
+  box-shadow: inset -1px 0 0 var(--hair);
   display: flex;
 }
 .track:hover .track-head {
-  background: #252525;
+  background: linear-gradient(rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-3);
 }
 .track-selected .track-head,
 .track-selected:hover .track-head {
-  background: #2c2e31;
+  background: linear-gradient(rgba(141, 122, 230, 0.06), transparent),
+    var(--surface-3);
+  box-shadow: inset -1px 0 0 var(--potion-dim);
 }
 .track-selected .track-name {
   color: #fff;
@@ -64,9 +69,10 @@
   position: relative;
   height: 16px;
   cursor: pointer;
+  background: linear-gradient(rgba(255, 255, 255, 0.015), transparent);
 }
 .ruler-seek:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(rgba(141, 122, 230, 0.06), transparent);
 }
 .ruler-tick {
   position: absolute;
@@ -97,6 +103,9 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* refonte t3: clips LIFT off the lane */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 .clip-name {
   flex: 0 0 13px;
@@ -119,10 +128,11 @@
 .clip[aria-selected='true'] {
   /* Session B: the 1px outline was invisible on a 1.4px-wide clip. The
      halo makes selection readable at ANY clip width - Delete must never
-     act on a selection the eye cannot see. */
-  outline: 2px solid rgba(255, 255, 255, 0.9);
+     act on a selection the eye cannot see. Refonte t3: the halo takes
+     the potion (selection = the brand accent), SAME intensity. */
+  outline: 2px solid rgba(214, 205, 255, 0.95);
   outline-offset: 1px;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22), 0 0 10px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(141, 122, 230, 0.35), 0 0 12px rgba(141, 122, 230, 0.5);
   filter: brightness(1.18);
   z-index: 3;
 }
