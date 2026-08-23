@@ -178,6 +178,34 @@ Toute seance qui touche l'UI livre sa TRACE VISUELLE avec le resultat :
 capture a chaque geste significatif (page.screenshot) ou enregistrement
 (gif). L'utilisateur juge l'interface sur la trace, pas sur le recit.
 
+## VERIFICATION PILOTEE DE BOUT EN BOUT (directive utilisateur
+## 2026-08-24 : « si tu vois ce que tu fais, tu peux tout corriger et
+## ameliorer toi-meme »)
+
+La methode qui a debloque le jam deux-machines, a appliquer a CHAQUE
+fonctionnalite qui traverse la stack : NE JAMAIS demander a
+l'utilisateur de tester ce que je peux voir moi-meme.
+
+1. LES YEUX SUR LE REEL : l'extension Chrome (claude-in-chrome) lit
+   les VRAIS onglets (read_page/a11y d'abord — les pixels mentent
+   quand la fenetre est petite) ; Playwright pilote des onglets
+   jetables ; sur l'AUTRE machine : Playwright via ssh avec
+   channel:'chrome' (le Chrome installe — jamais telecharger des
+   browsers sur le reseau de l'utilisateur).
+2. LA BOUCLE : voir l'etat reel (badges, data-state, compteurs
+   window.__daw*) -> sonde MINIMALE du maillon suspect (un seul
+   maillon par sonde) -> fix -> push/pull (les deux machines servent
+   leur PROPRE repo) -> re-voir. Trois sondes ont chacune revele une
+   couche du « pas de son » : personne ne diffusait, trou de
+   protocole auditeur-premier, onglet zombie.
+3. PIEGES PAYES : un onglet pilote en ARRIERE-PLAN est throttle par
+   Chrome (horloge figee, rendu gele) — jamais lui confier un role
+   temps reel (diffuseur, mesure) ; les modes auto (?jam=, ?tap=)
+   existent POUR le pilotage — les clics rejouables les completent ;
+   toujours verifier « qui fait quoi » AVANT d'accuser le reseau (la
+   sonde est deux fois coupable avant lui) ; exposer les etats de
+   test sur window.__daw* est ce qui rend tout ceci possible.
+
 ## Outillage UI/audio — les yeux et l'oreille (chantier UI)
 
 Boucle permanente : modifier (petit lot, hot-reload) -> `npm run snap` ->
