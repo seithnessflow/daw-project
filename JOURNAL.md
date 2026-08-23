@@ -296,6 +296,19 @@ Garde : token-zero-paste.spec. Le chemin site-distant (moteur qui sert
 son token Origin-gate, ou lancement-fragment seul) reste date dans
 TODO/ADR-019 — non bloquant pour 1bis.
 
+**2026-08-23 (preparation 1bis — les deux verrous sautent) :** le
+serveur peut ecouter au-dela du loopback (DAW_SERVER_BIND, defaut
+loopback conserve, note de securite gravee : bind ouvert = tout le LAN
+est client natif exempt, C2-distant devient vivant) ; le web accepte
+?server=<hote:port|url> et l'adresse HTTP des assets en derive (jumeau
+SERVER_HTTP de waveform.ts tue — une seule source). Garde :
+server-param.spec. Suite 18/18. Verdicts CI : 1pre VERT (run
+32642816909, build+e2e) ; B couvert par inclusion par ce meme run (son
+propre run suspendu sur une anomalie de runner, job e2e >50 min).
+Terrain du smoke : le portable de l'utilisateur — phase 1 meme reseau
+(IP LAN + regle firewall), phase 2 deux reseaux via partage de
+connexion telephone + tunnel cloudflared vers :3000 (wss).
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

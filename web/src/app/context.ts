@@ -12,7 +12,15 @@ import type { Library } from '../ui/library';
 import type { Overview } from '../ui/overview';
 
 // ---- Configuration --------------------------------------------------------
-export const SERVER_URL = 'ws://localhost:3000';
+// 1bis: the sync server can be REMOTE (two machines, one project).
+// ?server=<host:port | ws://url> - defaults to the local dev server.
+const serverParam = new URLSearchParams(window.location.search).get('server');
+const serverBase = serverParam
+  ? (serverParam.includes('://') ? serverParam : `ws://${serverParam}`)
+  : 'ws://localhost:3000';
+export const SERVER_URL = serverBase;
+/** HTTP side of the same server (assets store). ONE source of truth. */
+export const SERVER_HTTP = serverBase.replace(/^ws/, 'http');
 export const ENGINE_PORT = 47821;
 export const PROJECT_ID =
   new URLSearchParams(window.location.search).get('project') ?? 'default';
