@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 3;       // v3: param seqlock (v2: 4 slots)
+inline constexpr uint32_t kLayoutVersion = 4;       // v4: state side-channel (v3: param seqlock)
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
 inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
@@ -80,6 +80,20 @@ struct SharedAudioRing {
     std::atomic<uint32_t> shutdown;     // engine sets 1; child exits cleanly
     std::atomic<uint64_t> child_heartbeat;  // child bumps per processed block
 
+    // ---- State side-channel (2.5-etat, v4) ----
+    // The BLOB never crosses the ring: it travels through the file
+    // `<segment>.state` next to the segment. These two sequences only
+    // coordinate WHO wrote it last:
+    //   save:    engine bumps state_request_seq; the child serializes
+    //            IComponent state to the file, then copies the request
+    //            into state_ready_seq. Engine waits (bounded, control
+    //            thread) for ready >= its request, then reads the file.
+    //   restore: the engine writes the file BEFORE spawn/restart; the
+    //            child loads it during its ceremony (processor-first),
+    //            before the heartbeat says ready.
+    std::atomic<uint64_t> state_request_seq;
+    std::atomic<uint64_t> state_ready_seq;
+
     // ---- Planar audio, double-buffered: [slot][channel][frame] ----
     float in[kRingSlots][kRingChannels][kRingBlockSize];
     float out[kRingSlots][kRingChannels][kRingBlockSize];
@@ -103,9 +117,11 @@ static_assert(offsetof(SharedAudioRing, param_id) == 40);
 static_assert(offsetof(SharedAudioRing, param_value) == 48);
 static_assert(offsetof(SharedAudioRing, shutdown) == 56);
 static_assert(offsetof(SharedAudioRing, child_heartbeat) == 64);
-static_assert(offsetof(SharedAudioRing, in) == 72);
-static_assert(offsetof(SharedAudioRing, out) == 72 + kRingSlots * kRingChannels * kRingBlockSize * 4);
-static_assert(sizeof(SharedAudioRing) == 72 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
+static_assert(offsetof(SharedAudioRing, state_request_seq) == 72);
+static_assert(offsetof(SharedAudioRing, state_ready_seq) == 80);
+static_assert(offsetof(SharedAudioRing, in) == 88);
+static_assert(offsetof(SharedAudioRing, out) == 88 + kRingSlots * kRingChannels * kRingBlockSize * 4);
+static_assert(sizeof(SharedAudioRing) == 88 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 
 }  // namespace daw::host

@@ -520,3 +520,26 @@ graine (une fois), le serveur l'adopte — default.am est desormais
 seed-racine, plus un churn. Raffinement au passage : au premier
 contact la nouveaute du serveur est ATTENDUE (sinon chaque ouverture
 d'onglet payait 3 connexions de verification).
+
+**2026-08-23 (2.5-etat, session A — l'etat traverse la frontiere de
+process) :** premiere brique du differenciateur apres le design
+SCHEMA-V2. Le ring passe en layout v4 : deux atomics de sequence
+(state_request/state_ready) — le BLOB ne traverse jamais le ring, il
+voyage par le fichier `<segment>.state` (format partage
+[u32 comp][u32 cont], header commun state_file.h, regle des jumeaux —
+un contrat entre deux executables vit en UN lieu). Cote enfant :
+IBStream memoire minimal ecrit main (le MemoryStream du SDK n'est
+compile que par le validator — le tirer aurait evince le cache CI du
+SDK), restauration a la CEREMONIE avant le heartbeat (processor-first
+par construction : seul IComponent existe), requetes de sauvegarde
+servies entre les blocs (un getState rate SUPPRIME le fichier — le
+bridge ne lira jamais des octets perimes comme frais). Cote bridge :
+setPendingState (poser le blob avant spawn/restart), saveState
+(attente bornee, vivacite surveillee). Garde : testPluginStateRoundtrip
+— param 0.25 via le ring dans la vie A, blob de 12 octets, vie B SANS
+AUCUN param recoit le blob et sort EXACTEMENT 0.25x, et son propre
+getState re-rend le blob bit-identique. Moteur 26/26. Session moteur
+pure, pas de manip utilisateur — elle arrive en session B (stateHash
+dans le document + store). CI V1.5 annulee (runner suspendu des
+heures ; verdict subsume par les runs verts 8c1671f et 71c2577,
+surensembles du code).

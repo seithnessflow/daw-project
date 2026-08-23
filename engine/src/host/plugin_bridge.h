@@ -22,6 +22,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace daw::host {
 
@@ -68,6 +69,28 @@ public:
     /** Latest-value parameter channel (last state wins). */
     void setParam(uint32_t param_id, double normalized);
 
+    // ---- State side-channel (2.5-etat) -----------------------------------
+    // The blob travels via `<segment>.state`, never through the ring.
+
+    /**
+     * Stage a state blob for the NEXT child spawn (start or restart):
+     * the child restores it during its ceremony, processor-first,
+     * before its heartbeat says ready. Callable before start().
+     */
+    void setPendingState(std::vector<uint8_t> blob) {
+        pending_state_ = std::move(blob);
+    }
+
+    /**
+     * Ask the LIVE child to serialize its state and read the blob back.
+     * CONTROL THREAD ONLY (bounded wait). Returns false on timeout or
+     * when the plugin refused getState (error() explains).
+     */
+    bool saveState(std::vector<uint8_t>& out, uint32_t timeout_ms = 5000);
+
+    /** Path of the state side-channel file (valid after start()). */
+    [[nodiscard]] std::string statePath() const { return segment_path_ + ".state"; }
+
     /**
      * Synchronous block exchange - CONTROL THREAD ONLY.
      * Planar in/out, n <= kRingBlockSize frames.
@@ -100,6 +123,10 @@ private:
     std::string module_path_;
     std::string class_uid_;
     uint32_t restart_count_ = 0;
+
+    // 2.5-etat: blob staged for the next spawn (written to statePath()
+    // just before the child starts; empty = nothing staged)
+    std::vector<uint8_t> pending_state_;
 
     // Opaque platform handles (Windows: HANDLE file/mapping/process;
     // POSIX: fd + pid)

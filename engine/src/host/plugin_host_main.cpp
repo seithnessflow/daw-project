@@ -18,11 +18,13 @@
 
 #include "host_messages.pb.h"
 #include "shared_audio_ring.h"
+#include "state_file.h"
 
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 
+#include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 
@@ -163,6 +165,70 @@ bool writeWav16Stereo(const std::string& path, const std::vector<int16_t>& sampl
 constexpr int32_t kHostBlockSize = 256;
 static_assert(daw::host::kRingBlockSize == static_cast<uint32_t>(kHostBlockSize),
               "ring block size and host block size are the same contract");
+
+// ---- State side-channel (2.5-etat) -----------------------------------------
+// A minimal in-memory IBStream: the SDK's MemoryStream is only compiled by
+// the validator sample, and pulling it in would evict the CI's SDK build
+// cache - 50 self-contained lines beat that.
+class BlobStream final : public Steinberg::IBStream {
+public:
+    explicit BlobStream(std::vector<uint8_t> data = {}) : data_(std::move(data)) {}
+    std::vector<uint8_t>& data() { return data_; }
+
+    // FUnknown - stack-owned, never heap-refcounted
+    Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid,
+                                                 void** obj) override {
+        if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IBStream::iid) ||
+            Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid)) {
+            *obj = this;
+            return Steinberg::kResultOk;
+        }
+        *obj = nullptr;
+        return Steinberg::kNoInterface;
+    }
+    Steinberg::uint32 PLUGIN_API addRef() override { return 2; }
+    Steinberg::uint32 PLUGIN_API release() override { return 1; }
+
+    Steinberg::tresult PLUGIN_API read(void* buffer, Steinberg::int32 num_bytes,
+                                       Steinberg::int32* bytes_read) override {
+        const auto avail = static_cast<Steinberg::int64>(data_.size()) - pos_;
+        const auto n = std::max<Steinberg::int64>(
+            0, std::min<Steinberg::int64>(num_bytes, avail));
+        if (n > 0) std::memcpy(buffer, data_.data() + pos_, static_cast<size_t>(n));
+        pos_ += n;
+        if (bytes_read) *bytes_read = static_cast<Steinberg::int32>(n);
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API write(void* buffer, Steinberg::int32 num_bytes,
+                                        Steinberg::int32* bytes_written) override {
+        if (num_bytes < 0) return Steinberg::kInvalidArgument;
+        const auto end = pos_ + num_bytes;
+        if (static_cast<size_t>(end) > data_.size()) data_.resize(static_cast<size_t>(end));
+        std::memcpy(data_.data() + pos_, buffer, static_cast<size_t>(num_bytes));
+        pos_ = end;
+        if (bytes_written) *bytes_written = num_bytes;
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API seek(Steinberg::int64 pos, Steinberg::int32 mode,
+                                       Steinberg::int64* result) override {
+        Steinberg::int64 base = 0;
+        if (mode == kIBSeekCur) base = pos_;
+        else if (mode == kIBSeekEnd) base = static_cast<Steinberg::int64>(data_.size());
+        const auto target = base + pos;
+        if (target < 0) return Steinberg::kInvalidArgument;
+        pos_ = target;
+        if (result) *result = pos_;
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API tell(Steinberg::int64* pos) override {
+        if (pos) *pos = pos_;
+        return Steinberg::kResultOk;
+    }
+
+private:
+    std::vector<uint8_t> data_;
+    Steinberg::int64 pos_ = 0;
+};
 
 // ---- The VST3 instantiation ceremony, shared by --process and --serve ------
 // Extracted (not duplicated) when --serve arrived: one ceremony, two callers.
@@ -460,6 +526,25 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         return 1;
     }
 
+    // 2.5-etat: restore state placed by the engine BEFORE the heartbeat
+    // says ready (processor-first by construction - only IComponent
+    // exists in this host). A refused/corrupt blob is a WARNING, not a
+    // death: the plugin then starts from its defaults, audibly.
+    const std::string state_path = segment_path + ".state";
+    {
+        std::vector<uint8_t> comp;
+        if (daw::host::readStateFile(state_path, comp) && !comp.empty()) {
+            BlobStream stream(std::move(comp));
+            if (inst.component->setState(&stream) == Steinberg::kResultOk) {
+                std::cerr << "plugin_host: state restored ("
+                          << stream.data().size() << " bytes)" << std::endl;
+            } else {
+                std::cerr << "plugin_host warning: setState refused - defaults kept"
+                          << std::endl;
+            }
+        }
+    }
+
     // Ready signal: the bridge's start() waits for a nonzero heartbeat
     ring->child_heartbeat.store(1, std::memory_order_release);
     std::cerr << "plugin_host: serving on " << segment_path << " at "
@@ -470,7 +555,30 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     uint64_t beats = 1;
     uint64_t idle_spins = 0;
 
+    // 2.5-etat: serve a pending save request (control-plane, latency
+    // tolerant - a serialize may cost a block, counted engine-side)
+    auto serveStateRequest = [&]() {
+        const uint64_t req = ring->state_request_seq.load(std::memory_order_acquire);
+        if (req == ring->state_ready_seq.load(std::memory_order_relaxed)) return;
+        BlobStream stream;
+        if (inst.component->getState(&stream) == Steinberg::kResultOk &&
+            daw::host::writeStateFile(state_path, stream.data())) {
+            std::cerr << "plugin_host: state saved (" << stream.data().size()
+                      << " bytes)" << std::endl;
+        } else {
+            std::cerr << "plugin_host warning: getState/save failed" << std::endl;
+            // The file may still hold the spawn-time RESTORE blob: remove
+            // it so the bridge reads absence, never stale bytes as fresh.
+            std::remove(state_path.c_str());
+        }
+        // Always answer (even on failure): the bridge's bounded wait must
+        // not run its full timeout for a plugin that refuses getState -
+        // the absent file at ready IS the failure signal.
+        ring->state_ready_seq.store(req, std::memory_order_release);
+    };
+
     while (ring->shutdown.load(std::memory_order_acquire) == 0) {
+        serveStateRequest();
         const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);
         if (newest == last_in) {
             // Deliberate yield-spin: the block budget is 5.3 ms and Windows

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "plugin_bridge.h"
+#include "state_file.h"
 
 #include <chrono>
 #include <cstring>
@@ -164,6 +165,16 @@ bool PluginBridge::start(const std::string& host_exe, const std::string& module_
     module_path_ = module_path;
     class_uid_ = class_uid;
 
+    // 2.5-etat: a staged blob is on disk BEFORE the child spawns - its
+    // ceremony restores it, processor-first, before ready
+    if (!pending_state_.empty()) {
+        if (!writeStateFile(statePath(), pending_state_)) {
+            error_ = "cannot write pending state file";
+            unmapSegment();
+            return false;
+        }
+    }
+
     if (!spawnChild(host_exe, module_path, class_uid)) {
         unmapSegment();
         return false;
@@ -219,6 +230,14 @@ bool PluginBridge::restartChild(uint32_t timeout_ms) {
     // The old life's beats must not fake readiness; nobody else writes
     // here once the child is dead
     ring_->child_heartbeat.store(0, std::memory_order_release);
+    // 2.5-etat: refresh the staged blob for the new life (the ring's
+    // param channel already survives; the STATE now does too)
+    if (!pending_state_.empty()) {
+        if (!writeStateFile(statePath(), pending_state_)) {
+            error_ = "cannot write pending state file";
+            return false;
+        }
+    }
     if (!spawnChild(host_exe_, module_path_, class_uid_)) {
         return false;
     }
@@ -259,6 +278,35 @@ bool PluginBridge::childAlive() {
     }
     return r == 0;
 #endif
+}
+
+bool PluginBridge::saveState(std::vector<uint8_t>& out, uint32_t timeout_ms) {
+    if (!ring_) {
+        error_ = "bridge not running";
+        return false;
+    }
+    // One request = one bump; the child copies the request into ready
+    // once the file is written (or removed, on plugin refusal)
+    const uint64_t req =
+        ring_->state_request_seq.fetch_add(1, std::memory_order_acq_rel) + 1;
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeout_ms);
+    while (ring_->state_ready_seq.load(std::memory_order_acquire) < req) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            error_ = "state save timed out (child busy or dead)";
+            return false;
+        }
+        if (!childAlive()) {
+            error_ = "child died during state save";
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (!readStateFile(statePath(), out)) {
+        error_ = "plugin refused getState (no state file)";
+        return false;
+    }
+    return true;
 }
 
 void PluginBridge::setParam(uint32_t param_id, double normalized) {
@@ -353,6 +401,7 @@ void PluginBridge::unmapSegment() {
     }
     if (!segment_path_.empty()) {
         std::error_code ec;
+        fs::remove(segment_path_ + ".state", ec);  // 2.5-etat side-channel
         fs::remove(segment_path_, ec);
         segment_path_.clear();
     }

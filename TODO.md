@@ -580,6 +580,18 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          code mort/hygiene web/discipline de test) — declencheurs dans
          AUDIT-4.md.
 
+- [~] 2.5-ETAT EN COURS — session A FAITE 2026-08-23 (l'etat traverse
+      la frontiere de process) : ring v4 (state_request/ready_seq),
+      blob par fichier `<segment>.state` (format partage state_file.h),
+      restauration a la ceremonie processor-first, bridge
+      setPendingState/saveState, garde testPluginStateRoundtrip (12
+      octets AGain, 0.25x exact depuis l'etat seul, bit-stable).
+      SESSION B (la suivante) : stateHash/stateVersion dans le
+      document (SCHEMA-V2-DESIGN §2), blob pousse au store
+      contenu-adresse, capture debounce apres geste, restauration au
+      rebuild via setPendingState — et la MANIP : tweaker AGain,
+      tuer l'enfant, le reglage survit et converge vers l'autre pair.
+
 - [ ] INTRANTS 2.5 CONSIGNES (recherche mecanique profonde 2026-08-22,
       sources SDK dans docs/UI-CONVENTIONS.md) : les 5 mecaniques a
       respecter pour que etat+decouverte soient credibles — (1) deux

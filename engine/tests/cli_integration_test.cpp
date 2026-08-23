@@ -1078,6 +1078,82 @@ bool testPluginHostSetupRefusal() {
 // offline render sample for sample. Ready ceremony (heartbeat), the param
 // channel and clean shutdown are exercised on the way. Sync path only -
 // the one-frame audio-callback pipeline is proven by the ProxyNode tests.
+/**
+ * 2.5-etat: plugin state crosses the process boundary and SURVIVES it.
+ * Bridge A: param 0.25 through the ring, one processed block (the param
+ * reaches the plugin), saveState -> blob. Bridge B (fresh child, fresh
+ * segment, NO param ever sent): setPendingState(blob) -> the ceremony
+ * restores it processor-first -> a processed block comes out at
+ * EXACTLY 0.25x. The gain can only have come from the state file.
+ */
+bool testPluginStateRoundtrip() {
+    std::cout << "Test: plugin state roundtrip (2.5-etat)... ";
+
+    daw::host::PluginBridge a;
+    if (!a.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge A start: " << a.error() << "\n";
+        return false;
+    }
+    a.setParam(kAGainGainParamId, 0.25);
+
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    std::vector<float> in_l(kBlock, 0.5f), in_r(kBlock, -0.5f);
+    std::vector<float> out_l(kBlock), out_r(kBlock);
+    if (!a.processBlockSync(in_l.data(), in_r.data(),
+                            out_l.data(), out_r.data(), kBlock)) {
+        std::cout << "FAILED: bridge A process: " << a.error() << "\n";
+        return false;
+    }
+
+    std::vector<uint8_t> blob;
+    if (!a.saveState(blob) || blob.empty()) {
+        std::cout << "FAILED: saveState: " << a.error()
+                  << " (" << blob.size() << " bytes)\n";
+        return false;
+    }
+    a.stop();
+
+    daw::host::PluginBridge b;
+    b.setPendingState(blob);
+    if (!b.start(DAW_PLUGIN_HOST_EXE, fixtureModulePath(), kAGainAudioUid, 48000)) {
+        std::cout << "FAILED: bridge B start: " << b.error() << "\n";
+        return false;
+    }
+    // NO setParam here - the 0.25 can only come from the restored state
+    if (!b.processBlockSync(in_l.data(), in_r.data(),
+                            out_l.data(), out_r.data(), kBlock)) {
+        std::cout << "FAILED: bridge B process: " << b.error() << "\n";
+        return false;
+    }
+    for (uint32_t i = 0; i < kBlock; ++i) {
+        if (out_l[i] != 0.5f * 0.25f || out_r[i] != -0.5f * 0.25f) {
+            std::cout << "FAILED: restored gain not applied at frame " << i
+                      << " (out_l=" << out_l[i] << ", expected " << 0.5f * 0.25f
+                      << ")\n";
+            b.stop();
+            return false;
+        }
+    }
+
+    // Stability: the state B saves matches the blob it was born from
+    std::vector<uint8_t> blob2;
+    if (!b.saveState(blob2)) {
+        std::cout << "FAILED: bridge B saveState: " << b.error() << "\n";
+        b.stop();
+        return false;
+    }
+    b.stop();
+    if (blob2 != blob) {
+        std::cout << "FAILED: state not stable across a life ("
+                  << blob.size() << " vs " << blob2.size() << " bytes)\n";
+        return false;
+    }
+
+    std::cout << "OK (" << blob.size()
+              << " bytes, exact 0.25x from state alone, stable)\n";
+    return true;
+}
+
 bool testPluginBridgeTransparency() {
     std::cout << "Test: Plugin bridge transparency... ";
 
@@ -2213,6 +2289,7 @@ int main(int argc, char* argv[]) {
     run(testProxyNodePipeline);
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
+    run(testPluginStateRoundtrip);
     run(testDocumentChainRender);
 #else
     std::cout << "(plugin_host tests skipped: VST3 SDK not vendored)\n";
