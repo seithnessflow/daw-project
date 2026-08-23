@@ -54,17 +54,13 @@ dedouble). Ordre :
           selection poignee, deselection visible, Delete agit DOM+doc,
           Delete sans selection = no-op heads stables). Suite 16/16.
           Trace visuelle livree (halo prouve sur un clip de 2 px).
-       C. [ ] DUPLIQUER/REPETER UN CLIP — la gene n.1 de la seance,
-          ABSENTE de la roadmap. Prealable : session courte de lecture
-          Ableton sur CETTE question seule (modele loop/duplicate/
-          repeat + implications CRDT), revenir avec un modele.
-          DECOUVERTES session B (2026-08-23) : un Ctrl+D duplicate
-          EXISTE deja (wiring.ts:314, grille-snappe, selection sur la
-          copie) — cache, montre nulle part, jamais decouvert pendant
-          la seance musique. Le zoom EXISTE aussi (touches +/-,
-          navigation.ts) — meme maladie : la fonctionnalite sans son
-          affordance. La session C part donc de « rendre decouvrable
-          et repetable » autant que de « creer ».
+       C. [ ] RENDRE DECOUVRABLE (retreci 2026-08-23, 2e passe : plus
+          de modele a concevoir, la lecture Ableton ATTEND). La gene
+          n.1 de la seance n'etait pas un manque mais de l'INVISIBLE :
+          Ctrl+D duplicate et zoom +/- existaient, jamais trouves.
+          Perimetre : donner une affordance a l'existant (inventaire
+          des 16 caches fait en session, voir JOURNAL 2026-08-23) —
+          pas de nouvelle mecanique.
        D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
           trou le plus visible du chemin produit, et c'est le chemin
           du differenciateur.

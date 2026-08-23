@@ -261,6 +261,29 @@ sur un clip de 2 px. Decouvertes en route : Ctrl+D duplicate et zoom
 +/- EXISTENT deja, caches — la fonctionnalite sans affordance ;
 consigne comme intrant de la session C.
 
+**2026-08-23 (inventaire de l'invisible — ce que le code sait faire et
+que l'interface ne montre pas, 30 min, liste sans corrections) :**
+CLAVIER : Delete/Backspace (supprime le clip selectionne) ; Ctrl+D
+(duplique sur le pas de grille suivant, selection sur la copie) ;
+Espace (play/stop — seul raccourci annonce quelque part, par daw.ps1) ;
++/- (zoom centre) ; W (fit all) ; H (pistes compactes) ; Z (zoom 8 s
+autour du marqueur, pile) / X (pop retour, a la Ableton) ; Ctrl+molette
+(zoom au curseur). GESTES : Alt pendant drag/resize = snap desactive ;
+snap a grille RAFFINEE par le zoom (0,5 -> 0,0625 s selon pps) + snap
+aux bords des voisins (8 px) — aucune grille dessinee nulle part ;
+trim par la poignee gauche = head-trim (offset preserve) ; double-clic
+sur l'overview = fit all ; molette/scroll simple = pause du Follow
+(reprise : bouton ⇥, lui-meme un glyphe nu). CLICS : clic couloir non
+arme = selection piste + POSE LE MARQUEUR D'INSERTION + pause Follow
+(un clic, trois effets, rien ne le dit) ; re-clic sur le chip arme =
+desarme. BOUTONS NUS : ⇥ (follow), A/B/C (prototypes touch — trois
+lettres sans legende). URL : ?project= (seul moyen de changer/creer un
+projet), ?lab=1 (KIT harnais), ?starter=1. Bilan : 16 capacites sans
+affordance — la session C devient « rendre decouvrable », plus rien a
+concevoir. REGLE GRAVEE dans CLAUDE.md : une cible plus petite que ses
+propres poignees est inatteignable (fades/automation/marqueurs :
+verifier a chaque poignee).
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

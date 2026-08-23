@@ -159,6 +159,15 @@ Interdit:
   responsabilite. Un fichier qui grossit se remanie sans hesiter ; le
   harnais de contrats est la pour ca.
 
+## Regle d'ergonomie gravee (session B, 2026-08-23)
+
+**Une cible cliquable plus petite que ses propres poignees est
+inatteignable.** Toute surface enfant (poignee de resize, zone de grab)
+doit laisser un chemin de selection au clic simple — la branche
+« clic sans mouvement » existe pour CHAQUE poignee, jamais implicite.
+Cette classe de bug se reproduira sur les fades, l'automation, les
+marqueurs : verifier a chaque nouvelle poignee introduite.
+
 ## Trace visuelle (demande utilisateur 2026-08-23, habitude)
 
 Toute seance qui touche l'UI livre sa TRACE VISUELLE avec le resultat :
