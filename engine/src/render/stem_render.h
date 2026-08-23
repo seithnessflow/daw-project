@@ -34,14 +34,25 @@ struct StemRenderResult {
 };
 
 /**
+ * The module's version tag for the cache key: sha256 over the module
+ * BINARY (bundle directories walked in sorted order) - two builds of
+ * the same plugin are two versions, which is exactly the multi-machine
+ * bug the key exists to catch. Cached per path for the process life.
+ * Empty string when the path cannot be read (the key then still
+ * changes vs a readable module - never a silent match).
+ */
+std::string moduleVersionTag(const std::string& module_path);
+
+/**
  * Compute the stem's input-cache key WITHOUT rendering (the freshness
- * probe). Deterministic over: uid, state, params, samplerate, and the
- * upstream audio (clip geometry + asset hashes + fades, prior chain).
- * plugin version: dated debt (empty until the host exposes it).
+ * probe). Deterministic over: uid, MODULE VERSION TAG, state, params,
+ * samplerate, and the upstream audio (clip geometry + asset hashes +
+ * fades, prior chain).
  */
 std::string computeStemKey(const document::TrackDef& track,
                            size_t node_index,
-                           uint32_t sample_rate);
+                           uint32_t sample_rate,
+                           const std::string& module_version_tag);
 
 /**
  * Render the stem for `node_id` on `track_id`. vst3_modules/host_exe:

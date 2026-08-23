@@ -1215,6 +1215,22 @@ bool testStemInvariant() {
     config.sample_rate = 48000;
     config.bit_depth = 16;
 
+    // COUNTER-CONTROL 1 (the test must FAIL when the mechanism is
+    // removed): BEFORE any stem exists, machine B must REFUSE this
+    // document loudly - if it could produce a green here, the
+    // byte-identical assertion below would prove nothing.
+    {
+        daw::render::OfflineRenderer bare0;
+        auto refuse = bare0.render(doc, (dir / "refuse.wav").string(),
+                                   dir.string(), config);
+        if (refuse.success ||
+            refuse.error.find("Chain incomplete") == std::string::npos) {
+            std::cout << "FAILED: no-stem render did not refuse loudly ("
+                      << refuse.error << ")\n";
+            return false;
+        }
+    }
+
     // MACHINE A: reference render WITH the plugin
     daw::render::OfflineRenderer withPlugin;
     withPlugin.setVst3Modules(modules, DAW_PLUGIN_HOST_EXE);
@@ -1268,18 +1284,62 @@ bool testStemInvariant() {
         return false;
     }
 
-    // Freshness: touching a param must stale the key
+    // COUNTER-CONTROL 2: a CORRUPTED stem must refuse loudly, never a
+    // false green (the substitution declines an unloadable WAV and the
+    // R5 completeness guard fails the render). A mismatched KEY, by
+    // contrast, still PLAYS by arbitrated design (stale stem = UI
+    // state, never a playback block - reviewer amendment 2026-08-23).
+    {
+        const fs::path stem_file = dir / (stem.stem_hash + ".wav");
+        std::vector<char> original;
+        {
+            std::ifstream f(stem_file, std::ios::binary);
+            original.assign(std::istreambuf_iterator<char>(f),
+                            std::istreambuf_iterator<char>());
+        }
+        {
+            std::ofstream f(stem_file, std::ios::binary | std::ios::trunc);
+            f << "not a wav at all";
+        }
+        daw::render::OfflineRenderer bareCorrupt;  // fresh asset cache
+        auto corrupt = bareCorrupt.render(doc, (dir / "corrupt.wav").string(),
+                                          dir.string(), config);
+        if (corrupt.success) {
+            std::cout << "FAILED: corrupted stem produced a green render\n";
+            return false;
+        }
+        {
+            std::ofstream f(stem_file, std::ios::binary | std::ios::trunc);
+            f.write(original.data(),
+                    static_cast<std::streamsize>(original.size()));
+        }
+    }
+
+    // Freshness: touching a param must stale the key; a different
+    // MODULE BUILD must stale it too (the multi-machine trap: two
+    // builds of one plugin under one key would be indetectable)
+    const std::string vtag = daw::render::moduleVersionTag(fixtureModulePath());
+    if (vtag.empty()) {
+        std::cout << "FAILED: module version tag empty for a readable module\n";
+        return false;
+    }
     const auto snap = doc.getDocument();
     auto changed = snap.tracks[0];
     changed.chain[0].params["0"] = 0.7f;
-    if (daw::render::computeStemKey(changed, 0, 48000) == stem.stem_key) {
+    if (daw::render::computeStemKey(changed, 0, 48000, vtag) == stem.stem_key) {
         std::cout << "FAILED: key blind to a param change\n";
+        return false;
+    }
+    if (daw::render::computeStemKey(snap.tracks[0], 0, 48000, "other-build") ==
+        stem.stem_key) {
+        std::cout << "FAILED: key blind to a module version change\n";
         return false;
     }
 
     fs::remove_all(dir, ec);
-    std::cout << "OK (byte-identical without the plugin, peak "
-              << ref.peak_left << ", key stales on param change)\n";
+    std::cout << "OK (no-stem refused, byte-identical without the plugin, peak "
+              << ref.peak_left
+              << ", corrupted stem refused, key stales on param change)\n";
     return true;
 }
 

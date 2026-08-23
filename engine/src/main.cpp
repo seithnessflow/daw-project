@@ -1279,11 +1279,13 @@ int doPlayWithServer(const Options& opts) {
                 for (size_t ni = 0; ni < t.chain.size(); ++ni) {
                     const auto& p = t.chain[ni];
                     if (p.type != "vst3" || p.bypass) continue;
-                    if (opts.vst3_modules.find(p.uid) == opts.vst3_modules.end())
+                    const auto module_it = opts.vst3_modules.find(p.uid);
+                    if (module_it == opts.vst3_modules.end())
                         continue;  // not ours to render
                     if (t.clips.empty()) continue;  // no audio upstream
                     const std::string key = daw::render::computeStemKey(
-                        t, ni, snap.sample_rate);
+                        t, ni, snap.sample_rate,
+                        daw::render::moduleVersionTag(module_it->second));
                     if (key == p.stem_key) continue;  // fresh
                     auto stem = daw::render::renderTrackStem(
                         snap, t.id, p.id, opts.assets_dir,

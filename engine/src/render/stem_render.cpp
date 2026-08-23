@@ -5,6 +5,7 @@
 #include "../document/automerge_document.h"
 #include "../util/sha256.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -14,15 +15,47 @@ namespace fs = std::filesystem;
 
 namespace daw::render {
 
+std::string moduleVersionTag(const std::string& module_path) {
+    static std::map<std::string, std::string> cache;
+    auto it = cache.find(module_path);
+    if (it != cache.end()) return it->second;
+
+    std::string tag;
+    std::error_code ec;
+    std::vector<char> all;
+    const auto slurp = [&](const fs::path& p) {
+        std::ifstream f(p, std::ios::binary);
+        all.insert(all.end(), std::istreambuf_iterator<char>(f),
+                   std::istreambuf_iterator<char>());
+    };
+    if (fs::is_directory(module_path, ec)) {
+        // Bundle: walk in SORTED order so the tag is path-stable
+        std::vector<fs::path> files;
+        for (auto& e : fs::recursive_directory_iterator(module_path, ec)) {
+            if (e.is_regular_file(ec)) files.push_back(e.path());
+        }
+        std::sort(files.begin(), files.end());
+        for (const auto& p : files) slurp(p);
+    } else if (fs::is_regular_file(module_path, ec)) {
+        slurp(module_path);
+    }
+    if (!all.empty()) {
+        tag = daw::util::sha256Hex(all.data(), all.size());
+    }
+    cache[module_path] = tag;
+    return tag;
+}
+
 std::string computeStemKey(const document::TrackDef& track,
                            size_t node_index,
-                           uint32_t sample_rate) {
+                           uint32_t sample_rate,
+                           const std::string& module_version_tag) {
     // Canonical, order-stable text over every INPUT of the render.
     // A changed key = a stale stem (UI state, never a playback block).
     std::ostringstream k;
     k << "stem-v1|sr=" << sample_rate;
     const auto& node = track.chain[node_index];
-    k << "|uid=" << node.uid << "|ver=";  // plugin version: dated debt
+    k << "|uid=" << node.uid << "|ver=" << module_version_tag;
     k << "|state=" << node.state_hash << ":" << node.state_version;
     for (const auto& c : track.clips) {
         k << "|clip=" << c.asset_hash << "," << c.start_sample << ","
@@ -127,7 +160,11 @@ StemRenderResult renderTrackStem(const document::ProjectDef& project,
         return out;
     }
 
-    out.stem_key = computeStemKey(*track, node_index, project.sample_rate);
+    const auto module_it = vst3_modules.find(track->chain[node_index].uid);
+    out.stem_key = computeStemKey(
+        *track, node_index, project.sample_rate,
+        module_it != vst3_modules.end() ? moduleVersionTag(module_it->second)
+                                        : std::string());
     out.latency_samples = 0;  // offline sync path: no pipeline depth
     out.success = true;
     return out;

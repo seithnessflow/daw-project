@@ -617,6 +617,20 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          code mort/hygiene web/discipline de test) — declencheurs dans
          AUDIT-4.md.
 
+## ORDRE POST-S7 (revue externe consignee 2026-08-23, execution en
+## cours) : 1. push+CI S7 [fait 92abe0d] ; 2. CONTRE-CONTROLES du
+## test (sans-stem = refus bruyant assert, stem corrompu = jamais un
+## faux vert assert ; cle desaccordee JOUE par design arbitre) ;
+## 3. version du plugin dans la cle (= sha256 du BINAIRE du module,
+## bundles marches tries) + purge default.am [fait, backup
+## .junk-1246tracks.bak] ; 4. SMOKE S7 DEUX MACHINES (le vert du
+## critere 6, premiere session portable) ; 5. PDC lecteur + badge
+## fraicheur ; 6. streaming jam (c'est LUI qu'on coupe s'il deborde).
+## Rappel de la revue : la preuve est calibree sur le plugin le plus
+## gentil du monde — latence nulle, etat minuscule, deterministe,
+## sans GUI : quatre endroits ou le premier vrai plugin cassera.
+## Chaque contact avec le reel vaut dix sessions de construction.
+
 - [x] STEMS S7 — LE JALON PROUVE 2026-08-23, le meme soir :
       testStemInvariant = machine B SANS AUCUN module rend le document
       OCTET POUR OCTET comme la machine A qui a AGain (stem float32
