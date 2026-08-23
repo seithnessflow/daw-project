@@ -1,26 +1,38 @@
 /* ================================================================
-   Design pass (2026-08-22): minimal, flat, dense — the Ableton
-   lesson. One radius (3px), no decorative borders (hairlines and
-   fill shades carry structure), a 4px spacing rhythm, tabular
-   numerals, color reserved for STATE and CONTENT.
+   Design system v2 — REFONTE PROGRESSIVE, tranche 1 (2026-08-23,
+   directive utilisateur). Kept from the 2026-08-22 pass: minimal,
+   flat, dense; one radius; hairlines and fills carry structure;
+   color reserved for STATE and CONTENT.
+   New in v2: a warm near-black depth ramp (surfaces read as LAYERS,
+   not gray boxes), brighter content text vs dimmer chrome, a potion
+   VIOLET as the brand/selection accent beside the amber of state,
+   and buttons with true relief (hairline + inner light).
    ================================================================ */
 * {
   box-sizing: border-box;
 }
 :root {
-  --bg: #131313;
-  --surface: #1b1b1b;
-  --surface-2: #212121;
-  --surface-3: #282828;
-  --hair: rgba(255, 255, 255, 0.05);
-  --text: #cfcfcf;
-  --text-2: #8f8f8f;
-  --text-3: #5f5f5f;
+  /* Depth ramp: warm near-black, one step per layer */
+  --bg: #101012;
+  --surface: #18181b;
+  --surface-2: #1f1f23;
+  --surface-3: #27272c;
+  --surface-4: #303036;
+  --hair: rgba(255, 255, 255, 0.06);
+  --hair-strong: rgba(255, 255, 255, 0.12);
+  /* Text: content bright, chrome dim */
+  --text: #dcdcdf;
+  --text-2: #97979d;
+  --text-3: #63636a;
+  /* State colors (unchanged roles) */
   --amber: #d9a441;
   --green: #58b368;
   --blue: #4f8fd0;
   --orange: #cf8a3c;
   --red: #d05548;
+  /* v2: the potion accent - brand and selection moments only */
+  --potion: #8d7ae6;
+  --potion-dim: rgba(141, 122, 230, 0.35);
   --r: 3px;
 }
 html,
@@ -30,7 +42,11 @@ body {
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-size: 12px;
-  background: var(--bg);
+  /* Subtle vignette: the stage is lit from the work area */
+  background:
+    radial-gradient(ellipse 120% 90% at 50% 0%,
+      rgba(141, 122, 230, 0.045), transparent 55%),
+    var(--bg);
   color: var(--text);
   margin: 0;
   padding: 10px 14px 0;
@@ -44,14 +60,23 @@ body {
 button {
   font: inherit;
   color: var(--text);
-  background: var(--surface-3);
+  background: linear-gradient(rgba(255, 255, 255, 0.03), transparent),
+    var(--surface-3);
   border: 0;
+  box-shadow: inset 0 0 0 1px var(--hair);
   border-radius: var(--r);
   cursor: pointer;
   padding: 5px 12px;
+  transition: background-color 90ms ease, box-shadow 90ms ease;
 }
 button:hover {
-  background: #323232;
+  background: linear-gradient(rgba(255, 255, 255, 0.05), transparent),
+    var(--surface-4);
+  box-shadow: inset 0 0 0 1px var(--hair-strong);
+}
+button:active {
+  background: var(--surface-2);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 button:disabled {
   opacity: 0.35;
@@ -59,16 +84,26 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible {
-  outline: 1px solid var(--amber);
+  outline: 1px solid var(--potion);
   outline-offset: 1px;
 }
+::selection {
+  background: var(--potion-dim);
+}
 ::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+  height: 9px;
+  width: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
+  background: var(--surface-4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #46464e;
+  background-clip: content-box;
+  border: 2px solid transparent;
 }
 ::-webkit-scrollbar-track {
   background: transparent;

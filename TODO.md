@@ -15,6 +15,25 @@ seed, VST2, mobile. Details : plan approuve du 2026-08-23 (designs
 challenges : wrap sample-accurate par sous-bloc, master dans
 AudioGraph::process, undo par descripteurs types + groupes).
 
+## REFONTE PROGRESSIVE DU SITE (directive utilisateur 2026-08-23 :
+## « le site devrait etre refait completement au fur et a mesure »)
+
+En PARALLELE du programme : chaque session livre une tranche VISIBLE
+de refonte UI, directement observable dans l'onglet ouvert (HMR).
+Regles inchangees (boucle snap/grille, invariants Playwright verrouilles
+avant refonte, trace visuelle par tranche). Ordre des tranches :
+1. [ ] FONDATION VISUELLE : systeme de couleurs/typo/espacements
+       (tokens CSS), lisibilite generale — la tranche qui change la
+       perception de tout le reste.
+2. [ ] TOPBAR + TRANSPORT : hierarchie claire (transport | master |
+       horloge | statuts), etats visibles.
+3. [ ] ZONE PISTES : headers de piste, clips (waveforms, selection,
+       fades), regle temporelle.
+4. [ ] PANNEAU DEVICES : chaine lisible, etat/badges, add/remove.
+5. [ ] PALETTE/KIT + OVERLAYS (aide, starter, messages d'etat).
+6. [ ] MICRO-INTERACTIONS : hover/focus/transitions, coherence des
+       curseurs, feedbacks de geste.
+
 ## TRANCHE 3 — LE DIFFERENCIATEUR (ADR-019, recadrage 2026-08-23)
 
 L'invariant : un pair sans le plugin entend le resultat du plugin.
