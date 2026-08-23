@@ -238,10 +238,15 @@ export function analyze(wav) {
   }
 
   const truePeakDb = dbfs(truePeak);
+  const silenceRatio = Math.round((silent / nWin) * 1000) / 1000;
   const reasons = [];
   if (truePeakDb > -1) reasons.push(`true peak ${truePeakDb.toFixed(1)} dBFS > -1 dBFS`);
   if (clipped > 0) reasons.push(`${clipped} clipped samples`);
   if (discontinuities > 0) reasons.push(`${discontinuities} discontinuities (max jump ${maxJump.toFixed(3)})`);
+  // TOTAL silence is RED by principle (lesson 2026-08-23: a 48 s silent
+  // render came out green - a proof tool that validates emptiness
+  // retroactively invalidates every verdict it ever gave).
+  if (silenceRatio >= 0.999) reasons.push('render is TOTAL SILENCE - a silent proof proves nothing');
 
   return {
     sample_rate: sampleRate,
@@ -257,7 +262,7 @@ export function analyze(wav) {
     periodic_edges: periodicEdges,
     max_jump: Math.round(maxJump * 1000) / 1000,
     clipped_samples: clipped,
-    silence_ratio: Math.round((silent / nWin) * 1000) / 1000,
+    silence_ratio: silenceRatio,
     verdict: { ok: reasons.length === 0, reasons },
   };
 }

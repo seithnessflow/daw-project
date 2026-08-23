@@ -112,9 +112,27 @@ export async function init(): Promise<void> {
   };
 
   // ---- Engine (telemetry + transport) -------------------------------------
-  const engineToken =
-    new URLSearchParams(window.location.search).get('token') ?? '';
+  // 1pre token resolution: FRAGMENT first (never leaves the browser -
+  // logs/Referer safe, the engine-launch path), legacy query second,
+  // then the local endpoint (zero-paste: "j'ouvre le site, ca marche").
+  const fragTok = new URLSearchParams(
+    window.location.hash.replace(/^#/, '')).get('token');
+  const queryTok = new URLSearchParams(window.location.search).get('token');
+  const fetchLocalToken = async (): Promise<string | null> => {
+    try {
+      const r = await fetch(`/api/engine-token?port=${ENGINE_PORT}`);
+      if (!r.ok) return null;
+      return (await r.json()).token ?? null;
+    } catch {
+      return null;
+    }
+  };
+  let engineToken = fragTok ?? queryTok ?? '';
+  if (!engineToken) engineToken = (await fetchLocalToken()) ?? '';
   const engineClient = new EngineClient({ port: ENGINE_PORT, token: engineToken });
+  // 4001 (stale token, e.g. engine restarted) -> re-fetch and retry ONCE,
+  // silently - the rule written the day the harness tripped on it.
+  engineClient.tokenRefresher = fetchLocalToken;
   ctx.engineClient = engineClient;
   engineClient.onConnect = () => {
     els.engineStatus.classList.add('connected');
@@ -278,6 +296,7 @@ export async function init(): Promise<void> {
     }
     // Lane click (unarmed): select the track AND set the insert marker
     // (Ableton: one click, two effects). Deselects any selected clip.
+    const hadSelectedClip = ctx.selectedClipId !== null;
     ctx.selectedClipId = null;
     if (lane) {
       const x = e.clientX - lane.getBoundingClientRect().left;
@@ -288,6 +307,11 @@ export async function init(): Promise<void> {
     }
     if (id !== ctx.selectedTrackId) {
       ctx.selectedTrackId = id;
+      renderTracks(true);
+    } else if (hadSelectedClip) {
+      // Session B fix: same track, but a clip WAS selected - without
+      // this re-render its aria-selected stayed on screen (lying
+      // visual, Delete inert) - AUDIT-4 A4-18.
       renderTracks(true);
     }
   });

@@ -186,6 +186,16 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
       setTimeout(() => { ctx.justDragged = false; }, 0);
       flushBounds();
       renderTracks(true);
+    } else {
+      // A plain click on an edge SELECTS the clip, exactly like the
+      // title bar. Session B fix: this branch did not exist, so a tiny
+      // clip (entirely covered by its 6px edges) could NEVER be
+      // selected - and Delete silently did nothing.
+      ctx.selectedClipId = clipId;
+      ctx.selectedTrackId = trackId;
+      ctx.justDragged = true;
+      setTimeout(() => { ctx.justDragged = false; }, 0);
+      renderTracks(true);
     }
   };
   window.addEventListener('pointermove', onMove);

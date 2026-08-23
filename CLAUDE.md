@@ -159,6 +159,25 @@ Interdit:
   responsabilite. Un fichier qui grossit se remanie sans hesiter ; le
   harnais de contrats est la pour ca.
 
+## Regle d'ergonomie gravee (session B, 2026-08-23)
+
+**Une cible cliquable plus petite que ses propres poignees est
+inatteignable.** Toute surface enfant (poignee de resize, zone de grab)
+doit laisser un chemin de selection au clic simple — la branche
+« clic sans mouvement » existe pour CHAQUE poignee, jamais implicite.
+Cette classe de bug se reproduira sur les fades, l'automation, les
+marqueurs : verifier a chaque nouvelle poignee introduite.
+**Corollaire (2e passe, meme jour) : une action qui produit plusieurs
+effets doit les montrer TOUS** — un effet de bord non annonce est la
+cause du sentiment que le logiciel agit tout seul (precedent : le clic
+de couloir a trois effets, aucun annonce).
+
+## Trace visuelle (demande utilisateur 2026-08-23, habitude)
+
+Toute seance qui touche l'UI livre sa TRACE VISUELLE avec le resultat :
+capture a chaque geste significatif (page.screenshot) ou enregistrement
+(gif). L'utilisateur juge l'interface sur la trace, pas sur le recit.
+
 ## Outillage UI/audio — les yeux et l'oreille (chantier UI)
 
 Boucle permanente : modifier (petit lot, hot-reload) -> `npm run snap` ->
@@ -186,6 +205,18 @@ Les deux gestes de la boucle complete (consignes 2026-08-22) :
   demander a l'utilisateur de lancer quoi que ce soit.
 
 ---
+
+## REGIME DE LIVRAISON (arbitrage utilisateur 2026-08-23 — prime sur tout)
+
+1. Chaque session se termine par une manip que l'utilisateur peut VOIR
+   ou ENTENDRE en 5 min avec une consigne d'une ligne — pas un rapport,
+   pas une CI verte. Session qui ne peut pas : le dire A L'OUVERTURE et
+   proposer un decoupage qui le permet.
+2. Boucle de bug bornee a DEUX sessions. Au-dela : stop, une phrase
+   sans jargon sur ce qui bloque, trois options chiffrees (contourner /
+   reparer proprement / abandonner la piste). L'utilisateur tranche.
+3. ZERO audit, zero fusion de docs, zero passe de coherence tant que la
+   tranche 3 n'a pas produit du code qui tourne.
 
 ## RÉGIME DE SESSION — économe, fluide, sans temps mort
 

@@ -117,8 +117,14 @@
   cursor: grabbing;
 }
 .clip[aria-selected='true'] {
-  outline: 1px solid rgba(255, 255, 255, 0.8);
+  /* Session B: the 1px outline was invisible on a 1.4px-wide clip. The
+     halo makes selection readable at ANY clip width - Delete must never
+     act on a selection the eye cannot see. */
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22), 0 0 10px rgba(255, 255, 255, 0.35);
   filter: brightness(1.18);
+  z-index: 3;
 }
 .clip-edge {
   position: absolute;

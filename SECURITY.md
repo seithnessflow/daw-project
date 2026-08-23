@@ -36,6 +36,11 @@ et suivi dans TODO.md.*
 
 - **C2 (moitie distante)** : secret partage pour un VRAI pair distant
   (aujourd'hui client natif sans Origin = exempt) — a faire au 1er pair.
+  NOTE 1bis (2026-08-23) : `DAW_SERVER_BIND=0.0.0.0` existe pour le
+  smoke deux machines — sur un bind non-loopback, tout processus du LAN
+  est un « client natif » exempt avec acces complet aux projets. Le
+  defaut RESTE loopback ; l'ouverture est un opt-in de test sur reseau
+  prive, jamais un mode de production tant que C2-distant n'est pas fait.
 - **H2 (reste)** : sortir le parse Automerge de dessous store_lock (ou
   le borner davantage).
 - **H3** (session dediee) : fichiers token + `.shm` owner-only + O_EXCL

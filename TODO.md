@@ -22,6 +22,92 @@ dedouble). Ordre :
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
        declencheront en premier).
+0pre. [~] ARBITRAGE POST-SEANCE-MUSIQUE (2026-08-23, compte-rendu de la
+       premiere seance utilisateur complete — 203 clips, AGain, rendu
+       48 s). ORDRE RE-ARBITRE 2026-08-23 (2e passe utilisateur) :
+       A -> B -> 1pre -> 1bis, PUIS C et D. Raison ecrite : ni C ni D
+       ne rapprochent deux machines l'une de l'autre, et le smoke
+       apprendra des choses qui touchent au modele — a connaitre AVANT
+       de coder duplicate.
+       A. [x] EAR-VERITE — FAIT 2026-08-23 : l'oreille avait dit VERT sur
+          48 s de silence total. Deux corrections : ear resout les
+          assets depuis le STORE du serveur (aujourd'hui il ne lit que
+          engine/test-assets -> tout projet fait d'assets droppes rend
+          muet) ; et silence integral = ROUGE PAR PRINCIPE (garde-fou
+          au self-test CI). Un outil de preuve qui valide du vide
+          invalide retroactivement ses verdicts. FAIT : staging par
+          hash depuis server/assets (fallback test-assets, manquant =
+          refus bruyant) + self-test 6 (silence rouge, piece eparse
+          verte). Preuve : ma-piece muet-vert -> son-vert, copies de
+          contournement retirees avant preuve. CI verte (run
+          32641506712, commit adbd7a0).
+       B. [x] SUPPRESSION DE CLIP + ETAT DE SELECTION — FAIT
+          2026-08-23. Cause trouvee : un clic SANS mouvement sur une
+          poignee de bord ne selectionnait RIEN (branche absente dans
+          beginClipResize) — et un clip minuscule (hat 0,07 s = 1,4 px)
+          est ENTIEREMENT couvert par ses poignees : selection
+          impossible, Suppr inerte, silencieux. Correctifs : clic sur
+          poignee = selection (symetrique du bandeau) ; deselection au
+          clic-couloir re-rend (le visuel ne ment plus, A4-18 solde) ;
+          halo de selection lisible a toute largeur (2 px l'etait pas).
+          Garde : clip-selection.spec (5 invariants : selection bandeau,
+          selection poignee, deselection visible, Delete agit DOM+doc,
+          Delete sans selection = no-op heads stables). Suite 16/16.
+          Trace visuelle livree (halo prouve sur un clip de 2 px).
+       C. [ ] RENDRE VISIBLE (perimetre FINAL arbitre 2026-08-23,
+          3e passe — session UNIQUE et BORNEE, APRES 1pre et 1bis,
+          pas avant). Constat acte : le DAW est plus capable qu'on ne
+          le croyait (16 capacites cachees, JOURNAL), rien n'en est
+          visible. Contenu, dans l'ordre de valeur :
+          1. DESSINER LA GRILLE DE SNAP, y compris son raffinement au
+             zoom — une regle invisible et variable est pire que pas
+             de regle.
+          2. RENDRE VISIBLES LES TROIS EFFETS du clic de couloir
+             (selection piste + marqueur d'insertion + pause Follow) —
+             pas de la decouvrabilite : un effet de bord non annonce,
+             la cause du « logiciel qui agit tout seul ».
+          3. LEGENDER les quatre glyphes nus (⇥, A, B, C) + une aide
+             raccourcis (?) listant les huit touches.
+          TOUT LE RESTE de l'inventaire ATTEND. Pas de refonte d'UI,
+          pas de lecture Ableton : les capacites existent, il s'agit
+          de les montrer.
+       D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
+          trou le plus visible du chemin produit, et c'est le chemin
+          du differenciateur.
+       Le reste de la liste ATTEND (fades = candidats au degel, PAS
+       degeles ; grille, master meter, renommage, tempo).
+1pre. [x] MECANISME DE LIVRAISON DU TOKEN — FAIT 2026-08-23 (etage
+       dev, suffisant pour 1bis ou chaque machine porte sa stack) :
+       resolution FRAGMENT (#token, lancements moteur/daw.ps1) ->
+       query (legacy) -> endpoint local /api/engine-token (vite
+       middleware lit %TEMP%, la page ne peut pas ; pas de CORS =
+       illisible cross-origine, LNA par-dessus). REGLE 4001 CABLEE :
+       token refuse -> re-fetch + UNE retentative silencieuse (marche
+       apres un RESTART moteur reel, sans recharger l'onglet). Garde :
+       token-zero-paste.spec (2 invariants : pastille verte sans aucun
+       token dans l'URL ; recovery 4001 apres kill+restart moteur).
+       RESTE (production, quand le site sera distant — date, pas
+       bloquant pour 1bis) : le moteur sert le token lui-meme
+       (Origin-gate) OU lancement-fragment seul ; consigne ADR-019.
+       (item d'origine : a trancher AVANT 1bis —
+       decouvert par le 4001 accidentel du harnais LNA 2026-08-23) :
+       une page servie d'un domaine distant ne peut pas lire
+       %TEMP%\daw-engine-token-<port>. Option de tete (reviewer
+       2026-08-23) : le moteur ouvre le navigateur avec le token en
+       FRAGMENT d'URL (#token=..., JAMAIS en query : la query part
+       dans les logs du tunnel, l'historique et le Referer — le
+       fragment ne quitte jamais le navigateur). Alternatives a peser :
+       endpoint local servi par le moteur apres permission LNA ;
+       handler de protocole. Bloque « j'allume mon
+       ordi, je vais sur mon site » ; sur deux machines le probleme est
+       double. + REGLE gravee : close 4001 (token perime, ex. moteur
+       redemarre) -> l'onglet re-recupere le token et retente UNE fois,
+       sans rien demander a l'humain (signature distincte de 1006,
+       prouvee). + Onboarding non destructif : permissions.query
+       ('local-network-access'/'local-network', Chrome 151) lisible ->
+       etape guidee AVANT toute tentative, jamais d'invite surprise ;
+       feature-detection OBLIGATOIRE (les deux noms + le chemin
+       TypeError : Firefox/Safari sans API = heuristique de secours).
 1bis. [ ] SMOKE DEUX MACHINES (hoiste 2026-08-23, retour reviewer :
        ne pas re-commettre l'erreur qu'on vient de corriger — valider
        l'hypothese qui porte tout AVANT de construire dessus) : deux
@@ -58,6 +144,26 @@ dedouble). Ordre :
        projet — E2E reel (le serveur gagne au passage son avenir
        explicite : identites, projets heberges, invitations, signaling
        — etat provisoire assume, plus une loi de design).
+
+7. [ ] L'INSTRUMENT JOUABLE (avis reviewer consigne 2026-08-23 —
+       APRES 1bis, jamais avant : ne rapproche pas l'invariant).
+       Le raccourci qui decoule d'ADR-002 : jouer des notes en direct =
+       PERFORMANCE, pas document — note-on/note-off sur le canal WS
+       moteur existant (meme sang que bypass/solo/transport), zero
+       CRDT, zero clip MIDI. Demo « j'ouvre le site, je clique, un
+       synthe natif sonne ». Prerequis deja dans la tranche : D
+       (bouton device), 2.5-etat, decouverte ; manque propre a lui :
+       config de bus INSTRUMENT (l'hote ne sait faire que des effets),
+       et les events note dans le ring (couvert si la file A3-1 est
+       GENERIQUE — voir note ordre 3). REFUS ECRIT : VST2 (Massive
+       classique) — hote VST3 exclusif, SDK VST2 plus distribue ;
+       banc d'essai : synthe VST3 libre (Surge XT, GPL comme nous ;
+       Dexed). La GUI du plugin = fenetre native a cote du navigateur,
+       choix de design a trancher a ce moment-la.
+       LES CLIPS MIDI DANS LE DOCUMENT (notes persistantes, editables,
+       convergentes) = l'autre moitie, un VRAI morceau de schema : se
+       pense AVEC la session placement (SCHEMA v2, item 2 ci-dessus),
+       pas apres — sinon on dessine deux fois.
 
 Les ordres AUDIT-4 items 3-4 (ring, cycle de vie enfants) restent des
 fondations de l'hote que les stems rendront ; items 5-6 inchanges.
@@ -325,7 +431,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          plugin a n params perd n-1 params a chaque rebuild. File SPSC
          de paires {id, value} dans le segment, moule CommandRingBuffer.
          Session courte, test : 2 params envoyes coup sur coup, les 2
-         appliques.
+         appliques. DECISION D'ENTREE (2026-08-23, instrument jouable
+         en vue) : la file est GENERIQUE — evenements {type, id, value}
+         (type: param aujourd'hui, note-on/off demain) — pour que les
+         notes de l'instrument s'y branchent sans re-bump de layout.
       3. [ ] A3-2+A3-3 CONTRAT DE PERIODE (une session) : depth clampee
          en silence a 2 (TODO promettait « buffer 1024 -> 4 blocs » —
          phrase fausse, famille des 47 runs) + bloc partiel (periode non
@@ -486,6 +595,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       - Identites (actorId <-> compte) : prerequis presence/IA, tranche 3+.
       - Discord : integrer (Rich Presence, webhook), jamais construire.
         Tranche 3+.
+      - VCV Rack en natif (note 2026-08-23, sans l'ouvrir) : open
+        source, installable par tous -> terrain d'essai ideal pour le
+        partage de chaine. APRES l'invariant, pas avant ; pour tester
+        le differenciateur, un VST3 gratuit quelconque suffit.
 
 - [ ] COHERENCE (audit 2026-08-22) — split-rule et jumeaux restants :
       a. [x] buildGraph : noyau partage (makeClipPlayer/makeGainNode dans

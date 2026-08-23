@@ -69,7 +69,17 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    // 1bis (two machines): bind address opt-in via DAW_SERVER_BIND
+    // (e.g. 0.0.0.0 for the LAN smoke). DEFAULT STAYS LOOPBACK: on
+    // 0.0.0.0 any LAN process is a "native client" (no Origin header,
+    // exempt by design) with full project access - the C2-remote debt
+    // (shared secret for real remote peers) becomes LIVE the day this
+    // is exposed beyond a trusted network. Recorded in SECURITY.md.
+    let bind_ip: std::net::IpAddr = std::env::var("DAW_SERVER_BIND")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| std::net::IpAddr::from([127, 0, 0, 1]));
+    let addr = SocketAddr::from((bind_ip, port));
     tracing::info!("Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

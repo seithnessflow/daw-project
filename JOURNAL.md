@@ -207,6 +207,118 @@ affiche « Failed to fetch » meme quand le reseau passe — defaut de la
 page de test consigne. Reste 30 s de mains : refus/memoire/annulation.
 Observation : le moteur ne loggue pas les connexions acceptees.
 
+**2026-08-23 (campagne LNA automatisee — l'oracle temporel) :** sur
+directive du reviewer, tout l'automatisable a ete automatise (Playwright
+sur le VRAI Chrome 151, profils vierges). L'oracle : etat prompt +
+tentative qui PEND = invite affichee ; echec immediat = subit sans
+pouvoir demander ; succes immediat = non soumis. Verdicts : fetch ET
+WebSocket pendent tous deux (soumis au LNA, savent demander — le pire
+cas est ecarte) ; ZERO GESTE viable (connexion au chargement declenche
+l'invite) ; permissions.query lisible en reel ; AUTH OK de bout en bout
+quand permis ; 4001 sur token perime (signature distincte). Prealable
+pose en route : --keepalive au moteur (le doc de 600 s tuait la stack
+de test en plein run — une passe entiere perdue avant le correctif ;
+mode fichier boucle via seek(0), API lock-free existante). Lecons de
+methode payees : CDP setPermission = accepte mais no-op (deny non
+automatisable) ; les captures d'ecran/entrees OS pendant que
+l'utilisateur se sert de la machine capturent SA fenetre — approche
+abandonnee, captures supprimees ; la ligne « latences identiques » de
+R1 est RETIREE (runs contamines par l'invite en attente). Inconnus
+dates (documentation, pas bloquants) : texte de l'invite, semantique
+dismissal/refus explicite, memorisation, FF/Safari. Reste UN geste
+humain : le sceau vert (AUTH OK) dans le navigateur de l'utilisateur.
+
+**2026-08-23 (seance musique — premiere utilisation complete en
+utilisateur) :** un morceau de 48 s (ma-piece.wav, 5 pistes, 203 clips
+poses par l'UI, AGain sur la kick regle a 0,72 par le slider UI, bypass
+A/B mesure a -2,85 dB exact, rendu vert -2,82 dBFS). Moisson : le
+compte-rendu de friction (pas de duplication de clips = gene n.1 et
+ABSENTE de la roadmap ; add/remove device inexistant dans l'UI ;
+suppression de clip qui echoue en silence ; ear muet sur les assets du
+store ET vert sur 48 s de silence ; pas d'export UI ; 20 px/s sans
+zoom ; lecture sans fin ; pas de renommage). Arbitrage utilisateur :
+ordre A (ear-verite) -> B (suppression/selection) -> C (lecture Ableton
+duplicate -> modele) -> D (add/remove device), puis 1pre/1bis. Habitude
+gravee : trace visuelle a chaque seance UI. VCV Rack note en piste
+future (apres l'invariant).
+
+**2026-08-23 (session A — ear-verite) :** l'oreille resout desormais
+les assets depuis le STORE du serveur (staging par hash, test-assets en
+secours, asset manquant = REFUS bruyant, plus jamais du silence) ; et
+le silence integral est ROUGE PAR PRINCIPE (self-test 6 : silence pur
+rouge avec raison nommee, piece eparse reste verte). Preuve : ma-piece
+rendait muet-vert, elle rend maintenant son-vert sans aucune copie
+manuelle. La lecon du hash-de-silence, soudee cote outillage.
+
+**2026-08-23 (session B — la selection ne ment plus) :** cause du
+Suppr-inerte de la seance musique trouvee : un clic sans mouvement sur
+une poignee de bord ne selectionnait rien (branche absente), et un clip
+minuscule est entierement couvert par ses poignees — selection
+impossible en silence. Correctifs : clic-poignee = selection,
+deselection re-rendue (A4-18 solde), halo lisible a toute largeur.
+Garde clip-selection.spec (5 invariants), suite 16/16, trace visuelle
+sur un clip de 2 px. Decouvertes en route : Ctrl+D duplicate et zoom
++/- EXISTENT deja, caches — la fonctionnalite sans affordance ;
+consigne comme intrant de la session C.
+
+**2026-08-23 (inventaire de l'invisible — ce que le code sait faire et
+que l'interface ne montre pas, 30 min, liste sans corrections) :**
+CLAVIER : Delete/Backspace (supprime le clip selectionne) ; Ctrl+D
+(duplique sur le pas de grille suivant, selection sur la copie) ;
+Espace (play/stop — seul raccourci annonce quelque part, par daw.ps1) ;
++/- (zoom centre) ; W (fit all) ; H (pistes compactes) ; Z (zoom 8 s
+autour du marqueur, pile) / X (pop retour, a la Ableton) ; Ctrl+molette
+(zoom au curseur). GESTES : Alt pendant drag/resize = snap desactive ;
+snap a grille RAFFINEE par le zoom (0,5 -> 0,0625 s selon pps) + snap
+aux bords des voisins (8 px) — aucune grille dessinee nulle part ;
+trim par la poignee gauche = head-trim (offset preserve) ; double-clic
+sur l'overview = fit all ; molette/scroll simple = pause du Follow
+(reprise : bouton ⇥, lui-meme un glyphe nu). CLICS : clic couloir non
+arme = selection piste + POSE LE MARQUEUR D'INSERTION + pause Follow
+(un clic, trois effets, rien ne le dit) ; re-clic sur le chip arme =
+desarme. BOUTONS NUS : ⇥ (follow), A/B/C (prototypes touch — trois
+lettres sans legende). URL : ?project= (seul moyen de changer/creer un
+projet), ?lab=1 (KIT harnais), ?starter=1. Bilan : 16 capacites sans
+affordance — la session C devient « rendre decouvrable », plus rien a
+concevoir. REGLE GRAVEE dans CLAUDE.md : une cible plus petite que ses
+propres poignees est inatteignable (fades/automation/marqueurs :
+verifier a chaque poignee).
+
+**2026-08-23 (session 1pre — le token sans copier-coller) :** le geste
+fondateur « j'ouvre le site, ca marche » tient au niveau dev :
+resolution fragment -> query legacy -> endpoint local /api/engine-token
+(le serveur de dev lit %TEMP%, la page ne peut pas ; reponse illisible
+cross-origine faute de CORS, LNA par-dessus). La regle 4001 est cablee
+et PROUVEE sur un restart moteur reel : token perime -> re-fetch + une
+retentative silencieuse, l'onglet reverdit sans rechargement. daw.ps1
+passe au fragment (M4 attenue : le token ne voyage plus en query).
+Garde : token-zero-paste.spec. Le chemin site-distant (moteur qui sert
+son token Origin-gate, ou lancement-fragment seul) reste date dans
+TODO/ADR-019 — non bloquant pour 1bis.
+
+**2026-08-23 (preparation 1bis — les deux verrous sautent) :** le
+serveur peut ecouter au-dela du loopback (DAW_SERVER_BIND, defaut
+loopback conserve, note de securite gravee : bind ouvert = tout le LAN
+est client natif exempt, C2-distant devient vivant) ; le web accepte
+?server=<hote:port|url> et l'adresse HTTP des assets en derive (jumeau
+SERVER_HTTP de waveform.ts tue — une seule source). Garde :
+server-param.spec. Suite 18/18. Verdicts CI : 1pre VERT (run
+32642816909, build+e2e) ; B couvert par inclusion par ce meme run (son
+propre run suspendu sur une anomalie de runner, job e2e >50 min).
+Terrain du smoke : le portable de l'utilisateur — phase 1 meme reseau
+(IP LAN + regle firewall), phase 2 deux reseaux via partage de
+connexion telephone + tunnel cloudflared vers :3000 (wss).
+
+**2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
+l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
+« NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie
+(13 octets) a 23 ms. Formulation gravee au critere : l'acces au moteur
+local depuis une origine HTTPS publique fonctionne sur Chrome 151/
+Windows 11, sous reserve d'autorisation utilisateur, avec etat lisible
+par API. Les inconnus restent dates (texte de l'invite, dismissal,
+refus explicite, memorisation, FF/Safari). Cap suivant : 1pre
+(mecanisme du token) puis 1bis (smoke deux machines).
+
 **2026-08-23 (retour du pair reviewer sur l'execution, consigne le jour
 meme) :** verdict LNA requalifie ⚠️ TIENT SOUS CONDITIONS (le mecanisme
 est la carve-out loopback — le tunnel n'a servi que la page, l'URL WS
