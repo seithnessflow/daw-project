@@ -492,6 +492,24 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                             }
                                             if (cr) AMresultFree(cr);
 
+                                            // 2.5-etat: additive (absent = none)
+                                            cr = AMmapGet(doc_, procObjId, AMstr("stateHash"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &sv)) {
+                                                proc.state_hash.assign(
+                                                    reinterpret_cast<const char*>(sv.src), sv.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, procObjId, AMstr("stateVersion"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                int64_t versionVal = 0;
+                                                if (AMitemToInt(AMresultItem(cr), &versionVal)) {
+                                                    proc.state_version = versionVal;
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
+
                                             cr = AMmapGet(doc_, procObjId, AMstr("params"), nullptr);
                                             if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
                                                 const AMobjId* paramsId = AMitemObjId(AMresultItem(cr));
@@ -715,6 +733,108 @@ bool AutomergeDocument::setMasterGain(float gain) {
     return ok;
 }
 
+bool AutomergeDocument::setProcessorState(const std::string& track_id,
+                                          const std::string& node_id,
+                                          const std::string& state_hash,
+                                          int64_t state_version) {
+    // 2.5-etat. THE engine-authored field pair: only the machine that
+    // hosts the plugin can serialize its state. Navigation mirrors the
+    // reader (id-matched, never index-assumed).
+    if (!doc_) {
+        last_error_ = "No document loaded";
+        return false;
+    }
+
+    const auto readStr = [&](const AMobjId* obj, const char* key,
+                             std::string& out) {
+        AMresult* r = AMmapGet(doc_, obj, AMstr(key), nullptr);
+        bool ok = false;
+        AMbyteSpan sv;
+        if (r && AMresultStatus(r) == AM_STATUS_OK &&
+            AMitemToStr(AMresultItem(r), &sv)) {
+            out.assign(reinterpret_cast<const char*>(sv.src), sv.count);
+            ok = true;
+        }
+        if (r) AMresultFree(r);
+        return ok;
+    };
+
+    bool written = false;
+    AMresult* tracksResult = AMmapGet(doc_, AM_ROOT, AMstr("tracks"), nullptr);
+    if (tracksResult && AMresultStatus(tracksResult) == AM_STATUS_OK &&
+        AMitemValType(AMresultItem(tracksResult)) == AM_VAL_TYPE_OBJ_TYPE) {
+        const AMobjId* tracksId = AMitemObjId(AMresultItem(tracksResult));
+        const size_t numTracks = AMobjSize(doc_, tracksId, nullptr);
+        for (size_t i = 0; i < numTracks && !written; ++i) {
+            AMresult* trackResult = AMlistGet(doc_, tracksId, i, nullptr);
+            if (trackResult && AMresultStatus(trackResult) == AM_STATUS_OK &&
+                AMitemValType(AMresultItem(trackResult)) == AM_VAL_TYPE_OBJ_TYPE) {
+                const AMobjId* trackObj = AMitemObjId(AMresultItem(trackResult));
+                std::string tid;
+                if (readStr(trackObj, "id", tid) && tid == track_id) {
+                    AMresult* chainResult =
+                        AMmapGet(doc_, trackObj, AMstr("chain"), nullptr);
+                    if (chainResult && AMresultStatus(chainResult) == AM_STATUS_OK &&
+                        AMitemValType(AMresultItem(chainResult)) == AM_VAL_TYPE_OBJ_TYPE) {
+                        const AMobjId* chainId =
+                            AMitemObjId(AMresultItem(chainResult));
+                        const size_t numProcs = AMobjSize(doc_, chainId, nullptr);
+                        for (size_t j = 0; j < numProcs && !written; ++j) {
+                            AMresult* procResult =
+                                AMlistGet(doc_, chainId, j, nullptr);
+                            if (procResult &&
+                                AMresultStatus(procResult) == AM_STATUS_OK &&
+                                AMitemValType(AMresultItem(procResult)) ==
+                                    AM_VAL_TYPE_OBJ_TYPE) {
+                                const AMobjId* procObj =
+                                    AMitemObjId(AMresultItem(procResult));
+                                std::string pid;
+                                if (readStr(procObj, "id", pid) && pid == node_id) {
+                                    AMresult* r1 = AMmapPutStr(
+                                        doc_, procObj, AMstr("stateHash"),
+                                        AMstr(state_hash.c_str()));
+                                    AMresult* r2 = AMmapPutInt(
+                                        doc_, procObj, AMstr("stateVersion"),
+                                        state_version);
+                                    written = checkResult(r1, "set stateHash") &&
+                                              checkResult(r2, "set stateVersion");
+                                    if (r1) AMresultFree(r1);
+                                    if (r2) AMresultFree(r2);
+                                }
+                            }
+                            if (procResult) AMresultFree(procResult);
+                        }
+                    }
+                    if (chainResult) AMresultFree(chainResult);
+                }
+            }
+            if (trackResult) AMresultFree(trackResult);
+        }
+    }
+    if (tracksResult) AMresultFree(tracksResult);
+
+    if (!written) {
+        last_error_ = "setProcessorState: node not found (" + track_id + "/" +
+                      node_id + ")";
+    }
+    return written;
+}
+
+std::vector<uint8_t> AutomergeDocument::getLastLocalChange() {
+    std::vector<uint8_t> out;
+    if (!doc_) return out;
+    AMresult* r = AMgetLastLocalChange(doc_);
+    if (r && AMresultStatus(r) == AM_STATUS_OK) {
+        AMchange* change = nullptr;
+        if (AMitemToChange(AMresultItem(r), &change) && change) {
+            const AMbyteSpan bytes = AMchangeRawBytes(change);
+            out.assign(bytes.src, bytes.src + bytes.count);
+        }
+    }
+    if (r) AMresultFree(r);
+    return out;
+}
+
 bool AutomergeDocument::addTrack(const TrackDef& track) {
     if (!doc_) {
         last_error_ = "No document loaded";
@@ -845,6 +965,16 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
         }
         cr = AMmapPutBool(doc_, procObjId, AMstr("bypass"), proc.bypass);
         if (cr) results_to_free.push_back(cr);
+
+        // 2.5-etat: only written when present (additive field)
+        if (!proc.state_hash.empty()) {
+            cr = AMmapPutStr(doc_, procObjId, AMstr("stateHash"),
+                             AMstr(proc.state_hash.c_str()));
+            if (cr) results_to_free.push_back(cr);
+            cr = AMmapPutInt(doc_, procObjId, AMstr("stateVersion"),
+                             proc.state_version);
+            if (cr) results_to_free.push_back(cr);
+        }
 
         cr = AMmapPutObject(doc_, procObjId, AMstr("params"), AM_OBJ_TYPE_LIST);
         if (!cr || AMresultStatus(cr) != AM_STATUS_OK) {

@@ -543,3 +543,31 @@ pure, pas de manip utilisateur — elle arrive en session B (stateHash
 dans le document + store). CI V1.5 annulee (runner suspendu des
 heures ; verdict subsume par les runs verts 8c1671f et 71c2577,
 surensembles du code).
+
+**2026-08-23 (2.5-etat, session B — l'etat entre au document, et
+l'incident duo) :** la boucle complete du differenciateur cote etat
+VIT, prouvee sur la stack duo reelle : AGain ajoute depuis l'onglet
+(+ device) -> param via CRDT -> rebuild moteur -> capture DEBOUNCEE
+1 s apres la rafale -> sha256 du blob au store local + PUT au serveur
+-> setProcessorState (LE champ que le MOTEUR authore : seule la
+machine qui heberge le plugin peut serialiser son etat) -> change
+expedie -> badge « 480376c6 v1 » visible dans le panneau devices des
+deux cotes. Restauration : ensureVst3Child pose le blob AVANT le
+spawn (résolution par la route des assets : local, sinon store) ; un
+blob manquant = warning et defauts, jamais un spawn rate. Gardes :
+testProcessorStateInDocument (authoring, refus d'ids inconnus, bytes
+de change, save/load), moteur 27/27, e2e 29/29.
+L'INCIDENT QUI VAUT LA SESSION : en verifiant sur duo, pistes VIDES
+et silence — la GRAINE poussee par l'anti-entropie du premier contact
+avait cree un conflit LWW sur `tracks` du VIEUX projet, et la liste
+vide de la graine avait GAGNE le tirage (les 39 clips du duo eclipses,
+pas perdus — CRDT). Racine : le placeholder VIERGE n'a rien a pousser ;
+merger pour merger est une erreur. FIX : isPristineSeed() — au premier
+contact, un placeholder intact ADOPTE le doc serveur (load), la route
+merge+push est reservee aux VRAIES editions hors-ligne. REPARATION :
+re-election de la valeur perdante par reecriture de `tracks` (backup
+.pre-repair.bak) — duo rejoue ses 39 clips (peaks de retour, muets).
+Audit du parc : ma-piece INTACTE (203 clips, zero conflit), beat/beat2
+sains, default.am laisse en l'etat (son « perdant » est un monstre de
+1246 pistes de tests — la vue graine est plus saine). Les specs
+offline/criterion3/devices re-vertes apres le fix.

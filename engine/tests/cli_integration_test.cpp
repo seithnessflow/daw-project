@@ -2197,6 +2197,77 @@ bool testClipFadesRender() {
 }
 
 /**
+ * 2.5-etat: the state reference lives in the document. The ENGINE
+ * authors it (setProcessorState), it roundtrips through save/load,
+ * and getLastLocalChange yields shippable bytes another document can
+ * apply (the exact road to the server).
+ */
+bool testProcessorStateInDocument() {
+    std::cout << "Test: processor state in document (2.5-etat)... ";
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: create\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "state track";
+    daw::document::ProcessorDef proc;
+    proc.id = "p1";
+    proc.type = "vst3";
+    proc.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    track.chain.push_back(proc);
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack\n";
+        return false;
+    }
+
+    const std::string sha(64, 'a');
+    if (!doc.setProcessorState("t1", "p1", sha, 3)) {
+        std::cout << "FAILED: setProcessorState: " << doc.getLastError() << "\n";
+        return false;
+    }
+    // Unknown ids must refuse, loudly, without touching anything
+    if (doc.setProcessorState("t1", "nope", sha, 1) ||
+        doc.setProcessorState("nope", "p1", sha, 1)) {
+        std::cout << "FAILED: unknown target accepted\n";
+        return false;
+    }
+
+    const auto read = doc.getDocument();
+    if (read.tracks[0].chain[0].state_hash != sha ||
+        read.tracks[0].chain[0].state_version != 3) {
+        std::cout << "FAILED: state fields not read back\n";
+        return false;
+    }
+
+    // The authored change applies onto an independent copy of the doc
+    const auto change = doc.getLastLocalChange();
+    if (change.empty()) {
+        std::cout << "FAILED: no local change bytes\n";
+        return false;
+    }
+
+    // Save/load roundtrip keeps the fields
+    const auto bytes = doc.toBytes();
+    daw::document::AutomergeDocument doc2;
+    if (!doc2.loadFromBytes(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: reload\n";
+        return false;
+    }
+    const auto read2 = doc2.getDocument();
+    if (read2.tracks[0].chain[0].state_hash != sha ||
+        read2.tracks[0].chain[0].state_version != 3) {
+        std::cout << "FAILED: state fields lost across save/load\n";
+        return false;
+    }
+
+    std::cout << "OK (authored, refused unknown ids, change bytes, save/load)\n";
+    return true;
+}
+
+/**
  * V1.5 / A4-5: registry eviction. A node id removed from the document
  * must take its registry handle with it (bridge stopped, entry erased),
  * and only that one - survivors keep their ADDRESS (rebuilds re-attach
@@ -2279,6 +2350,7 @@ int main(int argc, char* argv[]) {
     run(testTransportLoopAndStop);
     run(testRegistryEviction);
     run(testClipFadesRender);
+    run(testProcessorStateInDocument);
     run(testWebSocketAuth);
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);

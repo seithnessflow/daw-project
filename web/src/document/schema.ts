@@ -36,6 +36,11 @@ export interface ProcessorDef {
   /** 2.4d: bypass is DOCUMENT state, driven from the tab. */
   bypass: boolean;
   params: ProcessorParam[];
+  /** 2.5-etat (additive, ENGINE-authored): content-addressed reference
+   *  to the plugin's opaque state blob in the store. The tab never
+   *  writes these - only the machine hosting the plugin can. */
+  stateHash?: string;
+  stateVersion?: number;
 }
 
 export interface TrackDef {

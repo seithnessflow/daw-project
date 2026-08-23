@@ -36,6 +36,12 @@ struct ProcessorDef {
     std::string uid;  // vst3 only; empty otherwise
     bool bypass = false;  // 2.4d: document state, driven from the tab
     std::map<std::string, float> params;
+    // 2.5-etat (ADDITIF, SCHEMA-V2-DESIGN 2): opaque plugin state as a
+    // content-addressed reference into the store - the blob itself
+    // NEVER enters the CRDT. state_version is an LWW counter (two
+    // hashes have no order; binary states cannot merge).
+    std::string state_hash;      // sha256 hex of the state blob; empty = none
+    int64_t state_version = 0;
 };
 
 /**

@@ -401,6 +401,17 @@ function createDevicePanel(
   name.textContent = proc.type === 'vst3' ? 'AGain (vst3)' : proc.type;
   title.appendChild(name);
 
+  // 2.5-etat: the engine-captured state, visible (8 hex of the blob
+  // hash + version). Absent until the hosting machine first captures.
+  if (proc.stateHash) {
+    const state = document.createElement('span');
+    state.className = 'device-state';
+    state.dataset.role = 'device-state';
+    state.textContent = `✓ ${proc.stateHash.slice(0, 8)} v${proc.stateVersion ?? 0}`;
+    state.title = `Etat du plugin capture par l'hote (blob ${proc.stateHash.slice(0, 8)}..., version ${proc.stateVersion ?? 0})`;
+    title.appendChild(state);
+  }
+
   // V1.5: removal is a TWO-STEP button (armed on first click, fires on
   // the second, disarms after 3 s or on Escape) - keyboard-safe, no
   // blocking dialog; Ctrl+Z restores the device anyway.
@@ -503,6 +514,18 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
     const panel = view.querySelector(
       `.device[data-proc-id="${cssId(proc.id)}"]`) as HTMLElement | null;
     if (!panel) continue;
+    // 2.5-etat: the state badge settles in place (first capture CREATES
+    // it - the engine's change arrives without a structural rebuild)
+    if (proc.stateHash) {
+      let badge = panel.querySelector('[data-role="device-state"]') as HTMLElement | null;
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'device-state';
+        badge.dataset.role = 'device-state';
+        panel.querySelector('.device-title')?.appendChild(badge);
+      }
+      badge.textContent = `✓ ${proc.stateHash.slice(0, 8)} v${proc.stateVersion ?? 0}`;
+    }
     for (const p of proc.params) {
       const slider = panel.querySelector(
         `[data-role="param"][data-param-key="${cssId(p.key)}"]`) as HTMLInputElement | null;

@@ -54,6 +54,20 @@ export class Project {
   }
 
   /**
+   * A4-3 refinement: true while the local document is EXACTLY the
+   * untouched seed (single head = the seed's). A pristine placeholder
+   * has nothing to merge or push - first contact must ADOPT the server
+   * document wholesale, or an OLD-ROOT project gets the seed pushed
+   * into it and a root LWW conflict can shadow its real tracks
+   * (observed live on duo: clips eclipsed by the seed's empty lists).
+   */
+  isPristineSeed(): boolean {
+    const heads = Automerge.getHeads(this.doc);
+    const seedHeads = Automerge.getHeads(seedDoc());
+    return heads.length === 1 && heads[0] === seedHeads[0];
+  }
+
+  /**
    * Merge a full remote document (Automerge binary) into the local one.
    *
    * Used on EVERY server document (first contact included, A4-3: the

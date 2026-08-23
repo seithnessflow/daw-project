@@ -68,6 +68,21 @@ export async function init(): Promise<void> {
       console.log('Reconnected: merging server document into local state');
     }
     const hadPending = serverClient.pendingCount() > 0;
+    // A pristine placeholder (untouched seed, nothing queued) ADOPTS the
+    // server document - merging would push the seed root into OLD
+    // projects and the tracks LWW could shadow their real content
+    // (bitten once, on duo). Offline edits take the merge road.
+    if (firstContact && !hadPending && ctx.project!.isPristineSeed()) {
+      ctx.project!.load(data);
+      renderTracks(true);
+      const wantStarter =
+        new URLSearchParams(window.location.search).get('starter') === '1';
+      if (!LAB_MODE && wantStarter) {
+        mountStarter(document.getElementById('starter-slot')!, ctx.project!,
+          sendLastChange, () => renderTracks(true));
+      }
+      return;
+    }
     const merged = ctx.project!.mergeRemote(data);
     if (merged === 'error') {
       // A4-2 annex: bad bytes are an ERROR, not "nothing new" - pull

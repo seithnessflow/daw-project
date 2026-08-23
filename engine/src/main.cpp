@@ -435,10 +435,17 @@ void pollPluginChildren(daw::graph::PluginInstanceRegistry& plugin_registry) {
  * c-2: ensure the out-of-process instance for a document vst3 node exists.
  * The registry keys by NODE id: rebuilds re-attach, never re-spawn.
  */
+bool fetchAssetFromServer(const std::string& server_ws_url,
+                          const std::string& hash,
+                          const std::string& assets_dir);
+
 daw::graph::PluginInstanceHandle* ensureVst3Child(
     daw::graph::PluginInstanceRegistry& plugin_registry,
-    const std::string& node_id, const std::string& uid,
+    const daw::document::ProcessorDef& proc_def,
+    const std::string& assets_dir,
     const Options& opts, uint32_t sample_rate) {
+    const std::string& node_id = proc_def.id;
+    const std::string& uid = proc_def.uid;
     auto& handle = plugin_registry.ensure(node_id);
     if (handle.bridge && handle.bridge->isRunning()) {
         return &handle;
@@ -453,6 +460,33 @@ daw::graph::PluginInstanceHandle* ensureVst3Child(
         return nullptr;
     }
     handle.bridge = std::make_unique<daw::host::PluginBridge>();
+
+    // 2.5-etat: stage the document's state blob BEFORE the spawn - the
+    // child's ceremony restores it processor-first. Blob resolution =
+    // the asset road (local file, else the store). A missing blob is a
+    // WARNING (defaults keep playing), never a spawn failure.
+    if (!proc_def.state_hash.empty()) {
+        const fs::path blob_path =
+            fs::path(assets_dir) / (proc_def.state_hash + ".wav");
+        bool have = fs::exists(blob_path);
+        if (!have && !opts.server_url.empty()) {
+            have = fetchAssetFromServer(opts.server_url, proc_def.state_hash,
+                                        assets_dir);
+        }
+        if (have) {
+            std::ifstream f(blob_path, std::ios::binary);
+            std::vector<uint8_t> blob((std::istreambuf_iterator<char>(f)),
+                                      std::istreambuf_iterator<char>());
+            if (!blob.empty()) {
+                handle.bridge->setPendingState(std::move(blob));
+            }
+        } else {
+            std::cerr << "Chain node " << node_id << ": state blob "
+                      << proc_def.state_hash.substr(0, 8)
+                      << "... unavailable - plugin starts from defaults\n";
+        }
+    }
+
     if (!handle.bridge->start(hostExePath(opts), it->second, uid, sample_rate)) {
         std::cerr << "Chain node " << node_id << ": plugin child failed: "
                   << handle.bridge->error() << "\n";
@@ -559,6 +593,61 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
     return true;
 }
 
+/**
+ * 2.5-etat: PUT a blob into the server's content-addressed store (the
+ * mirror of fetchAssetFromServer; the server re-verifies sha256(body)
+ * before storing - a store that does not verify is a lie).
+ */
+bool putAssetToServer(const std::string& server_ws_url,
+                      const std::string& hash,
+                      const std::vector<uint8_t>& bytes) {
+    if (server_ws_url.empty() || hash.empty()) return false;
+    std::string http_base = server_ws_url;
+    if (http_base.rfind("wss://", 0) == 0) {
+        http_base = "https://" + http_base.substr(6);
+    } else if (http_base.rfind("ws://", 0) == 0) {
+        http_base = "http://" + http_base.substr(5);
+    }
+    const std::string url = http_base + "/assets/" + hash;
+
+    ix::HttpClient http;
+    ix::HttpRequestArgsPtr args = http.createRequest();
+    args->connectTimeout = 10;
+    args->transferTimeout = 120;
+    std::string body(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    ix::HttpResponsePtr response = http.put(url, body, args);
+    if (!response || (response->statusCode != 200 && response->statusCode != 201)) {
+        std::cerr << "Asset " << hash.substr(0, 8) << "...: upload failed ("
+                  << (response ? response->statusCode : 0) << ")\n";
+        return false;
+    }
+    return true;
+}
+
+/** Atomic blob write into the local assets dir (the store mold). */
+bool writeBlobToAssets(const std::string& assets_dir, const std::string& hash,
+                       const std::vector<uint8_t>& bytes) {
+    std::error_code ec;
+    fs::create_directories(assets_dir, ec);
+    const fs::path final_path = fs::path(assets_dir) / (hash + ".wav");
+    const fs::path tmp_path = fs::path(assets_dir) / (hash + ".wav.tmp");
+    {
+        std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+        out.write(reinterpret_cast<const char*>(bytes.data()),
+                  static_cast<std::streamsize>(bytes.size()));
+        if (!out.good()) {
+            fs::remove(tmp_path, ec);
+            return false;
+        }
+    }
+    fs::rename(tmp_path, final_path, ec);
+    if (ec) {
+        fs::remove(tmp_path, ec);
+        return false;
+    }
+    return true;
+}
+
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
@@ -603,8 +692,8 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
             } else if (proc_def.type == "vst3") {
                 // c-2: ProxyNode from the DOCUMENT (uid on the node). The
                 // registry hands the same ring to every rebuild.
-                auto* handle = ensureVst3Child(plugin_registry, proc_def.id,
-                                               proc_def.uid, opts, sample_rate);
+                auto* handle = ensureVst3Child(plugin_registry, proc_def,
+                                               assets_dir, opts, sample_rate);
                 if (handle) {
                     // Latest wins + the ring survives rebuilds: re-sending
                     // the document's params on every rebuild is idempotent,
@@ -936,6 +1025,11 @@ int doPlayWithServer(const Options& opts) {
     std::set<std::string> eviction_keep;
     bool eviction_pending = false;
 
+    // 2.5-etat: state capture is DEBOUNCED one second after the last
+    // rebuild (a param gesture is a burst of rebuilds; serialize once,
+    // at the end). time_point{} = nothing scheduled.
+    std::chrono::steady_clock::time_point state_capture_due{};
+
     // Connect to sync server
     daw::network::ServerClient server_client;
     daw::network::ServerConfig server_config;
@@ -1076,6 +1170,11 @@ int doPlayWithServer(const Options& opts) {
                 }
 
                 std::cout << "Graph updated (document change, v=" << target_version << ")\n";
+
+                // 2.5-etat: a rebuild re-sends document params to the
+                // children - schedule ONE capture after the burst settles
+                state_capture_due =
+                    std::chrono::steady_clock::now() + std::chrono::seconds(1);
             } else {
                 std::cerr << "Failed to build audio graph\n";
                 last_built_version = target_version;  // don't spin on a broken doc
@@ -1098,6 +1197,50 @@ int doPlayWithServer(const Options& opts) {
                                return device.isRetireSafe(r) && r.graph.use_count() == 1;
                            }),
             retired_graphs.end());
+
+        // 2.5-etat: debounced capture. For every LIVE vst3 child, serialize
+        // its state; a hash that moved goes to the local assets, the store,
+        // and the document (engine-authored change, sent to the server).
+        // Our own change comes back as a broadcast -> one extra rebuild ->
+        // one re-capture with an UNCHANGED hash -> the cycle terminates.
+        if (state_capture_due != std::chrono::steady_clock::time_point{} &&
+            std::chrono::steady_clock::now() >= state_capture_due) {
+            state_capture_due = {};
+            daw::document::ProjectDef snap;
+            {
+                std::lock_guard<std::mutex> lock(doc_mutex);
+                snap = doc.getDocument();
+            }
+            for (const auto& t : snap.tracks) {
+                for (const auto& p : t.chain) {
+                    if (p.type != "vst3") continue;
+                    auto* h = plugin_registry.find(p.id);
+                    if (!h || !h->bridge || !h->bridge->isRunning()) continue;
+                    std::vector<uint8_t> blob;
+                    if (!h->bridge->saveState(blob, 2000) || blob.empty()) continue;
+                    const std::string sha = daw::util::sha256Hex(
+                        reinterpret_cast<const char*>(blob.data()), blob.size());
+                    if (sha == p.state_hash) continue;  // settled
+                    if (!writeBlobToAssets(opts.assets_dir, sha, blob)) continue;
+                    if (!opts.server_url.empty()) {
+                        putAssetToServer(opts.server_url, sha, blob);
+                    }
+                    {
+                        std::lock_guard<std::mutex> lock(doc_mutex);
+                        if (doc.setProcessorState(t.id, p.id, sha,
+                                                  p.state_version + 1)) {
+                            const auto change = doc.getLastLocalChange();
+                            if (!change.empty()) server_client.sendChange(change);
+                        }
+                    }
+                    // Crash restarts of THIS child resume from the fresh state
+                    h->bridge->setPendingState(std::move(blob));
+                    std::cout << "State captured for node " << p.id << ": "
+                              << sha.substr(0, 8) << "... (v"
+                              << (p.state_version + 1) << ")\n";
+                }
+            }
+        }
 
         // V1.5 / A4-5: the staged eviction fires once NO retired graph can
         // still touch a bridge ring. Telemetry is re-wired IMMEDIATELY (the

@@ -92,6 +92,17 @@
   color: var(--red, #d9534f);
 }
 
+/* ---- 2.5-etat: captured-state badge ------------------------------ */
+.device-state {
+  font-size: 9px;
+  font-family: Consolas, monospace;
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--r);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
 /* ---- V1.5: remove (two-step armed button) ----------------------- */
 .device-remove {
   margin-left: auto;

@@ -125,6 +125,24 @@ public:
     bool setMasterGain(float gain);
 
     /**
+     * 2.5-etat: write a chain node's state reference (stateHash +
+     * stateVersion). THE exception to "the browser owns the document":
+     * only the machine hosting the plugin can serialize its state, so
+     * the ENGINE authors this one field pair.
+     */
+    bool setProcessorState(const std::string& track_id,
+                           const std::string& node_id,
+                           const std::string& state_hash,
+                           int64_t state_version);
+
+    /**
+     * Bytes of the LAST local change (empty when none) - what the
+     * engine ships to the server after authoring. Mirrors the web's
+     * getLastLocalChange contract.
+     */
+    std::vector<uint8_t> getLastLocalChange();
+
+    /**
      * Check if document is loaded.
      */
     bool isLoaded() const { return doc_ != nullptr; }
