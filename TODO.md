@@ -267,6 +267,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          multiple de 256) = bypass permanent. Remede : kRingSlots=8,
          clamp BRUYANT ou refus de demarrer, verification de periode a
          l'initialisation. La regle sort de la prose, entre dans le code.
+         ELARGIE PAR AUDIT-4 (2026-08-23) : la meme session absorbe
+         A4-5 (seq PAR SLOT de sortie — un bloc saute par l'enfant fait
+         rejouer un slot perime, ni dry ni compte) et grave l'invariant
+         input-dechire dans shared_audio_ring.h. Meme segment, meme
+         bump de layout, une seule session.
          REPRODUCTEUR TROUVE (usage libre 2026-08-22) : le backend null
          (--mute) livre ses callbacks en rafales irregulieres -> le live
          sert massivement du DRY enfant vivant (meter sine 22,5 % =
@@ -288,6 +293,46 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       (candidat grille existant, meme chantier). A3-7 (rewrite complet
       par change cote serveur, quadratique) et A3-8 (menu hygiene) restent
       dates dans AUDIT-3.md avec leurs declencheurs.
+
+- [ ] ARBITRAGE AUDIT-4 (2026-08-23, rapport AUDIT-4.md — quatrieme
+      audit lecture seule : 3 passes paralleles moteur/serveur/web +
+      critique de fond des .md). Ordre DECIDE (utilisateur, meme jour) :
+      1. [ ] PASSE « DOCUMENTS QUI DISENT VRAI » (session courte,
+         mecanique) : 21/21 aux trois endroits, token par port dans les
+         procedures (STATUS + test-des-mains — le runbook des mains est
+         casse a sa premiere etape), port 9000 purge, dettes soldees
+         cochees (token global, 2.3bis), README verite (fixtures, /proto,
+         CLI ref), ADR-005 corrige (ixwebsocket, pas websocketpp),
+         en-tete websocket_server.h (LNA fantome). Les FUSIONS
+         structurelles (STATUS scinde etat/journal, DECISIONS racine ->
+         docs/, BACKLOG -> TODO, CLAUDE.md qui renvoie au lieu de
+         dupliquer) : proposees dans AUDIT-4 A4-20, A ARBITRER dans
+         cette session.
+      2. [ ] « CRITERE 3 VRAIMENT VRAI, ROUND 2 » (A4-1+A4-2+A4-3,
+         + A4-4/A4-1c) : Automerge bufferise les changes a deps
+         manquantes SANS erreur des deux cotes — le serveur jette et
+         broadcast quand meme, le client ne resync jamais sur le cas
+         principal, et tout ce qui est edite avant le premier contact
+         serveur est perdu. + heartbeat serveur->clients (socket zombie
+         cote onglet). Tests de garde : scenario Lagged reproduit,
+         demarrage serveur eteint. STATUS : reserve critere 3 ROUVERTE
+         en attendant.
+      3. [ ] SESSION RING ELARGIE = l'item A3-2+A3-3 ci-dessus, qui
+         absorbe A4-5 (voir la note ELARGIE PAR AUDIT-4 dans l'item).
+      4. [ ] CYCLE DE VIE ENFANTS + BOUCLE DE CONTROLE (A4-6 eviction
+         du registre — enfant zombie 100 % CPU au retrait d'un noeud ;
+         A4-7 fetch d'asset et spawn/restart deportes hors de la boucle
+         de controle — gels 10-120 s, Ctrl+C inoperant). Avant 2.5.
+      5. [ ] CONVERGENCE VISIBLE DES CLIPS (A4-9) dans la boucle
+         refonte UI : sameStructure ignore la geometrie -> les
+         deplacements distants ne se redessinent jamais dans l'autre
+         onglet ; spec clip-drag a ancrer sur le DOM de l'onglet B.
+      6. [ ] DETTES DATEES AUDIT-4 : A4-8 (validation document
+         inoperante — zone format, refonte planifiee), A4-10 (lissage
+         gain mort de fait), A4-11 (ids Date.now vs UUID), A4-12
+         (32 bits INT_MIN), A4-13..A4-19 (menus moteur/serveur/scripts/
+         code mort/hygiene web/discipline de test) — declencheurs dans
+         AUDIT-4.md.
 
 - [ ] INTRANTS 2.5 CONSIGNES (recherche mecanique profonde 2026-08-22,
       sources SDK dans docs/UI-CONVENTIONS.md) : les 5 mecaniques a

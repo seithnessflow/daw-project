@@ -153,13 +153,21 @@ de documents en avance sur le code — plus d'erreurs de jeunesse. Ordre decide
 (TODO) : mains AVEC variation de buffer -> file param -> contrat de periode ->
 critere 3 vrai -> 2.5. Critere 3 passe en « valide avec reserve » (A3-4).
 
+**2026-08-23 (AUDIT-4, lecture seule) :** quatrieme audit — 3 passes
+paralleles (moteur, serveur/sync, web/scripts) + critique de fond des
+.md. Moisson : trio deps-manquantes qui vide la garantie du critere 3
+(reserve ROUVERTE), slot perime rejoue par le ring sous surcharge,
+enfants VST3 zombies sans eviction, et jumeaux documentaires qui
+divergent (20/20 vs 21 tests reels, deux registres DECISIONS, ADR-005
+mensonger). Ordre 1-6 consigne dans TODO (arbitrage utilisateur).
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |
 |---|---------|--------|--------|
 | 1 | Rendu deterministe | ✅ VALIDE | Hash `89f1a1105dc09e92` (fixture reel 2 pistes, MSVC verifie; GCC via CI). Ancien hash `f40af882097b704a` = silence, invalide (voir DECISIONS.md 2026-08-21) |
 | 2 | Test CLI sans navigateur | ✅ VALIDE | `./daw_engine_test` 20/20 |
-| 3 | Convergence 2 onglets | ✅ VALIDE (reserve levee 2026-08-22) | Online, offline, ET push anti-entropie : la nouveaute locale que le serveur n'a pas (flush avale par un socket mourant compris) est diffee et RE-POUSSEE a chaque reconnexion. Garde : criterion3-push.spec (flush avale reproduit exactement, serveur redemarre, le change revient). A3-5 solde aussi (applyChange qui echoue -> resync) |
+| 3 | Convergence 2 onglets | ⚠️ VALIDE AVEC RESERVE (rouverte AUDIT-4, 2026-08-23) | Push anti-entropie et resync en place (A3-4/A3-5), MAIS Automerge bufferise les changes a deps manquantes SANS erreur des deux cotes : le serveur peut jeter et broadcaster quand meme (A4-1), le client ne resync pas sur le cas principal (A4-2), et l'edition avant premier contact serveur se perd (A4-3). Remede + tests de garde : AUDIT-4.md, session TODO ordre 2 |
 | 4 | LNA HTTPS→WS local | ⛔ NON TESTE | Test manuel Chrome jamais documente |
 | 5 | 10 min WASAPI sans underrun | ⚠️ PARTIEL | 0 underruns mais **sans charge CPU** |
 
