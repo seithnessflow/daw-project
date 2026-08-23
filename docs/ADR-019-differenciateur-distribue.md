@@ -145,6 +145,15 @@ produit circule (stems/streaming). C'est la ligne exacte qui rend le
 montage propre vis-a-vis des ayants droit — a re-arbitrer explicitement
 si un besoin de GUI distante apparait, jamais a eroder en douce.
 
+### Livraison du token (amendement 2026-08-23, seance LNA)
+
+Le mecanisme de production pressenti : le moteur ouvre le navigateur
+avec le token en FRAGMENT d'URL (`#token=...`) — jamais en query
+string (une query part dans les logs du tunnel/serveur, l'historique
+et le Referer ; le fragment ne quitte jamais le navigateur). Regle
+associee : close 4001 (token perime) -> l'onglet re-recupere le token
+et retente UNE fois, silencieusement. Arbitrage complet : TODO 1pre.
+
 ### Vigilance streaming (gravee)
 
 WebRTC/NAT/TURN est un univers en soi et vit en position 5 de la

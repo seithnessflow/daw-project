@@ -22,6 +22,25 @@ dedouble). Ordre :
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
        declencheront en premier).
+1pre. [ ] MECANISME DE LIVRAISON DU TOKEN (a trancher AVANT 1bis —
+       decouvert par le 4001 accidentel du harnais LNA 2026-08-23) :
+       une page servie d'un domaine distant ne peut pas lire
+       %TEMP%\daw-engine-token-<port>. Option de tete (reviewer
+       2026-08-23) : le moteur ouvre le navigateur avec le token en
+       FRAGMENT d'URL (#token=..., JAMAIS en query : la query part
+       dans les logs du tunnel, l'historique et le Referer — le
+       fragment ne quitte jamais le navigateur). Alternatives a peser :
+       endpoint local servi par le moteur apres permission LNA ;
+       handler de protocole. Bloque « j'allume mon
+       ordi, je vais sur mon site » ; sur deux machines le probleme est
+       double. + REGLE gravee : close 4001 (token perime, ex. moteur
+       redemarre) -> l'onglet re-recupere le token et retente UNE fois,
+       sans rien demander a l'humain (signature distincte de 1006,
+       prouvee). + Onboarding non destructif : permissions.query
+       ('local-network-access'/'local-network', Chrome 151) lisible ->
+       etape guidee AVANT toute tentative, jamais d'invite surprise ;
+       feature-detection OBLIGATOIRE (les deux noms + le chemin
+       TypeError : Firefox/Safari sans API = heuristique de secours).
 1bis. [ ] SMOKE DEUX MACHINES (hoiste 2026-08-23, retour reviewer :
        ne pas re-commettre l'erreur qu'on vient de corriger — valider
        l'hypothese qui porte tout AVANT de construire dessus) : deux

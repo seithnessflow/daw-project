@@ -107,8 +107,9 @@
             <input type="text" id="token" placeholder="From token file" style="width: 400px">
         </div>
         <p style="font-size: 12px; color: #888;">
-            Token file location: <code>/tmp/daw-engine-token</code> or custom path
+            Token file: <code>%TEMP%\daw-engine-token-&lt;port&gt;</code> (JSON - paste the <code>token</code> field only)
         </p>
+        <p style="font-size: 12px;" id="perm-probe">Permission probe: (running...)</p>
     </div>
 
     <div class="result-grid">
@@ -213,36 +214,40 @@
 
         async function testFetch() {
             const port = document.getElementById('port').value;
-            const token = document.getElementById('token').value;
-            const url = `http://127.0.0.1:${port}/?token=${token}`;
+            const url = `http://127.0.0.1:${port}/`;
 
-            logTo('fetch-log', `Testing fetch to ${url}...`, 'info');
+            logTo('fetch-log', `Canary (no-cors) to ${url}...`, 'info');
             setStatus('fetch-status', 'untested', 'Testing...');
 
+            // Stage 1 - no-cors canary: RESOLVES (opaque) as soon as the
+            // request reached the network, even on a CORS-less 400.
+            // REJECTS only if blocked upstream (LNA / connection refused).
+            // This separates "CORS" from "network" - the old cors-mode
+            // canary could not (400 without CORS headers => same
+            // "Failed to fetch" as an LNA block or a dead engine).
+            const t0 = performance.now();
+            let reached = false;
             try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    mode: 'cors'
-                });
-
-                if (response.ok) {
-                    const text = await response.text();
-                    logTo('fetch-log', `Success! Response: ${text.substring(0, 100)}`, 'success');
-                    setStatus('fetch-status', 'success', 'Connected');
-                } else {
-                    logTo('fetch-log', `HTTP error: ${response.status} ${response.statusText}`, 'error');
-                    setStatus('fetch-status', 'failed', `HTTP ${response.status}`);
-                }
+                await fetch(url, { method: 'GET', mode: 'no-cors' });
+                const ms = Math.round(performance.now() - t0);
+                reached = true;
+                logTo('fetch-log', `NETWORK PATH OPEN (opaque response, ${ms} ms) - LNA allowed the request`, 'success');
+                setStatus('fetch-status', 'success', 'Reachable');
             } catch (e) {
-                logTo('fetch-log', `Error: ${e.name}: ${e.message}`, 'error');
-                console.error('Fetch error:', e);
+                const ms = Math.round(performance.now() - t0);
+                logTo('fetch-log', `BLOCKED UPSTREAM after ${ms} ms: ${e.name}: ${e.message}`, 'error');
+                logTo('fetch-log', 'LNA block OR connection refused (engine down) - see WS test', 'warn');
+                setStatus('fetch-status', 'blocked', 'Blocked upstream');
+            }
 
-                // Check if it looks like LNA block
-                if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-                    logTo('fetch-log', 'This may be LNA blocking the request', 'warn');
-                    setStatus('fetch-status', 'blocked', 'Blocked (LNA?)');
-                } else {
-                    setStatus('fetch-status', 'failed', 'Error');
+            // Stage 2 - cors probe, observation only (expected to throw on
+            // this engine: 400 without CORS headers).
+            if (reached) {
+                try {
+                    const r = await fetch(url, { method: 'GET', mode: 'cors' });
+                    logTo('fetch-log', `cors probe: HTTP ${r.status}`, 'info');
+                } catch (e) {
+                    logTo('fetch-log', `cors probe rejected (expected: engine answers without CORS headers)`, 'info');
                 }
             }
         }
@@ -250,35 +255,66 @@
         function testWebSocket() {
             const port = document.getElementById('port').value;
             const token = document.getElementById('token').value;
-            const url = `ws://127.0.0.1:${port}/?token=${token}`;
+            const url = `ws://127.0.0.1:${port}/`;
 
-            logTo('ws-log', `Testing WebSocket to ${url}...`, 'info');
+            logTo('ws-log', `Testing WebSocket to ${url} (token in first binary message)...`, 'info');
             setStatus('ws-status', 'untested', 'Testing...');
 
+            const t0 = performance.now();
+            const ms = () => Math.round(performance.now() - t0);
             try {
                 const ws = new WebSocket(url);
                 ws.binaryType = 'arraybuffer';
+                let opened = false;
+                let authed = false;
+                let closeTimer = null;
 
                 ws.onopen = () => {
-                    logTo('ws-log', 'Connected!', 'success');
-                    setStatus('ws-status', 'success', 'Connected');
-                    ws.close();
+                    opened = true;
+                    logTo('ws-log', `Handshake OK / onopen a ${ms()} ms - upgrade accepted, sending auth...`, 'success');
+                    // Auth = first binary message: [0x00] + UTF-8 token
+                    const tokenBytes = new TextEncoder().encode(token);
+                    const authMessage = new Uint8Array(1 + tokenBytes.length);
+                    authMessage[0] = 0x00;
+                    authMessage.set(tokenBytes, 1);
+                    ws.send(authMessage);
+                    // Auth is only PROVEN when data flows back (telemetry).
+                    // A server can accept the upgrade then close on bad auth.
+                    closeTimer = setTimeout(() => {
+                        logTo('ws-log', 'No message within 2 s after auth - handshake proven, auth NOT proven', 'warn');
+                        setStatus('ws-status', 'blocked', 'Open, no data');
+                        ws.close();
+                    }, 2000);
                 };
 
-                ws.onerror = (e) => {
-                    logTo('ws-log', 'WebSocket error occurred', 'error');
-                    console.error('WebSocket error:', e);
+                ws.onmessage = (e) => {
+                    if (!authed) {
+                        authed = true;
+                        clearTimeout(closeTimer);
+                        const n = e.data.byteLength ?? String(e.data).length;
+                        logTo('ws-log', `AUTH OK - telemetry received (${n} bytes, ${ms()} ms). Full path proven.`, 'success');
+                        setStatus('ws-status', 'success', 'Connected+Auth');
+                        ws.close();
+                    }
+                };
+
+                ws.onerror = () => {
+                    logTo('ws-log', `WebSocket error event after ${ms()} ms`, 'error');
                 };
 
                 ws.onclose = (e) => {
-                    if (e.code === 1006) {
-                        logTo('ws-log', `Connection failed (code 1006) - may be LNA block`, 'warn');
-                        setStatus('ws-status', 'blocked', 'Blocked (LNA?)');
-                    } else if (e.code === 4001) {
-                        logTo('ws-log', `Rejected: Unauthorized (invalid token)`, 'error');
-                        setStatus('ws-status', 'failed', 'Unauthorized');
+                    clearTimeout(closeTimer);
+                    // The onopen bit is THE discriminator: "blocked
+                    // upstream" (never opened) vs "opened then closed".
+                    logTo('ws-log', opened ? `onopen: OUI (voir Handshake OK ci-dessus)` : `onopen: JAMAIS`, opened ? 'info' : 'warn');
+                    if (authed) {
+                        logTo('ws-log', `Closed cleanly by test (code=${e.code})`, 'info');
+                    } else if (e.code === 1006) {
+                        logTo('ws-log', `Failed: code=1006 after ${ms()} ms - LNA block OR engine down (opaque by spec)`, 'warn');
+                        setStatus('ws-status', 'blocked', 'Failed (opaque)');
                     } else {
-                        logTo('ws-log', `Closed: code=${e.code}, reason=${e.reason}`, 'info');
+                        logTo('ws-log', `Closed before auth proof: code=${e.code}, reason=${e.reason} (${ms()} ms)`, 'error');
+                        setStatus('ws-status', 'failed', `Closed ${e.code}`);
                     }
                 };
 
@@ -286,6 +322,48 @@
                 logTo('ws-log', `Error: ${e.name}: ${e.message}`, 'error');
                 setStatus('ws-status', 'failed', 'Error');
             }
+        }
+
+        // LNA permission probe: if the Permissions API knows the state,
+        // the UI never has to guess from opaque error codes.
+        (async () => {
+            const el = document.getElementById('perm-probe');
+            const names = ['local-network-access', 'local-network'];
+            for (const name of names) {
+                try {
+                    const st = await navigator.permissions.query({ name });
+                    el.textContent = `Permission probe: '${name}' = ${st.state}`;
+                    logTo('ws-log', `permissions.query('${name}') = ${st.state}`, 'success');
+                    st.onchange = () => {
+                        el.textContent = `Permission probe: '${name}' = ${st.state} (changed)`;
+                        logTo('ws-log', `permission changed: ${st.state}`, 'warn');
+                    };
+                    return;
+                } catch (e) {
+                    logTo('ws-log', `permissions.query('${name}') threw: ${e.name}`, 'info');
+                }
+            }
+            el.textContent = 'Permission probe: API does not expose LNA - UI is condemned to heuristics';
+        })();
+
+        // Auto-fill browser version (a verdict is only valid dated AND versioned)
+        const chromeMatch = navigator.userAgent.match(/Chrome\/([\d.]+)/);
+        document.getElementById('obs-browser').value = chromeMatch ? `Chrome ${chromeMatch[1]}` : navigator.userAgent;
+
+        // ?auto=1 : connect at LOAD, without any user gesture - tests
+        // whether the LNA prompt requires a gesture (product wants to
+        // connect on page load; if a gesture is required, silent failure).
+        // #token=... : prefill the token field. FRAGMENT, never query -
+        // the fragment is never sent to the server, never hits the
+        // tunnel logs, never leaks via Referer. This is the production
+        // pattern (TODO 1pre): a secret in a query string is a secret
+        // in third-party logs.
+        const qs = new URLSearchParams(location.search);
+        const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+        if (hash.get('token')) document.getElementById('token').value = hash.get('token');
+        if (qs.get('auto') === '1') {
+            logTo('ws-log', 'AUTO MODE: connecting at load, zero gesture...', 'warn');
+            testWebSocket();
         }
 
         function copyReport() {

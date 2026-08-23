@@ -70,6 +70,7 @@ void printUsage(const char* program) {
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
               << "  --mute             Use null audio backend (silent playback for testing)\n"
+              << "  --keepalive        File mode: loop the document instead of exiting at its end\n"
               << "  --sample-rate <n>  Sample rate for rendering (default: 48000)\n"
               << "  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)\n"
               << "  --ws-port <n>      WebSocket server port (default: 47821)\n"
@@ -107,6 +108,7 @@ struct Options {
     bool render = false;
     bool info = false;
     bool mute = false;
+    bool keepalive = false;  // File mode: loop the document instead of exiting at its end
     bool list_devices = false;
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
@@ -163,6 +165,8 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.bit_depth = static_cast<uint32_t>(std::stoul(argv[i]));
+        } else if (arg == "--keepalive") {
+            opts.keepalive = true;
         } else if (arg == "--mute") {
             opts.mute = true;
         } else if (arg == "--ws-port") {
@@ -827,9 +831,15 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
                       << " | Underruns: " << telemetry->buffer_underruns
                       << "    " << std::flush;
 
-            // Stop if we've reached the end
+            // Stop if we've reached the end (--keepalive: loop instead -
+            // the test stack must not die mid-measurement; seek() is the
+            // documented lock-free control-thread API)
             if (telemetry->position_samples >= total_length) {
-                g_running = false;
+                if (opts.keepalive) {
+                    device.getTransport().seek(0);
+                } else {
+                    g_running = false;
+                }
             }
         }
 

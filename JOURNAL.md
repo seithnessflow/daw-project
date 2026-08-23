@@ -207,6 +207,27 @@ affiche « Failed to fetch » meme quand le reseau passe — defaut de la
 page de test consigne. Reste 30 s de mains : refus/memoire/annulation.
 Observation : le moteur ne loggue pas les connexions acceptees.
 
+**2026-08-23 (campagne LNA automatisee — l'oracle temporel) :** sur
+directive du reviewer, tout l'automatisable a ete automatise (Playwright
+sur le VRAI Chrome 151, profils vierges). L'oracle : etat prompt +
+tentative qui PEND = invite affichee ; echec immediat = subit sans
+pouvoir demander ; succes immediat = non soumis. Verdicts : fetch ET
+WebSocket pendent tous deux (soumis au LNA, savent demander — le pire
+cas est ecarte) ; ZERO GESTE viable (connexion au chargement declenche
+l'invite) ; permissions.query lisible en reel ; AUTH OK de bout en bout
+quand permis ; 4001 sur token perime (signature distincte). Prealable
+pose en route : --keepalive au moteur (le doc de 600 s tuait la stack
+de test en plein run — une passe entiere perdue avant le correctif ;
+mode fichier boucle via seek(0), API lock-free existante). Lecons de
+methode payees : CDP setPermission = accepte mais no-op (deny non
+automatisable) ; les captures d'ecran/entrees OS pendant que
+l'utilisateur se sert de la machine capturent SA fenetre — approche
+abandonnee, captures supprimees ; la ligne « latences identiques » de
+R1 est RETIREE (runs contamines par l'invite en attente). Inconnus
+dates (documentation, pas bloquants) : texte de l'invite, semantique
+dismissal/refus explicite, memorisation, FF/Safari. Reste UN geste
+humain : le sceau vert (AUTH OK) dans le navigateur de l'utilisateur.
+
 **2026-08-23 (retour du pair reviewer sur l'execution, consigne le jour
 meme) :** verdict LNA requalifie ⚠️ TIENT SOUS CONDITIONS (le mecanisme
 est la carve-out loopback — le tunnel n'a servi que la page, l'URL WS
