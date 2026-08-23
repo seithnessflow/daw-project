@@ -164,6 +164,34 @@ console.log('Test 5: drum burst train = attacks green; lone spike still red');
   check('verdict green on drums', r.verdict.ok, JSON.stringify(r.verdict));
 }
 
+// ---- 6. TOTAL silence is RED by principle (lesson 2026-08-23: a 48 s
+// silent render came out green - the hash-of-silence lesson, again) -----
+console.log('Test 6: total silence = RED; mostly-silent-but-alive = green');
+{
+  const sr = 48000;
+  const silent = new Float64Array(2 * sr * 2); // 2 s of zeros
+  const p1 = join(dir, 'silence.wav');
+  writeWav16(p1, silent);
+  const r1 = analyze(readWav(p1));
+  check('silence_ratio = 1', r1.silence_ratio === 1, r1.silence_ratio);
+  check('verdict RED on total silence', !r1.verdict.ok, JSON.stringify(r1.verdict));
+  check('reason names silence', r1.verdict.reasons.some((x) => /SILENCE/i.test(x)),
+    JSON.stringify(r1.verdict.reasons));
+
+  // A sparse but real piece (one quiet tone burst in 2 s) must stay green:
+  // silence is only damning when it is TOTAL.
+  const sparse = new Float64Array(2 * sr * 2);
+  for (let n = 0; n < 4800; n++) {
+    const v = 0.2 * Math.sin((2 * Math.PI * 440 * n) / sr) * Math.min(1, n / 480) * Math.min(1, (4800 - n) / 480);
+    sparse[2 * (sr + n)] = v;
+    sparse[2 * (sr + n) + 1] = v;
+  }
+  const p2 = join(dir, 'sparse.wav');
+  writeWav16(p2, sparse);
+  const r2 = analyze(readWav(p2));
+  check('sparse piece stays green', r2.verdict.ok, JSON.stringify(r2.verdict));
+}
+
 if (failures > 0) {
   console.error(`\near-analyze self-test: ${failures} FAILURE(S)`);
   process.exit(1);

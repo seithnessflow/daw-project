@@ -29,7 +29,7 @@
 // Exit 1 on a red verdict or a failed render - "ca devrait aller" does
 // not exist for eardrums.
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -123,10 +123,39 @@ if (!needSurgery) {
   writeFileSync(docCopy, Automerge.save(doc));
 }
 
+// ---- Asset staging --------------------------------------------------------
+// The STORE is the source of truth for user-dropped assets. Lesson
+// 2026-08-23 (seance musique): ear pointed only at engine/test-assets, so
+// any project made of real user files rendered 48 s of SILENCE - and the
+// gate said green. Resolution order: server store first, test-assets
+// fallback (seeded fixtures), missing = LOUD REFUSAL, never silence.
+const storeDir = join(root, 'server', 'assets');
+const stageDir = join(earDir, 'assets-stage');
+rmSync(stageDir, { recursive: true, force: true });
+mkdirSync(stageDir, { recursive: true });
+{
+  const stagedDoc = Automerge.load(readFileSync(docCopy));
+  const hashes = new Set();
+  for (const t of stagedDoc.tracks) for (const c of t.clips ?? []) if (c.assetHash) hashes.add(c.assetHash);
+  const missing = [];
+  for (const h of hashes) {
+    const name = `${h}.wav`;
+    const src = [join(storeDir, name), join(assetsDir, name)].find(existsSync);
+    if (!src) { missing.push(h); continue; }
+    copyFileSync(src, join(stageDir, name));
+  }
+  if (missing.length) {
+    console.error(`ear: ${missing.length} asset(s) in the document but NOT FOUND in the store (${storeDir}) nor test-assets - refusing to render silence:`);
+    for (const h of missing) console.error(`  ${h}`);
+    process.exit(2);
+  }
+  console.error(`ear: ${hashes.size} asset(s) staged from store/test-assets`);
+}
+
 // ---- Render (offline, silent by nature) -----------------------------------
 const render = spawnSync(
   engineExe,
-  ['--doc', docCopy, '--render', outWav, '--assets', assetsDir,
+  ['--doc', docCopy, '--render', outWav, '--assets', stageDir,
    '--vst3-module', `${againUid}=${againModule}`],
   { cwd: join(root, 'engine', 'build-msvc'), encoding: 'utf8', timeout: 120000 },
 );

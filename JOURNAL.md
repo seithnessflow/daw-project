@@ -228,6 +228,28 @@ dates (documentation, pas bloquants) : texte de l'invite, semantique
 dismissal/refus explicite, memorisation, FF/Safari. Reste UN geste
 humain : le sceau vert (AUTH OK) dans le navigateur de l'utilisateur.
 
+**2026-08-23 (seance musique — premiere utilisation complete en
+utilisateur) :** un morceau de 48 s (ma-piece.wav, 5 pistes, 203 clips
+poses par l'UI, AGain sur la kick regle a 0,72 par le slider UI, bypass
+A/B mesure a -2,85 dB exact, rendu vert -2,82 dBFS). Moisson : le
+compte-rendu de friction (pas de duplication de clips = gene n.1 et
+ABSENTE de la roadmap ; add/remove device inexistant dans l'UI ;
+suppression de clip qui echoue en silence ; ear muet sur les assets du
+store ET vert sur 48 s de silence ; pas d'export UI ; 20 px/s sans
+zoom ; lecture sans fin ; pas de renommage). Arbitrage utilisateur :
+ordre A (ear-verite) -> B (suppression/selection) -> C (lecture Ableton
+duplicate -> modele) -> D (add/remove device), puis 1pre/1bis. Habitude
+gravee : trace visuelle a chaque seance UI. VCV Rack note en piste
+future (apres l'invariant).
+
+**2026-08-23 (session A — ear-verite) :** l'oreille resout desormais
+les assets depuis le STORE du serveur (staging par hash, test-assets en
+secours, asset manquant = REFUS bruyant, plus jamais du silence) ; et
+le silence integral est ROUGE PAR PRINCIPE (self-test 6 : silence pur
+rouge avec raison nommee, piece eparse reste verte). Preuve : ma-piece
+rendait muet-vert, elle rend maintenant son-vert sans aucune copie
+manuelle. La lecon du hash-de-silence, soudee cote outillage.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

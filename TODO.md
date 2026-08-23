@@ -22,6 +22,28 @@ dedouble). Ordre :
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
        declencheront en premier).
+0pre. [ ] ARBITRAGE POST-SEANCE-MUSIQUE (2026-08-23, compte-rendu de la
+       premiere seance utilisateur complete — 203 clips, AGain, rendu
+       48 s). Ordre DECIDE, avant 1pre :
+       A. [ ] EAR-VERITE (session immediate) : l'oreille a dit VERT sur
+          48 s de silence total. Deux corrections : ear resout les
+          assets depuis le STORE du serveur (aujourd'hui il ne lit que
+          engine/test-assets -> tout projet fait d'assets droppes rend
+          muet) ; et silence integral = ROUGE PAR PRINCIPE (garde-fou
+          au self-test CI). Un outil de preuve qui valide du vide
+          invalide retroactivement ses verdicts.
+       B. [ ] SUPPRESSION DE CLIP + ETAT DE SELECTION (meme session,
+          meme trou vecu deux fois) : clic sur clip + Suppr = aucun
+          effet, aucun message ; l'etat selectionne est invisible.
+       C. [ ] DUPLIQUER/REPETER UN CLIP — la gene n.1 de la seance,
+          ABSENTE de la roadmap. Prealable : session courte de lecture
+          Ableton sur CETTE question seule (modele loop/duplicate/
+          repeat + implications CRDT), revenir avec un modele.
+       D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
+          trou le plus visible du chemin produit, et c'est le chemin
+          du differenciateur.
+       Le reste de la liste ATTEND (fades = candidats au degel, PAS
+       degeles ; grille, master meter, renommage, tempo).
 1pre. [ ] MECANISME DE LIVRAISON DU TOKEN (a trancher AVANT 1bis —
        decouvert par le 4001 accidentel du harnais LNA 2026-08-23) :
        une page servie d'un domaine distant ne peut pas lire
@@ -505,6 +527,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       - Identites (actorId <-> compte) : prerequis presence/IA, tranche 3+.
       - Discord : integrer (Rich Presence, webhook), jamais construire.
         Tranche 3+.
+      - VCV Rack en natif (note 2026-08-23, sans l'ouvrir) : open
+        source, installable par tous -> terrain d'essai ideal pour le
+        partage de chaine. APRES l'invariant, pas avant ; pour tester
+        le differenciateur, un VST3 gratuit quelconque suffit.
 
 - [ ] COHERENCE (audit 2026-08-22) — split-rule et jumeaux restants :
       a. [x] buildGraph : noyau partage (makeClipPlayer/makeGainNode dans
