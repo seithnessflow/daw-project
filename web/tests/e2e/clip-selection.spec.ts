@@ -66,10 +66,21 @@ test.describe('Clip selection and delete (session B)', () => {
     await expect(page.locator('.clip')).toHaveCount(0);
     await expect.poll(() => clipCount(page), { timeout: 5000 }).toBe(0);
 
-    // 5. Delete with no selection is a no-op on the document
+    // 5. Delete with no selection is a no-op on the document.
+    // Ultra bug_003: the old form (waitForTimeout + one stale read) was
+    // the forbidden masking pattern AND missed any write landing after
+    // the wait. This is an ACTIVE detector: heads sampled continuously
+    // over a bounded window, failing on ANY divergence inside it.
     const h1 = await heads(page);
     await page.keyboard.press('Delete');
-    await page.waitForTimeout(300);
-    expect(await heads(page), 'Delete with no selection wrote to the document').toBe(h1);
+    const diverged = await page.evaluate(async (before) => {
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        const now = JSON.stringify((window as any).__dawProject.getHeads());
+        if (now !== before) return now;
+      }
+      return null;
+    }, h1);
+    expect(diverged, 'Delete with no selection wrote to the document').toBeNull();
   });
 });

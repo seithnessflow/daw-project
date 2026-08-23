@@ -117,6 +117,11 @@ export async function init(): Promise<void> {
   // then the local endpoint (zero-paste: "j'ouvre le site, ca marche").
   const fragTok = new URLSearchParams(
     window.location.hash.replace(/^#/, '')).get('token');
+  // Ultra bug_006: scrub the secret from the address bar once read (the
+  // OAuth-redirect pattern) - the fragment never hits the network, but
+  // it WAS visible on screen, in bookmarks and in copied URLs. Reload
+  // recovery is covered by the /api/engine-token path below.
+  if (fragTok) history.replaceState(null, '', window.location.pathname + window.location.search);
   const queryTok = new URLSearchParams(window.location.search).get('token');
   const fetchLocalToken = async (): Promise<string | null> => {
     try {

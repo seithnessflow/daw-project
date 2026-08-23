@@ -254,6 +254,12 @@ export class EngineClient {
 
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
+      // Ultra bug_004: ONE refresh budget per SCHEDULED cycle. Without
+      // this, a single failed tokenRefresher() locked the stale token in
+      // forever (dot red until reload). Resetting here - never in
+      // connect() - keeps the 4001 path incapable of tight-looping:
+      // the budget only ever returns on this 3 s cadence.
+      this.refreshedOnce = false;
       console.log('Attempting to reconnect to engine...');
       this.connect().catch(console.error);
     }, 3000);

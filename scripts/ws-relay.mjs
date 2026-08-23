@@ -37,6 +37,11 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 server.on('upgrade', (req, socket, head) => {
   const remote = new WebSocket(`wss://${targetHost}${req.url}`);
+  // Ultra bug_005: a client that aborts BEFORE the remote handshake
+  // completes (~3.5 s cold through the tunnel) must not orphan the wss
+  // connection - terminate() is safe pre- and post-open.
+  socket.on('close', () => { try { remote.terminate(); } catch {} });
+  socket.on('error', () => { try { remote.terminate(); } catch {} });
   remote.on('open', () => {
     wss.handleUpgrade(req, socket, head, (local) => {
       local.on('message', (d, isBinary) => remote.send(d, { binary: isBinary }));

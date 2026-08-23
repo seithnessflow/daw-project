@@ -8,7 +8,8 @@
 
 import { TIMELINE } from '../ui/track';
 import { Library, type Kit } from '../ui/library';
-import { decodeDurationSec, SERVER_HTTP } from '../ui/waveform';
+import { decodeDurationSec } from '../ui/waveform';
+import { SERVER_HTTP } from './context';
 import { ctx, sendLastChange, LAB_MODE } from './context';
 import { renderTracks } from './render';
 import { markLanded } from './gestures';

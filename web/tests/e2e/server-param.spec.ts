@@ -23,4 +23,27 @@ test.describe('Remote server parameter (1bis)', () => {
     expect(urls.ws).toBe('ws://127.0.0.1:3000');
     expect(urls.http).toBe('http://127.0.0.1:3000');
   });
+
+  // Ultra merged_bug_002: the raw forms a human actually pastes.
+  test('trailing slash is stripped (no silent //ws 404) and still connects', async ({ page }) => {
+    const projectId = `e2e-serverparam-slash-${Date.now()}`;
+    await page.goto(`/?project=${projectId}&server=ws://127.0.0.1:3000/`);
+    await waitForServerConnection(page);   // a //ws path would never connect
+    const urls = await page.evaluate(async () => {
+      const ctx = await import('/src/app/context.ts');
+      return { ws: ctx.SERVER_URL, http: ctx.SERVER_HTTP };
+    });
+    expect(urls.ws).toBe('ws://127.0.0.1:3000');
+    expect(urls.http).toBe('http://127.0.0.1:3000');
+  });
+
+  test('http(s) scheme is coerced to ws(s) instead of throwing', async ({ page }) => {
+    await page.goto(`/?project=coerce-${Date.now()}&server=https://example.invalid:3000`);
+    const urls = await page.evaluate(async () => {
+      const ctx = await import('/src/app/context.ts');
+      return { ws: ctx.SERVER_URL, http: ctx.SERVER_HTTP };
+    });
+    expect(urls.ws).toBe('wss://example.invalid:3000');
+    expect(urls.http).toBe('https://example.invalid:3000');
+  });
 });

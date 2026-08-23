@@ -14,9 +14,15 @@ import type { Overview } from '../ui/overview';
 // ---- Configuration --------------------------------------------------------
 // 1bis: the sync server can be REMOTE (two machines, one project).
 // ?server=<host:port | ws://url> - defaults to the local dev server.
-const serverParam = new URLSearchParams(window.location.search).get('server');
-const serverBase = serverParam
-  ? (serverParam.includes('://') ? serverParam : `ws://${serverParam}`)
+// Ultra merged_bug_002: normalize - a trailing slash gave //ws/... paths
+// (silent 404, axum does not collapse slashes) and a pasted http(s)://
+// threw a SyntaxError in new WebSocket(). Coerce both at the boundary.
+const rawServer = new URLSearchParams(window.location.search)
+  .get('server')?.trim().replace(/\/+$/, '');
+const serverBase = rawServer
+  ? (rawServer.includes('://')
+      ? rawServer.replace(/^http(s?):/, 'ws$1:')
+      : `ws://${rawServer}`)
   : 'ws://localhost:3000';
 export const SERVER_URL = serverBase;
 /** HTTP side of the same server (assets store). ONE source of truth. */

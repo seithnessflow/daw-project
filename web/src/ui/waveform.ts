@@ -9,11 +9,10 @@
  * on a rebuild redraws instantly; the network is hit once per asset.
  */
 
-// 1bis: single source of truth for the server address (twin killed -
-// this constant used to live here hard-coded). Imported AND re-exported
-// (a bare `export {} from` would not bind it in this module's scope).
+// 1bis + ultra bug_009: SERVER_HTTP's single owner is app/context -
+// imported here for local use only, no re-export (the forwarding twin
+// is dead for real this time).
 import { SERVER_HTTP } from '../app/context';
-export { SERVER_HTTP };
 
 /** Decode audio duration in seconds (shared AudioContext). */
 export async function decodeDurationSec(bytes: ArrayBuffer): Promise<number> {

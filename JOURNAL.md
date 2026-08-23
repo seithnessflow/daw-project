@@ -324,6 +324,21 @@ Frictions : moteur sans --assets ecrit les fetches dans le CWD ;
 lecture sans fin (57 min au compteur). Le controle SSH inter-NAT
 (docs/deux-machines.md) a servi pour toute la verification distante.
 
+**2026-08-23 (moisson ultra — les 7 nits de la premiere ultrareview,
+PR #1, soldes en une session) :** budget de refresh 4001 par cycle
+PLANIFIE (l'echec d'un fetch ne fige plus la pastille au rouge, et
+jamais de boucle serree — invariant mieux que la suggestion de la
+revue) ; relais : terminate() du wss si le client avorte pendant le
+handshake ; ?server= normalise (slash final strippe, http(s) coerce en
+ws(s)) + 2 tests des formes reellement collees ; #token efface de la
+barre d'adresse apres lecture (motif OAuth) ; jumeau SERVER_HTTP
+vraiment tue (placement importe du proprietaire) ; page de test LNA :
+fossile /tmp corrige ; mon waitForTimeout remplace par un detecteur
+actif (echantillonnage continu des heads — la suggestion expect.poll
+de la revue passait a la premiere lecture, refusee). tsc vert, 19/19
+local (spec token exclu : le moteur du duo tient 47821 — verdict
+complet par la CI).
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie
