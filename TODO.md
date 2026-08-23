@@ -100,6 +100,26 @@ dedouble). Ordre :
        explicite : identites, projets heberges, invitations, signaling
        — etat provisoire assume, plus une loi de design).
 
+7. [ ] L'INSTRUMENT JOUABLE (avis reviewer consigne 2026-08-23 —
+       APRES 1bis, jamais avant : ne rapproche pas l'invariant).
+       Le raccourci qui decoule d'ADR-002 : jouer des notes en direct =
+       PERFORMANCE, pas document — note-on/note-off sur le canal WS
+       moteur existant (meme sang que bypass/solo/transport), zero
+       CRDT, zero clip MIDI. Demo « j'ouvre le site, je clique, un
+       synthe natif sonne ». Prerequis deja dans la tranche : D
+       (bouton device), 2.5-etat, decouverte ; manque propre a lui :
+       config de bus INSTRUMENT (l'hote ne sait faire que des effets),
+       et les events note dans le ring (couvert si la file A3-1 est
+       GENERIQUE — voir note ordre 3). REFUS ECRIT : VST2 (Massive
+       classique) — hote VST3 exclusif, SDK VST2 plus distribue ;
+       banc d'essai : synthe VST3 libre (Surge XT, GPL comme nous ;
+       Dexed). La GUI du plugin = fenetre native a cote du navigateur,
+       choix de design a trancher a ce moment-la.
+       LES CLIPS MIDI DANS LE DOCUMENT (notes persistantes, editables,
+       convergentes) = l'autre moitie, un VRAI morceau de schema : se
+       pense AVEC la session placement (SCHEMA v2, item 2 ci-dessus),
+       pas apres — sinon on dessine deux fois.
+
 Les ordres AUDIT-4 items 3-4 (ring, cycle de vie enfants) restent des
 fondations de l'hote que les stems rendront ; items 5-6 inchanges.
 
@@ -366,7 +386,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          plugin a n params perd n-1 params a chaque rebuild. File SPSC
          de paires {id, value} dans le segment, moule CommandRingBuffer.
          Session courte, test : 2 params envoyes coup sur coup, les 2
-         appliques.
+         appliques. DECISION D'ENTREE (2026-08-23, instrument jouable
+         en vue) : la file est GENERIQUE — evenements {type, id, value}
+         (type: param aujourd'hui, note-on/off demain) — pour que les
+         notes de l'instrument s'y branchent sans re-bump de layout.
       3. [ ] A3-2+A3-3 CONTRAT DE PERIODE (une session) : depth clampee
          en silence a 2 (TODO promettait « buffer 1024 -> 4 blocs » —
          phrase fausse, famille des 47 runs) + bloc partiel (periode non
