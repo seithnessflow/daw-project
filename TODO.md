@@ -639,9 +639,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 ## S8a FAIT 2026-08-24 : TapRing lock-free (drop-newest, etage
 ## d'accumulation anti-trous), pumpTap chaque tour, AudioTap/TapControl
 ## au protocole, ?tap=1 + badge continuite, garde tap.spec (~375
-## blocs/2s contigus, zero drop). RESTE : S8b traversee (signaling
-## serveur + RTCPeerConnection, STUN sans TURN, echec propre),
-## S8c ecoute (WebAudio + tranche JAM + latence AFFICHEE).
+## blocs/2s contigus, zero drop). S8b FAIT 2026-08-24 : relais
+## signaling texte (serveur verbatim), JamChannel (1 diffuseur/projet,
+## JOIN des auditeurs, STUN seul), latence ping mesuree au badge,
+## file de signaling anti-CONNECTING + reassert (le bug de la
+## premiere spec). RESTE : S8c ecoute — tap -> AudioWorklet ->
+## MediaStream addTrack cote diffuseur ; lecture + tranche JAM cote
+## auditeur ; latence bout-en-bout affichee ; puis le test REEL deux
+## machines (portable).
 ## (c'est LUI qu'on coupe s'il deborde.)
 ## Rappel de la revue : la preuve est calibree sur le plugin le plus
 ## gentil du monde — latence nulle, etat minuscule, deterministe,

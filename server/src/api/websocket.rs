@@ -119,6 +119,15 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
             tokio::select! {
                 received = rx.recv() => match received {
                     Ok(msg) => {
+                        // S8b: internally-tagged signaling goes out as TEXT
+                        // (old clients ignore text; the doc path never sees it)
+                        if msg.len() >= 2 && msg[0] == 0xFF && msg[1] == b'S' {
+                            let text = String::from_utf8_lossy(&msg[2..]).into_owned();
+                            if sender.send(Message::Text(format!("signal:{}", text))).await.is_err() {
+                                break;
+                            }
+                            continue;
+                        }
                         let msg_len = msg.len();
                         match sender.send(Message::Binary(msg)).await {
                             Ok(_) => {
@@ -202,7 +211,24 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
                         Message::Ping(_) => {}
                         Message::Pong(_) => {}
                         Message::Text(t) => {
-                            tracing::warn!("Session {}: Received unexpected text message: {}", session_id_recv, t);
+                            // S8b: jam signaling relay. "signal:{json}" is
+                            // relayed VERBATIM to every peer of the project
+                            // (sender filters its own via the embedded id).
+                            // The server never parses the payload - pure
+                            // signaling, ADR-019 kept literally.
+                            if let Some(payload) = t.strip_prefix("signal:") {
+                                let sync_state = state_clone.sync_state.read().await;
+                                if let Some(tx) = sync_state.get_broadcast(&project_id_clone) {
+                                    // Internal tag: broadcast carries Vec<u8>;
+                                    // 0xFF 'S' cannot collide with an Automerge
+                                    // frame (magic 0x85 0x6F 0x4A 0x83).
+                                    let mut framed = vec![0xFFu8, b'S'];
+                                    framed.extend_from_slice(payload.as_bytes());
+                                    let _ = tx.send(framed);
+                                }
+                            } else {
+                                tracing::warn!("Session {}: Received unexpected text message: {}", session_id_recv, t);
+                            }
                         }
                     }
                 }

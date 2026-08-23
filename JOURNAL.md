@@ -615,6 +615,24 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (S8b — la traversee : deux onglets se connectent en
+P2P) :** le signaling voyage en TEXTE sur le WS document (prefixe
+`signal:`, relais serveur VERBATIM — il ne parse jamais la charge,
+ADR-019 tenu a la lettre ; tag interne 0xFF'S' dans le canal
+broadcast, impossible a confondre avec la magie automerge). JamChannel
+web : UN diffuseur par projet (bouton JAM, aria-pressed), les
+auditeurs demandent (JOIN = offre vide), le diffuseur repond en offre
+dirigee, ICE en STUN seul (NAT strict = echec PROPRE affiche, TURN =
+dette datee). DataChannel jam-ctl : ping/pong -> latence MESUREE et
+AFFICHEE au badge (« jam diffuse N pair(s) X ms »). LE BUG QUI A
+COUTE LA PREMIERE SPEC : les modes auto (?jam=) tirent au chargement,
+AVANT l'open du socket — le JOIN partait dans le vide (sendSignal
+silencieux sur CONNECTING, diagnostique par sonde ws.readyState=0).
+Fix : file de signaling flushee a l'open + reassert() du JOIN a
+chaque (re)connexion. Garde jam.spec : broadcast+listen connectes,
+latence >= 0 affichee, bye propre vu par l'auditeur. S8c reste :
+l'audio DANS le tuyau (tap -> AudioWorklet -> addTrack -> lecture).
+
 **2026-08-24 (S8a — le robinet du jam : moteur -> onglet) :**
 l'arbitrage streaming delegue (« propre et performant ») -> WebRTC
 navigateur ratifie (dossier docs/STREAMING-DESIGN.md), et la premiere

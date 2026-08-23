@@ -25,6 +25,7 @@ import {
 import { startPlayback, stopPlayback } from './transport';
 import { beginClipDrag, beginClipResize, beginFadeDrag, markLanded } from './gestures';
 import { toggleHelp, isHelpOpen } from '../ui/help';
+import { JamChannel } from '../network/jam';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 
@@ -41,12 +42,15 @@ export async function init(): Promise<void> {
   window.__dawProject = ctx.project;
 
   // ---- Server (document) --------------------------------------------------
+  let jamReassert: (() => void) | null = null;  // set once the jam exists
   const serverClient = new ServerClient(SERVER_URL);
   ctx.serverClient = serverClient;
   serverClient.onConnect = () => {
     els.serverStatus.classList.add('connected');
     // Selection contract: tests read data-state, the class only styles
     els.serverStatus.dataset.state = 'connected';
+    // S8b: a listener's JOIN may have died with the old socket
+    jamReassert?.();
     console.log('Connected to server');
   };
   serverClient.onDisconnect = () => {
@@ -208,6 +212,40 @@ export async function init(): Promise<void> {
     sendLastChange();
     els.masterDb.textContent = formatGain(Number(els.masterGain.value));
   });
+
+  // S8b: the jam traversal - one broadcaster per project, listeners
+  // answer; latency MEASURED over the data channel and displayed.
+  const jam = new JamChannel(serverClient);
+  (window as any).__dawJam = jam;
+  jamReassert = () => jam.reassert();
+  const jamBtn = document.getElementById('jam-btn') as HTMLButtonElement;
+  let jamBadge: HTMLElement | null = null;
+  jam.onStateChange = () => {
+    const peers = jam.peerCount();
+    const lat = [...jam.latencyMs.values()];
+    if (!jamBadge && jam.role !== 'idle') {
+      jamBadge = document.createElement('div');
+      jamBadge.className = 'status-item';
+      jamBadge.id = 'jam-status';
+      document.querySelector('.status')?.prepend(jamBadge);
+    }
+    if (jamBadge) {
+      jamBadge.dataset.state = peers > 0 ? 'connected' : jam.role;
+      jamBadge.textContent = jam.role === 'idle' ? 'jam off'
+        : `jam ${jam.role === 'broadcasting' ? 'diffuse' : 'ecoute'} ${peers} pair(s)` +
+          (lat.length ? ` ${Math.max(...lat)} ms` : '');
+    }
+    jamBtn.setAttribute('aria-pressed', jam.role === 'broadcasting' ? 'true' : 'false');
+  };
+  jamBtn.addEventListener('click', () => {
+    if (jam.role === 'broadcasting') jam.stop();
+    else { if (jam.role === 'listening') jam.stop(); jam.startBroadcast(); }
+  });
+  {
+    const mode = new URLSearchParams(window.location.search).get('jam');
+    if (mode === 'broadcast') jam.startBroadcast();
+    else if (mode === 'listen') jam.startListen();
+  }
 
   // S8a: the tap badge - blocks/s, sequence continuity, drops. The
   // meter that says "the jam road's first leg is flowing".

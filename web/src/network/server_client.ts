@@ -63,6 +63,8 @@ export class ServerClient {
   /** Called with the full document at the start of EVERY connection. */
   onDocument: ((data: Uint8Array) => void) | null = null;
   onChange: ((change: Uint8Array) => void) | null = null;
+  /** S8b: jam signaling relayed by the server (parsed JSON). */
+  onSignal: ((signal: unknown) => void) | null = null;
 
   constructor(baseUrl: string) {
     this.url = baseUrl;
@@ -84,6 +86,7 @@ export class ServerClient {
           console.log('Server WebSocket connected');
           this.awaitingInitialDoc = true;
           this.startWatchdog();
+          this.flushSignals();  // S8b: queued jam signals ship now
           this.onConnect?.();
           resolve();
         };
@@ -102,8 +105,16 @@ export class ServerClient {
 
         this.ws.onmessage = (event) => {
           this.lastActivity = Date.now();
-          // A4-4: text frames are heartbeats - never Automerge data
-          if (typeof event.data === 'string') return;
+          // A4-4: text frames are heartbeats or jam signaling - never
+          // Automerge data
+          if (typeof event.data === 'string') {
+            if (event.data.startsWith('signal:')) {
+              try {
+                this.onSignal?.(JSON.parse(event.data.slice(7)));
+              } catch { /* malformed signal: ignore */ }
+            }
+            return;
+          }
           if (event.data instanceof ArrayBuffer) {
             const data = new Uint8Array(event.data);
             // First message of each connection is the full document,
@@ -269,6 +280,27 @@ export class ServerClient {
   pendingCount(): number {
     return this.outbox.length;
   }
+
+  /** S8b: ship a jam signal through the server relay (text frame).
+   *  Queued until the socket opens (auto-jam modes fire at page load,
+   *  BEFORE the connection - a silent drop here cost a session). */
+  private signalOutbox: string[] = [];
+  sendSignal(signal: unknown): void {
+    const text = 'signal:' + JSON.stringify(signal);
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(text);
+    } else {
+      this.signalOutbox.push(text);
+    }
+  }
+  private flushSignals(): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    for (const t of this.signalOutbox) this.ws.send(t);
+    this.signalOutbox = [];
+  }
+
+  /** Stable per-tab identity (used as the jam sender id). */
+  get id(): string { return this.tabId; }
 
   /**
    * Anti-entropy: schedule one resync cycle (close + auto-reconnect, which
