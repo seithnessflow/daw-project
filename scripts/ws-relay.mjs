@@ -16,6 +16,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const require2 = createRequire(join(here, '..', 'web', 'package.json'));
 const { WebSocket, WebSocketServer } = require2('ws');
 
+// A relay that DIES takes the whole two-machine link with it: an
+// aborting client racing the tunnel handshake can make handleUpgrade
+// throw outside every catch (observed: silent death, empty err log).
+// The relay LOGS and SURVIVES - it owns nothing worth crashing for.
+process.on('uncaughtException', (e) => console.error('relay uncaught:', e.message));
+process.on('unhandledRejection', (e) => console.error('relay unhandled:', e));
+
 const target = process.argv[2];
 const port = Number(process.argv[3] ?? 3000);
 if (!target || !/^https:\/\//.test(target)) {
@@ -43,6 +50,7 @@ server.on('upgrade', (req, socket, head) => {
   socket.on('close', () => { try { remote.terminate(); } catch {} });
   socket.on('error', () => { try { remote.terminate(); } catch {} });
   remote.on('open', () => {
+    if (socket.destroyed) { try { remote.terminate(); } catch {} return; }
     wss.handleUpgrade(req, socket, head, (local) => {
       local.on('message', (d, isBinary) => remote.send(d, { binary: isBinary }));
       remote.on('message', (d, isBinary) => local.send(d, { binary: isBinary }));
