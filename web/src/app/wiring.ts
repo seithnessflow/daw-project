@@ -20,10 +20,11 @@ import {
 } from './context';
 import {
   setZoom, fitAll, snapStep, contentSeconds,
-  updateInsertMarker, refreshOverview,
+  updateInsertMarker, refreshOverview, updateFollowUI,
 } from './navigation';
 import { startPlayback, stopPlayback } from './transport';
 import { beginClipDrag, beginClipResize, markLanded } from './gestures';
+import { toggleHelp, isHelpOpen } from '../ui/help';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 
@@ -159,6 +160,10 @@ export async function init(): Promise<void> {
     console.log('Disconnected from engine');
   };
 
+  // V1.4: the "?" button (the help itself must be discoverable)
+  (document.getElementById('help-btn') as HTMLButtonElement)
+    .addEventListener('click', () => toggleHelp());
+
   // V1.3: master sweeps coalesce into one undo entry, like track faders
   els.masterGain.addEventListener('pointerdown', () => {
     ctx.project?.beginUndoGroup();
@@ -233,6 +238,7 @@ export async function init(): Promise<void> {
     ctx.follow = !ctx.follow;
     ctx.followPaused = false;
     followBtn.setAttribute('aria-pressed', ctx.follow ? 'true' : 'false');
+    updateFollowUI();
   });
 
   // ---- Library / palette --------------------------------------------------
@@ -272,6 +278,7 @@ export async function init(): Promise<void> {
   ctx.overview = new Overview({
     onScrollTo: (sec) => {
       ctx.followPaused = true;
+    updateFollowUI();
       ctx.programmaticScroll = true;
       els.tracks.scrollLeft = Math.max(0,
         sec * TIMELINE.pps - (els.tracks.clientWidth - TIMELINE.headWidth) / 2);
@@ -343,6 +350,14 @@ export async function init(): Promise<void> {
         Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
       updateInsertMarker();
       ctx.followPaused = true;   // editing intent: stop chasing
+      updateFollowUI();
+      // V1.4: announce the marker the click just set (2nd silent effect)
+      const markerEl = document.getElementById('insert-marker');
+      if (markerEl) {
+        markerEl.classList.remove('flash');
+        void markerEl.offsetWidth;
+        markerEl.classList.add('flash');
+      }
     }
     if (id !== ctx.selectedTrackId) {
       ctx.selectedTrackId = id;
@@ -358,7 +373,21 @@ export async function init(): Promise<void> {
   // ---- Keyboard -----------------------------------------------------------
   window.addEventListener('keydown', (e) => {
     const tag = (e.target as HTMLElement).tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+
+    // V1.4: the "?" panel - BEFORE the focus guard (Escape must close
+    // from anywhere, including with a button focused; found by spec).
+    if (e.key === 'Escape' && isHelpOpen()) {
+      toggleHelp(false);
+      return;
+    }
+    if (e.key === '?' && !typing) {
+      e.preventDefault();
+      toggleHelp();
+      return;
+    }
+
+    if (typing || tag === 'BUTTON') return;
 
     // V1.3: undo/redo FIRST - and before the zoom branch below, whose
     // bare KeyZ test used to swallow Ctrl+Z into a zoom (ultra-found bug).
@@ -459,6 +488,7 @@ export async function init(): Promise<void> {
   els.tracks.addEventListener('wheel', (e) => {
     if (!e.ctrlKey) {
       ctx.followPaused = true;
+    updateFollowUI();
       return;
     }
     e.preventDefault();
@@ -477,6 +507,7 @@ export async function init(): Promise<void> {
       return;
     }
     ctx.followPaused = true;
+    updateFollowUI();
   });
 
   // ---- Phase 3: the touch prototypes (user arbitrates, never the agent) ---

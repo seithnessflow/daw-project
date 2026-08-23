@@ -174,14 +174,48 @@
   position: absolute;
   top: 23px; /* below the ruler */
   bottom: 0;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.35);
+  width: 2px;
+  background: rgba(255, 255, 255, 0.45);
   z-index: 2;
   pointer-events: none;
+}
+/* V1.4: the lane click ANNOUNCES the marker it just set */
+.insert-marker.flash {
+  animation: marker-flash 500ms ease-out;
+}
+@keyframes marker-flash {
+  0% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35); background: #fff; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 .follow-btn[aria-pressed='true'] {
   background: #3c3524;
   color: var(--amber);
+}
+/* V1.4: follow exists but is PAUSED (scroll/zoom/edit) - say it */
+.follow-btn[aria-pressed='true'].follow-paused {
+  opacity: 0.55;
+  color: #b8a25c;
+}
+
+/* ---- V1.4: the snap grid, DRAWN. An invisible, variable rule is
+   worse than no rule - the grid refines with zoom (vars set by
+   navigation.updateGridVars: fine = snapStep, strong = 1 s). ---- */
+.track-lane {
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.075) 0 1px,
+      transparent 1px var(--grid-sec-px, 20px)),
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.035) 0 1px,
+      transparent 1px var(--grid-fine-px, 5px));
+}
+
+/* V1.4: newly selected track ANNOUNCES itself (one flash, not a state) */
+.track-selected.just-selected .track-head {
+  animation: head-flash 400ms ease-out;
+}
+@keyframes head-flash {
+  0% { background: #4a4335; }
 }
 /* H: compact all tracks (fit height) */
 body.compact-tracks .track-head-body {

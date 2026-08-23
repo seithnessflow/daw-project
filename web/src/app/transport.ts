@@ -5,6 +5,7 @@
  */
 
 import { ctx } from './context';
+import { updateFollowUI } from './navigation';
 
 export function startPlayback(): void {
   if (!ctx.engineClient?.isConnected()) return;
@@ -12,6 +13,7 @@ export function startPlayback(): void {
   ctx.engineClient.seek(Math.round(ctx.insertMarkerSec * sr));
   ctx.engineClient.play();
   ctx.followPaused = false;          // Follow resumes on restart (Ableton)
+  updateFollowUI();
 }
 
 export function stopPlayback(): void {

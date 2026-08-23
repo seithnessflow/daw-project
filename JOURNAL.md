@@ -386,6 +386,21 @@ modificateur — Ctrl+Z zoomait. Piles bornees 100. Tests : e2e 23/23
 dont undo-redo.spec (5 invariants : geste=1 entree, restauration
 convergente, geste distant intact, redo vide, pas de vol de zoom).
 
+**2026-08-23 (V1.4 — ce que le DAW sait, l'ecran le dit) :** la GRILLE
+DE SNAP est dessinee dans les couloirs (deux calques CSS pilotes par
+variables : fin = pas de snap, fort = la seconde — se raffine au zoom,
+zero cout DOM) ; les trois effets du clic de couloir sont ANNONCES
+(marqueur d'insertion qui flashe, piste qui flashe a la selection,
+bouton follow qui dit sa pause avec titre explicite — le corollaire
+grave « une action a plusieurs effets doit les montrer tous » est
+applique a son precedent fondateur) ; panneau d'aide « ? » (touche et
+bouton, Echap ferme, 13 raccourcis enfin dits — la moisson de
+l'inventaire de l'invisible). BUG trouve par le spec en route : la
+garde BUTTON du clavier mangeait l'Echap quand le bouton ? gardait le
+focus — panneau infermable au clavier, corrige (l'aide passe avant la
+garde). Suite 24/24 (visibility.spec : grille+vars au zoom, panneau,
+flashs, follow-paused). Traces : traces/session-v14/.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

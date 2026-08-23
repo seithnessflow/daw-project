@@ -19,7 +19,7 @@ import {
 import * as life from '../ui/life';
 import { fillWaveforms } from '../ui/waveform';
 import { ctx, els, sendLastChange } from './context';
-import { updateInsertMarker, refreshOverview } from './navigation';
+import { updateInsertMarker, refreshOverview, updateGridVars } from './navigation';
 import { refreshPalette } from './placement';
 import { cssId } from '../document/sanitize';
 
@@ -33,6 +33,9 @@ export function renderTracks(force = false): void {
   }
   const selectedTrack =
     doc.tracks.find((t) => t.id === ctx.selectedTrackId) ?? null;
+
+  // V1.4: the snap grid vars follow the zoom (lanes draw the rule)
+  updateGridVars();
 
   // V1.2: master strip follows the document (remote moves converge) -
   // never fight the hand currently on the fader.
@@ -93,6 +96,12 @@ export function renderTracks(force = false): void {
         }
       },
     );
+    // V1.4: a NEWLY selected track flashes once (announce, not a state)
+    if (track.id === ctx.selectedTrackId &&
+        ctx.lastFlashedTrackId !== ctx.selectedTrackId) {
+      element.classList.add('just-selected');
+      ctx.lastFlashedTrackId = ctx.selectedTrackId;
+    }
     els.tracks.appendChild(element);
   }
 

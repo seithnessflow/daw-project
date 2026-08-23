@@ -1,0 +1,64 @@
+/* ---- V1.4: the "?" shortcuts panel ------------------------------- */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 50;
+}
+.help-overlay.open {
+  display: flex;
+}
+.help-panel {
+  background: #17181a;
+  border: 1px solid #2c2e31;
+  border-radius: 8px;
+  padding: 18px 24px 12px;
+  max-width: 460px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.help-panel h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-2);
+}
+.help-panel table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.help-panel td {
+  padding: 4px 10px 4px 0;
+  font-size: 12px;
+  color: var(--text-2);
+  vertical-align: top;
+}
+.help-panel kbd {
+  display: inline-block;
+  background: #232527;
+  border: 1px solid #3a3d40;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: #d3d7db;
+  white-space: nowrap;
+}
+.help-hint {
+  margin: 12px 0 2px;
+  font-size: 10px;
+  color: var(--text-3);
+  text-align: center;
+}
+.help-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+}

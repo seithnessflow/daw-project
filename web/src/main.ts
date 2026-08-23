@@ -20,6 +20,7 @@ import './styles/devices.css';
 import './styles/life.css';
 import './styles/touch-modes.css';
 import './styles/starter.css';
+import './styles/help.css';
 
 import { init } from './app/wiring';
 

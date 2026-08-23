@@ -33,6 +33,8 @@ export function setZoom(newPps: number, anchorSec: number, anchorViewportX: numb
   if (pps === TIMELINE.pps) return;
   TIMELINE.pps = pps;
   ctx.followPaused = true;
+  updateFollowUI();
+  updateGridVars();
   if (zoomRaf) return;               // coalesce zoom ticks to one render
   zoomRaf = requestAnimationFrame(() => {
     zoomRaf = 0;
@@ -56,6 +58,28 @@ export function snapStep(): number {
   if (pps >= 40) return 0.125;
   if (pps >= 10) return 0.25;
   return 0.5;
+}
+
+/**
+ * V1.4: publish the grid pitches as CSS vars - the lanes DRAW the snap
+ * rule (fine = snapStep, strong = one second), refined with the zoom.
+ */
+export function updateGridVars(): void {
+  els.tracks.style.setProperty('--grid-fine-px', `${snapStep() * TIMELINE.pps}px`);
+  els.tracks.style.setProperty('--grid-sec-px', `${TIMELINE.pps}px`);
+}
+
+/**
+ * V1.4: the follow button SAYS when follow is paused (scroll/zoom/edit)
+ * - the third silent effect of the lane click, now announced.
+ */
+export function updateFollowUI(): void {
+  const btn = document.getElementById('follow-btn');
+  if (!btn) return;
+  btn.classList.toggle('follow-paused', ctx.followPaused);
+  btn.setAttribute('title', ctx.followPaused
+    ? 'Follow en pause (scroll/zoom/edition) - clic pour reprendre'
+    : 'Follow playhead');
 }
 
 export function updateInsertMarker(): void {
