@@ -634,7 +634,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 ## simple, faux si producteur hors-ligne ; (c) timestamps —
 ## approximatif. PROPOSITION : (b) + mention « fraicheur inconnue »
 ## quand le producteur est absent] ;
-## 6. streaming jam (c'est LUI qu'on coupe s'il deborde).
+## 6. streaming jam — CADRAGE ECRIT (docs/STREAMING-DESIGN.md,
+## 2026-08-24) : PROPOSITION A RATIFIER = WebRTC navigateur-a-
+## navigateur (zero dependance native, Opus/jitter/NAT integres),
+## robinet moteur->onglet en WS loopback, signaling par le serveur
+## (pur texte), PAS de TURN au v1 (echec propre affiche). Latence
+## 30-80 ms attendue, MESUREE ET AFFICHEE, jamais promise. Decoupage
+## S8a robinet / S8b traversee / S8c ecoute. AUCUNE ligne avant
+## l'arbitrage utilisateur. (c'est LUI qu'on coupe s'il deborde.)
 ## Rappel de la revue : la preuve est calibree sur le plugin le plus
 ## gentil du monde — latence nulle, etat minuscule, deterministe,
 ## sans GUI : quatre endroits ou le premier vrai plugin cassera.
