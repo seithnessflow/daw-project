@@ -22,10 +22,24 @@ dedouble). Ordre :
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
        declencheront en premier).
+1bis. [ ] SMOKE DEUX MACHINES (hoiste 2026-08-23, retour reviewer :
+       ne pas re-commettre l'erreur qu'on vient de corriger — valider
+       l'hypothese qui porte tout AVANT de construire dessus) : deux
+       ordinateurs, deux reseaux, un projet, un WAV depose, convergence
+       observee. Pas le critere complet, pas les VST, pas les stems —
+       une heure. Fait tomber les surprises identite/NAT/decouverte du
+       serveur pendant que 2-3-4 sont encore modifiables, et verifie
+       que le trio deps-manquantes est vraiment regle.
 2. [ ] DESIGN DU PLACEMENT (session dediee, SCHEMA v2) : chaque noeud
        declare quel pair l'heberge, negocie par capacite ; reprise
        quand le pair hebergeur part. AVANT toute nouvelle ligne de
        timeline. Le design seul — l'implementation suit les fondations.
+       INTRANTS GRAVES (amendement ADR-019) : cle de stem = cle de
+       cache d'ENTREES (version/build plugin + samplerate DANS la cle,
+       jamais d'assertion de re-rendu bit-exact d'un plugin tiers) ;
+       stem perime = etat d'UI ; un stem survit a son producteur
+       (invariant) ; PDC cuite ou declaree ; B controle les params
+       exposes via CRDT, la GUI et le binaire ne traversent JAMAIS.
 3. [ ] 2.5-ETAT REQUALIFIE PREREQUIS : l'etat persiste des plugins
        (blobs Comp/Cont, canal assets) entre dans la CLE de stem
        (hash = entree + uid + etat + plage) — il precede le jalon

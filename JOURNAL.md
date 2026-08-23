@@ -206,3 +206,20 @@ chez nous : le moteur repond 400 sans en-tetes CORS, le navigateur
 affiche « Failed to fetch » meme quand le reseau passe — defaut de la
 page de test consigne. Reste 30 s de mains : refus/memoire/annulation.
 Observation : le moteur ne loggue pas les connexions acceptees.
+
+**2026-08-23 (retour du pair reviewer sur l'execution, consigne le jour
+meme) :** verdict LNA requalifie ⚠️ TIENT SOUS CONDITIONS (le mecanisme
+est la carve-out loopback — le tunnel n'a servi que la page, l'URL WS
+etait 127.0.0.1 par construction ; --allow-origin = design d'origine
+prod a trancher ; handshake prouve, pas l'audio ; Firefox/Safari non
+testes). ADR-019 amende : la cle de stem est une CLE DE CACHE D'ENTREES
+(version/build du plugin + samplerate dans la cle, jamais d'assertion
+de re-rendu bit-exact d'un tiers — les VST ne sont pas deterministes) ;
+intrants SCHEMA v2 graves (stem perime = etat d'UI, un stem survit a
+son producteur, PDC cuite ou declaree) ; ligne de controle gravee (B
+pilote les params exposes via CRDT, GUI et binaire ne traversent
+jamais — la ligne juridique) ; vigilance streaming (s'il deborde, on
+coupe le streaming, jamais les stems). Ordre corrige : SMOKE DEUX
+MACHINES hoiste en 1bis, avant le placement — valider l'hypothese qui
+porte tout AVANT de construire dessus. Correction item 2 (fondation
+multi-machine) et 2.5-etat-prerequis ACCEPTEES par le reviewer.

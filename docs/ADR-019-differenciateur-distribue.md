@@ -107,6 +107,50 @@ et le cycle de vie des enfants (ordre 4) portent l'hote que les stems
 rendront. 2.5-etat (etat des plugins persiste) devient un PREREQUIS
 direct du hash de stem (l'etat des params entre dans la cle).
 
+## Amendement 2026-08-23 (retour du pair reviewer, consigne le jour meme)
+
+### La cle de stem est une CLE DE CACHE D'ENTREES, pas une assertion de determinisme
+
+Le moteur est deterministe ; les VST tiers ne le sont PAS (modelisation
+analogique, bruit interne, LFO libres, etat entre blocs). Formulation
+gravee pour empecher le test piege :
+
+> Le hash `(entree + class-uid + VERSION/BUILD du plugin + etat params
+> + plage + SAMPLERATE)` dit QUAND re-rendre, jamais CE QU'ON DEVRAIT
+> OBTENIR. La verite, ce sont les octets du stem stockes. AUCUN test ne
+> doit asserter un re-rendu bit-exact d'un stem de plugin tiers.
+
+Version/build du plugin et samplerate FONT PARTIE de la cle — sans eux,
+deux machines avec deux versions du meme VST produisent des stems
+silencieusement faux.
+
+### Intrants graves pour la session SCHEMA v2 (avec le placement)
+
+1. **Stem perime = etat d'UI a modeliser**, pas un cas limite : B
+   modifie un param d'un plugin heberge chez A, A est hors ligne —
+   l'edition entre dans le CRDT, le stem devient perime, B doit LE VOIR.
+2. **Un stem survit a son producteur** (invariant a ecrire, argument de
+   vente entier) : A se deconnecte, B continue de lire le projet
+   complet — tombe gratuitement du store d'assets.
+3. **PDC** : quand un stem remplace une chaine live, la compensation de
+   latence est cuite dans le rendu OU declaree dans le document —
+   sinon decalages invisibles jusqu'au multi-piste.
+
+### La ligne de controle (et la ligne juridique)
+
+**B controle les parametres EXPOSES du VST de A via le CRDT (ils sont
+deja dans le document). La GUI du plugin ne traverse JAMAIS les
+machines. Le binaire ne traverse JAMAIS les machines.** Seul l'AUDIO
+produit circule (stems/streaming). C'est la ligne exacte qui rend le
+montage propre vis-a-vis des ayants droit — a re-arbitrer explicitement
+si un besoin de GUI distante apparait, jamais a eroder en douce.
+
+### Vigilance streaming (gravee)
+
+WebRTC/NAT/TURN est un univers en soi et vit en position 5 de la
+tranche. S'il deborde son budget, c'est LUI qu'on coupe (ou retarde),
+jamais les stems.
+
 ## Consequences
 
 - SCHEMA.md annonce la v2 (placement + references de stems) — design en
