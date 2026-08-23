@@ -1,0 +1,176 @@
+# JOURNAL — chronique datee du projet
+
+*Append-only. STATUS.md ne garde que l'ETAT courant ; chaque session y
+laisse un delta court et consigne ici le recit date. (Scission decidee a
+l'arbitrage AUDIT-4, 2026-08-23 — les blocs ci-dessous viennent de
+STATUS.md, inchanges.)*
+
+---
+
+**2026-08-22 (CI-verite):** premier run CI vert de l'histoire du projet —
+https://github.com/seithnessflow/daw-project/actions/runs/32531658552 —
+moteur + SDK VST3 + determinisme valides sur un second OS jamais utilise
+pour developper. STATUS ne contient plus de phrase que le reel contredit.
+(Run #48, a91d57b : 14 tests moteur sous Linux dont hash + plugin_host/
+AGain, E2E complet. Avant lui : 47 runs rouges jamais regardes — lecon
+inscrite au regime.)
+
+**2026-08-22 (R1+R2):** construction du graphe sortie du thread reseau
+(boucle principale, snapshot sous verrou, dernier etat gagne, version
+loggee) ; registre d'instances plugins (ADR-017) en place ; test de
+rafale = la preuve de coalescing dont le chantier VST3 dependra.
+
+**2026-08-22 (R4+S4):** le thread sacre est desormais verifie par le
+compilateur (static_assert lock-free sur tous les types partages avec le
+callback + test runtime) ; spinlock atomic<shared_ptr> sorti du callback
+(retention par generation, ADR-010 annote) ; solo/mute atomiques (S4 solde).
+
+**2026-08-22 (S1 hygiene CI):** pushes markdown-only ne declenchent plus de
+run (piege branches-protegees documente) ; build tree SDK en cache actions,
+cle = pin + hash de cmake/vst3sdk.cmake (extrait du CMakeLists pour survivre
+aux editions engine). Runs froids reels : ~12 min (#50/#51), verdicts verts.
+A chaud : 4,4 min (run #52) — critere atteint.
+
+**2026-08-22 (2.4c-1):** le pont est transparent au bit pres (tests 15-16,
+16/16) ; rafale E2E verte a travers le proxy ; smoke WASAPI 10 s : 0
+underrun. Profondeur de pipeline revisee 1->2 sur preuve vivante (534/1875
+blocs sec en depth 1 : le driver livre 2 blocs dos a dos) — latence 2.4d
+= depth x 256, calculee depuis la profondeur vivante du noeud (jamais une
+constante). Layout v2, enfant traite le backlog dans l'ordre.
+
+**2026-08-22 (2.4c-2):** seqlock param (layout v3) ; kill en plein vol ->
+bypass sec exact + relance a froid sur le meme segment, param survivant
+(test 18) ; garde parent (plus d'orphelin apres kill dur du moteur) ; chain
+lu/ecrit (M3 solde), ProxyNode depuis le document, rendu offline prouve par
+echantillons (test 20), uid non resolu = echec bruyant. 20/20, E2E 4/4.
+
+**2026-08-22 (2.4d — LE JALON):** un toggle bypass clique dans le navigateur
+change le son, prouve par echantillons, a travers AGain dans son processus
+(E2E 10/10). getLatencySamples = calcul (depth vivante), telemetrie honnete ;
+bypass = etat du document, un chemin vivant pour les deux constructeurs.
+La tranche 2.4 (hote VST3, tranche fine) est TENUE.
+
+**2026-08-22, verdict final — run #55 (d034102) VERT en 4,3 min :** la
+promesse du premier message du chantier est tenue mot pour mot, jusqu'a
+« depuis un onglet ». Quatre sessions (hygiene CI, c-1, c-2, 2.4d), cinq
+pushes, cinq verdicts verts, zero dette de verdict.
+
+**Nuit du 2026-08-22 (post-jalon, runs #56-58 verts) :** outillage du test
+des mains (docs/test-des-mains-2.4.md + seed teste), elagage docs (prealable
+4 enfin solde), persistance outbox (dette critere 3, spec 11/11).
+PROCHAINE ETAPE, dans l'ordre : 1. LE TEST DES MAINS (runbook pret,
+intrant obligatoire) ; 2. session 2.5 re-cadrage, qui OUVRE sur ces notes.
+Critere 5 sous charge : au backlog expres (exige du son reel sur le ZenGo).
+
+**Nuit du 2026-08-22, suite — 2.3 solde :** assetHash = SHA-256 reel
+(vecteurs FIPS, 21/21) ; store d'assets adresse par contenu sur le serveur
+(PUT VERIFIANT — il a debusque un jumeau FNV dans create_test_doc a sa
+premiere execution) ; le moteur tire les assets manquants du store en mode
+serveur (preuve E2E asset-fetch, 12/12). Le triangle de l'architecture est
+FERME sur ses trois cotes. Verdict final de nuit : run #60 VERT (4,6 min).
+Bilan de la nuit : runs #56-60, cinq verts, zero dette. Au reveil : le
+test des mains (docs/test-des-mains-2.4.md), puis 2.5.
+
+**2026-08-22 (outillage yeux+oreille) :** `npm run snap` (Playwright sur la
+stack vivante, 2 viewports, --two-tabs) et `npm run ear` (rendu offline de
+l'etat courant + analyseur WAV pur Node, gate -1 dBFS/clip/discontinuite,
+ecoute SELECTIVE par chirurgie de snapshot : --solo/--mute/--bypass).
+Calibre sur le ton connu (-12,04/-15,05 dBFS assertes), rouge prouve
+(clip+saut injectes detectes), contribution AGain mesuree a 6,03 dB
+(=0,5 exact). Self-test analyseur en CI ; snap/ear restent hors CI (stack
+vivante). Boucle + securite auditive gravees dans CLAUDE.md.
+
+**2026-08-22 (refonte UI, lot 1 — le contrat avant le pixel) :** test des
+mains REPORTE (decision utilisateur : produit trop embryonnaire) et requalifie
+en GATE DE SORTIE de la refonte ; metaphore RATIFIEE : timeline d'abord.
+Contrat de selection pose (data-role/data-state + ARIA, jumeaux helpers/diag
+fusionnes, zero pixel change) — suite e2e 12/12 en 1,7 min comme preuve,
+snap re-ancre sur le contrat. La refonte peut etre agressive : les tests
+tiennent la semantique, les pixels sont libres.
+
+**2026-08-22 (le labo — l'agent utilise le site et ecoute) :** projet 'lab'
+seede par make-signals.mjs (5 types de signaux etages, PUT verifiant) ;
+ui-drive.mjs = usage scripte du site (6 gestes, tous verts : faders, bypass
+via doc, playhead vivant, convergence 2 onglets, add track) ; batterie ear
+en solo par piste : la chaine geste UI -> document -> moteur -> enfant VST3
+-> rendu est EXACTE au centieme de dB (sine 0,25 x fader 0,9 x AGain 0,5 =
+-18,97 predit, -18,98 mesure ; RMS saw/noise/sweep exacts silence compte).
+Trouvailles : inter-sample peaks reels (~2 dB) sur fronts raides, lecture
+chaude (+5,6 dB) du true peak sur bruit (note calibration) ; playhead qui
+fuyait hors couloir (ui-drive) -> clamp pose. Moteur agent = --mute (regle).
+
+**2026-08-22 (Magic Potion, phase 1 — la purge et la vraie matiere) :**
+le produit s'appelle Magic Potion (titre/README ; renommage infra = backlog).
+Fixtures hors du chemin produit : KIT + labo derriere ?lab=1 (les organes
+snap/drive et les specs sont le harnais, ils le portent). Le produit mange
+TES fichiers : drop d'un WAV sur un couloir -> hash client (SHA-256) -> PUT
+verifiant -> clip pose au point de drop, duree decodee ; palette generique
+construite des assets du PROJET (l'armer/cliquer survit sans kit de demo).
+Preuve pilote (geste 12, mode produit) : zero chip embarque, hint d'etat
+vide, drop -> clip -> asset 200 au store -> chip 'my-note' dans la palette.
+Drive 12 gestes verts, suite 13/13.
+
+**2026-08-22 (Magic Potion, phase 2 — tout ce qui sonne se voit) :** la
+couche de vie (ui/life.ts) : une boucle rAF, mutations directes, aria-hidden
++ pointer-events:none (spec dedie), budget ~0 a l'arret, ZERO ecriture
+document (grep prouve). VU balistiques (montee instantanee, chute 300 ms,
+crete tenue 1 s), clips qui pulsent a l'energie du point de lecture (pics
+caches x position — croises pour la premiere fois), sante ambiante aux
+seuils de l'oreille (piste > -1 dBFS, silence en lecture, plugin late),
+solo qui tamise le reste. La boucle d'auto-test a debusque DEUX mensonges
+moteur en route : connexion serveur ZOMBIE (serveur redemarre sous le
+moteur = document gele a jamais, sans un mot -> heartbeat ping 15 s +
+l'auto-reconnect existant) ; peaks fantomes a l'arret (processTrack fige
+-> clearMeters au chemin silence du callback, stores relaxed). Moteur
+21/21 x2, drive 13 gestes verts, suite 14/14.
+
+**2026-08-22 (AUDIT-3, lecture seule post-jalon) :** troisieme audit, rapport
+AUDIT-3.md. Moisson : contrats non verifies aux frontieres (depth clampee en
+silence, bloc partiel = bypass permanent, canal param mono-slot) et promesses
+de documents en avance sur le code — plus d'erreurs de jeunesse. Ordre decide
+(TODO) : mains AVEC variation de buffer -> file param -> contrat de periode ->
+critere 3 vrai -> 2.5. Critere 3 passe en « valide avec reserve » (A3-4).
+
+**Detail critere 3 (historique des validations et dettes soldees) :**
+- Valide (Playwright, epoque) : sync online, bidirectionnelle, ajout de
+  piste.
+- 2026-08-21, dette soldee : `criterion3-offline.spec.ts` (arret/relance
+  REELS du serveur, onglets vivants pendant la coupure, edits distincts +
+  conflit) VERT, `test.fail()` retire. Corrections : outbox (file des
+  changements emis hors ligne, envoyes dans l'ordre a la reconnexion) ;
+  fusion a la reconnexion via `Automerge.merge()` (premier message de
+  chaque connexion = document complet, drapeau par connexion).
+- A3-4/A3-5 soldes 2026-08-22 : push symetrique getMissingChanges ->
+  sendChange a chaque reconnexion, flushOutbox non-destructif,
+  requestResync sur echec d'applyChange. Garde : criterion3-push.spec
+  (flush avale reproduit, serveur redemarre, le change revient). 15/15.
+- Dettes distinctes soldees : outbox persistee (miroir localStorage par
+  onglet + adoption des files orphelines, spec outbox-persistence,
+  2026-08-22) ; persist-avant-broadcast (websocket.rs, test kill brutal,
+  2026-08-21) ; course a la creation du doc par defaut (store_lock, test
+  concurrent_first_writes, 2026-08-22).
+
+**Problemes resolus (fondation, 2026-08-20/21) :**
+1. Depot git initialise, premier commit `d2c5015`.
+2. Fichiers temporaires supprimes, .gitignore en place.
+3. WebSocket Windows : `ix::initNetSystem()` + port 47821 (9000 occupe
+   par wslrelay ; SO_REUSEADDR patche).
+4. Incompatibilite Web/Server : Web migre vers Automerge reel (ADR-016).
+5. Web incompatible moteur : `engine_client.ts` en Protobuf, token en
+   premier message binaire, port 47821.
+
+**2026-08-23 (AUDIT-4, lecture seule) :** quatrieme audit — 3 passes
+paralleles (moteur, serveur/sync, web/scripts) + critique de fond des
+.md. Moisson : trio deps-manquantes qui vide la garantie du critere 3
+(reserve ROUVERTE), slot perime rejoue par le ring sous surcharge,
+enfants VST3 zombies sans eviction, et jumeaux documentaires qui
+divergent (20/20 vs 21 tests reels, deux registres DECISIONS, ADR-005
+mensonger). Ordre 1-6 consigne dans TODO (arbitrage utilisateur).
+
+**2026-08-23 (session 1 — documents qui disent vrai) :** corrections
+factuelles de A4-20 (21/21, token par port dans les procedures, port
+9000 purge, README verite, ADR-005 corrige, en-tete websocket_server.h,
+dettes soldees cochees) ET les 4 fusions structurelles arbitrees : ce
+JOURNAL est ne (STATUS scinde etat/journal), DECISIONS racine fusionne
+dans docs/DECISIONS.md, BACKLOG fusionne dans TODO, CLAUDE.md renvoie a
+STATUS au lieu de dupliquer les criteres.

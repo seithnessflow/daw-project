@@ -83,7 +83,7 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       - Le moteur C++ ne migre PAS (il parle au serveur). Le jalon
         fader->moteur doit rester vert SANS modification cote moteur ;
         si ca casse, c'est le serveur qui s'adapte.
-- [x] 2.2 FAIT 2026-08-22 — VERDICT A (voir DECISIONS.md): taille quasi
+- [x] 2.2 FAIT 2026-08-22 — VERDICT A (voir docs/DECISIONS.md): taille quasi
       constante (compression colonnaire), seul le temps de chargement croit
       (~2,4-4,9 us/change). Le VST3 demarre sans prealable. Dettes datees:
       compaction (declencheur: > ~100k changes / load web > 500 ms),
@@ -104,11 +104,10 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          recupere et construit le graphe). E2E 12/12.
       Le socle de « l'etat des plugins d'abord » (2.5) est pose : les
       blobs hashes hors CRDT ont leur canal.
-- [ ] 2.3bis AUDIT A FROID avant d'ouvrir 2.4 — session neuve, lecture
-      seule, prompt pret : `docs/audit-2-prompt.md`. Question directrice :
-      qu'est-ce qui va ceder quand le VST3 va s'appuyer dessus ?
-      (cycle de vie du graphe sous rebuild lourd, chain ignore,
-      frontieres de processus + dettes audit 1 : solo/mute, assetHash)
+- [x] 2.3bis AUDIT A FROID — FAIT 2026-08-21 (rapport AUDIT-2.md ;
+      case restee ouverte par oubli, cochee a la session 1 post-AUDIT-4).
+      Question directrice : qu'est-ce qui va ceder quand le VST3 va
+      s'appuyer dessus ? Reponses arbitrees dans PREALABLES 2.4.
 - [ ] PREALABLES 2.4 (arbitrage audit 2, 2026-08-22) — quatre sessions
       bornees, dans cet ordre, puis l'hote. Seuls prealables recevables :
       ce sur quoi le plugin de gain isole s'appuie directement.
@@ -297,17 +296,17 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
 - [ ] ARBITRAGE AUDIT-4 (2026-08-23, rapport AUDIT-4.md — quatrieme
       audit lecture seule : 3 passes paralleles moteur/serveur/web +
       critique de fond des .md). Ordre DECIDE (utilisateur, meme jour) :
-      1. [ ] PASSE « DOCUMENTS QUI DISENT VRAI » (session courte,
-         mecanique) : 21/21 aux trois endroits, token par port dans les
-         procedures (STATUS + test-des-mains — le runbook des mains est
-         casse a sa premiere etape), port 9000 purge, dettes soldees
-         cochees (token global, 2.3bis), README verite (fixtures, /proto,
-         CLI ref), ADR-005 corrige (ixwebsocket, pas websocketpp),
-         en-tete websocket_server.h (LNA fantome). Les FUSIONS
-         structurelles (STATUS scinde etat/journal, DECISIONS racine ->
-         docs/, BACKLOG -> TODO, CLAUDE.md qui renvoie au lieu de
-         dupliquer) : proposees dans AUDIT-4 A4-20, A ARBITRER dans
-         cette session.
+      1. [x] PASSE « DOCUMENTS QUI DISENT VRAI » — FAIT 2026-08-23 :
+         21/21 partout, token par port dans les procedures (STATUS +
+         test-des-mains repare), port 9000 purge, dettes soldees cochees
+         (token global, 2.3bis), README verite (Quick Start reel via
+         daw.ps1/CI, structure, CLI ref complete), ADR-005 corrige
+         (ixwebsocket), en-tete websocket_server.h (LNA fantome retire).
+         Les 4 FUSIONS structurelles ARBITREES OUI et appliquees :
+         STATUS scinde (JOURNAL.md cree, STATUS = etat court),
+         DECISIONS racine fusionne dans docs/DECISIONS.md (registre
+         unique), BACKLOG fusionne ici (liste unique), CLAUDE.md renvoie
+         a STATUS au lieu de dupliquer criteres et liste de specs.
       2. [ ] « CRITERE 3 VRAIMENT VRAI, ROUND 2 » (A4-1+A4-2+A4-3,
          + A4-4/A4-1c) : Automerge bufferise les changes a deps
          manquantes SANS erreur des deux cotes — le serveur jette et
@@ -384,11 +383,11 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       test des mains. Les niveaux 1 constates a l'audit outillage (wrap dB,
       congestion Track 1) se dissolvent dans la refonte, pas de rapiecage.
 
-- [ ] Dette (trouvee 2026-08-22, vraie-UI lot B) : %TEMP%\daw-engine-token
-      est GLOBAL — les moteurs ephemeres des specs ecrasent le token du
-      moteur interactif (pastille Engine morte en 4001 pour toute page
-      neuve). Remede : fichier par port (daw-engine-token-<port>) cote
-      moteur + lecture assortie cote outils. Session courte moteur+web.
+- [x] Dette token global — FAIT 2026-08-22 (fichier par port
+      daw-engine-token-<port> cote moteur, websocket_server.cpp:488,
+      lecture assortie daw.ps1/ui-drive/ui-snap ; consigne dans
+      AMELIORATIONS « Token par port », case restee ouverte par oubli,
+      cochee a la session 1 post-AUDIT-4).
 
 - [ ] ORGANE --capture (approuve 2026-08-22, session MOTEUR bornee, cadree
       a part) : le backend null gagne --capture <wav> pour que l'oreille
@@ -402,6 +401,25 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       d'infrastructure (depot, binaires daw_*, packages) = churn differe ;
       formats compresses au drop (mp3/flac -> decode + PUT wav) ; analyse
       spectrale ; masquage inter-pistes ; suggestions IA (acteur Automerge).
+
+- [ ] Backlog hors cap (fusion BACKLOG.md, 2026-08-23 — une seule liste
+      d'idees desormais ; l'ancien preambule cadrait sur le cap VST3,
+      tenu depuis le 2026-08-22) :
+      - Moteur WASM : ecarte — direction Soundtrap/BandLab, l'inverse du
+        differenciateur. Peut-etre un jour comme mode invite
+        lecture/commentaire.
+      - Sortir automerge-c du moteur (sidecar Rust) : decision
+        d'architecture, pas une optimisation. Pas sans dossier complet.
+      - Presence ephemere (curseurs, qui tient quel fader, transport
+        partage) : tranche 3+, canal hors CRDT (meme logique que
+        solo/mute).
+      - IA comme acteur Automerge (actorId propre, mode suggestion) :
+        tranche 3+ (recouvre l'entree du Backlog Magic Potion ci-dessus).
+      - Undo par utilisateur : probleme dur du CRDT musical, a scoper tot
+        mais pas maintenant (voir aussi roadmap item 7, les depassements).
+      - Identites (actorId <-> compte) : prerequis presence/IA, tranche 3+.
+      - Discord : integrer (Rich Presence, webhook), jamais construire.
+        Tranche 3+.
 
 - [ ] COHERENCE (audit 2026-08-22) — split-rule et jumeaux restants :
       a. [x] buildGraph : noyau partage (makeClipPlayer/makeGainNode dans

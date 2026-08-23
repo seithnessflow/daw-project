@@ -2,6 +2,11 @@
 
 Ce document trace chaque décision technique non triviale, sa justification, et les alternatives écartées.
 
+*Registre UNIQUE depuis 2026-08-23 (fusion AUDIT-4) : l'ancien
+`DECISIONS.md` racine (decisions produit + resultats de tests) vit
+desormais ici, dans la section « Decisions produit et resultats de
+tests » en fin de fichier. Un seul proprietaire par information.*
+
 ## ADR-001: Audio Thread Constraints
 
 **Statut:** Accepté
@@ -106,14 +111,22 @@ Le graphe audio est une **projection** du document. À chaque patch Automerge :
 
 ## ADR-005: WebSocket Library
 
-**Statut:** Accepté
+> **Note 2026-08-23 (correctif AUDIT-4).** Cet ADR mentait : le code n'a
+> jamais utilise websocketpp. La bibliotheque REELLE, dans le moteur
+> entier (serveur WS + client vers le serveur de sync), est
+> **ixwebsocket** — retenue en pratique pour son API simple, son support
+> Windows natif (`ix::initNetSystem()` = WSAStartup) et l'absence de
+> dependance Asio/Boost. Le texte d'origine est conserve ci-dessous
+> comme decision historique jamais appliquee.
+
+**Statut:** Remplace par ixwebsocket (constat 2026-08-23)
 **Date:** 2026-08-20
 
 ### Contexte
 
 Le moteur C++ expose un WebSocket sur 127.0.0.1 pour le navigateur.
 
-### Décision
+### Décision (jamais appliquée)
 
 Utiliser **websocketpp** (basé sur Asio).
 
@@ -555,3 +568,103 @@ constexpr uint32_t INTERNAL_BLOCK_SIZE = 256;  // ~5.3ms @ 48kHz
 - `AudioGraph::prepare()` alloue pour `INTERNAL_BLOCK_SIZE` uniquement
 - `AudioGraph::process()` reçoit toujours `<= INTERNAL_BLOCK_SIZE`
 - Le callback boucle pour remplir la demande du driver
+
+---
+
+# Decisions produit et resultats de tests
+
+*(Fusionne le 2026-08-23 depuis l'ancien `DECISIONS.md` racine. Les
+sections encore vraies sont reprises telles quelles ; les procedures et
+listes d'etapes perimees de 2026-08-20 — port 9000, WSL, « prochaines
+etapes » toutes soldees — ne sont pas reprises, git les garde.)*
+
+## Licence du projet - 2026-08-22
+
+**GPL-3.0-or-later.** Raisons : emboitement direct avec le SDK VST3
+(branche GPLv3, zero analyse de compatibilite), ecosysteme audio libre
+majoritairement GPL (Ardour, Audacity... - echanges de code triviaux dans
+les deux sens), lisibilite instantanee pour les contributeurs.
+Structure : copyright integralement a l'auteur ; CLA a mettre en place au
+PREMIER contributeur externe (c'est le CLA qui garde les options ouvertes,
+pas la licence) ; si des morceaux du serveur sont publies separement un
+jour, leur licence prevue est AGPLv3 ; l'accord proprietaire Steinberg
+sera signe en parallele comme option d'avenir, pas comme prerequis.
+Mise en oeuvre : LICENSE (texte canonique GPLv3), en-tete SPDX
+`GPL-3.0-or-later` sur les 57 sources suivies (generes exclus), section
+Licence du README.
+
+## Diagnostic compaction (2.2) - 2026-08-22
+
+**Seuils fixes AVANT mesure** (modele: drag = 30 changes/s, 20% du temps
+actif -> 21 600 changes/h ; 4 pistes):
+- A gerable: a 1h, taille < 5 Mo ET chargement moteur < 1 s ET web < 1 s
+- B sous condition: moteur 1-5 s OU 5-50 Mo a 1h, ET coalescing ramene 10h sous A
+- C intenable: au-dela -> samod urgent
+
+**Mesures** (drags simules Automerge JS 2.2.9 ; moteur = daw_engine --info
+release, demarrage du process compris):
+
+| changes | taille .am | load web | load moteur |
+|---------|-----------|----------|-------------|
+| 1 000   | 1 013 o   | 17 ms    | 30 ms       |
+| 50 000  | 2 616 o   | 244 ms   | 141 ms      |
+
+La TAILLE est un non-probleme: la compression colonnaire d'Automerge rend
+les re-ecritures de la meme cle quasi gratuites (~0,03 octet/change).
+L'axe reel est le TEMPS de chargement, lineaire en nombre de changes:
+~4,9 us/change (web), ~2,4 us/change (moteur).
+
+**Projections** (lineaires, linearite verifiee sur 1k-50k):
+- 1 h: ~1,7 Ko ; moteur ~75 ms ; web ~110 ms
+- 10 h: ~8 Ko ; moteur ~540 ms ; web ~1,1 s
+- Le mur reel: ~100 h cumulees d'un projet au long cours (moteur ~5 s,
+  web ~11 s) - l'historique ne se compacte jamais.
+
+**VERDICT: A - croissance gerable pour la tranche 2.**
+
+Recommandation (3 lignes):
+1. Le chantier VST3 demarre sans prealable de compaction.
+2. Compaction = dette datee, declencheur: quand un projet reel depasse
+   ~100 000 changes (mesurable: taille > 5 Ko ou load web > 500 ms).
+3. Coalescing des drags cote client (1 change a la relache, /50): assurance
+   bon marche, optionnelle, a prendre lors d'une future session web courte.
+
+## Critere 1: nouveau hash de reference - 2026-08-21
+
+**L'ancien hash `f40af882097b704a` etait un hash de SILENCE. Ne plus s'y referer.**
+
+Le fixture de `testRenderDeterminism` etait un document sans clip: le rendu
+etait 1 seconde de silence, et l'egalite GCC/MSVC ne prouvait rien du chemin
+audio. (Ce meme fixture silencieux a masque pendant des semaines un bug du
+renderer hors-ligne qui rendait du silence pour tout document reel - corrige
+le 2026-08-21, commit `4cb1491`.)
+
+Nouveau fixture (genere par le test, deterministe inter-compilateurs car sans
+`sin()` de libm): deux pistes a gains differents (0.8 / 0.3), onde carree
+stereo + dent-de-scie mono, clips chevauchants, un offset non nul. Le test
+verifie que le rendu n'est PAS silencieux (peaks > 0.05) puis compare au
+hash de reference.
+
+```
+Hash de reference: 89f1a1105dc09e92
+```
+
+- MSVC (Windows natif): `89f1a1105dc09e92` (verifie 2026-08-21)
+- GCC (CI Linux): confirme depuis le premier run CI vert (#48, 2026-08-22)
+
+Toute deviation fait echouer `daw_engine_test` (CI comprise). Mise a jour du
+hash uniquement pour un changement de rendu delibere et documente ici.
+
+## Resultats historiques 2026-08-20 (resume)
+
+- **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,
+  0 underrun, charge CPU ABSENTE — le critere reste PARTIEL tant que le
+  test sous charge (procedure vivante dans STATUS.md, `ninja -j32`)
+  n'est pas fait.
+- **IXWebSocket sur Windows :** `ix::initNetSystem()` manquant
+  (WSAStartup), SO_REUSEADDR patche, port 9000 occupe par wslrelay ->
+  port 47821 adopte partout.
+- **addTrack ne copiait pas les clips :** corrige, garde par
+  `testDocumentClipsRoundTrip`.
+- L'ancien « hash identique GCC/MSVC f40af882 » de ce jour-la etait un
+  hash de silence (voir ci-dessus).

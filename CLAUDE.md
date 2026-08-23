@@ -40,7 +40,8 @@ daw-project/
 
 | Fichier | Role |
 |---------|------|
-| `STATUS.md` | Etat des criteres, procedures de test |
+| `STATUS.md` | ETAT courant : criteres, composants, procedures vivantes |
+| `JOURNAL.md` | Chronique datee append-only (les recits de session) |
 | `docs/SCHEMA.md` | Schema du document projet (v1) |
 | `engine/src/main.cpp` | Point d'entree moteur |
 | `server/src/main.rs` | Point d'entree serveur |
@@ -81,13 +82,8 @@ npm run dev
 
 ## Criteres d'acceptation
 
-| # | Critere | Statut |
-|---|---------|--------|
-| 1 | Rendu deterministe | Hash `89f1a1105dc09e92` |
-| 2 | Tests CLI | 20/20 |
-| 3 | Convergence 2 onglets | Valide |
-| 4 | LNA Chrome | Non teste |
-| 5 | WASAPI 10min sans underrun | Partiel (sans charge CPU) |
+Un seul proprietaire : le tableau vit dans STATUS.md (regle AUDIT-4,
+un proprietaire par information — ce fichier ne le duplique plus).
 
 ## Versions Automerge (ADR-016)
 
@@ -121,10 +117,8 @@ npm run test:e2e        # Run tests headless
 npm run test:e2e:ui     # Run with UI
 ```
 
-Tests automatises:
-- Convergence online (gain sync entre 2 onglets)
-- Sync bidirectionnelle (modifications simultanees)
-- Ajout de piste sync
+La liste des specs vit dans `web/tests/e2e/` (15 fichiers au dernier
+compte) — ce fichier ne la duplique plus.
 
 ### Tests manuels requis
 

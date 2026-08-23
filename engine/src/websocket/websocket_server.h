@@ -6,7 +6,8 @@
  * @brief WebSocket server for browser communication.
  *
  * Exposes transport control and telemetry on 127.0.0.1.
- * Handles Chrome Local Network Access (LNA) preflight.
+ * NOTE: no HTTP/LNA preflight handling exists here (criterion 4 is
+ * untested); an earlier version of this comment claimed otherwise.
  */
 
 #include "../audio/audio_device.h"

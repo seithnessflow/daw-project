@@ -74,47 +74,59 @@ brew install cmake protobuf node rust
 
 ## Quick Start
 
+On Windows (the primary dev platform), one command starts everything:
+
+```powershell
+scripts\daw.ps1        # server + engine + web, browser opens with token set
+scripts\daw.ps1 -Stop  # tear the stack down
+```
+
+Manual build (Linux path, mirrors `.github/workflows/ci.yml` - the CI file
+is the authoritative build recipe, including the pinned automerge-c commit
+and VST3 SDK tag):
+
 ```bash
-# 1. Generate test fixtures
-cd fixtures/generator
-npm install
-npm run generate
-cd ../..
+# 1. Build automerge-c (pinned) and clone the VST3 SDK (pinned) into
+#    third_party/ - see the "Clone and build automerge-c" and
+#    "Clone VST3 SDK" steps of ci.yml for the exact commands.
 
 # 2. Build engine
-mkdir -p build/engine
-cd build/engine
-cmake ../../engine -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j$(nproc)
-cd ../..
+cd engine
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
 
-# 3. Test playback
-./build/engine/daw_engine --doc fixtures/two-tracks.am --play --assets fixtures
+# 3. Generate a playable fixture (10s tone document + hashed asset)
+ASSET_HASH=$(./build/create_test_doc test-assets/test.am test-assets 10 \
+  | grep 'Asset hash' | awk '{print $3}')
+cp test-assets/test_tone.wav "test-assets/${ASSET_HASH}.wav"
 
-# 4. Test offline render
-./build/engine/daw_engine --doc fixtures/two-tracks.am --render output.wav --assets fixtures
+# 4. Test playback and offline render
+./build/daw_engine --doc test-assets/test.am --play --assets test-assets
+./build/daw_engine --doc test-assets/test.am --render out.wav --assets test-assets
 ```
+
+On Windows the engine builds with MSVC in `engine\build-msvc`
+(`..\rebuild_msvc.bat`); see STATUS.md for the local commands.
 
 ## Acceptance Criteria Verification
 
 ### 1. Deterministic WAV Rendering
 
 ```bash
-# Render twice and compare hashes
-./build/engine/daw_engine --doc fixtures/two-tracks.am --render /tmp/out1.wav --assets fixtures
-./build/engine/daw_engine --doc fixtures/two-tracks.am --render /tmp/out2.wav --assets fixtures
-
-# Hashes must match
+# Render twice and compare hashes (the reference hash 89f1a1105dc09e92 is
+# asserted inside daw_engine_test; see docs/DECISIONS.md)
+./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out1.wav --assets engine/test-assets
+./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out2.wav --assets engine/test-assets
 sha256sum /tmp/out1.wav /tmp/out2.wav
 ```
 
 ### 2. CLI Integration Test
 
 ```bash
-./build/engine/daw_engine_test fixtures
+./engine/build/daw_engine_test          # 21 tests, no browser needed
 ```
 
-### 3. Two-Tab Sync (Phase 3+)
+### 3. Two-Tab Sync
 
 ```bash
 # Terminal 1: Start server
@@ -127,15 +139,16 @@ cd web && npm run dev
 # Modify gain in one tab, observe change in the other
 ```
 
-### 4. Chrome Local Network Access (Phase 3+)
+### 4. Chrome Local Network Access
 
-See `docs/DECISIONS.md` ADR-008 for investigation results.
+See `docs/DECISIONS.md` ADR-008 for investigation results (still untested).
 
 ### 5. 10-Minute Stability Test
 
 ```bash
-# Create a long project and play for 10 minutes
-./build/engine/daw_engine --doc fixtures/long-project.am --play --assets fixtures
+# Play a long project for 10 minutes (fixtures/test10min.am is tracked;
+# regenerate its asset with create_test_doc if missing)
+./engine/build/daw_engine --doc fixtures/test10min.am --play --assets fixtures
 
 # Monitor the "Underruns" counter - should stay at 0
 ```
@@ -158,32 +171,51 @@ See `docs/DECISIONS.md` ADR-008 for investigation results.
 
 /web        TypeScript web client
   /src
+    /app        Wiring, gestures, rendering
     /document   Automerge wrapper
     /network    WebSocket clients
-    /ui         Fader, transport, meters
+    /proto      Generated protobuf code (npm run proto:gen)
+    /ui         Timeline, tracks, meters, life layer
 
-/proto      Protobuf schemas
-/docs       Architecture decisions, schema
-/fixtures   Test files
+/scripts     Stack launchers (daw.ps1, start-stack.ps1)
+/third_party Pinned SDKs (VST3, automerge) - not committed
+/docs        Architecture decisions, schema
+/fixtures    Test files
 ```
 
 ## Engine CLI Reference
 
 ```
 Usage:
-  engine --doc <file> --play [--assets <dir>]
-  engine --doc <file> --render <output.wav> [--assets <dir>]
-  engine --doc <file> --info
+  daw_engine --server <url> --play [--project <id>] [--assets <dir>]
+  daw_engine --doc <file.am> --play [--assets <dir>] [--ws-port <port>]
+  daw_engine --doc <file.am> --render <output.wav> [--assets <dir>]
+  daw_engine --doc <file.am> --info
 
 Options:
-  --doc <file>       Project document (Automerge .am)
-  --play             Play through audio device
+  --server <url>     Sync server URL (e.g., ws://localhost:3000)
+  --project <id>     Project ID for server sync (default: 'default')
+  --doc <file>       Project document file (Automerge binary .am)
+  --play             Play the project through audio device
   --render <file>    Render to WAV file
-  --assets <dir>     Asset directory (default: same as doc)
-  --info             Show project info
-  --sample-rate <n>  Sample rate (default: 48000)
-  --bit-depth <n>    Bit depth: 16, 24, 32 (default: 24)
+  --assets <dir>     Directory containing audio assets (default: same as doc)
+  --info             Show project information
+  --mute             Use null audio backend (silent playback for testing)
+  --sample-rate <n>  Sample rate for rendering (default: 48000)
+  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)
+  --ws-port <n>      WebSocket server port (default: 47821)
+  --vst3-module <uid>=<path.vst3>
+                     Resolve a VST3 class uid to a module path (repeatable)
+  --allow-origin <o> Allow an extra browser Origin on the WebSocket
+  --solo <track-id>  Solo specified track (repeatable)
+  --mute-track <id>  Mute specified track (repeatable)
+  --list-devices     List available audio devices and exit
+  --device <name>    Select audio device by name (substring match)
 ```
+
+`--doc` and `--server` are mutually exclusive; `--render`/`--info` require
+`--doc`. Debug flags (`--debug-proxy-again`, `--debug-rebuild-delay-ms`)
+are listed by `daw_engine --help`.
 
 ## Document Format
 

@@ -29,9 +29,15 @@ cd C:\Users\mb668\daw-project\engine\build-msvc
   --vst3-module 84E8DE5F92554F5396FAE4133C935A18=VST3\Release\again.vst3
 ```
 
-Onglet : `http://localhost:5173/?token=<contenu de %TEMP%\daw-engine-token>`
-(le token ne sert qu'a la telemetrie moteur ; sans lui, le son marche,
-les meters non).
+Onglet : `http://localhost:5173/?token=<champ "token" du JSON
+%TEMP%\daw-engine-token-47821>` — le fichier est PAR PORT depuis le
+2026-08-22 et contient `{token, port, address}` ; ne colle que la valeur
+du champ `token`. (Le token ne sert qu'a la telemetrie moteur ; sans
+lui, le son marche, les meters non.)
+
+Alternative sans copier-coller : `scripts\daw.ps1` monte toute la stack
+et ouvre le navigateur avec le token deja dans l'URL (projet `studio`).
+Ce runbook garde la voie manuelle pour rester au plus pres des organes.
 
 Tu dois voir : une piste avec un fader, une ligne de chain `vst3` avec un
 bouton **bypass**, et entendre le ton a mi-volume (AGain a 0,5).
