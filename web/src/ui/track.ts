@@ -183,6 +183,26 @@ export function createTrackUI(
       edge.dataset.edge = side;
       clipEl.appendChild(edge);
     }
+    // V1.6: fade shades (diagonal overlay = the ramp you hear) + top-
+    // corner handles. Handles rule (CLAUDE.md): a plain click on a fade
+    // handle SELECTS the clip - the branch exists from birth.
+    const fadeInPx = ((clip.fadeInSamples ?? 0) / sampleRate) * TIMELINE.pps;
+    const fadeOutPx = ((clip.fadeOutSamples ?? 0) / sampleRate) * TIMELINE.pps;
+    for (const side of ['in', 'out'] as const) {
+      const px = side === 'in' ? fadeInPx : fadeOutPx;
+      const shade = document.createElement('div');
+      shade.className = `clip-fade clip-fade-${side}`;
+      shade.style.width = `${px}px`;
+      clipEl.appendChild(shade);
+      const fh = document.createElement('div');
+      fh.className = `fade-handle fade-handle-${side}`;
+      fh.dataset.role = 'fade-handle';
+      fh.dataset.side = side;
+      fh.title = side === 'in' ? 'Fade in' : 'Fade out';
+      if (side === 'in') fh.style.left = `${px}px`;
+      else fh.style.right = `${px}px`;
+      clipEl.appendChild(fh);
+    }
     lane.appendChild(clipEl);
   }
   el.appendChild(lane);

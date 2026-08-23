@@ -420,6 +420,25 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                                 }
                                             }
                                             if (cr) AMresultFree(cr);
+
+                                            // V1.6: fades, additive (absent = 0)
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("fadeInSamples"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                AMitem* cit = AMresultItem(cr);
+                                                if (AMitemToInt(cit, &i64Val)) {
+                                                    clip.fade_in_samples = i64Val;
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("fadeOutSamples"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                                                AMitem* cit = AMresultItem(cr);
+                                                if (AMitemToInt(cit, &i64Val)) {
+                                                    clip.fade_out_samples = i64Val;
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
                                         }
                                     }
                                     if (clipResult) AMresultFree(clipResult);
@@ -777,6 +796,17 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
 
         cr = AMmapPutInt(doc_, clipObjId, AMstr("offsetSamples"), clip.offset_samples);
         if (cr) results_to_free.push_back(cr);
+
+        // V1.6: only write NON-ZERO fades (additive field, old docs and
+        // fixtures keep their byte-identical shape)
+        if (clip.fade_in_samples != 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("fadeInSamples"), clip.fade_in_samples);
+            if (cr) results_to_free.push_back(cr);
+        }
+        if (clip.fade_out_samples != 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("fadeOutSamples"), clip.fade_out_samples);
+            if (cr) results_to_free.push_back(cr);
+        }
     }
 
     // Create chain array and populate (c-2: processors travel with the

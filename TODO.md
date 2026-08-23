@@ -103,8 +103,16 @@ dedouble). Ordre :
           (2 evinces, survivant a la MEME adresse, idempotent).
           Bug attrape par la spec : display:flex ecrasait [hidden] —
           le menu invisible-cense interceptait tous les clics.
-       Le reste de la liste ATTEND (fades = candidats au degel, PAS
-       degeles ; grille, master meter, renommage, tempo).
+       Le reste de la liste ATTEND (renommage, tempo — la grille, le
+       master meter et les FADES sont FAITS : V1.4, V1.2, V1.6).
+       FADES DEGELES ET LIVRES 2026-08-23 (V1.6) : implicite 4 ms
+       inconditionnel (equivalence silence-rampe = identite), champs
+       fadeIn/fadeOutSamples additifs, poignees UI journalisees undo,
+       NOUVEAU HASH DE REFERENCE 56729beb61993cd7 (DECISIONS.md).
+       VAGUE 1 COMPLETE : V1.1 boucle/arret, V1.2 master, V1.3 undo,
+       V1.4 visibilite, V1.5 devices+eviction, V1.6 fades. Prochain
+       cap grave : ENTRELACS (critere-3-vrai A4-1/2/3 + heartbeat,
+       puis design placement SCHEMA v2 avec clips MIDI co-designes).
 1pre. [x] MECANISME DE LIVRAISON DU TOKEN — FAIT 2026-08-23 (etage
        dev, suffisant pour 1bis ou chaque machine porte sa stack) :
        resolution FRAGMENT (#token, lancements moteur/daw.ps1) ->

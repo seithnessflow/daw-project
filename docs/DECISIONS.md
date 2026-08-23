@@ -655,6 +655,20 @@ Hash de reference: 89f1a1105dc09e92
 Toute deviation fait echouer `daw_engine_test` (CI comprise). Mise a jour du
 hash uniquement pour un changement de rendu delibere et documente ici.
 
+### 2026-08-23 — nouveau hash de reference `56729beb61993cd7` (V1.6 fades)
+
+Changement de rendu DELIBERE : le fade implicite anti-clic de 4 ms
+(sample_rate/250 echantillons, rampe lineaire) s'applique desormais a
+chaque bord de clip dont le champ fadeIn/fadeOutSamples vaut 0 (clampe
+a la moitie du clip). L'option du plan « implicite seulement quand le
+bord coupe du signal non-nul » est EQUIVALENTE echantillon-pres a
+l'inconditionnel (ramper du silence = identite) — implemente
+inconditionnel, sans branche dependante du contenu. Consequence : le
+fixture du critere 1 (bords non-nuls) rend differemment, d'ou le
+nouveau hash. Rampes en float pur (divisions et multiplications, pas
+de candidat FMA) — determinisme inter-compilateurs preserve, verifie
+par le meme test. Ancien hash : `89f1a1105dc09e92` (2026-08-21).
+
 ## Resultats historiques 2026-08-20 (resume)
 
 - **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,

@@ -97,6 +97,86 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   window.addEventListener('pointerup', onUp);
 }
 
+/**
+ * V1.6: drag a top-corner fade handle. Horizontal drag sets the fade
+ * length (clamped to half the clip); both fields write together via
+ * setClipFades (one gesture = one undo entry). Handles rule: a click
+ * without movement SELECTS the clip.
+ */
+export function beginFadeDrag(e: PointerEvent, handleEl: HTMLElement): void {
+  if (!ctx.project) return;
+  const clipEl = handleEl.closest('.clip') as HTMLElement | null;
+  const trackEl = handleEl.closest('[data-track-id]') as HTMLElement | null;
+  if (!clipEl || !trackEl) return;
+  const side = handleEl.dataset.side as 'in' | 'out';
+  const clipId = clipEl.dataset.clipId!;
+  const trackId = trackEl.getAttribute('data-track-id')!;
+  const doc = ctx.project.getDocument();
+  const sr = doc.sampleRate || 48000;
+  const clip = doc.tracks.find((t) => t.id === trackId)
+    ?.clips.find((c) => c.id === clipId);
+  if (!clip) return;
+
+  const half = Math.floor(clip.lengthSamples / 2);
+  const origIn = clip.fadeInSamples ?? 0;
+  const origOut = clip.fadeOutSamples ?? 0;
+  let pendingIn = origIn;
+  let pendingOut = origOut;
+  const startX = e.clientX;
+  let moved = false;
+  let writeRaf = 0;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const shade = clipEl.querySelector(`.clip-fade-${side}`) as HTMLElement | null;
+  const onMove = (ev: PointerEvent) => {
+    const dx = ev.clientX - startX;
+    if (!moved && Math.abs(dx) < 3) return;
+    if (!moved) ctx.project!.beginUndoGroup();
+    moved = true;
+    const dSamples = (dx / TIMELINE.pps) * sr;
+    // Fade-in grows to the right, fade-out grows to the LEFT
+    if (side === 'in') {
+      pendingIn = Math.min(half, Math.max(0, Math.round(origIn + dSamples)));
+    } else {
+      pendingOut = Math.min(half, Math.max(0, Math.round(origOut - dSamples)));
+    }
+    const px = ((side === 'in' ? pendingIn : pendingOut) / sr) * TIMELINE.pps;
+    if (shade) shade.style.width = `${px}px`;
+    if (side === 'in') handleEl.style.left = `${px}px`;
+    else handleEl.style.right = `${px}px`;
+    if (!writeRaf) {
+      writeRaf = requestAnimationFrame(() => {
+        writeRaf = 0;
+        ctx.project!.setClipFades(trackId, clipId, pendingIn, pendingOut);
+        sendLastChange();
+      });
+    }
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    if (writeRaf) cancelAnimationFrame(writeRaf);
+    if (moved) {
+      ctx.justDragged = true;
+      setTimeout(() => { ctx.justDragged = false; }, 0);
+      ctx.project!.setClipFades(trackId, clipId, pendingIn, pendingOut);
+      ctx.project!.endUndoGroup();
+      sendLastChange();
+      renderTracks(true);
+    } else {
+      // Handles rule: plain click selects (same branch as edges)
+      ctx.selectedClipId = clipId;
+      ctx.selectedTrackId = trackId;
+      ctx.justDragged = true;
+      setTimeout(() => { ctx.justDragged = false; }, 0);
+      renderTracks(true);
+    }
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
 export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
   if (!ctx.project) return;
   const clipEl = edgeEl.closest('.clip') as HTMLElement | null;

@@ -147,6 +147,44 @@
 .clip-edge:hover {
   background: rgba(255, 255, 255, 0.18);
 }
+/* ---- V1.6: fades -------------------------------------------------- */
+.clip-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none; /* the HANDLE is the target, never the shade */
+  z-index: 3;
+}
+.clip-fade-in {
+  left: 0;
+  /* hypotenuse from top-right down to bottom-left = the rising ramp */
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.clip-fade-out {
+  right: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.fade-handle {
+  position: absolute;
+  top: 13px; /* NEVER over the title bar (same law as .clip-edge): the
+                strip is the drag-and-select surface, nothing covers it */
+  width: 9px;
+  /* Handles rule corollary: on a tiny clip the two corner handles must
+     NEVER overlap - each keeps to its own half */
+  max-width: 45%;
+  height: 9px;
+  margin: 1px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 4; /* above title bar and edges: always reachable */
+}
+.fade-handle:hover {
+  background: var(--amber);
+}
 .clip-wave {
   flex: 1;
   width: 100%;

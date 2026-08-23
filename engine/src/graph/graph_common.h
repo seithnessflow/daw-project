@@ -33,10 +33,18 @@ namespace daw::graph {
  * caller is responsible for making the asset file exist first (the live
  * path fetches from the server on a miss BEFORE calling this; offline
  * requires the file on disk).
+ *
+ * V1.6: resolves the clip's EFFECTIVE fades here (one place, both
+ * builders): explicit field, or the implicit anti-click sample_rate/250
+ * (= 4 ms, integer math) when the field is 0; each clamped to half the
+ * clip length. Applying the implicit ramp UNCONDITIONALLY is sample-
+ * exactly equivalent to "only when the edge cuts non-zero signal"
+ * (ramping silence is identity) - so no content-dependent branch.
  */
 ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
                           const std::string& assets_dir,
-                          AssetCache& asset_cache);
+                          AssetCache& asset_cache,
+                          uint32_t sample_rate);
 
 /**
  * Build a GainNode from a "gain" chain node (non-bypassed). Returns the

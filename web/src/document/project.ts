@@ -161,6 +161,8 @@ export class Project {
           this.removeProcessorParam(op.trackId, op.processorId, op.key); break;
         case 'setClipStart': this.setClipStart(op.trackId, op.clipId, op.startSample); break;
         case 'setClipBounds': this.setClipBounds(op.trackId, op.clipId, op.bounds); break;
+        case 'setClipFades':
+          this.setClipFades(op.trackId, op.clipId, op.fadeInSamples, op.fadeOutSamples); break;
         case 'addClip': this.addClip(op.trackId, op.clip); break;
         case 'deleteClip': this.deleteClip(op.trackId, op.clipId); break;
         case 'addTrack': this.addTrack(op.track); break;
@@ -314,6 +316,32 @@ export class Project {
       c.startSample = Math.max(0, Math.round(bounds.startSample));
       c.lengthSamples = Math.max(1024, Math.round(bounds.lengthSamples));
       c.offsetSamples = Math.max(0, Math.round(bounds.offsetSamples));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * V1.6: set a clip's explicit fades (samples; 0 = engine's implicit
+   * 4 ms anti-click). Both fields written together - a fade gesture
+   * never tears across peers.
+   */
+  setClipFades(trackId: string, clipId: string,
+    fadeInSamples: number, fadeOutSamples: number): void {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+    this.journal.capture({
+      type: 'setClipFades', trackId, clipId,
+      fadeInSamples: clip.fadeInSamples ?? 0,
+      fadeOutSamples: clip.fadeOutSamples ?? 0,
+    });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const c = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId);
+      if (!c) return;
+      const half = Math.floor(c.lengthSamples / 2);
+      c.fadeInSamples = Math.max(0, Math.min(half, Math.round(fadeInSamples)));
+      c.fadeOutSamples = Math.max(0, Math.min(half, Math.round(fadeOutSamples)));
     });
     this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }

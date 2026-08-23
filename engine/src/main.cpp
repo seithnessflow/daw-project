@@ -591,7 +591,8 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                 }
             }
             track.clips.push_back(
-                daw::graph::makeClipPlayer(clip_def, assets_dir, asset_cache));
+                daw::graph::makeClipPlayer(clip_def, assets_dir, asset_cache,
+                                           sample_rate));
         }
 
         // Create processors

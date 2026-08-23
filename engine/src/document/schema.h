@@ -47,6 +47,10 @@ struct ClipDef {
     int64_t start_sample = 0;
     int64_t length_samples = 0;
     int64_t offset_samples = 0;
+    // V1.6: explicit fades, ADDITIVE (absent = 0). 0 means "engine
+    // default": an implicit 4 ms anti-click ramp (see graph_common).
+    int64_t fade_in_samples = 0;
+    int64_t fade_out_samples = 0;
 };
 
 /**

@@ -618,7 +618,10 @@ bool testRenderDeterminism(const std::string& /*fixtures_dir*/) {
     // 2026-08-21: reference recomputed on a REAL fixture (two tracks, square
     // + sawtooth, gains 0.8/0.3). The previous value f40af882097b704a was a
     // hash of silence (clipless document) and proved nothing.
-    const std::string expected_hash = "89f1a1105dc09e92";
+    // 2026-08-23 (V1.6): reference recomputed - the implicit 4 ms anti-click
+    // fade now shapes every clip edge (deliberate rendering change, see
+    // docs/DECISIONS.md). Previous reference: 89f1a1105dc09e92.
+    const std::string expected_hash = "56729beb61993cd7";
     if (hash1 != expected_hash) {
         std::cout << "FAILED: Hash deviates from reference\n";
         std::cout << "  Got:      " << hash1 << "\n";
@@ -1613,9 +1616,24 @@ bool testDocumentChainRender() {
         std::cout << "FAILED: output size " << out_f.size() << " vs " << in.size() << "\n";
         return false;
     }
+    // V1.6 (test updated WITH the behavior, signaled): the implicit 4 ms
+    // anti-click ramp (48000/250 = 192 samples) now shapes the clip's
+    // edges; expectations replicate the engine's exact float ops.
+    const auto edgeRamp = [](size_t frame) {
+        float g = 1.0f;
+        if (frame < 192) {
+            g *= static_cast<float>(frame + 1) / static_cast<float>(192);
+        }
+        const size_t remaining = 4096 - frame;
+        if (remaining <= 192) {
+            g *= static_cast<float>(remaining) / static_cast<float>(192);
+        }
+        return g;
+    };
     for (size_t i = 0; i < in.size(); ++i) {
         const float loaded = static_cast<float>(in[i]) / 32768.0f;   // dr_wav f32
-        const float halved = loaded * 0.5f;                          // AGain
+        const float ramped = loaded * edgeRamp(i / 2);               // V1.6 fade
+        const float halved = ramped * 0.5f;                          // AGain
         const int16_t written = static_cast<int16_t>(halved * 32767.0f);  // convertSamples
         const float expected = static_cast<float>(written) / 32768.0f;    // readWavSamples
         if (out_f[i] != expected) {
@@ -1651,7 +1669,8 @@ bool testDocumentChainRender() {
     }
     for (size_t i = 0; i < in.size(); ++i) {
         const float loaded = static_cast<float>(in[i]) / 32768.0f;
-        const int16_t written = static_cast<int16_t>(loaded * 32767.0f);
+        const float ramped = loaded * edgeRamp(i / 2);  // V1.6: ramp survives bypass
+        const int16_t written = static_cast<int16_t>(ramped * 32767.0f);
         const float expected = static_cast<float>(written) / 32768.0f;
         if (byp_f[i] != expected) {
             std::cout << "FAILED: bypass sample " << i << " = " << byp_f[i]
@@ -1992,6 +2011,116 @@ bool testMasterGainRender() {
 }
 
 /**
+ * V1.6: clip fades render as EXACT linear ramps.
+ * Clip A: explicit fadeIn=100 / fadeOut=50. Clip B: fields at 0 ->
+ * implicit 4 ms (192) CLAMPED to half of its 300-sample length (150).
+ * Expectations replicate the engine's float ops sample by sample; the
+ * document roundtrip of the two additive fields is asserted too.
+ */
+bool testClipFadesRender() {
+    std::cout << "Test: clip fade ramps (V1.6)... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-fades-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Constant asset: 16000/32768 is dyadic - every float op is exact
+    std::vector<int16_t> in(4096 * 2, 16000);
+    if (!writeWav16((dir / "fadehash.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: cannot write asset\n";
+        return false;
+    }
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: doc create\n";
+        return false;
+    }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "fades";
+    track.gain = 1.0f;
+    daw::document::ClipDef a;
+    a.id = "a";
+    a.asset_hash = "fadehash";
+    a.start_sample = 0;
+    a.length_samples = 1000;
+    a.fade_in_samples = 100;
+    a.fade_out_samples = 50;
+    track.clips.push_back(a);
+    daw::document::ClipDef b;
+    b.id = "b";
+    b.asset_hash = "fadehash";
+    b.start_sample = 2000;
+    b.length_samples = 300;  // < 2x192: implicit fade clamps to 150
+    track.clips.push_back(b);
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack: " << doc.getLastError() << "\n";
+        return false;
+    }
+
+    // Roundtrip: the additive fields come back from the document
+    // (getDocument returns BY VALUE - keep the copy alive)
+    const auto rt_doc = doc.getDocument();
+    const auto& rt = rt_doc.tracks[0];
+    if (rt.clips[0].fade_in_samples != 100 || rt.clips[0].fade_out_samples != 50 ||
+        rt.clips[1].fade_in_samples != 0 || rt.clips[1].fade_out_samples != 0) {
+        std::cout << "FAILED: fade fields roundtrip\n";
+        return false;
+    }
+
+    daw::render::OfflineRenderer renderer;
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+    const std::string out_path = (dir / "out.wav").string();
+    const auto result = renderer.render(doc, out_path, dir.string(), config);
+    if (!result.success) {
+        std::cout << "FAILED: render: " << result.error << "\n";
+        return false;
+    }
+    const auto out_f = readWavSamples(out_path);
+    if (out_f.size() < 2300 * 2) {
+        std::cout << "FAILED: output too short: " << out_f.size() << "\n";
+        return false;
+    }
+
+    const float loaded = 16000.0f / 32768.0f;
+    const auto expectAt = [&](int64_t frame, float gain, const char* what) {
+        const float ramped = loaded * gain;
+        const int16_t written = static_cast<int16_t>(ramped * 32767.0f);
+        const float expected = static_cast<float>(written) / 32768.0f;
+        if (out_f[frame * 2] != expected) {
+            std::cout << "FAILED: " << what << " frame " << frame << " = "
+                      << out_f[frame * 2] << ", expected " << expected << "\n";
+            return false;
+        }
+        return true;
+    };
+    // Clip A, explicit ramps
+    if (!expectAt(0, 1.0f / 100.0f, "A fade-in first")) return false;
+    if (!expectAt(99, 100.0f / 100.0f, "A fade-in last")) return false;
+    if (!expectAt(500, 1.0f, "A body")) return false;
+    if (!expectAt(950, 50.0f / 50.0f, "A fade-out first")) return false;
+    if (!expectAt(999, 1.0f / 50.0f, "A fade-out last")) return false;
+    // Clip B, implicit clamped to 150
+    if (!expectAt(2000, 1.0f / 150.0f, "B fade-in first")) return false;
+    if (!expectAt(2149, 1.0f, "B fade-in last")) return false;
+    if (!expectAt(2150, 1.0f, "B fade-out first")) return false;
+    if (!expectAt(2299, 1.0f / 150.0f, "B fade-out last")) return false;
+    // Between the clips: silence
+    if (out_f[1500 * 2] != 0.0f) {
+        std::cout << "FAILED: expected silence between clips\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (explicit 100/50 exact, implicit clamped 150, roundtrip)\n";
+    return true;
+}
+
+/**
  * V1.5 / A4-5: registry eviction. A node id removed from the document
  * must take its registry handle with it (bridge stopped, entry erased),
  * and only that one - survivors keep their ADDRESS (rebuilds re-attach
@@ -2073,6 +2202,7 @@ int main(int argc, char* argv[]) {
     run(testAudioThreadLockFreedom);
     run(testTransportLoopAndStop);
     run(testRegistryEviction);
+    run(testClipFadesRender);
     run(testWebSocketAuth);
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);

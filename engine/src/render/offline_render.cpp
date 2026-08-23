@@ -209,7 +209,8 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         // Load clips (shared geometry+asset builder, S3)
         for (const auto& clip_def : track_def.clips) {
             track.clips.push_back(
-                graph::makeClipPlayer(clip_def, asset_dir, asset_cache_));
+                graph::makeClipPlayer(clip_def, asset_dir, asset_cache_,
+                                      sample_rate));
         }
 
         // Create processors

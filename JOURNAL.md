@@ -447,3 +447,31 @@ tous les clics du panneau. Moteur 24/24 (testRegistryEviction :
 2 evinces, survivant a la meme adresse, idempotent), devices.spec
 5 invariants avec convergence 2 onglets. Seance conduite moteur duo
 MUET (ordre utilisateur : film en cours).
+
+**2026-08-23 (V1.6 — fades, degel acte, cloture de la vague 1) :**
+l'option laissee ouverte au plan est TRANCHEE par equivalence : ramper
+du silence etant l'identite, le fade implicite anti-clic « seulement si
+le bord coupe du signal » = le fade inconditionnel, echantillon-pres —
+implemente inconditionnel (4 ms = sample_rate/250, clampe a la moitie
+du clip), zero branche dependante du contenu. Rampes lineaires dans
+ClipPlayer::render (chemin PARTAGE live/offline), champs additifs
+fadeIn/fadeOutSamples (schema.h + automerge + SCHEMA.md + web).
+CONSEQUENCE ASSUMEE : nouveau hash de reference 56729beb61993cd7
+(l'ancien 89f1a110 rendait des bords non rampes ; DECISIONS.md porte
+la justification, ci.yml et STATUS suivent). UI : ombres diagonales +
+poignees de coin draggables, journalisees undo (une poignee = les deux
+champs ecrits ensemble, un geste = une entree). TROIS bugs attrapes par
+les gardes, pas par mes yeux : (1) un clip de 8 px a ses deux poignees
+de fade superposees — le corollaire poignees ENCORE (max-width 45%
+chacune, la spec visait 'in' et attrapait 'out') ; (2) le chemin
+sameStructure de renderTracks n'actualisait pas les fades distants —
+le fade d'un pair n'apparaissait JAMAIS (updateClipFadesUI in-place) ;
+(3) les poignees posees en haut du clip RECOUVRAIENT la barre de
+titre — drag de clip et selection voles (2 specs de regression
+rouges) ; meme loi que les edges de la session B : rien ne couvre le
+bandeau (top 13px).
+Et une lecon de C++ : getDocument() retourne PAR VALEUR — une
+reference chainee sur le temporaire a segfaulte la suite entiere
+(0xC0000005 muet, stdout bufferise perdu). Moteur 25/25
+(testClipFadesRender : rampes explicites 100/50 exactes, implicite
+clampe 150, roundtrip, silence inter-clips).

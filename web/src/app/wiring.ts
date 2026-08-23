@@ -23,7 +23,7 @@ import {
   updateInsertMarker, refreshOverview, updateFollowUI,
 } from './navigation';
 import { startPlayback, stopPlayback } from './transport';
-import { beginClipDrag, beginClipResize, markLanded } from './gestures';
+import { beginClipDrag, beginClipResize, beginFadeDrag, markLanded } from './gestures';
 import { toggleHelp, isHelpOpen } from '../ui/help';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
@@ -296,6 +296,11 @@ export async function init(): Promise<void> {
   // ---- Pointer gestures on the timeline ----------------------------------
   els.tracks.addEventListener('pointerdown', (e) => {
     const target = e.target as HTMLElement;
+    const fade = target.closest('[data-role="fade-handle"]') as HTMLElement | null;
+    if (fade) {
+      beginFadeDrag(e, fade);
+      return;
+    }
     const edge = target.closest('[data-role="clip-edge"]') as HTMLElement | null;
     if (edge) {
       beginClipResize(e, edge);

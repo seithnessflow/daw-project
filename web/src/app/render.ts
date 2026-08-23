@@ -23,6 +23,31 @@ import { updateInsertMarker, refreshOverview, updateGridVars } from './navigatio
 import { refreshPalette } from './placement';
 import { cssId } from '../document/sanitize';
 
+/**
+ * V1.6: remote fade changes settle IN PLACE (the same-structure path
+ * rebuilds nothing - without this, a peer's fade never showed).
+ */
+function updateClipFadesUI(track: { id: string; clips: Array<{
+  id: string; fadeInSamples?: number; fadeOutSamples?: number }> },
+  sampleRate: number): void {
+  for (const clip of track.clips) {
+    const el = els.tracks.querySelector(
+      `[data-clip-id="${cssId(clip.id)}"]`) as HTMLElement | null;
+    if (!el) continue;
+    for (const side of ['in', 'out'] as const) {
+      const samples = (side === 'in' ? clip.fadeInSamples : clip.fadeOutSamples) ?? 0;
+      const px = (samples / sampleRate) * TIMELINE.pps;
+      const shade = el.querySelector(`.clip-fade-${side}`) as HTMLElement | null;
+      if (shade) shade.style.width = `${px}px`;
+      const handle = el.querySelector(`.fade-handle-${side}`) as HTMLElement | null;
+      if (handle) {
+        if (side === 'in') handle.style.left = `${px}px`;
+        else handle.style.right = `${px}px`;
+      }
+    }
+  }
+}
+
 export function renderTracks(force = false): void {
   if (!ctx.project) return;
   const doc = ctx.project.getDocument();
@@ -60,6 +85,7 @@ export function renderTracks(force = false): void {
   if (sameStructure) {
     for (const track of doc.tracks) {
       updateTrackGainUI(track.id, track.gain);
+      updateClipFadesUI(track, doc.sampleRate || 48000);
     }
     if (selectedTrack) updateDeviceViewUI(selectedTrack.chain);
     return;

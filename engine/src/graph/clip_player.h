@@ -51,6 +51,11 @@ struct ClipInfo {
     int64_t start_sample = 0;    // Timeline position where clip starts
     int64_t length_samples = 0;  // Duration of clip
     int64_t offset_samples = 0;  // Offset into asset
+    // V1.6: EFFECTIVE fade lengths, resolved by makeClipPlayer (explicit
+    // field, or the implicit 4 ms anti-click when the field is 0; both
+    // clamped to half the clip). render() ramps linearly over these.
+    int64_t fade_in_samples = 0;
+    int64_t fade_out_samples = 0;
 };
 
 /**

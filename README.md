@@ -113,7 +113,7 @@ On Windows the engine builds with MSVC in `engine\build-msvc`
 ### 1. Deterministic WAV Rendering
 
 ```bash
-# Render twice and compare hashes (the reference hash 89f1a1105dc09e92 is
+# Render twice and compare hashes (the reference hash 56729beb61993cd7 is
 # asserted inside daw_engine_test; see docs/DECISIONS.md)
 ./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out1.wav --assets engine/test-assets
 ./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out2.wav --assets engine/test-assets

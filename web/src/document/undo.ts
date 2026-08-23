@@ -27,6 +27,8 @@ export type InverseOp =
   | { type: 'setClipStart'; trackId: string; clipId: string; startSample: number }
   | { type: 'setClipBounds'; trackId: string; clipId: string;
       bounds: { startSample: number; lengthSamples: number; offsetSamples: number } }
+  | { type: 'setClipFades'; trackId: string; clipId: string;
+      fadeInSamples: number; fadeOutSamples: number }
   | { type: 'addClip'; trackId: string; clip: ClipDef }
   | { type: 'deleteClip'; trackId: string; clipId: string }
   | { type: 'addTrack'; track: TrackDef }
@@ -52,6 +54,7 @@ function targetKey(op: InverseOp): string {
     case 'removeProcessorParam': return `param:${op.trackId}:${op.processorId}:${op.key}`;
     case 'setClipStart': return `clipstart:${op.trackId}:${op.clipId}`;
     case 'setClipBounds': return `clipbounds:${op.trackId}:${op.clipId}`;
+    case 'setClipFades': return `clipfades:${op.trackId}:${op.clipId}`;
     case 'addClip': return `clip:${op.trackId}:${op.clip.id}`;
     case 'deleteClip': return `clip:${op.trackId}:${op.clipId}`;
     case 'addTrack': return `track:${op.track.id}`;

@@ -102,9 +102,26 @@ void ClipPlayer::render(
             const int64_t clip_offset = timeline_pos - clip_start;
             const int64_t asset_frame = clip_.offset_samples + clip_offset;
 
+            // V1.6: linear edge ramps over the EFFECTIVE fade lengths
+            // (resolved by makeClipPlayer). First sample of a fade-in is
+            // 1/FI, last is FI/FI = 1; symmetric on the way out (last
+            // sample is 1/FO). Pure float divides and multiplies, no
+            // FMA candidates: bit-identical across MSVC and GCC (the
+            // deterministic-render hash depends on it).
+            float gain = 1.0f;
+            if (clip_.fade_in_samples > 0 && clip_offset < clip_.fade_in_samples) {
+                gain *= static_cast<float>(clip_offset + 1) /
+                        static_cast<float>(clip_.fade_in_samples);
+            }
+            const int64_t remaining = clip_.length_samples - clip_offset;
+            if (clip_.fade_out_samples > 0 && remaining <= clip_.fade_out_samples) {
+                gain *= static_cast<float>(remaining) /
+                        static_cast<float>(clip_.fade_out_samples);
+            }
+
             // Get samples (handles mono-to-stereo conversion)
-            output[i * 2]     = getSample(asset_frame, 0);
-            output[i * 2 + 1] = getSample(asset_frame, 1);
+            output[i * 2]     = getSample(asset_frame, 0) * gain;
+            output[i * 2 + 1] = getSample(asset_frame, 1) * gain;
         } else {
             // Outside clip - silence
             output[i * 2]     = 0.0f;

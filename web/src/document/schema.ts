@@ -13,6 +13,10 @@ export interface ClipDef {
   startSample: number;
   lengthSamples: number;
   offsetSamples: number;
+  /** V1.6: explicit fades, ADDITIVE (absent = 0). 0 = engine default,
+   *  an implicit 4 ms anti-click ramp. */
+  fadeInSamples?: number;
+  fadeOutSamples?: number;
 }
 
 /** One parameter as a {key, value} pair - a LIST across every consumer

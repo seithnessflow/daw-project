@@ -14,7 +14,7 @@ on:
 
 env:
   # Criterion 1 reference (asserted inside daw_engine_test; see DECISIONS.md)
-  EXPECTED_HASH: 89f1a1105dc09e92
+  EXPECTED_HASH: 56729beb61993cd7
 
 jobs:
   build-linux:

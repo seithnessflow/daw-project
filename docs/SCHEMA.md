@@ -29,7 +29,9 @@
           "assetHash": "string (SHA-256 hex)",
           "startSample": "int64",
           "lengthSamples": "int64",
-          "offsetSamples": "int64"
+          "offsetSamples": "int64",
+          "fadeInSamples": "int64 (optional, default 0)",
+          "fadeOutSamples": "int64 (optional, default 0)"
         }
       ],
       "chain": [
@@ -75,6 +77,8 @@
 | `startSample` | `int64` | Yes | Position on timeline where clip begins. |
 | `lengthSamples` | `int64` | Yes | Duration of the clip in samples. |
 | `offsetSamples` | `int64` | Yes | Offset into the source asset. |
+| `fadeInSamples` | `int64` | No | V1.6, additive. Explicit fade-in length. 0 or absent = the engine's implicit 4 ms anti-click ramp (sample_rate/250, clamped to half the clip - see docs/DECISIONS.md 2026-08-23). |
+| `fadeOutSamples` | `int64` | No | V1.6, additive. Same contract as `fadeInSamples`, at the tail. |
 
 ### Processor
 
