@@ -250,6 +250,17 @@ rouge avec raison nommee, piece eparse reste verte). Preuve : ma-piece
 rendait muet-vert, elle rend maintenant son-vert sans aucune copie
 manuelle. La lecon du hash-de-silence, soudee cote outillage.
 
+**2026-08-23 (session B — la selection ne ment plus) :** cause du
+Suppr-inerte de la seance musique trouvee : un clic sans mouvement sur
+une poignee de bord ne selectionnait rien (branche absente), et un clip
+minuscule est entierement couvert par ses poignees — selection
+impossible en silence. Correctifs : clic-poignee = selection,
+deselection re-rendue (A4-18 solde), halo lisible a toute largeur.
+Garde clip-selection.spec (5 invariants), suite 16/16, trace visuelle
+sur un clip de 2 px. Decouvertes en route : Ctrl+D duplicate et zoom
++/- EXISTENT deja, caches — la fonctionnalite sans affordance ;
+consigne comme intrant de la session C.
+
 **2026-08-23 (LE SCEAU — critere 4 clos) :** dans le navigateur reel de
 l'utilisateur (Chrome 151/Windows 11) : sonde granted, canari no-cors
 « NETWORK PATH OPEN » en 4 ms, onopen a 3 ms, AUTH OK + telemetrie

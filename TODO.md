@@ -22,23 +22,49 @@ dedouble). Ordre :
        REQUALIFIE fondation du multi-machine : le trio deps-manquantes
        est exactement le bug que deux machines sur deux reseaux
        declencheront en premier).
-0pre. [ ] ARBITRAGE POST-SEANCE-MUSIQUE (2026-08-23, compte-rendu de la
+0pre. [~] ARBITRAGE POST-SEANCE-MUSIQUE (2026-08-23, compte-rendu de la
        premiere seance utilisateur complete — 203 clips, AGain, rendu
-       48 s). Ordre DECIDE, avant 1pre :
-       A. [ ] EAR-VERITE (session immediate) : l'oreille a dit VERT sur
+       48 s). ORDRE RE-ARBITRE 2026-08-23 (2e passe utilisateur) :
+       A -> B -> 1pre -> 1bis, PUIS C et D. Raison ecrite : ni C ni D
+       ne rapprochent deux machines l'une de l'autre, et le smoke
+       apprendra des choses qui touchent au modele — a connaitre AVANT
+       de coder duplicate.
+       A. [x] EAR-VERITE — FAIT 2026-08-23 : l'oreille avait dit VERT sur
           48 s de silence total. Deux corrections : ear resout les
           assets depuis le STORE du serveur (aujourd'hui il ne lit que
           engine/test-assets -> tout projet fait d'assets droppes rend
           muet) ; et silence integral = ROUGE PAR PRINCIPE (garde-fou
           au self-test CI). Un outil de preuve qui valide du vide
-          invalide retroactivement ses verdicts.
-       B. [ ] SUPPRESSION DE CLIP + ETAT DE SELECTION (meme session,
-          meme trou vecu deux fois) : clic sur clip + Suppr = aucun
-          effet, aucun message ; l'etat selectionne est invisible.
+          invalide retroactivement ses verdicts. FAIT : staging par
+          hash depuis server/assets (fallback test-assets, manquant =
+          refus bruyant) + self-test 6 (silence rouge, piece eparse
+          verte). Preuve : ma-piece muet-vert -> son-vert, copies de
+          contournement retirees avant preuve. CI verte (run
+          32641506712, commit adbd7a0).
+       B. [x] SUPPRESSION DE CLIP + ETAT DE SELECTION — FAIT
+          2026-08-23. Cause trouvee : un clic SANS mouvement sur une
+          poignee de bord ne selectionnait RIEN (branche absente dans
+          beginClipResize) — et un clip minuscule (hat 0,07 s = 1,4 px)
+          est ENTIEREMENT couvert par ses poignees : selection
+          impossible, Suppr inerte, silencieux. Correctifs : clic sur
+          poignee = selection (symetrique du bandeau) ; deselection au
+          clic-couloir re-rend (le visuel ne ment plus, A4-18 solde) ;
+          halo de selection lisible a toute largeur (2 px l'etait pas).
+          Garde : clip-selection.spec (5 invariants : selection bandeau,
+          selection poignee, deselection visible, Delete agit DOM+doc,
+          Delete sans selection = no-op heads stables). Suite 16/16.
+          Trace visuelle livree (halo prouve sur un clip de 2 px).
        C. [ ] DUPLIQUER/REPETER UN CLIP — la gene n.1 de la seance,
           ABSENTE de la roadmap. Prealable : session courte de lecture
           Ableton sur CETTE question seule (modele loop/duplicate/
           repeat + implications CRDT), revenir avec un modele.
+          DECOUVERTES session B (2026-08-23) : un Ctrl+D duplicate
+          EXISTE deja (wiring.ts:314, grille-snappe, selection sur la
+          copie) — cache, montre nulle part, jamais decouvert pendant
+          la seance musique. Le zoom EXISTE aussi (touches +/-,
+          navigation.ts) — meme maladie : la fonctionnalite sans son
+          affordance. La session C part donc de « rendre decouvrable
+          et repetable » autant que de « creer ».
        D. [ ] AJOUTER/RETIRER UN DEVICE DEPUIS L'UI (2.5 avance) — le
           trou le plus visible du chemin produit, et c'est le chemin
           du differenciateur.

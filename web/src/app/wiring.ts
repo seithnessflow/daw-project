@@ -278,6 +278,7 @@ export async function init(): Promise<void> {
     }
     // Lane click (unarmed): select the track AND set the insert marker
     // (Ableton: one click, two effects). Deselects any selected clip.
+    const hadSelectedClip = ctx.selectedClipId !== null;
     ctx.selectedClipId = null;
     if (lane) {
       const x = e.clientX - lane.getBoundingClientRect().left;
@@ -288,6 +289,11 @@ export async function init(): Promise<void> {
     }
     if (id !== ctx.selectedTrackId) {
       ctx.selectedTrackId = id;
+      renderTracks(true);
+    } else if (hadSelectedClip) {
+      // Session B fix: same track, but a clip WAS selected - without
+      // this re-render its aria-selected stayed on screen (lying
+      // visual, Delete inert) - AUDIT-4 A4-18.
       renderTracks(true);
     }
   });
