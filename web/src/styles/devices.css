@@ -139,9 +139,25 @@
 }
 .device-chain {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   align-items: stretch;
   overflow-x: auto;
+}
+/* Bible Ableton : le signal circule de gauche a droite - le chevron
+   entre deux cartes rend la SERIE visible (lumiere seule, pas de
+   geometrie animee) */
+.device-chain > .device + .device {
+  position: relative;
+}
+.device-chain > .device + .device::before {
+  content: '\25B8';
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  font-size: 11px;
+  pointer-events: none;
 }
 .device {
   background: linear-gradient(rgba(255, 255, 255, 0.02), transparent),

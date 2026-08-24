@@ -25,8 +25,13 @@
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
 
 #include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "pluginterfaces/vst/ivsteditcontroller.h"
+#include "pluginterfaces/vst/ivstmessage.h"
+
+#include <map>
 
 #include <algorithm>
 #include <cstdint>
@@ -229,6 +234,206 @@ private:
     std::vector<uint8_t> data_;
     Steinberg::int64 pos_ = 0;
 };
+
+// ---- Fenetrage v1 (verrue assumee, arbitrage utilisateur 2026-08-24) -------
+// La GUI native du plugin dans une fenetre OS, pompee sur LE MEME thread
+// que la boucle de service : zero concurrence. Une fenetre trainee = une
+// boucle modale = quelques blocs servis en retard, que le moteur bypass
+// et COMPTE deja (degradation prevue par le ring, jamais un blocage).
+// Les tweaks GUI (performEdit) partent dans les IParameterChanges du bloc
+// suivant : audibles immediatement. HONNETE : ils ne sont PAS persistes
+// au document (la capture d'etat 2.5 ne les voit qu'au prochain rebuild).
+
+// performEdit atterrit ici (meme thread que la pompe) ; coalesce par id -
+// un drag de potard = des centaines d'edits, seul le dernier par bloc
+// compte pour l'audio.
+class GuiParamSink final : public Steinberg::Vst::IComponentHandler {
+public:
+    std::map<Steinberg::Vst::ParamID, double> pending;
+
+    Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid,
+                                                 void** obj) override {
+        if (Steinberg::FUnknownPrivate::iidEqual(
+                iid, Steinberg::Vst::IComponentHandler::iid) ||
+            Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid)) {
+            *obj = this;
+            return Steinberg::kResultOk;
+        }
+        *obj = nullptr;
+        return Steinberg::kNoInterface;
+    }
+    Steinberg::uint32 PLUGIN_API addRef() override { return 2; }
+    Steinberg::uint32 PLUGIN_API release() override { return 1; }
+
+    Steinberg::tresult PLUGIN_API beginEdit(Steinberg::Vst::ParamID) override {
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API performEdit(Steinberg::Vst::ParamID id,
+                                              Steinberg::Vst::ParamValue v) override {
+        pending[id] = v;
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API endEdit(Steinberg::Vst::ParamID) override {
+        return Steinberg::kResultOk;
+    }
+    Steinberg::tresult PLUGIN_API restartComponent(Steinberg::int32) override {
+        return Steinberg::kResultOk;  // v1: param flush suffit au cas courant
+    }
+};
+
+#ifdef _WIN32
+struct EditorWindow {
+    HWND hwnd = nullptr;
+    Steinberg::IPtr<Steinberg::IPlugView> view;
+    Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
+    bool controller_is_component = false;  // effet mono-classe : pas de terminate dedie
+    GuiParamSink handler;
+
+    static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+        auto* self = reinterpret_cast<EditorWindow*>(
+            GetWindowLongPtrA(h, GWLP_USERDATA));
+        switch (msg) {
+            case WM_CLOSE:
+                ShowWindow(h, SW_HIDE);  // v1 : cacher, jamais detruire le plugin
+                return 0;
+            case WM_SIZE:
+                if (self && self->view &&
+                    self->view->canResize() == Steinberg::kResultTrue) {
+                    Steinberg::ViewRect r{0, 0, LOWORD(lp), HIWORD(lp)};
+                    self->view->onSize(&r);
+                }
+                return 0;
+            default:
+                return DefWindowProcA(h, msg, wp, lp);
+        }
+    }
+
+    bool open(VST3::Hosting::Module::Ptr& module,
+              Steinberg::IPtr<Steinberg::Vst::IComponent>& component,
+              Steinberg::Vst::HostApplication& host_app,
+              const std::string& title) {
+        using namespace Steinberg;
+        // 1. Le controleur d'edition : classe dediee, ou le composant
+        //    lui-meme (effets mono-classe)
+        Steinberg::TUID ctrl_tuid{};
+        if (component->getControllerClassId(ctrl_tuid) == kResultOk) {
+            controller = module->getFactory()
+                             .createInstance<Vst::IEditController>(
+                                 VST3::UID::fromTUID(ctrl_tuid));
+            if (controller &&
+                controller->initialize(&host_app) != kResultOk) {
+                controller = nullptr;
+            }
+        }
+        if (!controller) {
+            controller = FUnknownPtr<Vst::IEditController>(component);
+            controller_is_component = static_cast<bool>(controller);
+        }
+        if (!controller) {
+            std::cerr << "plugin_host: no edit controller - headless" << std::endl;
+            return false;
+        }
+        controller->setComponentHandler(&handler);
+        // 2. Connexion composant <-> controleur (meme process : directe)
+        {
+            FUnknownPtr<Vst::IConnectionPoint> cp_comp(component);
+            FUnknownPtr<Vst::IConnectionPoint> cp_ctrl(controller);
+            if (cp_comp && cp_ctrl && !controller_is_component) {
+                cp_comp->connect(cp_ctrl);
+                cp_ctrl->connect(cp_comp);
+            }
+        }
+        // 3. Synchroniser le controleur sur l'etat courant du processeur
+        if (!controller_is_component) {
+            BlobStream s;
+            if (component->getState(&s) == kResultOk) {
+                s.seek(0, IBStream::kIBSeekSet, nullptr);
+                controller->setComponentState(&s);
+            }
+        }
+        // 4. La vue
+        view = owned(controller->createView(Vst::ViewType::kEditor));
+        if (!view) {
+            std::cerr << "plugin_host: plugin has no editor view" << std::endl;
+            return false;
+        }
+        ViewRect vr{};
+        view->getSize(&vr);
+        WNDCLASSA wc{};
+        wc.lpfnWndProc = wndProc;
+        wc.hInstance = GetModuleHandleA(nullptr);
+        wc.lpszClassName = "DawPluginEditor";
+        wc.hCursor = LoadCursorA(nullptr, reinterpret_cast<LPCSTR>(IDC_ARROW));
+        RegisterClassA(&wc);  // idempotent-ish : un echec re-register est benin
+        RECT wr{0, 0, vr.getWidth(), vr.getHeight()};
+        AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+        hwnd = CreateWindowExA(0, "DawPluginEditor", title.c_str(),
+                               WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                               wr.right - wr.left, wr.bottom - wr.top,
+                               nullptr, nullptr, wc.hInstance, nullptr);
+        if (!hwnd) {
+            std::cerr << "plugin_host: CreateWindow failed" << std::endl;
+            return false;
+        }
+        SetWindowLongPtrA(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+        if (view->attached(hwnd, kPlatformTypeHWND) != kResultOk) {
+            std::cerr << "plugin_host: view attach refused" << std::endl;
+            DestroyWindow(hwnd);
+            hwnd = nullptr;
+            return false;
+        }
+        // Fullscreen demande : maximiser ; une vue redimensionnable suit
+        // (WM_SIZE -> onSize), une vue fixe reste a sa taille native.
+        ShowWindow(hwnd, view->canResize() == kResultTrue ? SW_MAXIMIZE : SW_SHOW);
+        UpdateWindow(hwnd);
+        std::cerr << "plugin_host: editor window open (" << title << ")" << std::endl;
+        return true;
+    }
+
+    void pump() {
+        if (!hwnd) return;
+        MSG msg;
+        while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+
+    void close() {
+        if (view) {
+            view->removed();
+            view = nullptr;
+        }
+        if (hwnd) {
+            DestroyWindow(hwnd);
+            hwnd = nullptr;
+        }
+        if (controller) {
+            controller->setComponentHandler(nullptr);
+            if (!controller_is_component) controller->terminate();
+            controller = nullptr;
+        }
+    }
+};
+// L'ouverture d'editeur executee du code TIERS : un crash la-dedans ne
+// doit tuer que la FENETRE, jamais le service audio (constate : le
+// fixture AGain plat, prive de ses ressources VSTGUI, crashe dans
+// createView). Garde SEH - la fonction hote n'a AUCUN objet a derouler.
+static bool openEditorGuarded(EditorWindow& w,
+                              VST3::Hosting::Module::Ptr& module,
+                              Steinberg::IPtr<Steinberg::Vst::IComponent>& component,
+                              Steinberg::Vst::HostApplication& host_app,
+                              const std::string& title) {
+    __try {
+        return w.open(module, component, host_app, title);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        std::fprintf(stderr,
+                     "plugin_host: editor open CRASHED (0x%08lX) - headless\n",
+                     GetExceptionCode());
+        return false;
+    }
+}
+#endif  // _WIN32
 
 // ---- The VST3 instantiation ceremony, shared by --process and --serve ------
 // Extracted (not duplicated) when --serve arrived: one ceremony, two callers.
@@ -471,7 +676,7 @@ daw::host::SharedAudioRing* mapSegment(const std::string& path) {
 }
 
 int runServe(const std::string& segment_path, const std::string& module_path,
-             const std::string& uid_str, long long parent_pid) {
+             const std::string& uid_str, long long parent_pid, bool editor) {
     using namespace Steinberg;
 
     // Engine-death watch (c-2): a hard-killed engine cannot raise the
@@ -545,6 +750,22 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }
     }
 
+    // Fenetrage v1 : la GUI s'ouvre AVANT le pret (elle fait partie de la
+    // ceremonie) ; son echec est un WARNING, jamais une mort - le plugin
+    // sert l'audio avec ou sans fenetre.
+#ifdef _WIN32
+    EditorWindow editor_win;
+    if (editor) {
+        std::string title = module_path;
+        const auto slash = title.find_last_of("/\\");
+        if (slash != std::string::npos) title = title.substr(slash + 1);
+        openEditorGuarded(editor_win, inst.module, inst.component,
+                          inst.host_app, title);
+    }
+#else
+    (void)editor;
+#endif
+
     // Ready signal: the bridge's start() waits for a nonzero heartbeat
     ring->child_heartbeat.store(1, std::memory_order_release);
     std::cerr << "plugin_host: serving on " << segment_path << " at "
@@ -578,6 +799,9 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 
     while (ring->shutdown.load(std::memory_order_acquire) == 0) {
         serveStateRequest();
+#ifdef _WIN32
+        editor_win.pump();  // meme thread, cout borne (PeekMessage draine)
+#endif
         const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);
         if (newest == last_in) {
             // Deliberate yield-spin: the block budget is 5.3 ms and Windows
@@ -634,6 +858,19 @@ int runServe(const std::string& segment_path, const std::string& module_path,
                 queue->addPoint(0, value, point_index);
             }
         }
+#ifdef _WIN32
+        // Fenetrage v1 : les tweaks GUI (coalesces par id) rejoignent les
+        // changements de ce bloc - meme thread que la pompe, zero verrou
+        for (const auto& [gid, gval] : editor_win.handler.pending) {
+            int32 queue_index = 0;
+            auto* queue = param_changes.addParameterData(gid, queue_index);
+            if (queue) {
+                int32 point_index = 0;
+                queue->addPoint(0, gval, point_index);
+            }
+        }
+        editor_win.handler.pending.clear();
+#endif
 
         // Zero-copy: VST3 channel pointers aim straight into the segment
         float* in_ch[2] = {ring->in[slot][0], ring->in[slot][1]};
@@ -666,6 +903,9 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }  // backlog loop
     }
 
+#ifdef _WIN32
+    editor_win.close();
+#endif
     inst.teardown();
     std::cerr << "plugin_host: clean shutdown after " << (beats - 1) << " blocks" << std::endl;
     return 0;
@@ -687,18 +927,21 @@ int main(int argc, char* argv[]) {
         // sides of this command line live in two executables
         std::string segment_path, module_path, uid;
         long long parent_pid = 0;
+        bool editor = false;
         bool args_ok = (argc >= 3);
         if (args_ok) segment_path = argv[2];
-        for (int i = 3; i + 1 < argc && args_ok; i += 2) {
+        for (int i = 3; i < argc && args_ok; ++i) {
             const std::string a = argv[i];
-            const std::string v = argv[i + 1];
+            if (a == "--editor") { editor = true; continue; }  // drapeau seul
+            if (i + 1 >= argc) { args_ok = false; break; }
+            const std::string v = argv[++i];
             if (a == "--module") module_path = v;
             else if (a == "--uid") uid = v;
             else if (a == "--parent") parent_pid = std::stoll(v);
             else args_ok = false;
         }
         if (args_ok && !module_path.empty() && !uid.empty()) {
-            return runServe(segment_path, module_path, uid, parent_pid);
+            return runServe(segment_path, module_path, uid, parent_pid, editor);
         }
     }
 

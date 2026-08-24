@@ -33,6 +33,9 @@ export interface ProcessorDef {
   /** vst3 only: 32-hex VST3 class id. The document NEVER carries module
    *  paths - uid -> module resolution is host-side. */
   uid?: string;
+  /** Display name (additive, tab-authored at add time - Ableton's title
+   *  bar). The engine ignores it; absent on old devices (UI falls back). */
+  name?: string;
   /** 2.4d: bypass is DOCUMENT state, driven from the tab. */
   bypass: boolean;
   params: ProcessorParam[];

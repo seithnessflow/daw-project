@@ -117,15 +117,34 @@ bool PluginBridge::spawnChild(const std::string& host_exe,
     const std::string parent_arg = std::to_string(self_pid);  // pre-fork: no malloc in the child
     const std::string cmdline = "\"" + host_exe + "\" --serve \"" + segment_path_ +
                                 "\" --module \"" + module_path + "\" --uid " + class_uid +
-                                " --parent " + parent_arg;
+                                " --parent " + parent_arg +
+                                (spawn_editors_ ? " --editor" : "");
 #ifdef _WIN32
     STARTUPINFOA si{};
     si.cb = sizeof(si);
+    // Les DERNIERS MOTS de l'enfant (organe sensoriel 2026-08-24) : sans
+    // heritage de poignees, son stderr partait dans le vide - un enfant
+    // mort en setup ne disait jamais pourquoi. <segment>.log les garde.
+    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+    HANDLE log = CreateFileA((segment_path_ + ".log").c_str(), GENERIC_WRITE,
+                             FILE_SHARE_READ, &sa, CREATE_ALWAYS,
+                             FILE_ATTRIBUTE_NORMAL, nullptr);
+    BOOL inherit = FALSE;
+    if (log != INVALID_HANDLE_VALUE) {
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdError = log;
+        si.hStdOutput = log;
+        si.hStdInput = nullptr;
+        inherit = TRUE;
+    }
     PROCESS_INFORMATION pi{};
     std::vector<char> mutable_cmd(cmdline.begin(), cmdline.end());
     mutable_cmd.push_back('\0');
-    if (!CreateProcessA(nullptr, mutable_cmd.data(), nullptr, nullptr, FALSE,
-                        CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    const BOOL created = CreateProcessA(nullptr, mutable_cmd.data(), nullptr,
+                                        nullptr, inherit, CREATE_NO_WINDOW,
+                                        nullptr, nullptr, &si, &pi);
+    if (log != INVALID_HANDLE_VALUE) CloseHandle(log);
+    if (!created) {
         error_ = "CreateProcess failed for plugin_host";
         return false;
     }

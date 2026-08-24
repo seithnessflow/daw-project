@@ -113,7 +113,17 @@ public:
      */
     [[nodiscard]] SharedAudioRing* ring() noexcept { return ring_; }
 
+    /**
+     * Fenetrage v1 (verrue assumee, arbitrage utilisateur 2026-08-24) :
+     * quand ON, chaque enfant spawne avec --editor et ouvre la GUI
+     * native du plugin dans une fenetre OS sur le bureau. Engine-wide
+     * (--editors), consulte a CHAQUE spawn - y compris les restarts.
+     */
+    static void setSpawnEditors(bool on) { spawn_editors_ = on; }
+    static bool spawnEditors() { return spawn_editors_; }
+
 private:
+    inline static bool spawn_editors_ = false;
     SharedAudioRing* ring_ = nullptr;
     std::string segment_path_;
     std::string error_;

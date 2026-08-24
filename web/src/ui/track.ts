@@ -292,6 +292,14 @@ export function createDeviceView(
 /** AGain (the vendored debug plugin) - the natural prefill for the uid field. */
 const AGAIN_UID = '84E8DE5F92554F5396FAE4133C935A18';
 const VST3_UID_RE = /^[0-9A-Fa-f]{32}$/;
+/** Convenance d'affichage pour les uid deja croises sur cette machine -
+ *  le champ name du document reste la verite (2.5-decouverte remplacera
+ *  cette table par le scan). */
+const KNOWN_VST3_NAMES: Record<string, string> = {
+  [AGAIN_UID]: 'AGain',
+  'ABCDEF019182FAEB4175446152523330': 'RoughRider3',
+  '565354734D617376616C68616C6C6173': 'ValhallaSupermassive',
+};
 
 /**
  * V1.5: the `+ device` control. Click opens a small inline menu:
@@ -329,6 +337,20 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   uidInput.spellcheck = false;
   uidInput.setAttribute('aria-label', 'VST3 class uid (32 hex)');
   vstRow.appendChild(uidInput);
+  // Nom d'affichage (bible Ableton : chaque device a sa barre de titre).
+  // Pre-rempli depuis les uid connus ; libre sinon.
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.id = 'vst3-name-input';
+  nameInput.placeholder = 'nom';
+  nameInput.value = KNOWN_VST3_NAMES[AGAIN_UID] ?? '';
+  nameInput.spellcheck = false;
+  nameInput.setAttribute('aria-label', 'Nom du device');
+  uidInput.addEventListener('input', () => {
+    const known = KNOWN_VST3_NAMES[uidInput.value.trim().toUpperCase()];
+    if (known) nameInput.value = known;
+  });
+  vstRow.appendChild(nameInput);
   const vstBtn = document.createElement('button');
   vstBtn.dataset.role = 'add-vst3';
   vstBtn.textContent = 'vst3';
@@ -360,8 +382,10 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
       uidInput.title = '32 caracteres hexadecimaux attendus';
       return;
     }
+    const label = nameInput.value.trim();
     onAddDevice({
       id: `dev-${Date.now()}`, type: 'vst3', uid: uid.toUpperCase(),
+      ...(label ? { name: label } : {}),
       bypass: false, params: [],
     });
     close();
@@ -398,7 +422,13 @@ function createDevicePanel(
   title.appendChild(toggle);
   const name = document.createElement('span');
   name.className = 'device-name';
-  name.textContent = proc.type === 'vst3' ? 'AGain (vst3)' : proc.type;
+  // Bible Ableton : la barre de titre porte le NOM du device. Les vieux
+  // devices sans champ name retombent sur l'uid court (jamais un mensonge
+  // - l'ancien libelle disait AGain quel que soit le plugin).
+  name.textContent = proc.name ??
+    (proc.type === 'vst3'
+      ? (KNOWN_VST3_NAMES[proc.uid ?? ''] ?? `vst3 ${(proc.uid ?? '').slice(0, 8)}`)
+      : proc.type);
   title.appendChild(name);
 
   // 2.5-etat: the engine-captured state, visible (8 hex of the blob

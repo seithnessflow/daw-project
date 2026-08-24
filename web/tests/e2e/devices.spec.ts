@@ -50,7 +50,7 @@ test.describe('Devices (V1.5)', () => {
       .fill('84E8DE5F92554F5396FAE4133C935A18');
     await page.locator('[data-role="add-vst3"]').click();
     await expect(page.locator('#device-view .device')).toHaveCount(2);
-    expect(await deviceNames(page)).toEqual(['builtin.gain', 'AGain (vst3)']);
+    expect(await deviceNames(page)).toEqual(['builtin.gain', 'AGain']);
     await expect(page2.locator('#device-view .device')).toHaveCount(2);
 
     // 4. Remove the FIRST device: click one ARMS, click two fires
@@ -60,13 +60,13 @@ test.describe('Devices (V1.5)', () => {
     await expect(page.locator('#device-view .device')).toHaveCount(2);  // armed != removed
     await rmFirst.click();
     await expect(page.locator('#device-view .device')).toHaveCount(1);
-    expect(await deviceNames(page)).toEqual(['AGain (vst3)']);
+    expect(await deviceNames(page)).toEqual(['AGain']);
     await expect(page2.locator('#device-view .device')).toHaveCount(1);
 
     // 5. Ctrl+Z: the gain device comes back FIRST (original index)
     await page.keyboard.press('Control+z');
     await expect(page.locator('#device-view .device')).toHaveCount(2);
-    expect(await deviceNames(page)).toEqual(['builtin.gain', 'AGain (vst3)']);
+    expect(await deviceNames(page)).toEqual(['builtin.gain', 'AGain']);
     await expect(page2.locator('#device-view .device')).toHaveCount(2);
 
     await page2.close();

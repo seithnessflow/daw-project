@@ -69,6 +69,7 @@ void printUsage(const char* program) {
               << "  --doc <file>       Project document file (Automerge binary .am)\n"
               << "  --play             Play the project through audio device\n"
               << "  --start-stopped    With --play: device up, transport stopped until a PLAY command (browser/WS)\n"
+              << "  --editors          Open each VST3 plugin's native GUI window (windowed hosting v1)\n"
               << "  --render <file>    Render to WAV file\n"
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
@@ -113,6 +114,7 @@ struct Options {
     bool mute = false;
     bool keepalive = false;  // File mode: loop the document instead of exiting at its end
     bool start_stopped = false;  // L1c: device up, transport ARMED but stopped (no sound until a PLAY command)
+    bool editors = false;        // Fenetrage v1: children open the plugin's native GUI window
     bool list_devices = false;
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
@@ -173,6 +175,8 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.keepalive = true;
         } else if (arg == "--start-stopped") {
             opts.start_stopped = true;
+        } else if (arg == "--editors") {
+            opts.editors = true;
         } else if (arg == "--mute") {
             opts.mute = true;
         } else if (arg == "--ws-port") {
@@ -1423,6 +1427,9 @@ int main(int argc, char* argv[]) {
     if (!parseArgs(argc, argv, opts)) {
         return 1;
     }
+
+    // Fenetrage v1: engine-wide, consulted at every child spawn
+    daw::host::PluginBridge::setSpawnEditors(opts.editors);
 
     // List devices mode
     if (opts.list_devices) {
