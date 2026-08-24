@@ -62,8 +62,11 @@ Write-Status "Starting engine (project '$PROJECT')..."
 $engineDir = Join-Path $projectRoot "engine\build-msvc"
 $muteArg = if ($Mute) { " --mute" } else { "" }
 # L1c: --start-stopped = le moteur ne SONNE que sur commande (bouton/Espace)
-$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped$muteArg " +
-              "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\Release\again.vst3"
+# 2.5-decouverte : le dossier VST3 standard est scanne (cache a cote du
+# binaire) - le menu + device propose tous les plugins de la machine
+$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped --editors$muteArg " +
+              "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\Release\again.vst3 " +
+              "--vst3-dir `"C:\Program Files\Common Files\VST3`""
 $engineProc = Start-Process -FilePath $engineExe -ArgumentList $engineArgs `
     -WorkingDirectory $engineDir -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $tempDir "daw-engine.log") `

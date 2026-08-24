@@ -295,6 +295,15 @@ const VST3_UID_RE = /^[0-9A-Fa-f]{32}$/;
 /** Convenance d'affichage pour les uid deja croises sur cette machine -
  *  le champ name du document reste la verite (2.5-decouverte remplacera
  *  cette table par le scan). */
+// 2.5-decouverte : le catalogue scanne par le moteur (recu a l'auth).
+// Effets seulement au menu - l'hote est Fx-only (stereo in/out) tant que
+// le bus INSTRUMENT n'existe pas (vague 3).
+type CatalogEntry = { uid: string; name: string; vendor: string; subCategories: string };
+let pluginCatalog: CatalogEntry[] = [];
+export function setPluginCatalog(entries: CatalogEntry[]): void {
+  pluginCatalog = entries;
+}
+
 const KNOWN_VST3_NAMES: Record<string, string> = {
   [AGAIN_UID]: 'AGain',
   'ABCDEF019182FAEB4175446152523330': 'RoughRider3',
@@ -344,6 +353,13 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   gainBtn.textContent = 'gain (builtin)';
   menu.appendChild(gainBtn);
 
+  // 2.5-decouverte : le catalogue du moteur, effets tries par nom.
+  // Choisir remplit uid+nom ; le champ uid reste la voie experte.
+  const catalogSelect = document.createElement('select');
+  catalogSelect.id = 'vst3-catalog-select';
+  catalogSelect.setAttribute('aria-label', 'Catalogue de plugins scannes');
+  menu.appendChild(catalogSelect);
+
   const vstRow = document.createElement('div');
   vstRow.className = 'device-add-vst';
   const uidInput = document.createElement('input');
@@ -380,7 +396,33 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   btn.addEventListener('click', () => {
     menu.hidden = !menu.hidden;
     btn.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
-    if (!menu.hidden) uidInput.classList.remove('invalid');
+    if (!menu.hidden) {
+      uidInput.classList.remove('invalid');
+      // Le catalogue au moment de l'OUVERTURE (il arrive apres l'auth)
+      const fx = pluginCatalog
+        .filter((e) => e.subCategories.includes('Fx'))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      catalogSelect.innerHTML = '';
+      const ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = fx.length
+        ? `— catalogue (${fx.length} effets) —`
+        : '— catalogue vide (moteur sans --vst3-dir) —';
+      catalogSelect.appendChild(ph);
+      for (const e of fx) {
+        const o = document.createElement('option');
+        o.value = e.uid;
+        o.textContent = `${e.name}  (${e.vendor})`;
+        catalogSelect.appendChild(o);
+      }
+    }
+  });
+  catalogSelect.addEventListener('change', () => {
+    const e = pluginCatalog.find((x) => x.uid === catalogSelect.value);
+    if (!e) return;
+    uidInput.value = e.uid;
+    nameInput.value = e.name;
+    uidInput.classList.remove('invalid');
   });
   gainBtn.addEventListener('click', () => {
     onAddDevice({

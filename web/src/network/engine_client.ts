@@ -49,6 +49,10 @@ export class EngineClient {
   /** S8a: post-master PCM batches from the tap (firstSeq, f32 bytes). */
   onAudioTap: ((firstSeq: number, blockCount: number, samples: Uint8Array,
                 droppedBlocks: number) => void) | null = null;
+  /** 2.5-decouverte : le catalogue de plugins scanne par le moteur
+   *  (envoye une fois a l'auth). */
+  onPluginCatalog: ((entries: Array<{ uid: string; name: string;
+    vendor: string; subCategories: string }>) => void) | null = null;
 
   constructor(config: EngineConfig = {}) {
     this.address = config.address ?? '127.0.0.1';
@@ -271,6 +275,9 @@ export class EngineClient {
         this.onAudioTap?.(
           Number(msg.data.firstSeq), msg.data.blockCount,
           msg.data.samples, Number(msg.data.droppedBlocks));
+        break;
+      case 'pluginCatalog':
+        this.onPluginCatalog?.(msg.data.entries);
         break;
       case 'error':
         this.onError?.(msg.data.message);

@@ -79,6 +79,15 @@
 .device-add-menu[hidden] {
   display: none;
 }
+.device-add-menu select {
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: var(--r);
+  background: #161616;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 100%;
+}
 .device-add-vst {
   display: flex;
   gap: 6px;

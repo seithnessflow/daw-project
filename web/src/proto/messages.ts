@@ -134,6 +134,25 @@ export interface AudioTap {
   droppedBlocks: number;
 }
 
+/** 2.5-decouverte: one scanned plugin class (Audio Module Class only) */
+export interface PluginEntry {
+  /** 32-hex VST3 class id */
+  uid: string;
+  name: string;
+  vendor: string;
+  /** e.g. "Fx|Dynamics|Stereo", "Instrument|Synth" */
+  subCategories: string;
+}
+
+/**
+ * The engine's plugin catalog: scanned from --vst3-dir folders (cache
+ * by path+size+mtime, enumeration in the crash-isolated child), plus
+ * explicit --vst3-module mappings. Sent ONCE per connection, on auth.
+ */
+export interface PluginCatalog {
+  entries: PluginEntry[];
+}
+
 /** Error from engine */
 export interface Error {
   severity: Error_Severity;
@@ -200,7 +219,11 @@ export interface Message {
     | Error
     | undefined;
   /** S8a */
-  audioTap?: AudioTap | undefined;
+  audioTap?:
+    | AudioTap
+    | undefined;
+  /** 2.5-decouverte */
+  pluginCatalog?: PluginCatalog | undefined;
 }
 
 function createBaseTransportCommand(): TransportCommand {
@@ -1108,6 +1131,196 @@ export const AudioTap: MessageFns<AudioTap> = {
   },
 };
 
+function createBasePluginEntry(): PluginEntry {
+  return { uid: "", name: "", vendor: "", subCategories: "" };
+}
+
+export const PluginEntry: MessageFns<PluginEntry> = {
+  encode(message: PluginEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.uid !== "") {
+      writer.uint32(10).string(message.uid);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.vendor !== "") {
+      writer.uint32(26).string(message.vendor);
+    }
+    if (message.subCategories !== "") {
+      writer.uint32(34).string(message.subCategories);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PluginEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePluginEntry();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.uid = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.name = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.vendor = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.subCategories = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PluginEntry {
+    return {
+      uid: isSet(object.uid) ? globalThis.String(object.uid) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      vendor: isSet(object.vendor) ? globalThis.String(object.vendor) : "",
+      subCategories: isSet(object.subCategories)
+        ? globalThis.String(object.subCategories)
+        : isSet(object.sub_categories)
+        ? globalThis.String(object.sub_categories)
+        : "",
+    };
+  },
+
+  toJSON(message: PluginEntry): unknown {
+    const obj: any = {};
+    if (message.uid !== "") {
+      obj.uid = message.uid;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.vendor !== "") {
+      obj.vendor = message.vendor;
+    }
+    if (message.subCategories !== "") {
+      obj.subCategories = message.subCategories;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PluginEntry>, I>>(base?: I): PluginEntry {
+    return PluginEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PluginEntry>, I>>(object: I): PluginEntry {
+    const message = createBasePluginEntry();
+    message.uid = object.uid ?? "";
+    message.name = object.name ?? "";
+    message.vendor = object.vendor ?? "";
+    message.subCategories = object.subCategories ?? "";
+    return message;
+  },
+};
+
+function createBasePluginCatalog(): PluginCatalog {
+  return { entries: [] };
+}
+
+export const PluginCatalog: MessageFns<PluginCatalog> = {
+  encode(message: PluginCatalog, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.entries) {
+      PluginEntry.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PluginCatalog {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePluginCatalog();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.entries.push(PluginEntry.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PluginCatalog {
+    return {
+      entries: globalThis.Array.isArray(object?.entries) ? object.entries.map((e: any) => PluginEntry.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: PluginCatalog): unknown {
+    const obj: any = {};
+    if (message.entries?.length) {
+      obj.entries = message.entries.map((e) => PluginEntry.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PluginCatalog>, I>>(base?: I): PluginCatalog {
+    return PluginCatalog.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PluginCatalog>, I>>(object: I): PluginCatalog {
+    const message = createBasePluginCatalog();
+    message.entries = object.entries?.map((e) => PluginEntry.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseError(): Error {
   return { severity: 0, code: "", message: "" };
 }
@@ -1219,6 +1432,7 @@ function createBaseMessage(): Message {
     engineState: undefined,
     error: undefined,
     audioTap: undefined,
+    pluginCatalog: undefined,
   };
 }
 
@@ -1247,6 +1461,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.audioTap !== undefined) {
       AudioTap.encode(message.audioTap, writer.uint32(66).fork()).join();
+    }
+    if (message.pluginCatalog !== undefined) {
+      PluginCatalog.encode(message.pluginCatalog, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -1328,6 +1545,14 @@ export const Message: MessageFns<Message> = {
             message.audioTap = AudioTap.decode(reader, reader.uint32());
             continue;
           }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.pluginCatalog = PluginCatalog.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1366,6 +1591,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.audio_tap)
         ? AudioTap.fromJSON(object.audio_tap)
         : undefined,
+      pluginCatalog: isSet(object.pluginCatalog)
+        ? PluginCatalog.fromJSON(object.pluginCatalog)
+        : isSet(object.plugin_catalog)
+        ? PluginCatalog.fromJSON(object.plugin_catalog)
+        : undefined,
     };
   },
 
@@ -1394,6 +1624,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.audioTap !== undefined) {
       obj.audioTap = AudioTap.toJSON(message.audioTap);
+    }
+    if (message.pluginCatalog !== undefined) {
+      obj.pluginCatalog = PluginCatalog.toJSON(message.pluginCatalog);
     }
     return obj;
   },
@@ -1424,6 +1657,9 @@ export const Message: MessageFns<Message> = {
     message.error = (object.error !== undefined && object.error !== null) ? Error.fromPartial(object.error) : undefined;
     message.audioTap = (object.audioTap !== undefined && object.audioTap !== null)
       ? AudioTap.fromPartial(object.audioTap)
+      : undefined;
+    message.pluginCatalog = (object.pluginCatalog !== undefined && object.pluginCatalog !== null)
+      ? PluginCatalog.fromPartial(object.pluginCatalog)
       : undefined;
     return message;
   },

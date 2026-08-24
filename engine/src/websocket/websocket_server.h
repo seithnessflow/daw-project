@@ -140,7 +140,15 @@ public:
      */
     void pumpTap();
 
+    /**
+     * 2.5-decouverte : le catalogue de plugins (trame protobuf deja
+     * serialisee avec prefixe longueur), envoye UNE fois par connexion
+     * a l'authentification. A poser AVANT start().
+     */
+    void setCatalogFrame(std::string frame) { catalog_frame_ = std::move(frame); }
+
 private:
+    std::string catalog_frame_;
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
                        ix::WebSocket& webSocket,

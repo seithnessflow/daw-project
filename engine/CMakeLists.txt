@@ -211,6 +211,8 @@ add_library(daw_engine_lib STATIC
     src/host/shared_audio_ring.h
     src/host/plugin_bridge.h
     src/host/plugin_bridge.cpp
+    src/host/plugin_scan.h
+    src/host/plugin_scan.cpp
     src/host/proxy_node.h
     src/host/proxy_node.cpp
     src/host/sync_proxy_node.h

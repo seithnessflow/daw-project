@@ -207,6 +207,11 @@ void WebSocketServer::handleMessage(
                     connections_.insert(&webSocket);
                 }
                 std::cout << "WebSocket: Connection authenticated" << std::endl;
+                // 2.5-decouverte : le catalogue part une fois, ici -
+                // l'onglet sait quoi proposer au menu + device
+                if (!catalog_frame_.empty()) {
+                    webSocket.sendBinary(catalog_frame_);
+                }
                 return;  // Auth message is consumed, never parsed as protobuf
             }
 

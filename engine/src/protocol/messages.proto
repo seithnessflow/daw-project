@@ -78,6 +78,21 @@ message AudioTap {
     uint64 dropped_blocks = 4; // cumulative ring overruns
 }
 
+// 2.5-decouverte: one scanned plugin class (Audio Module Class only)
+message PluginEntry {
+    string uid = 1;             // 32-hex VST3 class id
+    string name = 2;
+    string vendor = 3;
+    string sub_categories = 4;  // e.g. "Fx|Dynamics|Stereo", "Instrument|Synth"
+}
+
+// The engine's plugin catalog: scanned from --vst3-dir folders (cache
+// by path+size+mtime, enumeration in the crash-isolated child), plus
+// explicit --vst3-module mappings. Sent ONCE per connection, on auth.
+message PluginCatalog {
+    repeated PluginEntry entries = 1;
+}
+
 // Error from engine
 message Error {
     enum Severity {
@@ -107,5 +122,6 @@ message Message {
         EngineState engine_state = 5;
         Error error = 6;
         AudioTap audio_tap = 8;       // S8a
+        PluginCatalog plugin_catalog = 9;  // 2.5-decouverte
     }
 }

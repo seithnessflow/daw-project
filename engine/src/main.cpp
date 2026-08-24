@@ -21,6 +21,7 @@
 #include "render/stem_render.h"
 #include "util/crash_handler.h"
 #include "host/plugin_bridge.h"
+#include "host/plugin_scan.h"
 #include "host/proxy_node.h"
 #include "network/server_client.h"
 #include "util/sha256.h"
@@ -70,6 +71,7 @@ void printUsage(const char* program) {
               << "  --play             Play the project through audio device\n"
               << "  --start-stopped    With --play: device up, transport stopped until a PLAY command (browser/WS)\n"
               << "  --editors          Open each VST3 plugin's native GUI window (windowed hosting v1)\n"
+              << "  --vst3-dir <dir>   Scan a VST3 folder (repeatable; cached, crash-isolated enumeration)\n"
               << "  --render <file>    Render to WAV file\n"
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
@@ -123,6 +125,8 @@ struct Options {
     std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
     std::string self_exe;            // argv[0], to locate the sibling plugin_host
     std::map<std::string, std::string> vst3_modules;  // c-2: uid -> module path
+    std::vector<std::string> vst3_dirs;  // 2.5-decouverte: dossiers a scanner
+    std::string catalog_frame;           // trame PluginCatalog prete (auth)
     std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
@@ -177,6 +181,12 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.start_stopped = true;
         } else if (arg == "--editors") {
             opts.editors = true;
+        } else if (arg == "--vst3-dir") {
+            if (++i >= argc) {
+                std::cerr << "Error: --vst3-dir requires a directory path\n";
+                return false;
+            }
+            opts.vst3_dirs.push_back(argv[i]);
         } else if (arg == "--mute") {
             opts.mute = true;
         } else if (arg == "--ws-port") {
@@ -917,6 +927,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
                                      opts.allow_origins.begin(), opts.allow_origins.end());
 
     wirePluginTelemetry(ws_server, plugin_registry);
+    ws_server.setCatalogFrame(opts.catalog_frame);  // 2.5-decouverte
     if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
         std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n\n";
     } else {
@@ -1236,6 +1247,7 @@ int doPlayWithServer(const Options& opts) {
 
         // Start WebSocket server once we have a graph
         if (!ws_server.isRunning() && current_graph) {
+            ws_server.setCatalogFrame(opts.catalog_frame);  // 2.5-decouverte
             if (ws_server.start(ws_config, &device, device.getActiveGraphSlot())) {
                 std::cout << "WebSocket server: ws://127.0.0.1:" << opts.ws_port << "\n";
             }
@@ -1445,6 +1457,45 @@ int main(int argc, char* argv[]) {
 
     // Fenetrage v1: engine-wide, consulted at every child spawn
     daw::host::PluginBridge::setSpawnEditors(opts.editors);
+
+    // 2.5-decouverte : scan des dossiers VST3 (cache a cote du binaire,
+    // enumeration par l'enfant crash-isole). Les --vst3-module explicites
+    // GAGNENT sur le scan ; le catalogue nourrit le menu + device.
+    if (!opts.vst3_dirs.empty()) {
+        std::vector<daw::host::ScannedPlugin> catalog;
+        const std::string host_exe = hostExePath(opts);
+        const std::string cache_path =
+            (fs::path(opts.self_exe).parent_path() / "vst3-scan-cache.tsv").string();
+        for (const auto& d : opts.vst3_dirs) {
+            auto found = daw::host::scanVst3Dir(d, host_exe, cache_path, std::cerr);
+            for (auto& e : found) {
+                if (opts.vst3_modules.find(e.uid) == opts.vst3_modules.end()) {
+                    opts.vst3_modules[e.uid] = e.module_path;
+                }
+                catalog.push_back(std::move(e));
+            }
+        }
+        daw::protocol::Message msg;
+        auto* cat = msg.mutable_plugin_catalog();
+        for (const auto& e : catalog) {
+            auto* pe = cat->add_entries();
+            pe->set_uid(e.uid);
+            pe->set_name(e.name);
+            pe->set_vendor(e.vendor);
+            pe->set_sub_categories(e.sub_categories);
+        }
+        std::string payload;
+        msg.SerializeToString(&payload);
+        const uint32_t len = static_cast<uint32_t>(payload.size());
+        std::string frame;
+        frame.push_back(static_cast<char>((len >> 24) & 0xFF));
+        frame.push_back(static_cast<char>((len >> 16) & 0xFF));
+        frame.push_back(static_cast<char>((len >> 8) & 0xFF));
+        frame.push_back(static_cast<char>(len & 0xFF));
+        frame += payload;
+        opts.catalog_frame = std::move(frame);
+        std::cout << "VST3 catalog: " << catalog.size() << " plugin(s)\n";
+    }
 
     // List devices mode
     if (opts.list_devices) {

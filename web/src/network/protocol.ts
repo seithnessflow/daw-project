@@ -13,12 +13,13 @@ import {
   type Meters,
   type EngineState,
   type AudioTap,
+  type PluginCatalog,
   type Error as ProtoError,
 } from '../proto/messages';
 
 // Re-export types for convenience
 export { TransportCommand_Action as TransportAction };
-export type { EngineState, Meters, TransportPosition, AudioTap };
+export type { EngineState, Meters, TransportPosition, AudioTap, PluginCatalog };
 
 // Decoded message types for the client
 export type DecodedMessage =
@@ -26,6 +27,7 @@ export type DecodedMessage =
   | { type: 'meters'; data: Meters }
   | { type: 'state'; data: EngineState }
   | { type: 'audioTap'; data: AudioTap }
+  | { type: 'pluginCatalog'; data: PluginCatalog }
   | { type: 'error'; data: ProtoError };
 
 // Encode message types
@@ -117,6 +119,9 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
     }
     if (msg.audioTap !== undefined) {
       return { type: 'audioTap', data: msg.audioTap };
+    }
+    if (msg.pluginCatalog !== undefined) {
+      return { type: 'pluginCatalog', data: msg.pluginCatalog };
     }
     if (msg.error !== undefined) {
       return { type: 'error', data: msg.error };

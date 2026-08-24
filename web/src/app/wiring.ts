@@ -8,7 +8,7 @@
 import { Project } from '../document/project';
 import { ServerClient } from '../network/server_client';
 import { EngineClient } from '../network/engine_client';
-import { TIMELINE, formatGain } from '../ui/track';
+import { TIMELINE, formatGain, setPluginCatalog } from '../ui/track';
 import * as life from '../ui/life';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
@@ -449,6 +449,13 @@ export async function init(): Promise<void> {
   };
   engineClient.onState = (state) => {
     life.setEngineState(state.pluginBlocksMissed);
+  };
+  // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
+  // + device le lit a chaque ouverture
+  engineClient.onPluginCatalog = (entries) => {
+    setPluginCatalog(entries);
+    (window as any).__dawPlugins = entries;
+    console.log(`Plugin catalog: ${entries.length} classe(s)`);
   };
 
   // ---- Transport controls -------------------------------------------------
