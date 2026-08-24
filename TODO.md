@@ -26,7 +26,15 @@ timeOrigin (lecon : performance.now() a une EPOQUE PAR ONGLET — il
 n'existe pas de temps de session absolu, seulement des traductions
 par paire, le modele Link exact ; la premiere assertion « meme
 machine = offset 0 » etait fausse, 580 ms d'ecart de chargement
-mesures par l'estimateur juste)] ->
+mesures par l'estimateur juste). PROUVE DEUX MACHINES la meme nuit
+(sondes croisees tour/portable, hotspot+tunnel) : symetrie A/B a
+5-9 ms pres sur des chemins a RTT 60-90 ms, estimation stable ±3 ms
+entre lectures ; DERIVE REELLE mesuree ~200 ppm entre les deux
+machines (~12 ms/min) — la fenetre glissante de 16 x 2 s la suit
+naturellement, contrainte notee pour les ancres L1b (toujours
+traduire avec l'offset COURANT, jamais un offset fige) ; relais
+oblige, le RTT portable<->portable double (2 traversees de tunnel),
+topologie attendue] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
