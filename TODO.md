@@ -1,5 +1,30 @@
 # TODO
 
+## ORDRE GRAVE (recadrage utilisateur 2026-08-25 — ne bouge pas sans lui ;
+## une demande hors ordre se NOMME avant d'etre executee, regle CLAUDE.md)
+
+1. CRASH 0xe06d7363 — session bornee (2 max) : repro + symboles (PDB
+   en place) + correctif. Au-dela de 2 sessions : stop, 3 options
+   chiffrees. Gachette apparente : fermeture d'un lien WS / d'une
+   fenetre de plugin ; frappe les 2 machines ; 91 modules tiers
+   desormais chargeables = il reviendra a chaque seance.
+2. daw_engine_test RELINKE EN LOCAL — INCIDENT, pas friction : la
+   culture de preuve repose sur les gtests et la machine de dev ne
+   les lance plus (cibles bundle SDK en conflit apres le passage
+   RelWithDebInfo ; SMTG_CREATE_BUNDLE_FOR_WINDOWS=OFF pose en cache,
+   rebuild jamais mene au bout ; piege : le chemin de sortie
+   VST3/<config> vs les references VST3\Release\again.vst3 de
+   daw.ps1/ear/specs). Estime : une demi-session.
+3. L'INVARIANT RE-PROUVE SUR UN VRAI PLUGIN (la vraie session (3),
+   perimetre = les 4 points du recadrage, detail dans la reponse
+   ecrite du 2026-08-25) : PDC ecrivain (latence interne du plugin
+   declaree — le lecteur est fait et gteste), badge fraicheur
+   (arbitrage b attendu), preuve redefinie pour le non-determinisme
+   (meme BLOB par sha256 des deux cotes + cle fraiche + mesure audio
+   cote pair), deux machines.
+4. EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
+5. VAGUE 3 (MIDI + instruments -> le test ultime Massive).
+
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)
 
@@ -818,10 +843,16 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          dans le document) mais jamais implementee ; sans etat persiste,
          un vrai plugin oublie tout au reload. Marche la plus proche du
          muscle existant (setState/getState VST3 + le canal 2.3 assets).
-      2. LA DECOUVERTE ENSUITE — scanner les plugins installes, resoudre
-         UID -> chemin PAR MACHINE (le document ne porte que des UID,
-         deja acquis). Petit, controle pur ; fait passer de « AGain en
-         dur » a « tes plugins ». Le registre par UID de c-2 l'a prepare.
+      2. LA DECOUVERTE — FAITE 2026-08-24 (soiree, demande utilisateur) :
+         --vst3-dir scanne (enumeration par l'enfant crash-isole,
+         timeout 15 s), cache TSV par (chemin, taille, mtime), echec de
+         scan memorise ; resolution uid->module auto (flags explicites
+         gagnent) ; protocole PluginCatalog a l'auth ; menu + device =
+         picker (91 classes/72 effets sur la tour, instruments filtres
+         jusqu'au bus vague 3). RESTE de la mecanique 3 : moduleinfo.json
+         (on passe toujours par l'enfant, plus lent au premier scan) et
+         la blacklist au 2e crash d'INSTANTIATION (le registre compte
+         deja les restarts).
       3. LE FENETRAGE EN DERNIER, avec mefiance — le plus visible, le
          moins prouvable (aucun test par echantillons ne verifie une
          fenetre), tentation d'options maximale (native/capturee/dockee =

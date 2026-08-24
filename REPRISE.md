@@ -40,17 +40,19 @@ moteur, docs/deux-machines.md).
   build_core.bat contourne ; CI Linux teste, elle) — meme session.
 - Reglages GUI pendant une fenetre TRAINEE = blocs dry comptes (design).
 
-## La suite (ordre)
+## La suite — ORDRE GRAVE AU RECADRAGE 2026-08-25 (tete de TODO.md ;
+## ne bouge pas sans l'utilisateur ; hors-ordre = le nommer avant)
 
-1. Session crash 0xe06d7363 (+ cibles bundle + gtest local repare).
-2. 2.5-DECOUVERTE : scan automatique du dossier VST3 (~120 modules
-   enumeres a la main aujourd'hui, la table des noms est provisoire).
-3. Effets natifs (3 sessions arbitrees, VCV Rack comme litterature).
-4. Vague 3 : LE TEST ULTIME (MIDI laptop -> Massive tour -> entendu
-   partout). Massive.vst3 ET Massive X.vst3 sont sur la tour.
-5. Refus VST2 maintenu (SDK non licenciable) ; orphelins reels :
-   Absynth 5, ImpOSCar2, Trash 2 (versions VST3 existent, pas
-   installees).
+1. CRASH 0xe06d7363 (bornee, 2 sessions max, sinon 3 options).
+2. daw_engine_test relinke en local (INCIDENT — les gtests sont la
+   culture de preuve ; ~demi-session, piege du chemin VST3/<config>).
+3. INVARIANT RE-PROUVE SUR UN VRAI PLUGIN (les 4 points du recadrage :
+   PDC ecrivain, badge fraicheur [arbitrage b attendu], preuve
+   redefinie non-determinisme, deux machines).
+4. Effets natifs (3 sessions, VCV Rack).
+5. Vague 3 (test ultime Massive).
+Directives corrigees : manuel Live = reference PONCTUELLE (plus une
+bible) ; ordre grave = demande hors-ordre NOMMEE avant execution.
 
 ## Directives gravees
 

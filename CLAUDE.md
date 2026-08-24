@@ -151,11 +151,16 @@ Interdit:
 
 ## Conventions
 
-- LA BIBLE PRODUIT (directive utilisateur 2026-08-24) : le manuel
-  Ableton Live 12 (ableton.com/en/live-manual/12) — a consulter LE
-  PLUS SOUVENT POSSIBLE pour tout comportement/convention produit
-  (synthese locale : docs/ABLETON-INTEGRALE.md). Limite : source de
-  COMPORTEMENT, jamais de DSP (brief effets natifs).
+- MANUEL LIVE 12 = REFERENCE PONCTUELLE (corrige au recadrage
+  2026-08-25 — l'ancienne formule « bible a consulter sans cesse »
+  degelait la parite Ableton par capillarite) : consulte pour repondre
+  a UNE question precise deja posee, JAMAIS pour alimenter la file.
+  DSP exclu (litterature d'implementation : VCV Rack). Synthese
+  acquise : docs/ABLETON-INTEGRALE.md.
+- ORDRE GRAVE (recadrage 2026-08-25) : la file (TODO.md) ne se
+  reordonne pas sans l'utilisateur ; une demande utilisateur HORS
+  ORDRE se NOMME (« ceci passe devant X — je le fais ? ») avant
+  d'etre executee.
 - Pas d'accents dans code/commits (clavier QWERTY)
 - Commits: emoji robot + Co-Authored-By Claude
 - ADR pour decisions architecturales
