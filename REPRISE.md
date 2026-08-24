@@ -1,67 +1,58 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Ecrit le 2026-08-24 (soiree, la journee des vrais plugins). VOLATILE :
-etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
+*Ecrit le 2026-08-25 (fin de journee, sessions 1-2-3 de l'ordre grave).
+VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans
+JOURNAL.md.*
 
 ## Ou on en est (30 secondes)
 
-La journee a tout change :
-- **Link VERT deux machines** (L1a+b+c) : PLAY tour -> portable cale a
-  10,7 ms, ecart <= 16 ms, ecoute jam suspend la lecture (arbitre).
-- **LES VRAIS PLUGINS SONT LA** : 18 plugins du commerce mappes
-  (Valhalla, RoughRider, Krush, effets NI...), ajoutes par le geste UI
-  normal (+ device, noms reels, chaine en serie visible — bible Live).
-- **FENETRAGE v1** : chaque enfant vst3 ouvre la GUI native du plugin
-  (taille native, fullscreen retire), reglages audibles immediatement
-  (performEdit -> bloc suivant ; flush numSamples==0 a l'arret), et
-  **ring v6 : les reglages GUI SURVIVENT et VOYAGENT** (gui_edit_seq ->
-  capture d'etat -> store -> cle de stem -> le pair sans le plugin
-  re-entend TON reglage).
-- Preuve chiffree du comp : t1 1.0->1.4, crete 17.7->15.7 % (RoughRider
-  tient) ; piste sans chaine -> clip ROUGE.
-- Moteur --editors, --start-stopped ; ear --vst3 uid=chemin ; derniers
-  mots des enfants dans <segment>.log.
-- Commits ... -> 802029d. CI verte jusqu'a f4661d1 (v6) ; verdict
-  802029d = premier point de synchro si absent d'ici.
+L'ORDRE GRAVE du recadrage est execute dans l'ordre :
+1. [x] CRASH 0xe06d7363 : cause (envoi sous verrou + Close synchrone
+   ixwebsocket = self-lock), fix (envoi hors verrou), contre-epreuve
+   60/60 (scripts/crash-churn.cjs), handler auto-symbolisant.
+2. [x] GTESTS LOCAUX : 29/29 retablis (bundle SDK OFF epingle,
+   fixtures plates VST3\again.vst3, refs reconciliees).
+3. [~] INVARIANT SUR VRAIS PLUGINS — moitie locale COMPLETE :
+   - PREUVE : scripts/invariant-proof.ps1 (quatuor) — rendu reel x2
+     bit-deterministe, pair-sans-plugin = MEMES OCTETS via
+     « playing STEM », bidon = echec bruyant. VERT sur inv-proof
+     (Valhalla + RoughRider).
+   - PDC ECRIVAIN : ring v7 (latence interne declaree par l'enfant),
+     le stem declare la somme de sa chaine ; lecteur deja gteste.
+   - FRAICHEUR (arbitrage b, interprete d'un « OK » — a infirmer si
+     faux) : sf:1 / 2 s sur le canal ephemere, badge 3 etats,
+     « fraicheur inconnue » au silence ; stem-freshness.spec verte.
+   gtests 29/29, e2e 36/36, CI verte jusqu'a 55fcac8 (1c61c6c en
+   sentinelle — premier point de synchro si absent).
+
+## RESTE DE LA SESSION 3 — la jambe deux machines
+
+LE PORTABLE DOIT PULL + REBUILD AVANT TOUTE SEANCE (fix crash + ring
+v7 : un enfant v7 refuse un segment v6 et vice-versa). Puis :
+scripts/invariant-proof.ps1 jambe SANS chez lui (il n'a aucun de ces
+plugins) + badges de fraicheur observes depuis la-bas.
 
 ## Relancer
 
-Le banc du jour (moteur + 18 modules + editors) : voir la commande dans
-le JOURNAL du 2026-08-24 soir, ou relancer simple : scripts\daw.ps1.
-Stack : serveur + vite + moteur 47821 (+ portable : relais + vite +
-moteur, docs/deux-machines.md).
+- Banc : moteur ma-piece 47821 (audible, --start-stopped, --editors,
+  catalogue scanne) tourne ; onglets localhost:5173/?project=ma-piece.
+- Moteur de preuve : inv-proof sur 47831 (muet) — relancer au besoin,
+  memes flags + --vst3-dir.
+- Preuves rejouables : scripts/invariant-proof.ps1,
+  scripts/crash-churn.cjs, npm run ear -- --project X [--vst3 uid=path].
 
 ## A surveiller
 
-- **Crash 0xe06d7363** (fermeture lien WS, LES DEUX machines) — session
-  dediee : repro + symboles (build RelWithDebInfo, PDB en place).
-  crash-*.log + <segment>.log = la moisson.
-- Cibles bundle SDK en conflit (daw_engine_test ne LINKE PAS en local ;
-  build_core.bat contourne ; CI Linux teste, elle) — meme session.
-- Reglages GUI pendant une fenetre TRAINEE = blocs dry comptes (design).
+- Piege ARGV grave dans les scripts : \a en JS MANGE le backslash —
+  chemins en SLASHES AVANT dans tout script de test.
+- Les chemins --vst3-module relatifs se resolvent contre l'EXE
+  desormais (jamais le cwd) ; mapping logue verbatim au demarrage.
+- Sonde soothe2 (latence lookahead reelle) pendue (licence ?) — a
+  re-tenter pour une preuve PDC non-nulle.
 
-## La suite — ORDRE GRAVE AU RECADRAGE 2026-08-25 (tete de TODO.md ;
-## ne bouge pas sans l'utilisateur ; hors-ordre = le nommer avant)
+## La suite (ordre grave)
 
-1. [x] CRASH 0xe06d7363 SOLDE (2026-08-25, une session) : envoi hors
-   verrou (sendToAll/pumpTap), self-lock du Close synchrone
-   d'ixwebsocket = la cause ; harnais scripts/crash-churn.cjs 60/60 ;
-   handler auto-symbolisant (dbghelp + WHAT). LE PORTABLE DOIT
-   PULL+REBUILD pour recevoir le fix.
-2. [x] GTESTS LOCAUX RETABLIS (meme jour) : bundle SDK OFF epingle
-   (vst3sdk.cmake), fixtures plates VST3\again.vst3, refs
-   reconciliees ; 29/29 local, e2e 35/35.
-3. INVARIANT RE-PROUVE SUR UN VRAI PLUGIN — LA PROCHAINE : perimetre
-   = reponse ecrite du recadrage (PDC ecrivain, badge fraicheur,
-   preuve redefinie : meme BLOB par sha256 + cle fraiche + sonde
-   audio pair, deux machines). BLOQUE SUR : arbitrage (b) du badge
-   de fraicheur (oui/non utilisateur).
+3-fin. Jambe deux machines (ci-dessus).
 4. Effets natifs (3 sessions, VCV Rack).
 5. Vague 3 (test ultime Massive).
-Directives corrigees : manuel Live = reference PONCTUELLE (plus une
-bible) ; ordre grave = demande hors-ordre NOMMEE avant execution.
-
-## Directives gravees
-
-- Manuel Live 12 = bible produit (jamais DSP). Memoire + CLAUDE.md.
-- Organes sensoriels : ameliorer sans permission, self-test deux sens.
+6. AUDIT-5 harmonisation (souhait utilisateur, consigne).
