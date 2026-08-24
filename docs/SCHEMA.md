@@ -11,6 +11,25 @@
 > WITHOUT the plugin plays the plugin's output from the asset store.
 > Nothing of this exists in v1 or in code yet; do not build against it
 > before the design session lands here.
+>
+> **Also on the v2 design session's table (consigned 2026-08-25):
+> LISTENING PLACES** — each participant has their own listening
+> position, movable in one click: **Alone** (strictly local stream:
+> sample preview, chain experiments — editing still converges, only
+> LISTENING is isolated), **Common** (N local renders of the same
+> document — not a shared stream), **At a peer** (hear what they hear,
+> local solos/mutes/previews included). The capability exists by
+> construction (one engine per machine); it is to be revealed, not
+> built. Hard constraints: NONE of it enters this document (listening
+> position, mode, local solos, preview selection are performance
+> state on the ephemeral channel — the existing rule applies as-is);
+> the MODE is visible to others while its CONTENT stays private;
+> joining a peer is asked or at least signaled; returning to Common
+> breaks neither playback position nor transport. Joining a peer IS
+> the stem-streaming transport (one mechanism, hashed slices), and
+> the stem freshness badge must hold in Alone mode too. Full brief:
+> TODO.md, entry « LIEUX D'ECOUTE » (2bis). Placement and listening
+> places are the same subject seen from two sides — decide together.
 
 ## Schema v1
 

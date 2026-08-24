@@ -352,6 +352,58 @@ dedouble). Ordre :
        declare quel pair l'heberge, negocie par capacite ; reprise
        quand le pair hebergeur part. AVANT toute nouvelle ligne de
        timeline. Le design seul — l'implementation suit les fondations.
+       SE CONCOIT AVEC LES LIEUX D'ECOUTE (entree ci-dessous) — meme
+       sujet, deux faces.
+
+2bis. [ ] LIEUX D'ECOUTE (consignation utilisateur 2026-08-25 — a
+       TRANCHER pendant la session SCHEMA v2, pas avant, pas de code).
+       L'IDEE : dans un projet partage, chaque participant a sa propre
+       position d'ecoute, deplacable d'un clic — SEUL (flux strictement
+       local : pre-ecoute de samples, essais de chaines ; l'edition
+       converge normalement, c'est l'ECOUTE qui est isolee), COMMUN
+       (N rendus locaux du meme document — pas un flux partage, ils
+       sonnent pareil parce que le document est le meme), CHEZ UN PAIR
+       (j'ecoute ce qu'entend Paul, solos/mutes/pre-ecoutes compris).
+       La capacite existe PAR CONSTRUCTION (un moteur par machine) :
+       a REVELER, pas a construire. Besoin quotidien : tester 456
+       kicks sans que personne ne les entende, puis faire ecouter
+       l'elu.
+       CE QUE CA UNIFIE (trois cas speciaux -> un mecanisme) :
+       le solo/mute d'ecoute local (deja arbitre hors document — ce
+       modele rendu explicite et manipulable) ; la pre-ecoute (= mode
+       seul + source temporaire) ; le stream de stems (= le mecanisme
+       de « rejoindre quelqu'un », pas un canal separe).
+       CONTRAINTES NON NEGOCIABLES :
+       (a) RIEN dans le document — position, mode, solos locaux,
+           selection de pre-ecoute = etat de performance, canal
+           ephemere (comme la telemetrie) ; la regle existante
+           s'applique telle quelle, ne pas la violer par commodite ;
+       (b) le MODE est visible aux autres (partir dans son coin sans
+           le dire = « on me parle et je n'entends rien ») ; son
+           CONTENU est prive — presence, pas surveillance ;
+       (c) aller ecouter un pair SE DEMANDE ou au minimum SE SIGNALE
+           (ca consomme sa bande passante et expose ce qu'il
+           bricole) — consentement explicite ou notification, jamais
+           silencieux ;
+       (d) le retour au commun ne casse RIEN : ni la position de
+           lecture, ni le transport (le geste le plus frequent).
+       TROIS QUESTIONS A TRANCHER AVEC LE PLACEMENT (SCHEMA v2) :
+       1. le mode seul implique-t-il un rendu local des chaines
+          distantes ? (ecouter seul une piste dont le plugin est chez
+          Paul = entendre son stem — l'isolement depend quand meme de
+          lui ; coherent mais A ECRIRE, et le badge de fraicheur vaut
+          aussi dans ce mode) ;
+       2. ecouter un pair = recevoir son stem diffuse — MEME transport
+          que la pre-ecoute partagee, meme question du decoupage en
+          tranches hashees (on n'adresse pas par contenu ce qui
+          n'existe pas encore) : UN SEUL mecanisme pour les deux ;
+       3. niveau de presence : liste des lieux occupes, indicateur par
+          participant, ou juste un etat sur soi — a dimensionner,
+          PAS a zero.
+       REFUS ECRITS : pas de mise en oeuvre maintenant (consignation) ;
+       JAMAIS de mode persistant cache (on ne decouvre pas apres 20
+       minutes qu'on diffusait encore) ; pas de nouveau canal reseau —
+       canal ephemere existant + store, ou ca attend.
        INTRANTS GRAVES (amendement ADR-019) : cle de stem = cle de
        cache d'ENTREES (version/build plugin + samplerate DANS la cle,
        jamais d'assertion de re-rendu bit-exact d'un plugin tiers) ;
