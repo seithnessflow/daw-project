@@ -116,6 +116,20 @@ h1 {
   box-shadow: 0 0 6px rgba(88, 179, 104, 0.55);
 }
 
+/* ---- Sync (Link L1b): pressed = same potion as JAM; a remote anchor
+   driving OUR transport FLASHES the button (every effect announced) - */
+#sync-btn[aria-pressed='true'] {
+  background: var(--potion);
+  color: #0b0d0a;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(190, 120, 255, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+#sync-btn[data-flash='1'] {
+  box-shadow: 0 0 16px rgba(190, 120, 255, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
 /* ---- Jam: the button POURS when it broadcasts, the badge never
    disappears ("jam off" is a state, not an absence) ---------------- */
 #jam-btn[aria-pressed='true'] {

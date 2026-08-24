@@ -8,6 +8,7 @@
 import type { Project } from '../document/project';
 import type { ServerClient } from '../network/server_client';
 import type { EngineClient } from '../network/engine_client';
+import type { TransportSync } from '../network/transport_sync';
 import type { Library } from '../ui/library';
 import type { Overview } from '../ui/overview';
 
@@ -27,7 +28,13 @@ const serverBase = rawServer
 export const SERVER_URL = serverBase;
 /** HTTP side of the same server (assets store). ONE source of truth. */
 export const SERVER_HTTP = serverBase.replace(/^ws/, 'http');
-export const ENGINE_PORT = 47821;
+// L1b piloting: ?engine=<port> points a tab at another local engine
+// (two engines, two tabs, one machine = the sync manip without a second
+// computer). The token endpoint already serves any port.
+export const ENGINE_PORT = (() => {
+  const p = new URLSearchParams(window.location.search).get('engine');
+  return p && /^\d{2,5}$/.test(p) ? Number(p) : 47821;
+})();
 export const PROJECT_ID =
   new URLSearchParams(window.location.search).get('project') ?? 'default';
 // Magic Potion phase 1: the embedded KIT and lab fixtures are the TEST
@@ -43,6 +50,7 @@ export const ctx = {
   project: null as Project | null,
   serverClient: null as ServerClient | null,
   engineClient: null as EngineClient | null,
+  transportSync: null as TransportSync | null,
   library: null as Library | null,
   overview: null as Overview | null,
 

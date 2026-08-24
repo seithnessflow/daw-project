@@ -12,6 +12,8 @@ export function startPlayback(): void {
   const sr = ctx.project?.getDocument().sampleRate || 48000;
   ctx.engineClient.seek(Math.round(ctx.insertMarkerSec * sr));
   ctx.engineClient.play();
+  // L1b: PLAY here = PLAY there (anchor broadcast; no-op when SYNC off)
+  ctx.transportSync?.publish(true, ctx.insertMarkerSec);
   ctx.followPaused = false;          // Follow resumes on restart (Ableton)
   updateFollowUI();
 }
@@ -21,7 +23,9 @@ export function stopPlayback(): void {
   const sr = ctx.project?.getDocument().sampleRate || 48000;
   if (ctx.engineClient.isPlaying()) {
     ctx.engineClient.stop();         // 1st stop: halt where you are
+    ctx.transportSync?.publish(false, Math.max(0, ctx.lastPlayheadSec));
   } else {
     ctx.engineClient.seek(Math.round(ctx.insertMarkerSec * sr));  // 2nd: come home
+    ctx.transportSync?.publish(false, ctx.insertMarkerSec);
   }
 }

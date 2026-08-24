@@ -28,6 +28,7 @@ import { toggleHelp, isHelpOpen } from '../ui/help';
 import { JamChannel } from '../network/jam';
 import { JamAudio } from '../network/jam_audio';
 import { SessionClock } from '../network/session_clock';
+import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 
@@ -252,6 +253,35 @@ export async function init(): Promise<void> {
         : `clk ±${Math.round(worst)} ms (${peers.size})`;
     }
   };
+
+  // L1b: transport anchors - SYNC is opt-in; PLAY here = PLAY there,
+  // anchors translated with the CURRENT clock offset (never frozen).
+  const syncBtn = document.getElementById('sync-btn') as HTMLButtonElement;
+  const tsync = new TransportSync(serverClient, clock);
+  ctx.transportSync = tsync;
+  (window as any).__dawSync = tsync;
+  tsync.onApply = (playing, posSec) => {
+    if (!engineClient.isConnected()) return;
+    const sr = ctx.project?.getDocument().sampleRate || 48000;
+    if (playing) {
+      engineClient.seek(Math.round(posSec * sr));
+      engineClient.play();
+    } else {
+      engineClient.stop();                       // halt first, then park
+      engineClient.seek(Math.round(posSec * sr));
+    }
+    // The remote gesture must be SEEN (rule: every effect announced) -
+    // the button flashes when an anchor drives the local transport.
+    syncBtn.dataset.flash = '1';
+    window.setTimeout(() => { delete syncBtn.dataset.flash; }, 400);
+  };
+  tsync.onStateChange = () => {
+    syncBtn.setAttribute('aria-pressed', tsync.enabled ? 'true' : 'false');
+  };
+  syncBtn.addEventListener('click', () => tsync.setEnabled(!tsync.enabled));
+  if (new URLSearchParams(window.location.search).get('sync') === '1') {
+    tsync.setEnabled(true);   // piloting mode, like ?jam= and ?tap=
+  }
 
   // S8b: the jam traversal - one broadcaster per project, listeners
   // answer; latency MEASURED over the data channel and displayed.

@@ -34,7 +34,29 @@ machines (~12 ms/min) — la fenetre glissante de 16 x 2 s la suit
 naturellement, contrainte notee pour les ancres L1b (toujours
 traduire avec l'offset COURANT, jamais un offset fige) ; relais
 oblige, le RTT portable<->portable double (2 traversees de tunnel),
-topologie attendue] ->
+topologie attendue.
+L1b FAIT 2026-08-24 (jour) : TRANSPORT ANCRE — bouton SYNC opt-in
+(etat de performance, ?sync=1 pour le pilotage), ancre
+{playing, posSec, t} LWW sur le relais signal: (ta:1), reception =
+traduction avec l'offset COURANT de L1a (jamais fige, regle derive)
+puis seek+play du moteur LOCAL a « la ou l'ancre dit qu'on DOIT
+etre » (posSec + ecoule — un message en retard ne decale rien) ;
+ancre en attente tant que l'estimation d'horloge du pair n'existe
+pas (retry borne, jamais d'offset devine — 580 ms d'epoque entre
+onglets). Emission aux gestes play/stop uniquement (pas de
+re-broadcast : le rejoin tardif = L1c). Bouton SYNC flashe quand une
+ancre distante pilote le transport (regle « chaque effet annonce »).
+?engine=<port> pointe un onglet sur un autre moteur local (deux
+moteurs, deux onglets, une machine = la manip sync sans 2e
+ordinateur). Garde transport-sync.spec (moteur reel : opt-in
+respecte — recu-mais-ignore compte —, PLAY/STOP voyagent, VERITE de
+traduction contre timeOrigin avec ecart d'epoque construit > 1 s).
+Sonde pilote sur l'environnement reel deux-moteurs : ecart de
+position minimal 0 ms (telemetrie 30 Hz), verdict < 50 ms VERT.
+RESTE L1c : rejoin en cours de lecture, arbitrage jam-vs-sync
+(LINK-DESIGN 4). DECOUVERTE EAR en montant la manip : le projet duo
+rend 2 DISCONTINUITES (saut 0.9) — inapte a l'ecoute, a trier
+(ma-piece VERT, la manip tourne dessus)] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de

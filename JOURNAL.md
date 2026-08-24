@@ -830,3 +830,26 @@ ecrivent left/width en direct et la main ne doit jamais attendre), ni
 les vumetres (la balistique appartient a la couche life). Les six
 tranches sont passees UNE fois ; la directive « au fur et a mesure »
 les garde ouvertes aux passes suivantes.
+
+**2026-08-24 (jour, L1b — le transport ancre) :** la suite du chantier
+Link, sur l'horloge L1a de la nuit. Le principe applique tel que
+cadre : le transport partage n'est PAS un evenement « PLAY ! » mais
+une ANCRE {playing, posSec, t} — une fonction pure du temps de
+session. Le recepteur traduit le timbre du pair avec l'offset COURANT
+(jamais fige : la derive reelle de 200 ppm etait la contrainte notee)
+et cale son moteur la ou l'ancre dit qu'on DOIT etre — un message qui
+a traine n'introduit aucun decalage, l'erreur est bornee par la
+qualite d'horloge. LWW entre ancres (la plus recente en temps local
+gagne), SYNC opt-in dans la barre transport (le Start Stop Sync de
+Live), et une ancre recue d'un pair dont l'horloge n'est pas encore
+estimee ATTEND (deviner offset 0 = faux meme sur une machine, les
+580 ms d'epoque entre onglets l'ont prouve en L1a). La garde
+transport-sync.spec prouve la traduction contre la VERITE timeOrigin
+avec un ecart d'epoque construit de 1,2 s — une erreur de signe y
+vaudrait 2,4 s, la tolerance est 200 ms. Sonde pilote sur le banc
+reel (deux moteurs locaux, ?engine=47822) : PLAY dans l'onglet du
+moteur muet demarre le moteur voisin, ecart de position minimal 0 ms.
+Moisson du montage de la manip : l'EAR dit ROUGE sur le projet duo
+(2 discontinuites, saut 0.9) — le projet de la chasse au crash est
+inapte a l'ecoute, a trier ; ma-piece est VERT et porte la manip.
+Reste L1c : rejoin en cours de lecture, arbitrage jam-vs-sync.
