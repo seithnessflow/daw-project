@@ -28,6 +28,14 @@ regle firewall.*
      --url ssh://localhost:22`
    - relever l'URL `https://xxx.trycloudflare.com` affichee (EPHEMERE :
      change a chaque relance).
+   - CONSTAT 2026-08-24 : le LANCEMENT du tunnel est un GESTE HUMAIN —
+     le classifieur de l'auto mode le refuse aux deux Claude (exposer
+     un port sur une URL publique), des deux cotes. Les diagnostics,
+     eux, sont delegables (sshd, cles, journal). Cote tour, brancher
+     l'URL du jour : `scripts\liaison.ps1 -Url <url>` (patch du
+     ~/.ssh/config + test).
+   - Le sous-reseau du hotspot CHANGE (10.102.x releve 2026-08-23,
+     172.27.107.x le 2026-08-24) : aucune IP portable en dur, jamais.
 
 ### Cote fixe
 

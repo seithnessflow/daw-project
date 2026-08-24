@@ -42,6 +42,10 @@ export class TransportSync {
   /** L1c jam arbitration: true while this tab listens to a jam - its
    *  transport is suspended (anchors suppressed, no rejoin answers). */
   suspendProvider: (() => boolean) | null = null;
+  /** Diagnostic (ta:3) : etat moteur complet, sans l'ambiguite de
+   *  anchorProvider (null = arrete OU sans moteur - indistinguable). */
+  stateProvider:
+    (() => { engineConnected: boolean; playing: boolean; posSec: number }) | null = null;
 
   private server: ServerClient;
   private clock: SessionClock;
@@ -90,6 +94,21 @@ export class TransportSync {
     if (!m || typeof m.ta !== 'number' || !m.from ||
         m.from === this.server.id) return;
     if (m.to && m.to !== this.server.id) return;   // directed elsewhere
+    if (m.ta === 3) {
+      // Organe sensoriel (2026-08-24) : rapport d'etat A DISTANCE.
+      // Diagnostic pur, lecture seule, repond TOUJOURS (meme desarme,
+      // meme sans moteur) - c'est l'angle mort qui a coute la premiere
+      // sonde deux-machines : un pair muet ne disait pas POURQUOI.
+      this.server.sendSignal({
+        ta: 4, from: this.server.id, to: m.from,
+        state: {
+          ...this.snapshot(),
+          live: this.stateProvider?.() ?? null,    // moteur ? joue ? ou ?
+          suspended: !!this.suspendProvider?.(),   // ecoute jam ?
+        },
+      });
+      return;
+    }
     if (m.ta === 2) {
       // Rejoin request: answer with a FRESH anchor from the live
       // engine, directed - only when armed, playing, and not a jam

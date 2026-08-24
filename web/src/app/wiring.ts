@@ -301,6 +301,11 @@ export async function init(): Promise<void> {
       ? { playing: true, posSec: Math.max(0, ctx.lastPlayheadSec) }
       : null;
   tsync.suspendProvider = () => jam.role === 'listening';
+  tsync.stateProvider = () => ({
+    engineConnected: engineClient.isConnected(),
+    playing: engineClient.isPlaying(),
+    posSec: Math.max(0, ctx.lastPlayheadSec),
+  });
   let wasListening = false;
   jamReassert = () => jam.reassert();
   jamIsBroadcasting = () => jam.role === 'broadcasting';
