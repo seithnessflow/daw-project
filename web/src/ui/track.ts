@@ -304,6 +304,31 @@ export function setPluginCatalog(entries: CatalogEntry[]): void {
   pluginCatalog = entries;
 }
 
+// Session 3 (fraicheur, arbitrage b) : le PRODUCTEUR diffuse sf:1 sur
+// le canal ephemere (2 s) ; sans signal recent, le badge dit
+// « fraicheur inconnue » — il ne ment jamais par omission.
+const stemFreshness = new Map<string, { fresh: boolean; at: number }>();
+export function noteStemFreshness(nodes: Record<string, { f: boolean }>): void {
+  const at = performance.now();
+  for (const [id, v] of Object.entries(nodes)) {
+    stemFreshness.set(id, { fresh: !!v.f, at });
+  }
+  refreshStemBadges();
+}
+export function refreshStemBadges(): void {
+  const now = performance.now();
+  document.querySelectorAll<HTMLElement>('[data-role="device-stem"]').forEach((el) => {
+    const e = stemFreshness.get(el.dataset.procId ?? '');
+    const state = e && now - e.at < 7000 ? (e.fresh ? 'fresh' : 'stale') : 'unknown';
+    el.dataset.fresh = state;
+    el.title = state === 'fresh'
+      ? 'Stem a jour : un pair sans ce plugin entend exactement ce rendu'
+      : state === 'stale'
+        ? 'STEM PERIME : un reglage a change, le producteur re-rend'
+        : 'Fraicheur inconnue : aucun producteur de ce stem en vie';
+  });
+}
+
 const KNOWN_VST3_NAMES: Record<string, string> = {
   [AGAIN_UID]: 'AGain',
   'ABCDEF019182FAEB4175446152523330': 'RoughRider3',
@@ -505,6 +530,7 @@ function createDevicePanel(
     const stem = document.createElement('span');
     stem.className = 'device-stem';
     stem.dataset.role = 'device-stem';
+    stem.dataset.procId = proc.id;   // fraicheur : le signal sf cible par id
     stem.textContent = `STEM ${proc.stemHash.slice(0, 8)}`;
     stem.title = `Stem publie (${proc.stemHash.slice(0, 8)}...) : un pair sans ce plugin entend ce rendu`;
     title.appendChild(stem);
@@ -631,6 +657,10 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
         stemBadge = document.createElement('span');
         stemBadge.className = 'device-stem';
         stemBadge.dataset.role = 'device-stem';
+        // Jumeau attrape (session 3) : le badge cree A L'ARRIVEE du stem
+        // n'avait pas le procId - la fraicheur le cherchait par '' et
+        // repondait « inconnue » a vie. Les DEUX createurs le posent.
+        stemBadge.dataset.procId = proc.id;
         panel.querySelector('.device-title')?.appendChild(stemBadge);
       }
       stemBadge.textContent = `STEM ${proc.stemHash.slice(0, 8)}`;

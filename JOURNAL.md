@@ -945,3 +945,21 @@ continue » lu comme oui a l'arbitrage (b) de la fraicheur (a infirmer
 si faux), et « harmoniser tout le code » range en AUDIT-5 au TODO
 plutot qu'execute en direct. Reste de la session 3 : PDC ecrivain,
 badge de fraicheur, et la jambe deux-machines.
+
+**2026-08-25 (session 3, deuxieme lot — PDC ecrivain + le badge qui ne
+ment pas) :** le ring passe v7 (l'enfant declare la latence interne du
+plugin apres sa ceremonie) et le stem declare desormais LA SOMME des
+latences de sa chaine — l'ecrivain rejoint le lecteur gteste. Et
+l'arbitrage (b) est cable : le producteur diffuse sf:1 toutes les 2 s
+sur le canal ephemere, le badge STEM a trois etats et « fraicheur
+inconnue » au silence — il ne ment jamais par omission. La garde
+(stem-freshness.spec, moteur reel) a paye trois moissons avant de
+passer : un JUMEAU (le badge cree in-place a l'arrivee du stem n'avait
+pas le procId — la fraicheur cherchait par '' et repondait inconnue a
+vie), les chemins --vst3-module RELATIFS casses des que le cwd n'etait
+pas build-msvc (resolus contre l'EXE desormais, mapping logue verbatim
+au demarrage), et deux couches d'echappement de backslash dans mes
+propres sondes (bash -> JS : \a en JS mange le backslash — slashes
+avant partout dans les scripts, definitif). gtests 29/29, suite e2e
+36/36. Reste la jambe deux-machines : le portable doit pull + rebuild
+(fix crash + ring v7) avant toute nouvelle seance partagee.

@@ -1088,6 +1088,8 @@ int doPlayWithServer(const Options& opts) {
     // rebuild (a param gesture is a burst of rebuilds; serialize once,
     // at the end). time_point{} = nothing scheduled.
     std::chrono::steady_clock::time_point state_capture_due{};
+    // Session 3 (fraicheur, arbitrage b) : cadence du signal sf
+    auto next_freshness = std::chrono::steady_clock::now();
 
     // Connect to sync server
     daw::network::ServerClient server_client;
@@ -1373,6 +1375,43 @@ int doPlayWithServer(const Options& opts) {
             }
         }
 
+        // Session 3 (fraicheur, arbitrage b) : LE PRODUCTEUR publie la
+        // fraicheur de ses stems sur le canal ephemere, toutes les 2 s -
+        // pour chaque noeud vst3 qu'il resout, fresh = (cle recomputee ==
+        // cle publiee). Un pair sans signal recent affiche « fraicheur
+        // inconnue » : le badge ne ment jamais par omission.
+        if (std::chrono::steady_clock::now() >= next_freshness) {
+            next_freshness = std::chrono::steady_clock::now() +
+                             std::chrono::seconds(2);
+            daw::document::ProjectDef fsnap;
+            {
+                std::lock_guard<std::mutex> lock(doc_mutex);
+                fsnap = doc.getDocument();
+            }
+            std::ostringstream sf;
+            sf << "{\"sf\":1,\"from\":\"engine\",\"nodes\":{";
+            bool any = false;
+            for (const auto& t : fsnap.tracks) {
+                for (size_t ni = 0; ni < t.chain.size(); ++ni) {
+                    const auto& p = t.chain[ni];
+                    if (p.type != "vst3" || p.bypass) continue;
+                    const auto it = opts.vst3_modules.find(p.uid);
+                    if (it == opts.vst3_modules.end()) continue;
+                    const std::string key = daw::render::computeStemKey(
+                        t, ni, fsnap.sample_rate,
+                        daw::render::moduleVersionTag(it->second));
+                    if (any) sf << ",";
+                    any = true;
+                    sf << "\"" << p.id << "\":{\"f\":"
+                       << ((key == p.stem_key && !p.stem_hash.empty())
+                               ? "true" : "false")
+                       << "}";
+                }
+            }
+            sf << "}}";
+            if (any) server_client.sendSignal(sf.str());
+        }
+
         // V1.5 / A4-5: the staged eviction fires once NO retired graph can
         // still touch a bridge ring. Telemetry is re-wired IMMEDIATELY (the
         // evicted handle may be the one it pointed at).
@@ -1453,6 +1492,21 @@ int main(int argc, char* argv[]) {
     Options opts;
     if (!parseArgs(argc, argv, opts)) {
         return 1;
+    }
+
+    // Un chemin --vst3-module RELATIF se resout contre le DOSSIER DE
+    // L'EXE, jamais le cwd (session 3 : lance depuis web/ par les
+    // specs, l'enfant ne trouvait pas VST3\again.vst3 - stems en echec
+    // et fraicheur f:false, correcte mais pour la mauvaise raison).
+    for (auto& [uid, path] : opts.vst3_modules) {
+        const fs::path p(path);
+        if (p.is_relative()) {
+            path = (fs::path(opts.self_exe).parent_path() / p).string();
+        }
+        // Organe : le mapping VERBATIM au demarrage - une mutilation de
+        // chemin (backslash mange par un shell) se voit ICI, pas trois
+        // couches plus bas dans un LoadLibraryW
+        std::cerr << "vst3-module: " << uid << " -> " << path << "\n";
     }
 
     // Fenetrage v1: engine-wide, consulted at every child spawn

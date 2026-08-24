@@ -118,6 +118,18 @@
   white-space: nowrap;
 }
 
+/* Fraicheur (session 3, arbitrage b) : perime = ambre, inconnu = gris
+   italique - le badge ne ment jamais par omission */
+.device-stem[data-fresh='stale'] {
+  color: var(--amber);
+  background: rgba(217, 164, 65, 0.14);
+}
+.device-stem[data-fresh='unknown'] {
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.05);
+  font-style: italic;
+}
+
 /* ---- 2.5-etat: captured-state badge ------------------------------ */
 .device-state {
   font-size: 9px;

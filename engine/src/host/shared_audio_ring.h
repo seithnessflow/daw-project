@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 6;       // v6: gui_edit_seq (v5: param FIFO)
+inline constexpr uint32_t kLayoutVersion = 7;       // v7: plugin_latency_samples (v6: gui_edit_seq)
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
@@ -109,6 +109,16 @@ struct SharedAudioRing {
     // re-entendent le reglage sans avoir le plugin).
     std::atomic<uint64_t> gui_edit_seq;
 
+    // ---- PDC ecrivain (session 3, v7) ----
+    // La latence INTERNE declaree par le plugin (IAudioProcessor::
+    // getLatencySamples), ecrite par l'enfant apres sa ceremonie et a
+    // chaque kLatencyChanged futur. Le rendu de stem la SOMME sur la
+    // chaine et la declare au document (stemLatencySamples) - le
+    // lecteur (graph_common, gteste) avance le stem d'autant. AGain et
+    // les plugins sans lookahead ecrivent 0 : le flux est le meme.
+    // uint64 pour garder les offsets multiples de 8 (pas de padding).
+    std::atomic<uint64_t> plugin_latency_samples;
+
     // ---- Planar audio, double-buffered: [slot][channel][frame] ----
     float in[kRingSlots][kRingChannels][kRingBlockSize];
     float out[kRingSlots][kRingChannels][kRingBlockSize];
@@ -136,11 +146,12 @@ static_assert(offsetof(SharedAudioRing, child_heartbeat) == 56 + kParamQueueSlot
 static_assert(offsetof(SharedAudioRing, state_request_seq) == 64 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, state_ready_seq) == 72 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, gui_edit_seq) == 80 + kParamQueueSlots * 12);
-static_assert(offsetof(SharedAudioRing, in) == 88 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, plugin_latency_samples) == 88 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, in) == 96 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, out) ==
-              88 + kParamQueueSlots * 12 + kRingSlots * kRingChannels * kRingBlockSize * 4);
+              96 + kParamQueueSlots * 12 + kRingSlots * kRingChannels * kRingBlockSize * 4);
 static_assert(sizeof(SharedAudioRing) ==
-              88 + kParamQueueSlots * 12 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
+              96 + kParamQueueSlots * 12 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 
 }  // namespace daw::host

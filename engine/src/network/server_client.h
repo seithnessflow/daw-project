@@ -106,6 +106,13 @@ public:
      */
     void sendChange(const std::vector<uint8_t>& change);
 
+    /**
+     * Session 3 (fraicheur) : signal ephemere texte via le relais du
+     * serveur (prefixe "signal:", relaye verbatim aux pairs du projet).
+     * Jamais dans le document. No-op deconnecte.
+     */
+    void sendSignal(const std::string& json);
+
 private:
     std::unique_ptr<ix::WebSocket> ws_;
     std::atomic<bool> connected_{false};

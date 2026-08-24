@@ -37,13 +37,29 @@
    l'ear ne stageait pas les blobs stems/etat (corrige — le
    pair-simule ne pouvait pas jouer) ; ear --verbose + lignes de
    verite de chemin rejouees.
-   RESTE (3 suite) : PDC ECRIVAIN (latence interne du plugin declaree
-   au stem — lecteur fait/gteste, ecrivain ecrit 0 ; ring v7 champ
-   latence enfant) ; BADGE FRAICHEUR (b) (moteur -> signal ephemere
-   sf, badge STEM frais/perime/inconnu + spec) ; DEUX MACHINES
-   (portable : pull + rebuild [fix crash inclus] puis la jambe SANS
-   du quatuor chez lui). Piege pour la suite : mon interpretation
-   « OK » = oui a (b) — a infirmer si faux.
+   PDC ECRIVAIN FAIT (meme jour) : ring v7 (plugin_latency_samples,
+   ecrit par l'enfant apres sa ceremonie = IAudioProcessor::
+   getLatencySamples, logue sur stderr), bridge.pluginLatencySamples(),
+   le stem declare LA SOMME des latences internes de sa chaine
+   (renderer.totalPluginLatencySamples) — le lecteur gteste avance
+   d'autant. AGain/Valhalla/RoughRider declarent 0 (verifie) ; sonde
+   soothe2 non concluante (init/licence pend — a re-tenter avec un
+   lookahead franc).
+   BADGE FRAICHEUR (b) FAIT (meme jour) : le producteur diffuse sf:1
+   toutes les 2 s sur le canal ephemere (ServerClient::sendSignal
+   moteur — texte, jamais le document) pour chaque noeud qu'il
+   resout ; badge STEM a 3 etats (frais / perime ambre / « fraicheur
+   inconnue » gris a 7 s sans signal — il ne ment jamais par
+   omission). Garde stem-freshness.spec (moteur reel) : frais ->
+   entree changee -> NOUVEAU stem frais -> moteur tue -> inconnue
+   < 12 s. Moissons de la garde : JUMEAU attrape (le badge cree
+   in-place a l'arrivee du stem n'avait pas le procId), chemins
+   --vst3-module RELATIFS resolus contre l'EXE (plus jamais le cwd),
+   mapping logue verbatim au demarrage (organe).
+   RESTE (3 suite) : DEUX MACHINES (portable : pull + rebuild [fix
+   crash + ring v7 !] puis scripts/invariant-proof.ps1 jambe SANS
+   chez lui + badges fraicheur observes de la-bas). Piege : mon
+   interpretation « OK » = oui a (b) — a infirmer si faux.
 4. EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
 5. VAGUE 3 (MIDI + instruments -> le test ultime Massive).
 6. AUDIT-5 « HARMONISATION » (souhait utilisateur 2026-08-25

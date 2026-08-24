@@ -513,8 +513,16 @@ struct PluginInstance {
             return false;
         }
         active = true;
+        // PDC ecrivain (session 3) : la latence interne declaree par le
+        // plugin - lisible sur stderr pour les sondes, publiee au ring
+        // par --serve
+        latency_samples = processor->getLatencySamples();
+        std::cerr << "plugin latency: " << latency_samples << " samples"
+                  << std::endl;
         return true;
     }
+
+    Steinberg::uint32 latency_samples = 0;
 
     void teardown() {
         if (component) {
@@ -766,6 +774,11 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 #else
     (void)editor;
 #endif
+
+    // PDC ecrivain (v7) : la latence du plugin AVANT le pret - le
+    // bridge peut la lire des que le heartbeat dit ready
+    ring->plugin_latency_samples.store(inst.latency_samples,
+                                       std::memory_order_release);
 
     // Ready signal: the bridge's start() waits for a nonzero heartbeat
     ring->child_heartbeat.store(1, std::memory_order_release);

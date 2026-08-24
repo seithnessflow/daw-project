@@ -98,6 +98,12 @@ bool ServerClient::connect(const ServerConfig& config) {
     return true;
 }
 
+void ServerClient::sendSignal(const std::string& json) {
+    if (ws_ && connected_) {
+        ws_->sendText("signal:" + json);
+    }
+}
+
 void ServerClient::disconnect() {
     if (ws_) {
         ws_->stop();

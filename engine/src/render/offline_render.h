@@ -109,6 +109,19 @@ private:
     std::map<std::string, std::string> vst3_modules_;
     std::string host_exe_;
     std::vector<std::unique_ptr<host::PluginBridge>> bridges_;
+
+public:
+    /** PDC ecrivain (session 3) : somme des latences internes declarees
+     *  par les plugins du DERNIER rendu (chaque plugin decale la sortie
+     *  de sa latence ; le stem les cumule). Valide tant que le renderer
+     *  vit. */
+    [[nodiscard]] uint32_t totalPluginLatencySamples() const {
+        uint32_t sum = 0;
+        for (const auto& b : bridges_) sum += b->pluginLatencySamples();
+        return sum;
+    }
+
+private:
     std::vector<host::SyncProxyNode*> sync_nodes_;  // owned by the graph
     // S7: chain nodes legitimately ABSENT from the built graph because a
     // stem carries their truth (the R5 completeness guard subtracts them)

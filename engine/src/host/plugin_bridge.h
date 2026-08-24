@@ -103,6 +103,15 @@ public:
     /** Control-thread liveness check via the process handle (timeout 0). */
     bool childAlive();
 
+    /** PDC ecrivain (v7) : latence interne declaree par le plugin
+     *  (ecrite par l'enfant avant son heartbeat ready ; 0 sans ring). */
+    [[nodiscard]] uint32_t pluginLatencySamples() const {
+        return ring_ ? static_cast<uint32_t>(
+                           ring_->plugin_latency_samples.load(
+                               std::memory_order_acquire))
+                     : 0;
+    }
+
     [[nodiscard]] bool isRunning() const { return ring_ != nullptr; }
     [[nodiscard]] const std::string& error() const { return error_; }
 

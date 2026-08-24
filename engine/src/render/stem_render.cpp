@@ -165,7 +165,13 @@ StemRenderResult renderTrackStem(const document::ProjectDef& project,
         *track, node_index, project.sample_rate,
         module_it != vst3_modules.end() ? moduleVersionTag(module_it->second)
                                         : std::string());
-    out.latency_samples = 0;  // offline sync path: no pipeline depth
+    // PDC ecrivain (session 3) : la latence du stem = la somme des
+    // latences INTERNES declarees par les plugins de la chaine rendue
+    // (le chemin sync n'a pas de profondeur de pipeline, mais un
+    // lookahead, lui, decale la sortie - le lecteur gteste avance le
+    // stem d'exactement cette valeur)
+    out.latency_samples =
+        static_cast<int64_t>(renderer.totalPluginLatencySamples());
     out.success = true;
     return out;
 }

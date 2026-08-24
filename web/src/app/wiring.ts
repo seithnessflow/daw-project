@@ -8,7 +8,8 @@
 import { Project } from '../document/project';
 import { ServerClient } from '../network/server_client';
 import { EngineClient } from '../network/engine_client';
-import { TIMELINE, formatGain, setPluginCatalog } from '../ui/track';
+import { TIMELINE, formatGain, setPluginCatalog, noteStemFreshness,
+         refreshStemBadges } from '../ui/track';
 import * as life from '../ui/life';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
@@ -226,6 +227,14 @@ export async function init(): Promise<void> {
     sendLastChange();
     els.masterDb.textContent = formatGain(Number(els.masterGain.value));
   });
+
+  // Session 3 (fraicheur, arbitrage b) : le signal sf du producteur ->
+  // badges STEM (frais / perime / inconnu au timeout)
+  serverClient.addSignalListener((raw) => {
+    const m = raw as { sf?: number; nodes?: Record<string, { f: boolean }> };
+    if (m && m.sf === 1 && m.nodes) noteStemFreshness(m.nodes);
+  });
+  window.setInterval(refreshStemBadges, 2000);
 
   // L1a: the session clock - every tab measures every peer's clock
   // offset over the signal relay (LINK-DESIGN etage 1). L1b's
