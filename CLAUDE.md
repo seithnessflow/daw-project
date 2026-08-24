@@ -48,6 +48,7 @@ daw-project/
 
 | Fichier | Role |
 |---------|------|
+| `REPRISE.md` | Point de reprise VOLATILE : lu au demarrage, reecrit a la cloture |
 | `STATUS.md` | ETAT courant : criteres, composants, procedures vivantes |
 | `JOURNAL.md` | Chronique datee append-only (les recits de session) |
 | `docs/SCHEMA.md` | Schema du document projet (v1) |
@@ -277,7 +278,9 @@ en attente ni en remplissage. Ces règles priment sur le confort.
   coexiste (serveur + moteur + vite + build parallèle).
 
 ### Démarrage
-- Lis STATUS.md et l'entrée TODO.md de la tâche. Rien d'autre. Pas de scan du projet.
+- Lis REPRISE.md D'ABORD (le point de reprise de la session précédente),
+  puis STATUS.md et l'entrée TODO.md de la tâche. Rien d'autre. Pas de
+  scan du projet.
 - Plan en 3 lignes max : hypothèse, actions, critère de succès. Puis agis.
 - Si la session est de l'exécution cadrée (causes connues, plan écrit), dis-le en
   première ligne : Sonnet suffit pour cette session.
@@ -365,6 +368,11 @@ contre des allers-retours en moins.
 ### Fin de session
 - Aucune tâche d'arrière-plan ne survit à la session. Vérifie et tue.
 - STATUS.md (delta 3 lignes max), commit, push.
+- RÉÉCRIS REPRISE.md (règle utilisateur 2026-08-24) : le digest de 30 s
+  que l'humain lit au démarrage de l'ordinateur — où on en est, comment
+  relancer, quoi surveiller, la suite, les décisions ouvertes. Fichier
+  volatile avec renvois : il ne POSSÈDE aucune information
+  (STATUS/TODO/JOURNAL restent les propriétaires).
 - AUCUNE session ne se clôt sur un push dont la sentinelle CI n'a pas rendu
   verdict, OU dont le verdict attendu n'est pas explicitement transmis à la
   session suivante comme PREMIER point de synchronisation. Le rituel exige
