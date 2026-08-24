@@ -3,18 +3,28 @@
 ## ORDRE GRAVE (recadrage utilisateur 2026-08-25 — ne bouge pas sans lui ;
 ## une demande hors ordre se NOMME avant d'etre executee, regle CLAUDE.md)
 
-1. CRASH 0xe06d7363 — session bornee (2 max) : repro + symboles (PDB
-   en place) + correctif. Au-dela de 2 sessions : stop, 3 options
-   chiffrees. Gachette apparente : fermeture d'un lien WS / d'une
-   fenetre de plugin ; frappe les 2 machines ; 91 modules tiers
-   desormais chargeables = il reviendra a chaque seance.
-2. daw_engine_test RELINKE EN LOCAL — INCIDENT, pas friction : la
-   culture de preuve repose sur les gtests et la machine de dev ne
-   les lance plus (cibles bundle SDK en conflit apres le passage
-   RelWithDebInfo ; SMTG_CREATE_BUNDLE_FOR_WINDOWS=OFF pose en cache,
-   rebuild jamais mene au bout ; piege : le chemin de sortie
-   VST3/<config> vs les references VST3\Release\again.vst3 de
-   daw.ps1/ear/specs). Estime : une demi-session.
+1. [x] CRASH 0xe06d7363 — SOLDE 2026-08-25 EN UNE SESSION : repro au
+   premier harnais (churn de fermetures WS, scripts/crash-churn.cjs),
+   log auto-symbolise (handler + dbghelp + WHAT extrait) = cause en
+   une lecture : sendToAll/pumpTap envoyaient SOUS connections_mutex_,
+   l'echec d'envoi vers un client parti declenche la callback Close
+   synchrone sur le meme thread -> re-lock -> system_error(resource
+   deadlock would occur) non rattrape. Fix : copie sous verrou, envoi
+   HORS verrou (shared_ptr ix tenus) + ceinture try/catch a la
+   frontiere. Contre-epreuve 60/60, moteur vivant, ceinture jamais
+   sollicitee. RESTE : gtest dedie quand la cible relinke (session 2) ;
+   le PORTABLE doit pull+rebuild pour recevoir le fix.
+2. [x] daw_engine_test RELINKE EN LOCAL — SOLDE 2026-08-25 : cause =
+   mode bundle du SDK (dossier <name>.vst3 cree la ou le linker ecrit
+   le fichier -> LNK1104 permanent des que la config change) ;
+   SMTG_CREATE_BUNDLE_FOR_WINDOWS=OFF EPINGLE dans
+   engine/cmake/vst3sdk.cmake (portable/CI/checkout frais compris),
+   fixtures en fichiers plats VST3\again.vst3, references reconciliees
+   (daw.ps1, ear.mjs, docs ; gtests deja config-agnostiques via
+   $<TARGET_FILE> + bundleRootOf). GTESTS 29/29 EN LOCAL retablis.
+   Menage cosmetique restant : dossiers *.stale / *.bundle-old /
+   Release historiques dans build-msvc (suppression bloquee par le
+   classifieur ; inertes).
 3. L'INVARIANT RE-PROUVE SUR UN VRAI PLUGIN (la vraie session (3),
    perimetre = les 4 points du recadrage, detail dans la reponse
    ecrite du 2026-08-25) : PDC ecrivain (latence interne du plugin

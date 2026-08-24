@@ -58,7 +58,9 @@ const docPath = join(root, 'server', 'projects', `${projectId}.am`);
 const engineExe = join(root, 'engine', 'build-msvc', 'daw_engine.exe');
 const assetsDir = join(root, 'engine', 'test-assets');
 const againUid = '84E8DE5F92554F5396FAE4133C935A18';
-const againModule = join('VST3', 'Release', 'again.vst3'); // relative to build-msvc
+// Chemin plat depuis la session 2 (2026-08-25) : bundle SDK desactive,
+// le fixture est le FICHIER VST3\again.vst3
+const againModule = join('VST3', 'again.vst3'); // relative to build-msvc
 // Vrais plugins tiers (2026-08-24) : --vst3 uid=chemin, repetable -
 // l'oreille doit savoir ecouter tout module que le projet reference.
 const extraModules = [];

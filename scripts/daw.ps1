@@ -65,7 +65,7 @@ $muteArg = if ($Mute) { " --mute" } else { "" }
 # 2.5-decouverte : le dossier VST3 standard est scanne (cache a cote du
 # binaire) - le menu + device propose tous les plugins de la machine
 $engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped --editors$muteArg " +
-              "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\Release\again.vst3 " +
+              "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\again.vst3 " +
               "--vst3-dir `"C:\Program Files\Common Files\VST3`""
 $engineProc = Start-Process -FilePath $engineExe -ArgumentList $engineArgs `
     -WorkingDirectory $engineDir -PassThru -WindowStyle Hidden `

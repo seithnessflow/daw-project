@@ -26,7 +26,7 @@ node scripts\seed-again.mjs --base ..\engine\test-assets\mains.am --assets ..\en
 cd C:\Users\mb668\daw-project\engine\build-msvc
 .\daw_engine.exe --server ws://localhost:3000 --project default --play `
   --assets ..\test-assets `
-  --vst3-module 84E8DE5F92554F5396FAE4133C935A18=VST3\Release\again.vst3
+  --vst3-module 84E8DE5F92554F5396FAE4133C935A18=VST3\again.vst3
 ```
 
 Onglet : `http://localhost:5173/?token=<champ "token" du JSON

@@ -19,6 +19,12 @@ if(EXISTS "${VST3_SDK_DIR}/CMakeLists.txt")
     set(SMTG_ENABLE_VSTGUI_SUPPORT ON CACHE BOOL "" FORCE)
     set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
     set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
+    # Session 2 (2026-08-25) : fixtures en FICHIER PLAT sur Windows -
+    # le mode bundle creait le dossier <name>.vst3 la ou le linker veut
+    # ecrire le fichier (LNK1104 permanent apres tout changement de
+    # config). Epingle ICI pour que portable/CI/checkout frais aient le
+    # meme layout que les references (VST3\again.vst3).
+    set(SMTG_CREATE_BUNDLE_FOR_WINDOWS OFF CACHE BOOL "" FORCE)
     add_subdirectory(${VST3_SDK_DIR} vst3sdk EXCLUDE_FROM_ALL)
 
     # Module::create's platform implementation is not part of sdk_hosting:
