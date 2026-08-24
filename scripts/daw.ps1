@@ -61,7 +61,8 @@ Pop-Location
 Write-Status "Starting engine (project '$PROJECT')..."
 $engineDir = Join-Path $projectRoot "engine\build-msvc"
 $muteArg = if ($Mute) { " --mute" } else { "" }
-$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play$muteArg " +
+# L1c: --start-stopped = le moteur ne SONNE que sur commande (bouton/Espace)
+$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped$muteArg " +
               "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\Release\again.vst3"
 $engineProc = Start-Process -FilePath $engineExe -ArgumentList $engineArgs `
     -WorkingDirectory $engineDir -PassThru -WindowStyle Hidden `

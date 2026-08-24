@@ -176,7 +176,7 @@ export async function init(): Promise<void> {
   engineClient.onConnect = () => {
     els.engineStatus.classList.add('connected');
     els.engineStatus.dataset.state = 'connected';
-    els.playBtn.disabled = false;
+    els.playBtn.disabled = ctx.jamListening;   // L1c: listening = suspended
     els.stopBtn.disabled = false;
     els.loopBtn.disabled = false;
     // V1.1: loop is PERFORMANCE state - re-assert the local choice on
@@ -241,16 +241,21 @@ export async function init(): Promise<void> {
       clkBadge.className = 'status-item';
       clkBadge.id = 'clk-status';
       clkBadge.title =
-        'decalage d horloge estime avec les autres onglets/machines (Link L1a)';
+        'incertitude de l horloge de session (rtt/2, Link L1a) - ' +
+        'l offset brut vit dans __dawClock.snapshot()';
       document.querySelector('.status')?.prepend(clkBadge);
     }
     if (clkBadge) {
+      // Critique 2026-08-24 : l'offset brut melange les EPOQUES par
+      // onglet (70 s affiches entre deux onglets d'ages differents -
+      // correct mais alarmant). Le badge dit l'INCERTITUDE (borne NTP
+      // rtt/2) ; l'offset brut reste lisible au snapshot().
       let worst = 0;
       for (const pc of peers.values()) {
-        worst = Math.max(worst, Math.abs(pc.offsetMs));
+        worst = Math.max(worst, pc.rttMs / 2);
       }
       clkBadge.textContent = peers.size === 0 ? 'clk seul'
-        : `clk ±${Math.round(worst)} ms (${peers.size})`;
+        : `clk ±${Math.max(1, Math.round(worst))} ms (${peers.size})`;
     }
   };
 
@@ -289,6 +294,14 @@ export async function init(): Promise<void> {
   const jamAudio = new JamAudio();
   (window as any).__dawJam = jam;
   (window as any).__dawJamAudio = jamAudio;
+  // L1c: rejoin answers come from the LIVE engine (never a stored,
+  // drift-aged offset); a jam listener's transport is not authoritative.
+  tsync.anchorProvider = () =>
+    engineClient.isConnected() && engineClient.isPlaying()
+      ? { playing: true, posSec: Math.max(0, ctx.lastPlayheadSec) }
+      : null;
+  tsync.suspendProvider = () => jam.role === 'listening';
+  let wasListening = false;
   jamReassert = () => jam.reassert();
   jamIsBroadcasting = () => jam.role === 'broadcasting';
   const jamBtn = document.getElementById('jam-btn') as HTMLButtonElement;
@@ -296,13 +309,27 @@ export async function init(): Promise<void> {
   // absence - the user should never wonder whether the feature exists.
   const jamBadge = document.getElementById('jam-status') as HTMLElement;
   const renderJamBadge = () => {
+    // L1c arbitration (decided 2026-08-24): entering jam listening
+    // SUSPENDS the local transport - engine stopped once, PLAY gated,
+    // and the badge SAYS it (every effect announced).
+    const listening = jam.role === 'listening';
+    if (listening && !wasListening && engineClient.isConnected()) {
+      engineClient.stop();
+    }
+    wasListening = listening;
+    ctx.jamListening = listening;
+    els.playBtn.disabled = listening || !engineClient.isConnected();
+    els.playBtn.title = listening
+      ? 'Lecture locale suspendue pendant l ecoute du jam (L1c)'
+      : 'Play (Space)';
     const peers = jam.peerCount();
     const lat = [...jam.latencyMs.values()];
     jamBadge.dataset.state = peers > 0 ? 'connected' : jam.role;
     const audio = jamAudio.playbackState === 'playing' ? ' ▶' : '';
     jamBadge.textContent = jam.role === 'idle' ? 'jam off'
       : `jam ${jam.role === 'broadcasting' ? 'diffuse' : 'ecoute'} ${peers} pair(s)` +
-        (lat.length ? ` ${Math.max(...lat)} ms` : '') + audio;
+        (lat.length ? ` ${Math.max(...lat)} ms` : '') + audio +
+        (listening ? ' · lecture locale suspendue' : '');
     // Blocked autoplay gets a REAL button, not a hint to click anywhere
     if (jamAudio.playbackState === 'blocked') {
       const play = document.createElement('button');

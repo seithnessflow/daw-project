@@ -68,6 +68,7 @@ void printUsage(const char* program) {
               << "  --project <id>     Project ID for server sync (default: 'default')\n"
               << "  --doc <file>       Project document file (Automerge binary .am)\n"
               << "  --play             Play the project through audio device\n"
+              << "  --start-stopped    With --play: device up, transport stopped until a PLAY command (browser/WS)\n"
               << "  --render <file>    Render to WAV file\n"
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
@@ -111,6 +112,7 @@ struct Options {
     bool info = false;
     bool mute = false;
     bool keepalive = false;  // File mode: loop the document instead of exiting at its end
+    bool start_stopped = false;  // L1c: device up, transport ARMED but stopped (no sound until a PLAY command)
     bool list_devices = false;
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
@@ -169,6 +171,8 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.bit_depth = static_cast<uint32_t>(std::stoul(argv[i]));
         } else if (arg == "--keepalive") {
             opts.keepalive = true;
+        } else if (arg == "--start-stopped") {
+            opts.start_stopped = true;
         } else if (arg == "--mute") {
             opts.mute = true;
         } else if (arg == "--ws-port") {
@@ -931,8 +935,12 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
         device.getTransport().setLooping(true);
     }
 
-    // Start transport
-    device.getTransport().play();
+    // Start transport (unless armed-stopped: sound only on a PLAY command)
+    if (!opts.start_stopped) {
+        device.getTransport().play();
+    } else {
+        std::cout << "Transport armed (start-stopped)\n";
+    }
 
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
@@ -1198,8 +1206,12 @@ int doPlayWithServer(const Options& opts) {
                     playback_started = true;
                     if (device.getState() != daw::audio::AudioDeviceState::Running) {
                         if (device.start()) {
-                            device.getTransport().play();
-                            std::cout << "Playback started\n";
+                            if (!opts.start_stopped) {
+                                device.getTransport().play();
+                                std::cout << "Playback started\n";
+                            } else {
+                                std::cout << "Transport armed (start-stopped)\n";
+                            }
                         } else {
                             std::cerr << "Failed to start audio device\n";
                         }

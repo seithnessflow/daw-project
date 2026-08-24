@@ -63,6 +63,7 @@ export const ctx = {
   insertMarkerSec: 0,   // Ableton insert marker: Play starts HERE
   follow: true,         // view chases the playhead...
   followPaused: false,  // ...until the user scrolls/zooms/edits
+  jamListening: false,  // L1c: jam listener = local transport suspended
   lastFlashedTrackId: null as string | null,  // V1.4: selection-flash memory
   programmaticScroll: false,
   lastPlayheadSec: -1,

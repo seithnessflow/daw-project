@@ -53,10 +53,33 @@ respecte — recu-mais-ignore compte —, PLAY/STOP voyagent, VERITE de
 traduction contre timeOrigin avec ecart d'epoque construit > 1 s).
 Sonde pilote sur l'environnement reel deux-moteurs : ecart de
 position minimal 0 ms (telemetrie 30 Hz), verdict < 50 ms VERT.
-RESTE L1c : rejoin en cours de lecture, arbitrage jam-vs-sync
-(LINK-DESIGN 4). DECOUVERTE EAR en montant la manip : le projet duo
-rend 2 DISCONTINUITES (saut 0.9) — inapte a l'ecoute, a trier
-(ma-piece VERT, la manip tourne dessus)] ->
+L1c FAIT 2026-08-24 (meme jour, arbitrage utilisateur « oui, ecouter
+le jam suspend la lecture locale ») : REJOIN — armer SYNC diffuse une
+requete ta:2, chaque pair arme dont le moteur JOUE repond par une
+ancre FRAICHE dirigee re-ancree sur sa position moteur vivante
+(jamais un offset stocke vieilli par la derive) ; les pairs arretes
+se taisent (le rejoin adopte une performance en cours, il n'arbitre
+pas les parkings). SUSPENSION JAM (LINK-DESIGN 4 tranche) : entrer
+en ecoute = moteur stoppe une fois, PLAY gate + annonce au badge
+(« lecture locale suspendue »), ancres recues comptees (suppressed)
+jamais appliquees, jamais de reponse au rejoin (transport non
+authoritatif) ; reprise = geste manuel. Badge clk : affiche
+l'INCERTITUDE (borne NTP rtt/2), plus l'offset brut qui melangeait
+les epoques par onglet (70 s affiches = correct mais alarmant,
+critique soldee). Moteur : --start-stopped (device up, transport
+gare jusqu'a une commande PLAY — l'entorse « 48 s au lancement »
+soldee, daw.ps1 l'utilise). EAR : le rouge duo etait un FAUX POSITIF
+de l'analyseur (bruit d'attaque de charley : pocket HF 2 ms avec 2
+echantillons a 0.501 juste au-dessus du seuil) — regle d'echelle
+locale ajoutee (clic ssi saut > 6x la mediane |dx| sur ±1,5 ms),
+la branche periodique applique la densite AUX CANDIDATS, et l'ear
+dit desormais OU sont ses clics (discontinuity_positions_s + raison
+du verdict) ; self-test etendu (test 7, DEUX directions : rafale
+dense verte, spike isole rouge avec position). duo VERT, ma-piece
+VERT, self-test 7/7. Garde e2e : transport-sync.spec test 2 (rejoin
+sans nouveau geste + suspension observee). RESTE Link : test REEL
+deux machines (L1b+L1c, portable), etage 2 grille au quantum
+(attend vague 2 tempo)] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
@@ -306,6 +329,16 @@ dedouble). Ordre :
 
 7. [ ] L'INSTRUMENT JOUABLE (avis reviewer consigne 2026-08-23 —
        APRES 1bis, jamais avant : ne rapproche pas l'invariant).
+       LE TEST ULTIME (vision utilisateur 2026-08-24, scenario
+       d'acceptation de la vague 3) : « dessiner du midi sur le laptop
+       et que ca trigger un Massive de NI sur mon pc, et qu'on entende
+       tous les deux ». Decompose : clips MIDI dans le doc (SCHEMA v2)
+       + placement (le noeud Massive vit sur la tour) + rendu tour +
+       jam vers le laptop (suspension L1c evite le flanger) + sync
+       transport (fait). Note compat : Massive CLASSIQUE = VST2
+       (refus grave) mais NI l'a porte VST3 (1.6+, programme 2022-23,
+       comme FM8/Absynth) — la demo passe par le binaire VST3, verifier
+       la version installee sur la tour le moment venu.
        Le raccourci qui decoule d'ADR-002 : jouer des notes en direct =
        PERFORMANCE, pas document — note-on/note-off sur le canal WS
        moteur existant (meme sang que bypass/solo/transport), zero

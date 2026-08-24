@@ -95,8 +95,11 @@ entend DEUX fois le morceau a 40 ms d'ecart (flanger garanti).
 **Regle proposee** : ecouter un jam correspondant au projet courant
 suspend la lecture locale (le flux distant EST la lecture) ; le sync
 transport ne concerne que les pairs qui ne sont pas en ecoute jam.
-A trancher a l'execution — c'est un choix de produit (grille : 3,
-concept, proposer).
+**TRANCHE 2026-08-24 (utilisateur) : OUI** — entrer en ecoute jam
+arrete le moteur local, le bouton PLAY est suspendu (annonce au
+badge), et les ancres de transport recues sont comptees mais jamais
+appliquees tant que l'ecoute dure. La reprise apres l'ecoute est un
+geste manuel (pas de re-lecture automatique).
 
 ## 5. Ce que ce cadrage REFUSE
 

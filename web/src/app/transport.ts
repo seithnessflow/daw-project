@@ -9,6 +9,9 @@ import { updateFollowUI } from './navigation';
 
 export function startPlayback(): void {
   if (!ctx.engineClient?.isConnected()) return;
+  // L1c arbitration (2026-08-24): while listening to a jam the remote
+  // stream IS the playback - the local transport stays suspended.
+  if (ctx.jamListening) return;
   const sr = ctx.project?.getDocument().sampleRate || 48000;
   ctx.engineClient.seek(Math.round(ctx.insertMarkerSec * sr));
   ctx.engineClient.play();

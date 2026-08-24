@@ -49,7 +49,7 @@ interdisait le produit).
 | Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 29/29 ; crash handler dernier-mots installe (crash-<pid>.log, chasse au 0xc0000409 des runs audibles) |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 7/7 |
-| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 34/34 (attention : les specs moteur-reel exigent le port 47821 LIBRE — arreter le duo avant la suite) ; sync transport L1b livre (bouton SYNC, ancres LWW traduites par l'horloge L1a) |
+| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 35/35 (attention : les specs moteur-reel exigent le port 47821 LIBRE — arreter le duo avant la suite) ; sync transport L1b+L1c livres (SYNC opt-in, ancres LWW, rejoin ta:2, ecoute jam = lecture locale suspendue) ; ear : positions des clics + regle d'echelle locale, self-test 7/7 ; moteur --start-stopped (daw.ps1 l'utilise) |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 

@@ -101,8 +101,12 @@ export function analyze(wav) {
   let periodicEdges = 0;
   let maxJump = 0;
   let dcMax = 0;
+  // Sensory precision (2026-08-24): the ear SAYS WHERE its clicks are -
+  // a red verdict without positions costs a whole triage session.
+  const clickAt = [];
 
-  for (const x of channels) {
+  for (let ci = 0; ci < channels.length; ci++) {
+    const x = channels[ci];
     let sum = 0;
     const jumpAt = [];
     for (let n = 0; n < x.length; n++) {
@@ -138,10 +142,26 @@ export function analyze(wav) {
         // A periodic field. Its edges share an amplitude scale; a
         // residual is a CLICK only if it clearly exceeds that scale
         // (interval outliers at field amplitude are the field itself,
-        // displaced by summation with other material).
+        // displaced by summation with other material) - AND if it is
+        // ISOLATED. The density rule applies here too (false positive
+        // 2026-08-24: a 2 ms Nyquist-rate content burst inside duo's
+        // periodic field summed edges to 2x the field scale, repeated
+        // bit-identically where the arrangement repeats - content).
         const amps = jumpAt.map(([, j]) => j).sort((a, b) => a - b);
         const ampP50 = amps[Math.floor(amps.length / 2)];
-        const clicks = jumpAt.filter(([, j]) => j > ampP50 * 1.5).length;
+        // Density counted among the CANDIDATES ONLY - field edges are
+        // everyone's neighbors in a fast field and would mask a real
+        // click (the self-test caught exactly that on the first cut).
+        const dense = Math.round(0.010 * sampleRate);
+        const cand = jumpAt.filter(([, j]) => j > ampP50 * 1.5);
+        let clicks = 0;
+        for (let k = 0; k < cand.length; k++) {
+          const [n] = cand[k];
+          let neighbors = 0;
+          for (let m = k - 1; m >= 0 && n - cand[m][0] <= dense; m--) neighbors++;
+          for (let m = k + 1; m < cand.length && cand[m][0] - n <= dense; m++) neighbors++;
+          if (neighbors < 4) { clicks++; clickAt.push([n, ci]); }
+        }
         periodicEdges += jumpAt.length - clicks;
         discontinuities += clicks;
         continue;
@@ -177,8 +197,29 @@ export function analyze(wav) {
       }
       const preR = Math.sqrt(pre / Math.max(1, np));
       const postR = Math.sqrt(post / Math.max(1, nq));
-      if (postR > 4 * preR && postR > 0.01) content++;
-      else clicks++;
+      if (postR > 4 * preR && postR > 0.01) { content++; continue; }
+      // 3. LOCAL SCALE (duo false positive 2026-08-24) - a click STICKS
+      // OUT of its neighborhood. Dense HF content hovering just UNDER
+      // the 0.5 threshold (+-0.25 Nyquist-rate alternation, two samples
+      // peeking at 0.501) fooled the density rule, which only counts
+      // super-threshold jumps. Median |dx| over +-10 ms is the honest
+      // scale: a real click towers over it (a 0.65 jump in a 0.25 tone
+      // is 60x the local scale), content barely doubles it. Honest
+      // limit: a click fully MASKED by equally loud HF content stays
+      // invisible - acoustically it is too.
+      // +-1.5 ms, not +-10: a hat's 2 ms noise pocket (duo: the flagged
+      // 0.501 sits 5.5 ms into a hat clip) must supply its OWN scale -
+      // a wider window dilutes it in the calm around and cries click.
+      const jHere = jumpAt[k][1];
+      const scaleWin = Math.round(0.0015 * sampleRate);
+      const d0 = Math.max(1, n - scaleWin);
+      const d1 = Math.min(x.length - 1, n + scaleWin);
+      const local = [];
+      for (let i = d0; i <= d1; i++) local.push(Math.abs(x[i] - x[i - 1]));
+      local.sort((a, b) => a - b);
+      const scale = Math.max(local[Math.floor(local.length / 2)], 1e-4);
+      if (jHere > 6 * scale) { clicks++; clickAt.push([n, ci]); }
+      else content++;
     }
     periodicEdges += content;   // content reports with the periodic bucket
     discontinuities += clicks;
@@ -242,7 +283,11 @@ export function analyze(wav) {
   const reasons = [];
   if (truePeakDb > -1) reasons.push(`true peak ${truePeakDb.toFixed(1)} dBFS > -1 dBFS`);
   if (clipped > 0) reasons.push(`${clipped} clipped samples`);
-  if (discontinuities > 0) reasons.push(`${discontinuities} discontinuities (max jump ${maxJump.toFixed(3)})`);
+  if (discontinuities > 0) {
+    const where = clickAt.slice(0, 3)
+      .map(([n]) => `${(n / sampleRate).toFixed(4)}s`).join(', ');
+    reasons.push(`${discontinuities} discontinuities (at ${where})`);
+  }
   // TOTAL silence is RED by principle (lesson 2026-08-23: a 48 s silent
   // render came out green - a proof tool that validates emptiness
   // retroactively invalidates every verdict it ever gave).
@@ -259,6 +304,9 @@ export function analyze(wav) {
     rms_dbfs_seconds: perSec,
     dc_offset: Math.round(dcMax * 1e6) / 1e6,
     discontinuities,
+    // Where the clicks are (first 16), so a red verdict is actionable
+    discontinuity_positions_s: clickAt.slice(0, 16).map(
+      ([n, c]) => ({ t: Math.round((n / sampleRate) * 10000) / 10000, ch: c })),
     periodic_edges: periodicEdges,
     max_jump: Math.round(maxJump * 1000) / 1000,
     clipped_samples: clipped,

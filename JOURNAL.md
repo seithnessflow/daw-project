@@ -853,3 +853,27 @@ Moisson du montage de la manip : l'EAR dit ROUGE sur le projet duo
 (2 discontinuites, saut 0.9) — le projet de la chasse au crash est
 inapte a l'ecoute, a trier ; ma-piece est VERT et porte la manip.
 Reste L1c : rejoin en cours de lecture, arbitrage jam-vs-sync.
+
+**2026-08-24 (apres-midi, L1c + les organes sensoriels) :** trois
+chantiers dans la foulee de L1b, sur directive « fais ca » et
+l'arbitrage rendu (« oui, ecouter le jam suspend la lecture locale »).
+L1c : le rejoin est une REQUETE (ta:2) a laquelle seuls les pairs dont
+le moteur JOUE repondent, par une ancre fraiche re-ancree sur leur
+position vivante — un offset stocke aurait vieilli de 200 ppm ; les
+pairs arretes se taisent, le rejoin adopte une performance, il
+n'arbitre pas des parkings. La suspension jam est cablee et ANNONCEE
+(badge, PLAY gate, compteur suppressed). Le badge clk cesse d'afficher
+l'offset brut (70 s entre onglets d'ages differents — vrai mais
+illisible) pour l'incertitude rtt/2. Le moteur gagne --start-stopped
+et daw.ps1 l'adopte : plus jamais 48 s de lecture non commandee au
+lancement d'un banc. Et le triage du duo ROUGE a retourne le
+diagnostic DEUX fois : d'abord « faux positif periodique » (faux —
+mes sondes tronquaient), puis, grace au nouvel organe (l'ear dit OU
+sont ses clics), le vrai coupable : un pocket de bruit de charley de
+2 ms dont deux echantillons depassaient le seuil 0.5 de 0.001 — du
+contenu. Regle d'echelle locale (un clic DEPASSE son voisinage de
+±1,5 ms de 6x), densite comptee parmi les candidats (le premier jet
+masquait un vrai clic derriere les bords du champ — le self-test l'a
+attrape, il a fait son travail), self-test etendu aux deux directions.
+duo est VERT, l'ear est plus precis, et la directive est gravee en
+memoire : les organes sensoriels s'ameliorent sans permission.

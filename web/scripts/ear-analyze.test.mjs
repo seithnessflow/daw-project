@@ -192,6 +192,64 @@ console.log('Test 6: total silence = RED; mostly-silent-but-alive = green');
   check('sparse piece stays green', r2.verdict.ok, JSON.stringify(r2.verdict));
 }
 
+// ---- 7. Dense bursts INSIDE a periodic field are content; a lone spike
+// in the same field is still a click (false positive du 2026-08-24 : le
+// rendu duo - champ periodique + rafale Nyquist 2 ms - sortait rouge) ---
+console.log('Test 7: periodic field + dense burst = green; + lone spike = red');
+{
+  const sr = 48000;
+  const frames = 2 * sr;
+  const base = () => {
+    const s = new Float64Array(frames * 2);
+    for (let n = 0; n < frames; n++) {
+      const v = 0.32 * Math.sign(Math.sin((2 * Math.PI * 220 * n) / sr));
+      s[2 * n] = v;
+      s[2 * n + 1] = v;
+    }
+    return s;
+  };
+  // (a) 1.5 ms Nyquist-rate burst added mid-file: every jump is huge
+  // (1.1, above the residual threshold) but DENSE - content, the
+  // verdict stays green. Placed strictly INSIDE one half-period (72
+  // samples < 109) so no burst sample rides a field edge - a straddled
+  // edge sums to an honestly isolated outlier, a different animal.
+  const withBurst = base();
+  const at = sr + 27; // t = 1 s, mid-half-period
+  for (let n = 0; n < Math.round(0.0015 * sr); n++) {
+    const v = 0.5 * (n % 2 === 0 ? 1 : -1);   // peak 0.82 = -1.7 dBFS
+    withBurst[2 * (at + n)] += v;
+    withBurst[2 * (at + n) + 1] += v;
+  }
+  const p1 = join(dir, 'square-burst.wav');
+  writeWav16(p1, withBurst);
+  const r1 = analyze(readWav(p1));
+  check('dense burst in periodic field: no discontinuities',
+    r1.discontinuities === 0, r1.discontinuities);
+  check('dense burst in periodic field: verdict green',
+    r1.verdict.ok, JSON.stringify(r1.verdict));
+
+  // (b) The SAME field with one isolated 1-sample spike: still a click,
+  // still red - the fix must not blind the ear to real clicks. Spike at
+  // -0.70 mid-half-period (+0.32 field): jumps ~1.0 both sides, peak
+  // stays under -1 dBFS so the red can ONLY come from the discontinuity.
+  const withSpike = base();
+  const sp = Math.round(1.5 * sr) + 27;
+  withSpike[2 * sp] = -0.70;
+  withSpike[2 * sp + 1] = -0.70;
+  const p2 = join(dir, 'square-spike.wav');
+  writeWav16(p2, withSpike);
+  const r2 = analyze(readWav(p2));
+  check('lone spike in periodic field still detected',
+    r2.discontinuities >= 1, r2.discontinuities);
+  check('lone spike in periodic field: verdict RED',
+    !r2.verdict.ok, JSON.stringify(r2.verdict));
+  // Sensory precision: the report says WHERE (within 1 ms of the spike)
+  check('click position reported at the spike',
+    (r2.discontinuity_positions_s ?? []).some(
+      (p) => Math.abs(p.t - sp / sr) < 0.001),
+    JSON.stringify(r2.discontinuity_positions_s));
+}
+
 if (failures > 0) {
   console.error(`\near-analyze self-test: ${failures} FAILURE(S)`);
   process.exit(1);

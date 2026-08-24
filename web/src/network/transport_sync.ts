@@ -12,8 +12,16 @@
  * LWW: the newest anchor in local time wins, ties by peer id - nobody
  * is the master (Link's lesson). SYNC is opt-in PERFORMANCE state
  * (Live's Start Stop Sync), never the CRDT (ADR-002).
- * L1c still owns: rejoin mid-playback (anchors are gesture-sent, not
- * re-broadcast) and the jam-vs-sync arbitration (LINK-DESIGN 4).
+ *
+ * L1c: REJOIN - arming SYNC broadcasts a request (ta:2); every armed
+ * peer whose engine is PLAYING answers with a FRESH directed anchor
+ * re-anchored on its live engine position (never a stored offset - it
+ * would have aged by the 200 ppm drift). Stopped peers stay silent:
+ * rejoin adopts a running performance, it does not fight over where
+ * stopped transports parked. And the jam arbitration (LINK-DESIGN 4,
+ * decided 2026-08-24): a jam LISTENER's transport is suspended -
+ * anchors are counted (suppressed) but never applied, and it never
+ * answers rejoin requests (its transport is not authoritative).
  */
 
 import type { ServerClient } from './server_client';
@@ -28,6 +36,12 @@ export class TransportSync {
    *  relay latency already accounted for). */
   onApply: ((playing: boolean, posSec: number) => void) | null = null;
   onStateChange: (() => void) | null = null;
+  /** L1c rejoin: live engine state, read at answer time. Return null
+   *  when the engine is absent or stopped (then we do not answer). */
+  anchorProvider: (() => { playing: boolean; posSec: number } | null) | null = null;
+  /** L1c jam arbitration: true while this tab listens to a jam - its
+   *  transport is suspended (anchors suppressed, no rejoin answers). */
+  suspendProvider: (() => boolean) | null = null;
 
   private server: ServerClient;
   private clock: SessionClock;
@@ -39,6 +53,7 @@ export class TransportSync {
   private published = 0;
   private applied = 0;
   private ignored = 0;                  // received while SYNC is off
+  private suppressed = 0;               // received while jam-listening
   private lastPublished:
     { playing: boolean; posSec: number; t: number } | null = null;
   private lastApplied:
@@ -53,6 +68,8 @@ export class TransportSync {
   setEnabled(on: boolean): void {
     this.enabled = on;
     if (!on) this.pending = null;
+    // L1c rejoin: ask the running peers where the performance is
+    if (on) this.server.sendSignal({ ta: 2, from: this.server.id });
     this.onStateChange?.();
   }
 
@@ -68,11 +85,25 @@ export class TransportSync {
   }
 
   private handleSignal(raw: unknown): void {
-    const m = raw as { ta?: number; from?: string; playing?: boolean;
-                       posSec?: number; t?: number };
-    if (!m || m.ta !== 1 || !m.from || m.from === this.server.id ||
-        typeof m.playing !== 'boolean' || typeof m.posSec !== 'number' ||
-        typeof m.t !== 'number') return;
+    const m = raw as { ta?: number; from?: string; to?: string;
+                       playing?: boolean; posSec?: number; t?: number };
+    if (!m || typeof m.ta !== 'number' || !m.from ||
+        m.from === this.server.id) return;
+    if (m.to && m.to !== this.server.id) return;   // directed elsewhere
+    if (m.ta === 2) {
+      // Rejoin request: answer with a FRESH anchor from the live
+      // engine, directed - only when armed, playing, and not a jam
+      // listener (a suspended transport is not authoritative).
+      if (!this.enabled || this.suspendProvider?.()) return;
+      const live = this.anchorProvider?.();
+      if (!live || !live.playing) return;
+      this.server.sendSignal({ ta: 1, from: this.server.id, to: m.from,
+                               playing: true, posSec: live.posSec,
+                               t: performance.now() });
+      return;
+    }
+    if (m.ta !== 1 || typeof m.playing !== 'boolean' ||
+        typeof m.posSec !== 'number' || typeof m.t !== 'number') return;
     if (!this.enabled) { this.ignored++; this.onStateChange?.(); return; }
     this.pending = { from: m.from, playing: m.playing, posSec: m.posSec, t: m.t };
     this.tryApply();
@@ -101,6 +132,14 @@ export class TransportSync {
     if (this.last && (localT < this.last.localT ||
         (localT === this.last.localT && p.from < this.last.peer))) return;
     this.last = { playing: p.playing, posSec: p.posSec, localT, peer: p.from };
+    // L1c jam arbitration: the LWW state above stays current (later
+    // anchors still compare right) but a listener's engine is never
+    // driven - the remote stream IS its playback.
+    if (this.suspendProvider?.()) {
+      this.suppressed++;
+      this.onStateChange?.();
+      return;
+    }
     const now = performance.now();
     const posNow = p.playing
       ? Math.max(0, p.posSec + (now - localT) / 1000)
@@ -117,6 +156,7 @@ export class TransportSync {
       published: this.published,
       applied: this.applied,
       ignored: this.ignored,
+      suppressed: this.suppressed,
       lastPublished: this.lastPublished,
       lastApplied: this.lastApplied,
     };

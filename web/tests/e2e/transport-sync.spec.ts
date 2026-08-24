@@ -14,6 +14,14 @@
  *    timeOrigin difference. The applied position must match
  *    posSec + elapsed-in-true-time within clock-estimate error.
  *
+ * L1c invariants (second test):
+ * 5. REJOIN - a tab arming SYNC while the performance already plays
+ *    adopts it without any new gesture on the playing side (ta:2
+ *    request -> fresh directed anchor from the live engine).
+ * 6. JAM ARBITRATION (decided 2026-08-24) - a jam listener's local
+ *    transport is suspended: engine stopped, PLAY gated and announced,
+ *    incoming anchors counted (suppressed) but never applied.
+ *
  * Needs the real engine on the page's port (47821): cannot share the
  * machine with an interactive stack (same constraint as token spec).
  */
@@ -121,6 +129,73 @@ test.describe('Transport sync (Link L1b)', () => {
          (a.lastPublished!.t + originA)) / 1000;
       const expected = a.lastPublished!.posSec + elapsedTrueSec;
       expect(Math.abs(b.lastApplied!.posSec - expected)).toBeLessThan(0.2);
+
+      await tabB.close();
+    } finally {
+      try { engine.kill('SIGKILL'); } catch { /* already dead */ }
+    }
+  });
+
+  test('L1c: late tab rejoins mid-playback; jam listening suspends the transport', async ({ page, context }) => {
+    test.setTimeout(120000);
+    const projectId = `e2e-tsync-l1c-${Date.now()}`;
+    const logPath = path.join(os.tmpdir(), `daw-e2e-tsync-l1c-${Date.now()}.log`);
+    const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    const logFd = fs.openSync(logPath, 'w');
+    const engine: ChildProcess = spawn(
+      engineExe,
+      ['--server', 'ws://localhost:3000', '--project', projectId,
+       '--play', '--mute', '--ws-port', String(ENGINE_PORT)],
+      { stdio: ['ignore', logFd, logFd] },
+    );
+    fs.closeSync(logFd);
+
+    try {
+      expect(
+        await waitUntil(() => countInFile(logPath, 'WebSocket server') >= 1, 15000),
+        `engine WS never came up (log: ${logPath})`,
+      ).toBe(true);
+
+      // Tab A: content (a kit clip, as transport-loop does), loop ON so
+      // the engine KEEPS playing (empty projects end-stop immediately
+      // and a stopped peer does not answer rejoin requests - by design)
+      await openTab(page, projectId, true);
+      await page.locator('[data-role="sample"]').first().click();
+      await page.locator('[data-track-id] .track-lane').first()
+        .click({ position: { x: 20, y: 20 } });
+      await expect(page.locator('.clip').first()).toBeVisible({ timeout: 10000 });
+      await page.locator('[data-role="sample"]').first().click();
+      await expect.poll(() => countInFile(logPath, 'Graph updated'),
+        { timeout: 10000 }).toBeGreaterThan(0);
+      await page.locator('#loop-btn').click();
+      await page.locator('#play-btn').click();
+      await expect.poll(async () => (await readSync(page)).published).toBe(1);
+
+      // 5. REJOIN: B arrives LATE, arms sync at load, adopts the
+      // running performance without any new gesture on A
+      const tabB = await context.newPage();
+      await openTab(tabB, projectId, true);
+      await expect.poll(async () => (await readSync(tabB)).applied,
+        { timeout: 20000 }).toBeGreaterThanOrEqual(1);
+      const joined = await readSync(tabB);
+      expect(joined.lastApplied!.playing).toBe(true);
+
+      // 6. JAM ARBITRATION: B starts listening - transport suspended,
+      // announced, and incoming anchors suppressed
+      await tabB.evaluate(() => (window as any).__dawJam.startListen());
+      await expect(tabB.locator('#jam-status'))
+        .toContainText('lecture locale suspendue');
+      await expect(tabB.locator('#play-btn')).toBeDisabled();
+
+      const before = await readSync(tabB);
+      await page.locator('#stop-btn').click();   // A's gesture -> anchor
+      await expect.poll(async () => (await readSync(tabB)).suppressed,
+        { timeout: 10000 }).toBeGreaterThanOrEqual(1);
+      expect((await readSync(tabB)).applied).toBe(before.applied);
+
+      // Leaving the jam gives the transport back (manual resume)
+      await tabB.evaluate(() => (window as any).__dawJam.stop());
+      await expect(tabB.locator('#play-btn')).toBeEnabled();
 
       await tabB.close();
     } finally {
