@@ -202,6 +202,8 @@ add_library(daw_engine_lib STATIC
     src/render/offline_render.cpp
     src/render/stem_render.h
     src/render/stem_render.cpp
+    src/util/crash_handler.h
+    src/util/crash_handler.cpp
     src/network/server_client.h
     src/network/server_client.cpp
     src/websocket/websocket_server.h

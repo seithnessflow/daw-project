@@ -19,6 +19,7 @@
 #include "graph/graph_common.h"
 #include "graph/plugin_registry.h"
 #include "render/stem_render.h"
+#include "util/crash_handler.h"
 #include "host/plugin_bridge.h"
 #include "host/proxy_node.h"
 #include "network/server_client.h"
@@ -1402,6 +1403,10 @@ int doPlayWithServer(const Options& opts) {
 }
 
 int main(int argc, char* argv[]) {
+    // Last-words logging FIRST: three silent 0xc0000409 deaths in one
+    // night taught us the CRT fail-fast path leaves no trace otherwise
+    daw::util::installCrashHandler();
+
     Options opts;
     if (!parseArgs(argc, argv, opts)) {
         return 1;

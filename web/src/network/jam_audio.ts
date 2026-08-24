@@ -79,6 +79,15 @@ export class JamAudio {
     tryPlay();
   }
 
+  /** Listener: explicit gesture path - the badge's real ▶ button. */
+  resume(): void {
+    if (!this.remoteEl) return;
+    this.remoteEl.play().then(() => {
+      this.playbackState = 'playing';
+      this.onStateChange?.();
+    }).catch(() => {});
+  }
+
   stop(): void {
     this.remoteEl?.pause();
     if (this.remoteEl) this.remoteEl.srcObject = null;

@@ -11,8 +11,12 @@ STEMS S7, streaming) -> SYNC TRANSPORT INTER-MACHINES [AJOUT
 2026-08-24, constat utilisateur « les deux sites sont pas
 synchronises » : chaque moteur a SON transport, le doc converge mais
 la POSITION non — la reponse produit = ABLETON LINK (notes
-docs/ABLETON-*), session de CADRAGE dediee avant toute ligne :
-phase/tempo partages, election du maitre, rapport au jam S8] ->
+docs/ABLETON-*). CADRAGE FAIT 2026-08-24 : docs/LINK-DESIGN.md —
+personne n'est maitre, horloge de session NTP-style sur jam-ctl,
+transport = ANCRE {pos, temps de session} LWW via relais signal:,
+3 sessions L1a horloge / L1b ancres / L1c polissage ; la grille au
+quantum attend la vague 2 tempo ; arbitrage jam-vs-sync propose
+(ecoute jam = lecture locale suspendue, grille 3 a trancher)] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
@@ -805,9 +809,16 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       FAIT ce jour : proto/engine.proto (jumeau divergent) supprime ;
       updateMeter + parseTime (exports morts) supprimes ; README verite
       (.am, SHA-256, make test, licence, triangle, VST3).
-- [ ] Moteur : exit 9 silencieux a l'arret observe DEUX fois (backend
-      WASAPI, position figee puis mort sans log). Instrumenter la sortie
-      du callback/device pour capturer la cause avant de corriger.
+- [~] Moteur : morts silencieuses en run AUDIBLE (WASAPI). Historique :
+      exit 9 observe deux fois ; puis NUIT DU 2026-08-24 : 3 crashes
+      IDENTIQUES au journal Windows — 0xc0000409 (fail-fast) dans
+      ucrtbase.dll, MEME offset 0xa527e, ~2 h de vie, uniquement en
+      audible (le duo --mute n'a jamais crashe), zero trace dans nos
+      logs (le fail-fast CRT court-circuite stderr). INSTRUMENTATION
+      POSEE 2026-08-24 : util/crash_handler (terminate + SIGABRT +
+      invalid-parameter + SEH -> crash-<pid>.log, raison + pile brute
+      module+offset), installe en premiere ligne de main(). Prochaine
+      occurrence = un log a lire au lieu d'un fantome.
 
 ## Court terme (sessions economes)
 

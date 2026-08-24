@@ -234,27 +234,29 @@ export async function init(): Promise<void> {
   jamReassert = () => jam.reassert();
   jamIsBroadcasting = () => jam.role === 'broadcasting';
   const jamBtn = document.getElementById('jam-btn') as HTMLButtonElement;
-  let jamBadge: HTMLElement | null = null;
+  // The badge is PERMANENT (index.html): "jam off" is a state, not an
+  // absence - the user should never wonder whether the feature exists.
+  const jamBadge = document.getElementById('jam-status') as HTMLElement;
   const renderJamBadge = () => {
     const peers = jam.peerCount();
     const lat = [...jam.latencyMs.values()];
-    if (!jamBadge && jam.role !== 'idle') {
-      jamBadge = document.createElement('div');
-      jamBadge.className = 'status-item';
-      jamBadge.id = 'jam-status';
-      document.querySelector('.status')?.prepend(jamBadge);
-    }
-    if (jamBadge) {
-      jamBadge.dataset.state = peers > 0 ? 'connected' : jam.role;
-      const audio =
-        jamAudio.playbackState === 'playing' ? ' ▶' :
-        jamAudio.playbackState === 'blocked' ? ' (clic pour le son)' : '';
-      jamBadge.textContent = jam.role === 'idle' ? 'jam off'
-        : `jam ${jam.role === 'broadcasting' ? 'diffuse' : 'ecoute'} ${peers} pair(s)` +
-          (lat.length ? ` ${Math.max(...lat)} ms` : '') + audio;
+    jamBadge.dataset.state = peers > 0 ? 'connected' : jam.role;
+    const audio = jamAudio.playbackState === 'playing' ? ' ▶' : '';
+    jamBadge.textContent = jam.role === 'idle' ? 'jam off'
+      : `jam ${jam.role === 'broadcasting' ? 'diffuse' : 'ecoute'} ${peers} pair(s)` +
+        (lat.length ? ` ${Math.max(...lat)} ms` : '') + audio;
+    // Blocked autoplay gets a REAL button, not a hint to click anywhere
+    if (jamAudio.playbackState === 'blocked') {
+      const play = document.createElement('button');
+      play.className = 'jam-play-btn';
+      play.textContent = '▶';
+      play.title = 'Lancer le son du jam (le navigateur attend un clic)';
+      play.addEventListener('click', () => jamAudio.resume());
+      jamBadge.append(' ', play);
     }
     jamBtn.setAttribute('aria-pressed', jam.role === 'broadcasting' ? 'true' : 'false');
   };
+  renderJamBadge();
   jam.onStateChange = renderJamBadge;
   jamAudio.onStateChange = renderJamBadge;
   // S8c: the listener PLAYS what arrives

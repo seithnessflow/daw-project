@@ -615,6 +615,34 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (nuit — le fantome a un nom, Link a un dossier, le jam a
+ses habits) :** trois chantiers bornes pendant le sommeil. (1) LE
+CRASH FANTOME INSTRUMENTE : le journal Windows a revele 3 morts
+IDENTIQUES du moteur — 0xc0000409 (fail-fast) dans ucrtbase.dll, MEME
+offset 0xa527e, ~2 h de vie, UNIQUEMENT en run audible (le duo --mute
+n'a jamais crashe), zero trace dans nos logs car le fail-fast CRT
+court-circuite stderr. Reponse : util/crash_handler (terminate +
+SIGABRT + invalid-parameter + SEH -> crash-<pid>.log A COTE DE L'EXE
+— les moteurs WMI ont des CWD imprevisibles —, raison + pile brute
+module+offset, reentree gardee, minimum vital : open/write/flush/die),
+installe en PREMIERE ligne de main(). La prochaine mort ecrira ses
+derniers mots. Reserve honnete : pas de gtest dedie (hooks
+process-globaux) — sa validation sera le prochain crash reel.
+(2) CADRAGE LINK ECRIT (docs/LINK-DESIGN.md, la session dediee que
+TODO exigeait) : personne n'est maitre (LWW, la lecon des notes
+Ableton), horloge de session NTP-style sur le ping jam-ctl EXISTANT,
+transport = ANCRE {position, temps de session} — fonction pure du
+temps, pas un ordre « demarre maintenant » —, relais signal: existant,
+etage 1 SANS attendre le tempo (vague 2) ; l'arbitrage jam-vs-sync
+(flanger a 40 ms si on cumule ecoute et lecture locale) pose en
+proposition grille-3. (3) JAM UX (les trois critiques promises) :
+badge « jam off » PERMANENT (un etat, pas une absence), bouton JAM
+enfonce = potion qui coule, et l'autoplay bloque recoit un VRAI
+bouton ▶ pulsant au badge (plus un « cliquez quelque part »).
+Lecon de build : rebuild complet a -j32 = C1060 (tas du compilateur
+epuise, 786 cibles dont protobuf) — reprise incrementale a -j8 verte.
+Moteur 29/29 avec le handler dans le binaire.
+
 **2026-08-24 (« c'est bon les deux marchent » — LE JAM VALIDE A
 L'OREILLE, la tranche differenciateur est close) :** apres la
 brochette de la nuit (le tueur silencieux : chaque onglet neuf
