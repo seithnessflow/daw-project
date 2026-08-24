@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio_graph.h"
 #include "compressor_node.h"          // session 4.2: clone path
+#include "delay_node.h"               // session 4.3: clone path
+#include "drive_node.h"               // session 4.3: clone path
 #include "eq3_node.h"                 // session 4.2: clone path
 #include "utility_node.h"             // session 4.1: clone path
 #include "../audio/audio_callback.h"  // for INTERNAL_BLOCK_SIZE
@@ -332,6 +334,18 @@ std::unique_ptr<AudioGraph> GraphBuilder::build(
                     processor->getParameter("attackMs"),
                     processor->getParameter("releaseMs"),
                     processor->getParameter("makeupDb")));
+            } else if (processor->getType() == DriveNode::TYPE) {
+                new_track.chain.push_back(std::make_unique<DriveNode>(
+                    processor->getId(),
+                    processor->getParameter("driveDb"),
+                    processor->getParameter("levelDb"),
+                    processor->getParameter("mix")));
+            } else if (processor->getType() == DelayNode::TYPE) {
+                new_track.chain.push_back(std::make_unique<DelayNode>(
+                    processor->getId(),
+                    processor->getParameter("timeMs"),
+                    processor->getParameter("feedback"),
+                    processor->getParameter("mix")));
             }
             // Add other processor types here
         }

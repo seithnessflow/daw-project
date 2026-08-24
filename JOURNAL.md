@@ -1006,3 +1006,19 @@ piste pose PILE sur un entier mentait pareil (masterGain et track.gain
 corriges du meme coup). itemToDouble (f64 -> int -> uint) partout ou
 un flottant du web entre au moteur. Contre-epreuve : meme document,
 +9.02 dB de RMS - l'EQ et le comp mordent. e2e 36/36.
+
+**2026-08-25 (nuit, suite — session 4.3 : Drive + Delay, LE NOYAU
+NATIF EST COMPLET) :** les cinq effets du brief sont livres. Le delay
+est exact a l'echantillon (impulsion -> echos a 4800/9600/14400,
+amplitudes mix, mix*fb, mix*fb^2, EXACTES ; ligne preallouee au
+prepare, jamais dans le callback). Le drive est le PREMIER NATIF A
+LATENCE : oversampling 4x polyphase (FIR 65 taps Blackman calcule au
+prepare, -95 dB sur le 3e harmonique), tanh au taux 4x,
+getLatencySamples() = 16 - UN CALCUL - et le stem declare desormais
+plugins + natifs (totalDeclaredLatencySamples). La chasse a l'alias a
+enseigne sa physique : a saturation quasi-carree, l'harmonique 13
+(195 kHz) replie PILE en bande passante - aucun oversampling fini n'y
+peut rien (le resampler seul mesure a -280 dB l'a prouve) ; le seuil
+du brief se mesure a reglage musical : alias -80 dB contre -15,5 au
+naif du meme reglage, 65 dB gagnes. gtests 34/34, e2e 36/36. La CI de
+4.2 est verte (sentinelle reparee, verifiee).

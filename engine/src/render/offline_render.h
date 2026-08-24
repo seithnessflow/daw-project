@@ -121,7 +121,15 @@ public:
         return sum;
     }
 
+    /** Session 4.3 : latence TOTALE declaree du dernier build - plugins
+     *  (ring v7) + natifs a latence (drive : oversampling FIR). Le stem
+     *  la declare pour que le lecteur avance d'autant. */
+    [[nodiscard]] uint32_t totalDeclaredLatencySamples() const {
+        return native_latency_ + totalPluginLatencySamples();
+    }
+
 private:
+    uint32_t native_latency_ = 0;
     std::vector<host::SyncProxyNode*> sync_nodes_;  // owned by the graph
     // S7: chain nodes legitimately ABSENT from the built graph because a
     // stem carries their truth (the R5 completeness guard subtracts them)

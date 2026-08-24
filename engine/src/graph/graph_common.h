@@ -20,6 +20,8 @@
 
 #include "clip_player.h"
 #include "compressor_node.h"
+#include "delay_node.h"
+#include "drive_node.h"
 #include "eq3_node.h"
 #include "gain_node.h"
 #include "utility_node.h"

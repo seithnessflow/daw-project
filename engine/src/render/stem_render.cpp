@@ -171,7 +171,7 @@ StemRenderResult renderTrackStem(const document::ProjectDef& project,
     // lookahead, lui, decale la sortie - le lecteur gteste avance le
     // stem d'exactement cette valeur)
     out.latency_samples =
-        static_cast<int64_t>(renderer.totalPluginLatencySamples());
+        static_cast<int64_t>(renderer.totalDeclaredLatencySamples());
     out.success = true;
     return out;
 }

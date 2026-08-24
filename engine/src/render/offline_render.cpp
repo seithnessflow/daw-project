@@ -201,6 +201,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
     auto graph_ptr = std::make_unique<graph::AudioGraph>();
     graph_ptr->setSampleRate(sample_rate);
     stem_substituted_nodes_ = 0;  // per-build accounting (S7 / R5)
+    native_latency_ = 0;          // session 4.3 : latence des natifs
 
     const auto& doc = document.getDocument();
     graph_ptr->setMasterGain(doc.master_gain);  // V1.2: same stage as live
@@ -249,6 +250,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                 // Fabrique native PARTAGEE (session 4.1) - un dispatch
                 auto node = graph::makeBuiltinNode(proc_def);
                 if (node) {
+                    native_latency_ += node->getLatencySamples();  // 4.3
                     track.chain.push_back(std::move(node));
                 } else {
                     std::cerr << "Render: unknown builtin type '"

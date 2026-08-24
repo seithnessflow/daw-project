@@ -118,6 +118,16 @@ std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& pro
             get("attackMs", 10.0f), get("releaseMs", 100.0f),
             get("makeupDb", 0.0f));
     }
+    if (proc_def.type == DriveNode::TYPE) {
+        return std::make_unique<DriveNode>(
+            proc_def.id, get("driveDb", 12.0f), get("levelDb", -6.0f),
+            get("mix", 1.0f));
+    }
+    if (proc_def.type == DelayNode::TYPE) {
+        return std::make_unique<DelayNode>(
+            proc_def.id, get("timeMs", 350.0f), get("feedback", 0.35f),
+            get("mix", 0.35f));
+    }
     return nullptr;
 }
 

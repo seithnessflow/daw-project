@@ -364,6 +364,16 @@ const NATIVE_PARAM_SPECS: Record<string, Record<string, ParamSpec>> = {
     releaseMs: { min: 5, max: 1000, step: 5, fmt: (v) => `${Math.round(v)} ms` },
     makeupDb: { min: 0, max: 24, step: 0.5, fmt: (v) => `+${v.toFixed(1)} dB` },
   },
+  'builtin.drive': {
+    driveDb: { min: 0, max: 36, step: 0.5, fmt: (v) => `+${v.toFixed(1)} dB` },
+    levelDb: { min: -24, max: 6, step: 0.5, fmt: (v) => `${v.toFixed(1)} dB` },
+    mix: { min: 0, max: 1, step: 0.01, fmt: (v) => `${Math.round(v * 100)} %` },
+  },
+  'builtin.delay': {
+    timeMs: { min: 1, max: 2000, step: 1, fmt: (v) => `${Math.round(v)} ms` },
+    feedback: { min: 0, max: 0.95, step: 0.01, fmt: (v) => `${Math.round(v * 100)} %` },
+    mix: { min: 0, max: 1, step: 0.01, fmt: (v) => `${Math.round(v * 100)} %` },
+  },
 };
 
 const KNOWN_VST3_NAMES: Record<string, string> = {
@@ -431,6 +441,15 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   compBtn.dataset.role = 'add-comp';
   compBtn.textContent = 'compresseur (builtin)';
   menu.appendChild(compBtn);
+  // Session 4.3 : drive (oversample 4x) + delay natifs
+  const driveBtn = document.createElement('button');
+  driveBtn.dataset.role = 'add-drive';
+  driveBtn.textContent = 'drive (builtin)';
+  menu.appendChild(driveBtn);
+  const delayBtn = document.createElement('button');
+  delayBtn.dataset.role = 'add-delay';
+  delayBtn.textContent = 'delay (builtin)';
+  menu.appendChild(delayBtn);
 
   // 2.5-decouverte : le catalogue du moteur, effets tries par nom.
   // Choisir remplit uid+nom ; le champ uid reste la voie experte.
@@ -542,6 +561,28 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
         { key: 'thresholdDb', value: -24 }, { key: 'ratio', value: 4 },
         { key: 'attackMs', value: 10 }, { key: 'releaseMs', value: 100 },
         { key: 'makeupDb', value: 0 },
+      ],
+    });
+    close();
+  });
+  driveBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.drive', name: 'Drive',
+      bypass: false,
+      params: [
+        { key: 'driveDb', value: 12 }, { key: 'levelDb', value: -6 },
+        { key: 'mix', value: 1 },
+      ],
+    });
+    close();
+  });
+  delayBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.delay', name: 'Delay',
+      bypass: false,
+      params: [
+        { key: 'timeMs', value: 350 }, { key: 'feedback', value: 0.35 },
+        { key: 'mix', value: 0.35 },
       ],
     });
     close();

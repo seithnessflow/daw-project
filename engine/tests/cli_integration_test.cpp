@@ -13,6 +13,8 @@
 #include "../src/graph/utility_node.h"
 #include "../src/graph/eq3_node.h"
 #include "../src/graph/compressor_node.h"
+#include "../src/graph/drive_node.h"
+#include "../src/graph/delay_node.h"
 #include "../src/graph/plugin_registry.h"
 #include "../src/render/offline_render.h"
 #include "../src/render/stem_render.h"
@@ -522,6 +524,147 @@ bool testCompressorNode() {
     }
 
     std::cout << "OK\n";
+    return true;
+}
+
+// Session 4.3 : delay - impulsion -> echo AU BON ECHANTILLON pres,
+// decroissance conforme au feedback (brief), determinisme.
+bool testDelayNode() {
+    std::cout << "Test: Delay node (impulse, sample-exact)... ";
+    using daw::graph::DelayNode;
+    constexpr uint32_t kSr = 48000;
+    constexpr uint32_t kN = 20000;
+
+    DelayNode n("d", 100.0f, 0.5f, 0.5f);  // 100 ms = 4800 ech., fb .5, mix .5
+    n.prepare(kSr, 256);
+    n.reset();
+    std::vector<float> b(kN * 2, 0.0f);
+    b[0] = b[1] = 1.0f;  // impulsion
+    n.process(b.data(), b.data(), kN, 0);
+
+    struct Hit { uint32_t at; float expected; };
+    const Hit hits[] = {
+        {0, 0.5f},       // dry
+        {4800, 0.5f},    // echo 1 : mix * 1
+        {9600, 0.25f},   // echo 2 : mix * fb
+        {14400, 0.125f}, // echo 3 : mix * fb^2
+    };
+    for (const auto& h : hits) {
+        if (b[h.at * 2] != h.expected) {
+            std::cout << "FAILED: echantillon " << h.at << " attendu "
+                      << h.expected << ", lu " << b[h.at * 2] << "\n";
+            return false;
+        }
+    }
+    // Entre les echos : silence exact
+    for (uint32_t probe : {1u, 4799u, 4801u, 9599u}) {
+        if (b[probe * 2] != 0.0f) {
+            std::cout << "FAILED: bruit hors echo a " << probe << "\n";
+            return false;
+        }
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Session 4.3 : drive - LE test qui dit si l'oversampling fait son
+// travail (brief) : niveau d'alias du 3e harmonique sous un seuil.
+// Sinus 15 kHz a 48 kHz : 3e harmonique 45 kHz -> alias a 3 kHz.
+bool testDriveNode() {
+    std::cout << "Test: Drive node (aliasing under threshold)... ";
+    using daw::graph::DriveNode;
+    constexpr uint32_t kSr = 48000;
+    constexpr uint32_t kSettle = 4800;
+    constexpr uint32_t kWin = 4800;   // bins entiers pour 15 kHz et 3 kHz
+    constexpr uint32_t kN = kSettle + kWin;
+    constexpr double kPi2 = 3.14159265358979323846;
+
+    auto goertzelDb = [](const std::vector<float>& buf, uint32_t start,
+                         uint32_t n, double freq, double sr) {
+        const double w = 2.0 * kPi2 * freq / sr;
+        const double c = 2.0 * std::cos(w);
+        double s1 = 0.0, s2 = 0.0;
+        for (uint32_t i = 0; i < n; ++i) {
+            const double s0 = double(buf[(start + i) * 2]) + c * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+        const double p = s1 * s1 + s2 * s2 - c * s1 * s2;
+        return 10.0 * std::log10((std::max)(p, 1e-30));
+    };
+
+    // 1. Latence declaree = un CALCUL, 16 echantillons pour 65 taps x2
+    DriveNode probe("p", 18.0f, 0.0f, 1.0f);
+    if (probe.getLatencySamples() != 16) {
+        std::cout << "FAILED: latence declaree " << probe.getLatencySamples()
+                  << " (attendu 16)\n";
+        return false;
+    }
+
+    // 2. Alias du drive SOUS le seuil - REGLAGE MUSICAL (drive 12 dB,
+    // amp 0.5). Limite PHYSIQUE mesuree et assumee : a saturation
+    // quasi-carree, l'harmonique 13 (13 x 15 k = 195 kHz) replie PILE
+    // en bande passante (|195k - 4x48k| = 3 kHz) - AUCUN oversampling
+    // fini n'y peut rien (verifie : le resampler seul est a -280 dB).
+    // Le seuil du brief se mesure la ou l'oversampling PEUT agir ; le
+    // naif au MEME reglage prouve que la mesure voit l'alias.
+    std::vector<float> b(kN * 2);
+    for (uint32_t i = 0; i < kN; ++i) {
+        const float v = 0.5f * float(std::sin(2.0 * kPi2 * 15000.0 * i / kSr));
+        b[i * 2] = b[i * 2 + 1] = v;
+    }
+    DriveNode n("dr", 12.0f, 0.0f, 1.0f);
+    n.prepare(kSr, 256);
+    n.reset();
+    n.process(b.data(), b.data(), kN, 0);
+    const double fund = goertzelDb(b, kSettle, kWin, 15000.0, kSr);
+    const double alias = goertzelDb(b, kSettle, kWin, 3000.0, kSr);
+    const double rel = alias - fund;
+
+    // 3. Reference NAIVE (tanh sans oversampling, MEME reglage) :
+    // l'alias doit y etre massif - la preuve que la mesure sait le voir
+    std::vector<float> naive(kN * 2);
+    const double pre = std::pow(10.0, 12.0 / 20.0);
+    for (uint32_t i = 0; i < kN; ++i) {
+        const double v = 0.5 * std::sin(2.0 * kPi2 * 15000.0 * i / kSr);
+        naive[i * 2] = naive[i * 2 + 1] = float(std::tanh(pre * v));
+    }
+    const double nfund = goertzelDb(naive, kSettle, kWin, 15000.0, kSr);
+    const double nalias = goertzelDb(naive, kSettle, kWin, 3000.0, kSr);
+    const double nrel = nalias - nfund;
+
+    if (nrel < -40.0) {
+        std::cout << "FAILED: la reference naive n'alias pas (" << nrel
+                  << " dB) - mesure invalide\n";
+        return false;
+    }
+    if (rel > -60.0) {
+        std::cout << "FAILED: alias du drive " << rel
+                  << " dB (seuil -60 ; naif " << nrel << ")\n";
+        return false;
+    }
+
+    // 4. Determinisme
+    {
+        std::vector<float> a2(8192 * 2), b2(8192 * 2);
+        for (uint32_t i = 0; i < 8192; ++i) {
+            const float v = 0.8f * float(std::sin(2.0 * kPi2 * 220.0 * i / kSr));
+            a2[i * 2] = a2[i * 2 + 1] = v;
+            b2[i * 2] = b2[i * 2 + 1] = v;
+        }
+        DriveNode d1("x", 12.0f, -6.0f, 1.0f), d2("x", 12.0f, -6.0f, 1.0f);
+        d1.prepare(kSr, 256);
+        d2.prepare(kSr, 256);
+        d1.process(a2.data(), a2.data(), 8192, 0);
+        d2.process(b2.data(), b2.data(), 8192, 0);
+        if (std::memcmp(a2.data(), b2.data(), a2.size() * sizeof(float)) != 0) {
+            std::cout << "FAILED: deux rendus frais different\n";
+            return false;
+        }
+    }
+
+    std::cout << "OK (alias " << rel << " dB vs naif " << nrel << " dB)\n";
     return true;
 }
 
@@ -3022,6 +3165,8 @@ int main(int argc, char* argv[]) {
     run(testUtilityNode);
     run(testEq3Node);
     run(testCompressorNode);
+    run(testDriveNode);
+    run(testDelayNode);
     run(testRingBuffer);
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);

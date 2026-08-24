@@ -192,6 +192,10 @@ add_library(daw_engine_lib STATIC
     src/graph/eq3_node.cpp
     src/graph/compressor_node.h
     src/graph/compressor_node.cpp
+    src/graph/drive_node.h
+    src/graph/drive_node.cpp
+    src/graph/delay_node.h
+    src/graph/delay_node.cpp
     src/graph/clip_player.h
     src/graph/clip_player.cpp
     src/graph/audio_graph.h
