@@ -1,65 +1,69 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Ecrit le 2026-08-24 au matin, apres la session de nuit. Fichier
-VOLATILE : reecrit en fin de session ; il ne possede aucune
-information — l'etat de reference vit dans STATUS.md, la file dans
-TODO.md, le recit dans JOURNAL.md.*
+*Ecrit le 2026-08-24 (fin de journee, session L1b). Fichier VOLATILE :
+reecrit en fin de session ; il ne possede aucune information — l'etat
+de reference vit dans STATUS.md, la file dans TODO.md, le recit dans
+JOURNAL.md.*
 
 ## Ou on en est (30 secondes de lecture)
 
-Les deux moities du differenciateur sont VERTES et validees en reel :
-- **Stems S7** : critere 6 vert — le portable rend et JOUE un plugin
-  qu'il n'a pas installe, octets identiques a travers le store.
-- **Jam S8** : valide a l'oreille (« c'est bon les deux marchent »),
-  la tour diffuse, le portable ecoute en P2P, ~40 ms.
+**L1b EST LIVRE : PLAY ici = PLAY la-bas.** Le bouton SYNC (opt-in,
+barre transport) diffuse des ancres {playing, posSec, t} sur le relais
+signal:, traduites chez le recepteur avec l'offset COURANT de
+l'horloge L1a, qui cale son moteur la ou l'ancre dit qu'on doit etre.
+Garde transport-sync.spec (traduction prouvee contre timeOrigin),
+suite e2e 34/34, sonde pilote deux-moteurs : ecart 0 ms, verdict
+< 50 ms VERT. Commit f9f195f pousse, **CI VERTE** (run 32699124571).
 
-Cette nuit, pendant ton sommeil :
-1. **Le crash fantome est instrumente** : le moteur est mort 3 fois en
-   runs AUDIBLES (0xc0000409 ucrtbase, meme offset, ~2 h de vie, zero
-   trace). Un crash handler ecrit desormais ses derniers mots.
-2. **Link est cadre ET commence** : docs/LINK-DESIGN.md (la reponse a
-   ton « les deux sites sont pas synchronises »), et L1a est LIVRE —
-   l'horloge de session mesure, prouvee entre tour et portable
-   (symetrie a 5-9 ms a travers hotspot+tunnel). Badge « clk ±N ms ».
-3. **Jam UX** : badge permanent (« jam off » est un etat), bouton JAM
-   enfonce = potion, vrai bouton ▶ quand le navigateur bloque le son.
+## LA MANIP (5 minutes, elle t'attend)
 
-Verdicts : moteur 29/29, e2e 33/33, CI verte (commits 0c67697,
-d61ad54, 1b35943). Tout est pousse, le portable est a jour.
+Deux onglets sont OUVERTS dans Chrome (projet ma-piece, ear VERT) :
+deux moteurs locaux — 47821 AUDIBLE, 47822 muet (`?engine=47822`).
+**Presse PLAY dans l'onglet 47822 (muet) : le son sort de l'autre
+moteur, les deux tetes de lecture courent ensemble, le bouton SYNC
+flashe quand l'ancre distante pilote.** STOP suit aussi. Si les
+onglets sont fermes :
+`http://localhost:5173/?project=ma-piece&sync=1` et
+`http://localhost:5173/?project=ma-piece&sync=1&engine=47822`.
 
-## Relancer (tour)
+## Relancer
 
-- **Tout-en-un** : `scripts\daw.ps1` (audible, projet studio) ou
-  `scripts\daw.ps1 -Mute`. `-Stop` pour tout couper.
-- **Le montage duo de la nuit** (si la machine n'a pas redemarre, il
-  tourne encore : serveur + vite + moteur duo muet pid 28264) :
-  l'onglet est `http://localhost:5173/?project=duo`.
-- **Portable** : relais + vite + moteur muet en place (WMI, survivent
-  au ssh). Procedures deux-machines : STATUS.md.
+- Stack de la manip : serveur (cargo run) + vite + 2 moteurs tournent
+  (lances a la main cette session). Tout couper :
+  `scripts\start-stack.ps1 -Stop` + `Get-Process daw_engine | Stop-Process`.
+- Tout-en-un habituel : `scripts\daw.ps1` (ou -Mute), `-Stop`.
 
 ## A surveiller
 
-- **Si le moteur meurt** : chercher `crash-*.log` dans
-  `engine\build-msvc` — c'est LA moisson attendue. Le fantome ne
-  frappe qu'en AUDIBLE (le duo muet n'a jamais crashe) ; une session
-  d'ecoute longue est le meilleur appat.
-- Le badge « clk ±N ms (P) » dans la barre de statut : l'horloge Link
-  mesure en permanence des qu'un pair est la.
+- Le commit REPRISE qui suit f9f195f est DOC-ONLY : si sa CI n'est pas
+  verte au prochain demarrage, c'est un caprice d'infra, pas du code.
+- **EAR ROUGE sur le projet duo** : 2 discontinuites (saut 0.9) au
+  rendu — le projet de la chasse au crash est INAPTE A L'ECOUTE, a
+  trier (contenu abime ou bug de rendu ?). ma-piece est VERT.
+- **`--play` joue DES LE LANCEMENT du moteur** : un moteur audible
+  lance sur un projet avec contenu joue immediatement (constate : 48 s
+  de ma-piece au lancement du banc). Candidat : demarrer arrete
+  (--start-stopped) — a arbitrer.
+- Le crash fantome (0xc0000409) : chercher `crash-*.log` dans
+  engine\build-msvc apres toute session audible longue.
+- Badge « clk ±N ms » : entre onglets d'ages differents il affiche des
+  DIZAINES DE SECONDES (epoques par onglet — correct mais alarmant) ;
+  critique consignee, grille 3.
 
 ## La suite (ordre grave au TODO)
 
-1. **L1b — les ancres de transport** : bouton SYNC, PLAY ici = PLAY
-   la-bas (position calee par l'horloge L1a, prete). C'est le morceau
-   visible du chantier Link.
-2. **L1c** : rejoin en cours de lecture, stop synchronise.
-3. Ensuite : badge fraicheur stems, TURN, vrais plugins tiers,
-   re-passes refonte.
+1. **L1c — polissage Link** : rejoin en cours de lecture (ancres
+   re-diffusees a l'arrivee d'un pair), stop/arret synchronise fin,
+   ET l'arbitrage jam-vs-sync (LINK-DESIGN §4) a appliquer.
+2. Ensuite : badge fraicheur stems, TURN, vrais plugins tiers.
+3. Le test REEL deux machines de L1b (tour + portable, verdict a
+   l'oreille) — la sonde locale est verte, le reel reste le juge.
 
 ## Decisions qui t'attendent (rien d'urgent)
 
-- **Jam vs sync** (grille 3, propose dans LINK-DESIGN §4) : ecouter le
-  jam d'un projet devrait SUSPENDRE la lecture locale (sinon flanger a
-  40 ms). Un oui/non suffit.
-- **Badge fraicheur des stems** : option (b) proposee au TODO — le
-  producteur publie stemFresh, mention « fraicheur inconnue » s'il est
-  absent.
+- **Jam vs sync** (grille 3, LINK-DESIGN §4) : ecouter le jam d'un
+  projet devrait SUSPENDRE la lecture locale (sinon flanger a 40 ms).
+  Un oui/non suffit — necessaire pour L1c.
+- **Badge fraicheur des stems** : option (b) proposee au TODO.
+- Ultrareview PR #1 : 1 finding (nit ?server=), DEJA corrige dans
+  master (server-param.spec le garde) — commentaire poste sur la PR.
