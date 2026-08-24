@@ -877,3 +877,28 @@ masquait un vrai clic derriere les bords du champ — le self-test l'a
 attrape, il a fait son travail), self-test etendu aux deux directions.
 duo est VERT, l'ear est plus precis, et la directive est gravee en
 memoire : les organes sensoriels s'ameliorent sans permission.
+
+**2026-08-24 (fin de journee, LE SMOKE L1b DEUX MACHINES — vert) :**
+la journee s'acheve sur la preuve reelle : PLAY presse sur la tour,
+le portable TX15 (hotspot, deux NAT, relais) demarre SUR L'ANCRE et
+joue la piece entiere dans ses haut-parleurs — calage de depart
+10,7 ms, soit UN buffer de 512 frames exactement, le meilleur
+possible ; ecart de lecture pendant toute la piece : 5 sondes sur 6
+a 16 ms ou moins. Le critere « < 50 ms » du cadrage est tenu au
+chiffre et a l'oreille. La route a coute ses lecons : le tunnel ssh
+est un GESTE HUMAIN (les classifieurs des deux Claude le refusent,
+c'est consigne) ; le sens de la liaison s'est INVERSE en cours de
+route (le laptop vient au serveur par le tunnel DAW — plus simple que
+ssh) ; un onglet non recharge se detecte a son id de session
+inchange ; et les sondes ephemeres strandent leurs ancres (l'ancre
+attend l'estimation d'horloge de l'EMETTEUR — s'il ferme avant,
+orpheline). L'organe ta:3/ta:4 (etat a distance) est ne de cet
+aveuglement. LA MOISSON INATTENDUE : le crash 0xe06d7363 (exception
+C++ non rattrapee, thread worker, gachette = fermeture d'un lien WS)
+a frappe LES DEUX moteurs le meme jour — le handler dernier-mots a
+fait son travail des deux cotes, c'est un bug DISTINCT du fantome
+0xc0000409, reproductible en apparence, et le build est passe en
+RelWithDebInfo pour le symboliser. Session dediee a ouvrir. Enfin,
+deux directives gravees : le manuel Live est LA BIBLE produit
+(jamais DSP), et VCV Rack (GPL) est la litterature d'implementation
+des effets natifs a venir.

@@ -10,6 +10,13 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 Etat : **VERT** (smoke S7 deux machines, 2026-08-23) — le portable, sans
 aucun module VST3, a rendu l'octet-pour-octet de la tour a travers le
 store et l'a JOUE dans ses haut-parleurs. Details : critere 6.
+SYNC TRANSPORT LINK (L1a+L1b+L1c, 2026-08-24) : **VERT DEUX
+MACHINES** — PLAY sur la tour, le portable demarre sur l'ancre
+(calage 10,7 ms = 1 buffer) et joue la piece entiere audible, ecart
+de lecture <= 16 ms (5 sondes/6, critere < 50 ms tenu). Ecouter un
+jam suspend la lecture locale (arbitrage utilisateur applique).
+BUG OUVERT : crash 0xe06d7363 des moteurs (fermeture de lien WS,
+les DEUX machines) — session dediee, build en RelWithDebInfo.
 STREAMING JAM (S8, 2026-08-24) : **VALIDE A L'OREILLE DE
 L'UTILISATEUR** — « c'est bon les deux marchent » : la tour joue duo
 dans ses enceintes, le portable joue le meme duo recu en P2P (~40 ms,

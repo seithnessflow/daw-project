@@ -59,6 +59,12 @@ const engineExe = join(root, 'engine', 'build-msvc', 'daw_engine.exe');
 const assetsDir = join(root, 'engine', 'test-assets');
 const againUid = '84E8DE5F92554F5396FAE4133C935A18';
 const againModule = join('VST3', 'Release', 'again.vst3'); // relative to build-msvc
+// Vrais plugins tiers (2026-08-24) : --vst3 uid=chemin, repetable -
+// l'oreille doit savoir ecouter tout module que le projet reference.
+const extraModules = [];
+for (let i = 0; i < args.length - 1; i++) {
+  if (args[i] === '--vst3') extraModules.push(args[i + 1]);
+}
 
 const earDir = join(here, '..', 'ear');
 mkdirSync(earDir, { recursive: true });
@@ -156,7 +162,8 @@ mkdirSync(stageDir, { recursive: true });
 const render = spawnSync(
   engineExe,
   ['--doc', docCopy, '--render', outWav, '--assets', stageDir,
-   '--vst3-module', `${againUid}=${againModule}`],
+   '--vst3-module', `${againUid}=${againModule}`,
+   ...extraModules.flatMap((m) => ['--vst3-module', m])],
   { cwd: join(root, 'engine', 'build-msvc'), encoding: 'utf8', timeout: 120000 },
 );
 if (render.status !== 0) {

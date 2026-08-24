@@ -77,9 +77,24 @@ dit desormais OU sont ses clics (discontinuity_positions_s + raison
 du verdict) ; self-test etendu (test 7, DEUX directions : rafale
 dense verte, spike isole rouge avec position). duo VERT, ma-piece
 VERT, self-test 7/7. Garde e2e : transport-sync.spec test 2 (rejoin
-sans nouveau geste + suspension observee). RESTE Link : test REEL
-deux machines (L1b+L1c, portable), etage 2 grille au quantum
-(attend vague 2 tempo)] ->
+sans nouveau geste + suspension observee). TEST REEL DEUX MACHINES TENU 2026-08-24 (tour + portable TX15,
+hotspot 172.27.107.x + tunnel, relais) : le portable a demarre SUR
+L'ANCRE de la tour et joue la piece ENTIERE dans ses haut-parleurs —
+calage de depart 10,7 ms = UN buffer (512 fr) pile ; ecart de
+lecture mesure par sondes rejoin pendant toute la piece : 5 lectures
+sur 6 <= 16 ms (outlier 91 ms = bruit de mesure, reponses etalees
+par le reseau + telemetrie 33 ms). CRITERE < 50 ms : VERT, au
+chiffre et a l'oreille. MOISSON DU SMOKE : (1) CRASH 0xe06d7363
+(exception C++ non rattrapee, thread worker, gachette apparente =
+fermeture d'un lien WS) sur LES DEUX machines le meme jour —
+distinct du fantome 0xc0000409 ; le handler dernier-mots marche
+(crash-*.log les 2 cotes) ; build passe en RelWithDebInfo pour
+symboliser ; SESSION DEDIEE A OUVRIR (repro : fermer le lien
+serveur/WS ; symboliser crash-10156.log tour). (2) Le rejoin ta:2 de
+la sonde tardive du portable n'a pas repondu en manche 1 — a creuser
+avec la session crash. (3) Frictions consignees deux-machines.md
+3bis (vcvars, ws-relay chemin, playwright channel chrome).
+RESTE Link : etage 2 grille au quantum (attend vague 2 tempo)] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
@@ -329,6 +344,14 @@ dedouble). Ordre :
 
 7. [ ] L'INSTRUMENT JOUABLE (avis reviewer consigne 2026-08-23 —
        APRES 1bis, jamais avant : ne rapproche pas l'invariant).
+       REFERENCES D'IMPLEMENTATION EFFETS NATIFS (utilisateur
+       2026-08-24) : le code de VCV RACK (GPL-3, licence compatible —
+       reutilisable) comme litterature DSP (dsp/ : biquads, resamplers
+       pour l'oversampling du drive) ; le manuel Live = bible de
+       COMPORTEMENT seulement, jamais de DSP (brief effets natifs).
+       Decoupage arbitre en 3 sessions : 1 Utility+chassis natif,
+       2 EQ 3 bandes + compresseur, 3 Drive (oversampling, 1er client
+       PDC) + Delay. A ouvrir apres la session crash 0xe06d7363.
        LE TEST ULTIME (vision utilisateur 2026-08-24, scenario
        d'acceptation de la vague 3) : « dessiner du midi sur le laptop
        et que ca trigger un Massive de NI sur mon pc, et qu'on entende

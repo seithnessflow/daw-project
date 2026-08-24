@@ -84,6 +84,21 @@ regle firewall.*
   3. `cd web && npm run dev` puis
      `http://localhost:5173/?project=smoke&server=ws://localhost:3000`
 
+## 3bis. Frictions payees au smoke L1b (2026-08-24, rapport portable)
+
+- `ws-relay.mjs` vit dans `scripts/` A LA RACINE du repo, pas dans
+  `web/scripts/` — la commande est
+  `node ..\scripts\ws-relay.mjs <URL> 3000` depuis web/, ou chemin
+  absolu.
+- `rebuild_msvc.bat` : vcvars64 cherche desormais les DEUX emplacements
+  (LOCALAPPDATA tour, Program Files (x86) portable).
+- Playwright n'a pas ses navigateurs sur le portable : toujours
+  `channel: 'chrome'` la-bas (regle CLAUDE.md, confirmee).
+- CRASH 0xe06d7363 (exception C++ non rattrapee, thread worker,
+  declencheur apparent : fermeture d'un lien WebSocket) constate sur
+  LES DEUX machines le meme jour — distinct du fantome 0xc0000409.
+  Les crash-*.log fonctionnent ; il faut des PDB pour symboliser.
+
 ## 4. Pieges appris (payes une fois chacun)
 
 - Vite ecoute en IPv6 seul : un test de port IPv4 (Test-NetConnection)
