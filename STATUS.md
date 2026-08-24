@@ -53,10 +53,10 @@ interdisait le produit).
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 29/29 ; crash handler dernier-mots installe (crash-<pid>.log, chasse au 0xc0000409 des runs audibles) |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` 34/34 (noyau natif complet : Utility/EQ3/Comp/Drive/Delay, preuves exactes) ; crash 0xe06d7363 SOLDE (envoi hors verrou) ; handler auto-symbolisant (dbghelp+WHAT) ; --start-stopped, --editors, --vst3-dir (scan+cache) ; ring v7 (latence plugin + gui_edit_seq) ; bug int/f64 Automerge corrige (un entier du web etait lu 0.0) |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 7/7 |
-| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 35/35 (attention : les specs moteur-reel exigent le port 47821 LIBRE — arreter le duo avant la suite) ; sync transport L1b+L1c livres (SYNC opt-in, ancres LWW, rejoin ta:2, ecoute jam = lecture locale suspendue) ; ear : positions des clics + regle d'echelle locale, self-test 7/7 ; moteur --start-stopped (daw.ps1 l'utilise) |
+| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 36/36 (specs moteur-reel : port 47821 LIBRE requis) ; sync transport L1a/b/c VERT DEUX MACHINES ; catalogue PluginCatalog (91 classes) + picker ; fenetrage v1 (GUI natives des plugins, reglages qui voyagent par stems) ; badge fraicheur 3 etats (sf, ne ment jamais par omission) ; 5 devices natifs au menu, unites vraies ; ear --vst3 + positions des clics, self-test 7/7 |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 

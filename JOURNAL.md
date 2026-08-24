@@ -1022,3 +1022,15 @@ peut rien (le resampler seul mesure a -280 dB l'a prouve) ; le seuil
 du brief se mesure a reglage musical : alias -80 dB contre -15,5 au
 naif du meme reglage, 65 dB gagnes. gtests 34/34, e2e 36/36. La CI de
 4.2 est verte (sentinelle reparee, verifiee).
+
+**2026-08-25 (cloture) :** la seance se ferme sur un depot
+meconnaissable par rapport a la veille : Link vert deux machines,
+l'invariant prouve sur de vrais plugins du commerce, 91 classes au
+catalogue, les fenetres natives qui s'ouvrent et dont les reglages
+voyagent, le noyau natif complet (5 devices, 34 gtests), deux bugs de
+fond morts (le self-lock WS des deux moteurs, l'int/f64 Automerge qui
+lisait 0.0), et des organes qui disent desormais OU et POURQUOI
+(crash handler symbolisant, ear a positions, badge de fraicheur,
+ta:3, mappings verbatim). CI verte jusqu'a 8ebe73d ; b4dc522 en vol a
+la fermeture — VERDICT A LIRE EN PREMIER a la reprise. Stack coupee
+proprement (tunnel compris) ; daw.ps1 rallume tout.
