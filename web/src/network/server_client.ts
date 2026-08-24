@@ -65,6 +65,12 @@ export class ServerClient {
   onChange: ((change: Uint8Array) => void) | null = null;
   /** S8b: jam signaling relayed by the server (parsed JSON). */
   onSignal: ((signal: unknown) => void) | null = null;
+  /** L1a: additional signal consumers (session clock); onSignal keeps
+   *  its single-slot shape for the jam, listeners stack beside it. */
+  private signalListeners: Array<(signal: unknown) => void> = [];
+  addSignalListener(fn: (signal: unknown) => void): void {
+    this.signalListeners.push(fn);
+  }
 
   constructor(baseUrl: string) {
     this.url = baseUrl;
@@ -110,7 +116,9 @@ export class ServerClient {
           if (typeof event.data === 'string') {
             if (event.data.startsWith('signal:')) {
               try {
-                this.onSignal?.(JSON.parse(event.data.slice(7)));
+                const parsed = JSON.parse(event.data.slice(7));
+                this.onSignal?.(parsed);
+                for (const fn of this.signalListeners) fn(parsed);
               } catch { /* malformed signal: ignore */ }
             }
             return;

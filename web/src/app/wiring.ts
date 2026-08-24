@@ -27,6 +27,7 @@ import { beginClipDrag, beginClipResize, beginFadeDrag, markLanded } from './ges
 import { toggleHelp, isHelpOpen } from '../ui/help';
 import { JamChannel } from '../network/jam';
 import { JamAudio } from '../network/jam_audio';
+import { SessionClock } from '../network/session_clock';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 
@@ -224,6 +225,33 @@ export async function init(): Promise<void> {
     sendLastChange();
     els.masterDb.textContent = formatGain(Number(els.masterGain.value));
   });
+
+  // L1a: the session clock - every tab measures every peer's clock
+  // offset over the signal relay (LINK-DESIGN etage 1). L1b's
+  // transport anchors will be translated with these offsets; today it
+  // only measures and shows itself.
+  const clock = new SessionClock(serverClient);
+  (window as any).__dawClock = clock;
+  let clkBadge: HTMLElement | null = null;
+  clock.onStateChange = () => {
+    const peers = clock.peers();
+    if (!clkBadge && peers.size > 0) {
+      clkBadge = document.createElement('div');
+      clkBadge.className = 'status-item';
+      clkBadge.id = 'clk-status';
+      clkBadge.title =
+        'decalage d horloge estime avec les autres onglets/machines (Link L1a)';
+      document.querySelector('.status')?.prepend(clkBadge);
+    }
+    if (clkBadge) {
+      let worst = 0;
+      for (const pc of peers.values()) {
+        worst = Math.max(worst, Math.abs(pc.offsetMs));
+      }
+      clkBadge.textContent = peers.size === 0 ? 'clk seul'
+        : `clk ±${Math.round(worst)} ms (${peers.size})`;
+    }
+  };
 
   // S8b: the jam traversal - one broadcaster per project, listeners
   // answer; latency MEASURED over the data channel and displayed.

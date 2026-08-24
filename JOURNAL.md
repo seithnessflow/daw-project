@@ -615,6 +615,26 @@ avale l'echec de ninja — un enchainement `; exe` a lance le VIEUX
 binaire (27 passes en trompe-l'oeil) ; verifier le log de build avant
 de croire un compte de tests.
 
+**2026-08-24 (nuit, suite — L1a : l'horloge de session mesure) :** la
+premiere session du cadrage Link, livree dans la foulee du dossier.
+SessionClock NTP-style sur le relais signal: existant (clk:1
+broadcast, clk:2 dirige ; offset = t2 - (t1 + rtt/2), mediane des
+echantillons a bas RTT, fenetre 16, pairs oublies a 30 s de silence) ;
+addSignalListener multiplexe le canal (le jam garde son slot onSignal
+intact) ; badge discret « clk ±N ms (P) » + sonde __dawClock. LA
+LECON PAYEE PAR LA SPEC : performance.now() a une EPOQUE PAR ONGLET
+(timeOrigin = chargement de page) — la premiere assertion « meme
+machine donc offset nul » a mesure 580 ms, l'ecart de chargement
+EXACT, estime juste par un estimateur juste. Il n'existe donc PAS de
+temps de session absolu, seulement des traductions par paire — le
+modele Link au sens strict, et la contrainte gravee pour les ancres
+L1b. Spec reecrite sur les vrais invariants (symetrie A/B + verite
+timeOrigin, justification consignee). Deuxieme lecon, sur moi : les 3
+specs moteur-reel ont rougi car MON duo squattait 47821 pendant la
+suite — la regle « jamais deux executions sur la meme stack » vaut
+aussi pour le gardien de nuit ; port libere, 3/3 re-verts, note au
+STATUS. Suite 33/33, tsc propre.
+
 **2026-08-24 (nuit — le fantome a un nom, Link a un dossier, le jam a
 ses habits) :** trois chantiers bornes pendant le sommeil. (1) LE
 CRASH FANTOME INSTRUMENTE : le journal Windows a revele 3 morts

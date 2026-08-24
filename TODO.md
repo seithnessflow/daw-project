@@ -16,7 +16,17 @@ personne n'est maitre, horloge de session NTP-style sur jam-ctl,
 transport = ANCRE {pos, temps de session} LWW via relais signal:,
 3 sessions L1a horloge / L1b ancres / L1c polissage ; la grille au
 quantum attend la vague 2 tempo ; arbitrage jam-vs-sync propose
-(ecoute jam = lecture locale suspendue, grille 3 a trancher)] ->
+(ecoute jam = lecture locale suspendue, grille 3 a trancher).
+L1a FAIT 2026-08-24 (nuit) : SessionClock NTP-style sur le relais
+signal: (clk:1 broadcast / clk:2 dirige, mediane des echantillons a
+bas RTT, fenetre 16, peers oublies a 30 s), addSignalListener
+multiplexe (le jam garde onSignal), badge « clk ±N ms (P) » +
+__dawClock.snapshot(). Garde clock.spec : symetrie A/B + VERITE
+timeOrigin (lecon : performance.now() a une EPOQUE PAR ONGLET — il
+n'existe pas de temps de session absolu, seulement des traductions
+par paire, le modele Link exact ; la premiere assertion « meme
+machine = offset 0 » etait fausse, 580 ms d'ecart de chargement
+mesures par l'estimateur juste)] ->
 VAGUE 2 TEMPO (cadrage puis migration) ->
 VAGUE 3 MIDI+instruments (Surge XT) -> VAGUE 4 studio (automation,
 sends/groupes, enregistrement+comping, warp APRES recherche de
