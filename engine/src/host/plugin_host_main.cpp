@@ -804,6 +804,28 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 #endif
         const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);
         if (newest == last_in) {
+#ifdef _WIN32
+            // Fenetrage : a l'ARRET, pas de bloc pour porter les edits
+            // GUI - flush officiel numSamples==0 (intrants 2.5, mecanique
+            // 4) pour qu'ils entrent au COMPOSANT, puis signal moteur.
+            if (!editor_win.handler.pending.empty()) {
+                Vst::ParameterChanges flush_changes;
+                flush_changes.setMaxParameters(daw::host::kParamQueueSlots);
+                for (const auto& [gid, gval] : editor_win.handler.pending) {
+                    int32 qi = 0;
+                    auto* q = flush_changes.addParameterData(gid, qi);
+                    if (q) { int32 pi = 0; q->addPoint(0, gval, pi); }
+                }
+                editor_win.handler.pending.clear();
+                Vst::ProcessData flush{};
+                flush.processMode = Vst::kRealtime;
+                flush.symbolicSampleSize = Vst::kSample32;
+                flush.numSamples = 0;
+                flush.inputParameterChanges = &flush_changes;
+                inst.processor->process(flush);
+                ring->gui_edit_seq.fetch_add(1, std::memory_order_release);
+            }
+#endif
             // Deliberate yield-spin: the block budget is 5.3 ms and Windows
             // sleep granularity (up to 15.6 ms) can eat it whole. One busy
             // core on a 32-thread machine is the cheap side of that trade.
@@ -860,16 +882,21 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }
 #ifdef _WIN32
         // Fenetrage v1 : les tweaks GUI (coalesces par id) rejoignent les
-        // changements de ce bloc - meme thread que la pompe, zero verrou
-        for (const auto& [gid, gval] : editor_win.handler.pending) {
-            int32 queue_index = 0;
-            auto* queue = param_changes.addParameterData(gid, queue_index);
-            if (queue) {
-                int32 point_index = 0;
-                queue->addPoint(0, gval, point_index);
+        // changements de ce bloc - meme thread que la pompe, zero verrou.
+        // Le bump previent le moteur (capture d'etat debouncee : le
+        // reglage survivra et voyagera).
+        if (!editor_win.handler.pending.empty()) {
+            for (const auto& [gid, gval] : editor_win.handler.pending) {
+                int32 queue_index = 0;
+                auto* queue = param_changes.addParameterData(gid, queue_index);
+                if (queue) {
+                    int32 point_index = 0;
+                    queue->addPoint(0, gval, point_index);
+                }
             }
+            editor_win.handler.pending.clear();
+            ring->gui_edit_seq.fetch_add(1, std::memory_order_release);
         }
-        editor_win.handler.pending.clear();
 #endif
 
         // Zero-copy: VST3 channel pointers aim straight into the segment

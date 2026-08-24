@@ -43,6 +43,11 @@ struct PluginInstanceHandle {
     std::atomic<bool> child_alive{true};
     std::atomic<uint32_t> child_restarts{0};
 
+    // Fenetrage v1 (v6) : dernier gui_edit_seq observe par la boucle de
+    // controle - un delta programme la capture d'etat debouncee (le
+    // reglage a la fenetre survit et voyage par les stems).
+    uint64_t gui_edits_seen{0};
+
     PluginInstanceHandle() = default;
     PluginInstanceHandle(const PluginInstanceHandle&) = delete;
     PluginInstanceHandle& operator=(const PluginInstanceHandle&) = delete;

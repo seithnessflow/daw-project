@@ -1251,6 +1251,21 @@ int doPlayWithServer(const Options& opts) {
                            }),
             retired_graphs.end());
 
+        // Fenetrage v1 : des edits GUI chez un enfant (gui_edit_seq bouge)
+        // -> capture debouncee, le meme chemin que les rebuilds. Le
+        // reglage a la fenetre entre au document et donc a la cle de stem.
+        plugin_registry.forEach([&](const std::string&, auto& h) {
+            if (!h.bridge || !h.bridge->isRunning()) return;
+            auto* r = h.bridge->ring();
+            if (!r) return;
+            const uint64_t seen = r->gui_edit_seq.load(std::memory_order_acquire);
+            if (seen != h.gui_edits_seen) {
+                h.gui_edits_seen = seen;
+                state_capture_due =
+                    std::chrono::steady_clock::now() + std::chrono::seconds(1);
+            }
+        });
+
         // 2.5-etat: debounced capture. For every LIVE vst3 child, serialize
         // its state; a hash that moved goes to the local assets, the store,
         // and the document (engine-authored change, sent to the server).
