@@ -382,9 +382,10 @@ struct EditorWindow {
             hwnd = nullptr;
             return false;
         }
-        // Fullscreen demande : maximiser ; une vue redimensionnable suit
-        // (WM_SIZE -> onSize), une vue fixe reste a sa taille native.
-        ShowWindow(hwnd, view->canResize() == kResultTrue ? SW_MAXIMIZE : SW_SHOW);
+        // Taille NATIVE (le fullscreen essaye puis retire le meme jour -
+        // arbitrage utilisateur : « c'est nul ») ; une vue redimensionnable
+        // reste redimensionnable a la main (WM_SIZE -> onSize).
+        ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
         std::cerr << "plugin_host: editor window open (" << title << ")" << std::endl;
         return true;
