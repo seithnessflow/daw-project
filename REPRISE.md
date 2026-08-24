@@ -53,6 +53,8 @@ plugins) + badges de fraicheur observes depuis la-bas.
 ## La suite (ordre grave)
 
 3-fin. Jambe deux machines (ci-dessus).
+4.1 [x] UTILITY + chassis natif FAIT (gtest exact, -6.02 dB bout-en-bout).
+4.2 EQ 3 bandes + compresseur = LA SUIVANTE.
 4. Effets natifs (3 sessions, VCV Rack).
 5. Vague 3 (test ultime Massive).
 6. AUDIT-5 harmonisation (souhait utilisateur, consigne).

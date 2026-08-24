@@ -60,7 +60,21 @@
    crash + ring v7 !] puis scripts/invariant-proof.ps1 jambe SANS
    chez lui + badges fraicheur observes de la-bas). Piege : mon
    interpretation « OK » = oui a (b) — a infirmer si faux.
-4. EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
+4. [~] EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
+   4.1 UTILITY + CHASSIS — FAIT 2026-08-25 : UtilityNode
+   (gain/pan/mono/phase, matrice 2x2 hors callback, lissage demarrant
+   sur la cible = exactitude au bit structurelle, pan loi de BALANCE
+   centre unite — le constant-power reste au pan de piste), fabrique
+   native PARTAGEE makeBuiltinNode (les 2 builders + le clone), menu
+   + device, panneau en UNITES VRAIES (NATIVE_PARAM_SPECS : dB, L/R,
+   mono/stereo, inv — createur ET in-place). Preuves gtest
+   testUtilityNode (exactes : -6 dB = moitie, negation, pan -1,
+   (L+R)/2, determinisme octets) ; bout-en-bout : Utility -6 dB pose
+   par l'UI sur inv-proof -> rendu -6.02 dB exact (peak ET rms).
+   4.2 EQ 3 bandes + compresseur (biquads hors callback, detecteur +
+   gain lisse ; preuves : balayage 3 freqs, 4:1 numerique). SUIVANTE.
+   4.3 Drive (oversampling 4x, 1er client PDC reel) + Delay
+   (impulsion a l'echantillon, decroissance = feedback).
 5. VAGUE 3 (MIDI + instruments -> le test ultime Massive).
 6. AUDIT-5 « HARMONISATION » (souhait utilisateur 2026-08-25
    « il faut harmoniser tout le code je pense », NOMME hors ordre et
