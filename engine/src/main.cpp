@@ -735,9 +735,17 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         for (size_t proc_i = sub.active ? sub.resume_index : 0;
              proc_i < track_def.chain.size(); ++proc_i) {
             const auto& proc_def = track_def.chain[proc_i];
-            if (proc_def.type == daw::graph::GainNode::TYPE) {
+            if (proc_def.type.rfind("builtin.", 0) == 0) {
                 if (proc_def.bypass) continue;  // zero-latency node: bypass = omission
-                track.chain.push_back(daw::graph::makeGainNode(proc_def));  // S3 shared
+                // Fabrique native PARTAGEE (session 4.1) - un dispatch
+                auto node = daw::graph::makeBuiltinNode(proc_def);
+                if (node) {
+                    track.chain.push_back(std::move(node));
+                } else {
+                    std::cerr << "Chain node " << proc_def.id
+                              << ": unknown builtin type '" << proc_def.type
+                              << "' (skipped, signaled)\n";
+                }
             } else if (proc_def.type == "vst3") {
                 // c-2: ProxyNode from the DOCUMENT (uid on the node). The
                 // registry hands the same ring to every rebuild.

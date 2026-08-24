@@ -20,7 +20,8 @@ import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { waitForServerConnection, resolveBinary, waitUntil, countInFile } from './helpers';
+import { waitForServerConnection, resolveBinary, resolveAgainModule,
+         waitUntil, countInFile } from './helpers';
 
 const ENGINE_PORT = 47821;
 const AGAIN_UID = '84E8DE5F92554F5396FAE4133C935A18';
@@ -36,7 +37,7 @@ test.describe('Stem freshness (session 3, arbitrage b)', () => {
       engineExe,
       ['--server', 'ws://localhost:3000', '--project', projectId,
        '--play', '--start-stopped', '--mute', '--ws-port', String(ENGINE_PORT),
-       '--vst3-module', `${AGAIN_UID}=VST3/again.vst3`],
+       '--vst3-module', `${AGAIN_UID}=${resolveAgainModule()}`],
       { stdio: ['ignore', logFd, logFd] },
     );
     fs.closeSync(logFd);

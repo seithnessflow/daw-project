@@ -10,6 +10,7 @@
 #include "../src/document/schema.h"
 #include "../src/graph/audio_graph.h"
 #include "../src/graph/clip_player.h"
+#include "../src/graph/utility_node.h"
 #include "../src/graph/plugin_registry.h"
 #include "../src/render/offline_render.h"
 #include "../src/render/stem_render.h"
@@ -273,6 +274,107 @@ bool testGainNodeProcessing() {
     if (std::fabs(final_sample - 0.5f) > 0.01f) {
         std::cout << "FAILED: Expected ~0.5, got " << final_sample << "\n";
         return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Session 4.1 : Utility - preuves EXACTES exigees par le brief (gain
+// -6 dB = peaks exactement halves ; phase = negation exacte ; pan
+// balance a centre unite ; mono = (L+R)/2 exact ; rendu deux fois =
+// memes octets). Le lisseur demarre SUR la cible : un noeud frais
+// multiplie par des constantes, l'exactitude au bit est structurelle.
+bool testUtilityNode() {
+    std::cout << "Test: Utility node (exact proofs)... ";
+    using daw::graph::UtilityNode;
+
+    auto fill = [](std::vector<float>& b) {
+        for (size_t i = 0; i < b.size(); i += 2) {
+            b[i] = 0.25f;      // L
+            b[i + 1] = 0.75f;  // R
+        }
+    };
+
+    // 1. gain 0.5 (-6.02 dB) : EXACTEMENT la moitie, tous echantillons
+    {
+        UtilityNode n("u1", 0.5f, 0.0f, false, false);
+        n.prepare(48000, 256);
+        std::vector<float> b(256 * 2);
+        fill(b);
+        n.process(b.data(), b.data(), 256, 0);
+        for (size_t i = 0; i < b.size(); i += 2) {
+            if (b[i] != 0.125f || b[i + 1] != 0.375f) {
+                std::cout << "FAILED: gain 0.5 pas exact a l'echantillon "
+                          << i << " (" << b[i] << ", " << b[i + 1] << ")\n";
+                return false;
+            }
+        }
+    }
+
+    // 2. phase : negation exacte
+    {
+        UtilityNode n("u2", 1.0f, 0.0f, false, true);
+        n.prepare(48000, 256);
+        std::vector<float> b(256 * 2);
+        fill(b);
+        n.process(b.data(), b.data(), 256, 0);
+        if (b[0] != -0.25f || b[1] != -0.75f) {
+            std::cout << "FAILED: phase pas une negation exacte\n";
+            return false;
+        }
+    }
+
+    // 3. pan balance : centre = identite exacte ; pan -1 = R eteint,
+    // L intact (centre unite, jamais -3 dB)
+    {
+        UtilityNode c("u3", 1.0f, 0.0f, false, false);
+        c.prepare(48000, 256);
+        std::vector<float> b(256 * 2);
+        fill(b);
+        c.process(b.data(), b.data(), 256, 0);
+        if (b[0] != 0.25f || b[1] != 0.75f) {
+            std::cout << "FAILED: pan centre pas identite\n";
+            return false;
+        }
+        UtilityNode l("u4", 1.0f, -1.0f, false, false);
+        l.prepare(48000, 256);
+        fill(b);
+        l.process(b.data(), b.data(), 256, 0);
+        if (b[0] != 0.25f || b[1] != 0.0f) {
+            std::cout << "FAILED: pan -1 (L=" << b[0] << ", R=" << b[1] << ")\n";
+            return false;
+        }
+    }
+
+    // 4. mono : les deux sorties = (L+R)/2 exact (0.25+0.75)/2 = 0.5
+    {
+        UtilityNode n("u5", 1.0f, 0.0f, true, false);
+        n.prepare(48000, 256);
+        std::vector<float> b(256 * 2);
+        fill(b);
+        n.process(b.data(), b.data(), 256, 0);
+        if (b[0] != 0.5f || b[1] != 0.5f) {
+            std::cout << "FAILED: mono (" << b[0] << ", " << b[1] << ")\n";
+            return false;
+        }
+    }
+
+    // 5. determinisme : deux noeuds frais, memes octets
+    {
+        std::vector<float> a(256 * 2), b(256 * 2);
+        fill(a);
+        fill(b);
+        UtilityNode n1("u6", 0.7f, 0.3f, false, false);
+        UtilityNode n2("u6", 0.7f, 0.3f, false, false);
+        n1.prepare(48000, 256);
+        n2.prepare(48000, 256);
+        n1.process(a.data(), a.data(), 256, 0);
+        n2.process(b.data(), b.data(), 256, 0);
+        if (std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) != 0) {
+            std::cout << "FAILED: deux rendus frais different\n";
+            return false;
+        }
     }
 
     std::cout << "OK\n";
@@ -2773,6 +2875,7 @@ int main(int argc, char* argv[]) {
     run(testTrackManagement);
     run(testAudioGraphConstruction);
     run(testGainNodeProcessing);
+    run(testUtilityNode);
     run(testRingBuffer);
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);

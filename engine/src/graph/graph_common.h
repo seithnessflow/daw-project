@@ -20,6 +20,7 @@
 
 #include "clip_player.h"
 #include "gain_node.h"
+#include "utility_node.h"
 #include "../document/schema.h"
 
 #include <functional>
@@ -52,6 +53,15 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
  * node with the document's gain param (default 1.0 when absent).
  */
 std::unique_ptr<GainNode> makeGainNode(const document::ProcessorDef& proc_def);
+
+/**
+ * Fabrique PARTAGEE des devices natifs (session 4.1) : UN dispatch
+ * pour les builders live et offline (regle des jumeaux - le troisieme,
+ * le clone d'audio_graph, reste par type faute de ProcessorDef).
+ * nullptr = type builtin inconnu (le builder signale et suit son
+ * chemin d'echec habituel).
+ */
+std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& proc_def);
 
 /**
  * S7 STEM SUBSTITUTION - the INVARIANT's reading half, decided in ONE

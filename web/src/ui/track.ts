@@ -329,6 +329,27 @@ export function refreshStemBadges(): void {
   });
 }
 
+// Session 4.1 (effets natifs) : UNITES VRAIES au panneau - le brief
+// interdit le 0-1 nu. Chaque param natif declare bornes + formatteur.
+type ParamSpec = {
+  min: number; max: number; step: number; fmt: (v: number) => string;
+};
+const NATIVE_PARAM_SPECS: Record<string, Record<string, ParamSpec>> = {
+  'builtin.gain': {
+    gain: { min: 0, max: 2, step: 0.01, fmt: (v) => formatGain(v) },
+  },
+  'builtin.utility': {
+    gain: { min: 0, max: 2, step: 0.01, fmt: (v) => formatGain(v) },
+    pan: {
+      min: -1, max: 1, step: 0.01,
+      fmt: (v) => (Math.abs(v) < 0.005 ? 'C'
+        : v < 0 ? `L${Math.round(-v * 100)}` : `R${Math.round(v * 100)}`),
+    },
+    mono: { min: 0, max: 1, step: 1, fmt: (v) => (v >= 0.5 ? 'mono' : 'stereo') },
+    phase: { min: 0, max: 1, step: 1, fmt: (v) => (v >= 0.5 ? 'inv' : 'nor') },
+  },
+};
+
 const KNOWN_VST3_NAMES: Record<string, string> = {
   [AGAIN_UID]: 'AGain',
   'ABCDEF019182FAEB4175446152523330': 'RoughRider3',
@@ -377,6 +398,13 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   gainBtn.dataset.role = 'add-gain';
   gainBtn.textContent = 'gain (builtin)';
   menu.appendChild(gainBtn);
+
+  // Session 4.1 : Utility - le device de cablage natif (gain/pan/mono/
+  // phase), present sur toutes les machines par construction
+  const utilBtn = document.createElement('button');
+  utilBtn.dataset.role = 'add-utility';
+  utilBtn.textContent = 'utility (builtin)';
+  menu.appendChild(utilBtn);
 
   // 2.5-decouverte : le catalogue du moteur, effets tries par nom.
   // Choisir remplit uid+nom ; le champ uid reste la voie experte.
@@ -453,6 +481,17 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
     onAddDevice({
       id: `dev-${Date.now()}`, type: 'builtin.gain', bypass: false,
       params: [{ key: 'gain', value: 1 }],
+    });
+    close();
+  });
+  utilBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.utility', name: 'Utility',
+      bypass: false,
+      params: [
+        { key: 'gain', value: 1 }, { key: 'pan', value: 0 },
+        { key: 'mono', value: 0 }, { key: 'phase', value: 0 },
+      ],
     });
     close();
   });
@@ -581,20 +620,24 @@ function createDevicePanel(
     label.className = 'param-label';
     label.textContent = proc.type === 'vst3' ? `p${p.key}` : p.key;
     row.appendChild(label);
+    // Session 4.1 : unites vraies quand le device declare ses specs
+    // (dB, L/R, mono/stereo, inv) - le 0-1 nu reste le repli vst3
+    const spec = NATIVE_PARAM_SPECS[proc.type]?.[p.key];
+    const fmt = spec?.fmt ?? ((v: number) => v.toFixed(2));
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.dataset.role = 'param';
     slider.dataset.paramKey = p.key;
-    slider.min = '0';
-    slider.max = proc.type === 'vst3' ? '1' : '2';
-    slider.step = '0.01';
+    slider.min = String(spec?.min ?? 0);
+    slider.max = String(spec?.max ?? (proc.type === 'vst3' ? 1 : 2));
+    slider.step = String(spec?.step ?? 0.01);
     slider.value = String(p.value);
     slider.setAttribute('aria-label', `${proc.type} ${p.key}`);
     const valueEl = document.createElement('span');
     valueEl.className = 'param-value';
-    valueEl.textContent = Number(p.value).toFixed(2);
+    valueEl.textContent = fmt(Number(p.value));
     slider.addEventListener('input', () => {
-      valueEl.textContent = Number(slider.value).toFixed(2);
+      valueEl.textContent = fmt(Number(slider.value));
       onParamChange(proc.id, p.key, parseFloat(slider.value));
     });
     row.appendChild(slider);
@@ -671,7 +714,10 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
       if (slider && document.activeElement !== slider) {
         slider.value = String(p.value);
         const valueEl = slider.nextElementSibling as HTMLElement | null;
-        if (valueEl) valueEl.textContent = Number(p.value).toFixed(2);
+        // Meme formatteur que le createur (regle des jumeaux)
+        const fmt = NATIVE_PARAM_SPECS[proc.type]?.[p.key]?.fmt ??
+          ((v: number) => v.toFixed(2));
+        if (valueEl) valueEl.textContent = fmt(Number(p.value));
       }
     }
   }

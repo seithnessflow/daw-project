@@ -186,6 +186,8 @@ add_library(daw_engine_lib STATIC
     src/graph/processor_node.h
     src/graph/gain_node.h
     src/graph/gain_node.cpp
+    src/graph/utility_node.h
+    src/graph/utility_node.cpp
     src/graph/clip_player.h
     src/graph/clip_player.cpp
     src/graph/audio_graph.h

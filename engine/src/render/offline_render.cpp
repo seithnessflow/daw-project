@@ -237,7 +237,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         for (size_t proc_i = sub.active ? sub.resume_index : 0;
              proc_i < track_def.chain.size(); ++proc_i) {
             const auto& proc_def = track_def.chain[proc_i];
-            if (proc_def.type == graph::GainNode::TYPE) {
+            if (proc_def.type.rfind("builtin.", 0) == 0) {
                 if (proc_def.bypass) {
                     // zero-latency node: bypass = omission; the chain-count
                     // check still needs a node, so a bypassed SyncProxyNode
@@ -246,7 +246,15 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                         proc_def.id, nullptr, true));
                     continue;
                 }
-                track.chain.push_back(graph::makeGainNode(proc_def));
+                // Fabrique native PARTAGEE (session 4.1) - un dispatch
+                auto node = graph::makeBuiltinNode(proc_def);
+                if (node) {
+                    track.chain.push_back(std::move(node));
+                } else {
+                    std::cerr << "Render: unknown builtin type '"
+                              << proc_def.type << "' (node " << proc_def.id
+                              << ") - render will fail\n";
+                }
             } else if (proc_def.type == "vst3") {
                 // c-2: out-of-process plugin, SYNC path (offline has no
                 // real-time constraint; zero latency, bit-exact). A missing

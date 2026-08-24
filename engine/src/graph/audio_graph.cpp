@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio_graph.h"
+#include "utility_node.h"             // session 4.1: clone path
 #include "../audio/audio_callback.h"  // for INTERNAL_BLOCK_SIZE
 
 #include <algorithm>
@@ -303,6 +304,14 @@ std::unique_ptr<AudioGraph> GraphBuilder::build(
                     processor->getParameter(GainNode::PARAM_GAIN)
                 );
                 new_track.chain.push_back(std::move(gain_node));
+            } else if (processor->getType() == UtilityNode::TYPE) {
+                // Session 4.1 : le clone recree l'Utility par ses params
+                new_track.chain.push_back(std::make_unique<UtilityNode>(
+                    processor->getId(),
+                    processor->getParameter(UtilityNode::PARAM_GAIN),
+                    processor->getParameter(UtilityNode::PARAM_PAN),
+                    processor->getParameter(UtilityNode::PARAM_MONO) >= 0.5f,
+                    processor->getParameter(UtilityNode::PARAM_PHASE) >= 0.5f));
             }
             // Add other processor types here
         }

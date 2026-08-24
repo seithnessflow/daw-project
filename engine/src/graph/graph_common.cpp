@@ -90,6 +90,24 @@ StemSubstitution resolveStemSubstitution(
     return out;
 }
 
+std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& proc_def) {
+    if (proc_def.type == GainNode::TYPE) {
+        return makeGainNode(proc_def);
+    }
+    if (proc_def.type == UtilityNode::TYPE) {
+        auto get = [&](const char* k, float dv) {
+            auto it = proc_def.params.find(k);
+            return it != proc_def.params.end() ? it->second : dv;
+        };
+        return std::make_unique<UtilityNode>(
+            proc_def.id, get(UtilityNode::PARAM_GAIN, 1.0f),
+            get(UtilityNode::PARAM_PAN, 0.0f),
+            get(UtilityNode::PARAM_MONO, 0.0f) >= 0.5f,
+            get(UtilityNode::PARAM_PHASE, 0.0f) >= 0.5f);
+    }
+    return nullptr;
+}
+
 std::unique_ptr<GainNode> makeGainNode(const document::ProcessorDef& proc_def) {
     float gain = 1.0f;
     auto it = proc_def.params.find("gain");

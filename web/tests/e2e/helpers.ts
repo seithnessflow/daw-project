@@ -39,6 +39,22 @@ export function resolveBinary(envVar: string, name: string): string {
   );
 }
 
+/** Resolve the AGain fixture module for --vst3-module: layouts differ
+ *  per OS (Windows: flat file since bundle OFF; Linux: bundle DIR) and
+ *  per build tree. Absolute path, loud failure listing candidates. */
+export function resolveAgainModule(): string {
+  const candidates = [
+    path.join(REPO_ROOT, 'engine', 'build-msvc', 'VST3', 'again.vst3'),
+    path.join(REPO_ROOT, 'engine', 'build', 'VST3', 'again.vst3'),
+    path.join(REPO_ROOT, 'engine', 'build-msvc', 'VST3', 'Release', 'again.vst3'),
+    path.join(REPO_ROOT, 'engine', 'build', 'VST3', 'Release', 'again.vst3'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  throw new Error(`again.vst3 fixture not found (looked at: ${candidates.join(', ')})`);
+}
+
 /** Poll a predicate until it holds or the timeout expires. */
 export async function waitUntil(
   pred: () => boolean,

@@ -963,3 +963,25 @@ propres sondes (bash -> JS : \a en JS mange le backslash — slashes
 avant partout dans les scripts, definitif). gtests 29/29, suite e2e
 36/36. Reste la jambe deux-machines : le portable doit pull + rebuild
 (fix crash + ring v7) avant toute nouvelle seance partagee.
+
+**2026-08-25 (soir — session 4.1 ouverte : Utility + le chassis natif,
+et la CI qui avait menti) :** l'ordre grave enchaine sur les effets
+natifs pendant que la jambe deux-machines attend le portable. Utility
+est ne dans le moule du depot : matrice 2x2 calculee HORS callback,
+lissage one-pole 5 ms qui demarre SUR la cible (un graphe frais
+multiplie par des constantes - l'exactitude au bit est structurelle),
+pan en loi de BALANCE a centre unite (le -3 dB du constant-power est
+reserve au pan de piste), fabrique native PARTAGEE par les deux
+builders + le clone (regle des jumeaux appliquee trois fois, y
+compris au formatteur d'unites du panneau). Preuves exactes au gtest :
+-6 dB = moitie exacte, phase = negation, pan -1 = R eteint L intact,
+mono = (L+R)/2, deux rendus frais = memes octets. Le panneau parle en
+UNITES VRAIES (dB, L/R, mono/stereo, inv) - le 0-1 nu reste le repli
+vst3. Et une lecon de sentinelle payee : le mail « run failed » de
+l'utilisateur a revele que 1c61c6c etait ROUGE en CI (stem-freshness
+sur Linux : chemin de fixture Windows code en dur) pendant que mes
+watchs disaient vert - le `gh run list` final de mes commandes de
+veille MASQUAIT le code de sortie du watch. Fixture resolue
+multi-candidats (helpers.resolveAgainModule), sentinelle reparee
+(une seule commande, le watch EST le verdict). gtests 30/30,
+e2e 36/36.
