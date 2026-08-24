@@ -151,6 +151,11 @@ Interdit:
 
 ## Conventions
 
+- LA BIBLE PRODUIT (directive utilisateur 2026-08-24) : le manuel
+  Ableton Live 12 (ableton.com/en/live-manual/12) — a consulter LE
+  PLUS SOUVENT POSSIBLE pour tout comportement/convention produit
+  (synthese locale : docs/ABLETON-INTEGRALE.md). Limite : source de
+  COMPORTEMENT, jamais de DSP (brief effets natifs).
 - Pas d'accents dans code/commits (clavier QWERTY)
 - Commits: emoji robot + Co-Authored-By Claude
 - ADR pour decisions architecturales

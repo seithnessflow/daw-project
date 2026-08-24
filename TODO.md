@@ -771,7 +771,14 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
       (placeholder vierge = load, jamais merge+push) + reparation
       duo (re-election, backup) ; ma-piece auditee INTACTE.
 
-- [ ] INTRANTS 2.5 CONSIGNES (recherche mecanique profonde 2026-08-22,
+- [ ] INTRANTS 2.5 CONSIGNES — complement manuel Live 12 (lecture
+      2026-08-24, demande utilisateur) : conventions CONFIRMEES par le
+      manuel (auto-disable au 2e crash, etat par instance dans le set,
+      PDC par defaut, fenetre native separee auto-open) + un seuil
+      chiffre a retenir : <= 64 params -> tout afficher, au-dela ->
+      panneau vide + Configure mode. Windows = VST2+VST3 chez Live ;
+      nous VST3-only (Massive demo : binaire VST3 1.6+).
+      (recherche mecanique profonde 2026-08-22,
       sources SDK dans docs/UI-CONVENTIONS.md) : les 5 mecaniques a
       respecter pour que etat+decouverte soient credibles — (1) deux
       blobs Comp/Cont, restauration processor-first ; (2) cle = class ID,
