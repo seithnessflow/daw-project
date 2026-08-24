@@ -240,6 +240,7 @@ if(WIN32)
     target_link_libraries(daw_engine_lib PUBLIC
         ws2_32      # Winsock2 (IXWebSocket)
         wsock32     # Winsock
+        dbghelp     # crash handler: symbolisation au crash (PDB a cote)
         userenv     # Rust runtime
         bcrypt      # Rust crypto
         ntdll       # Rust runtime

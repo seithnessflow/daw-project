@@ -902,3 +902,24 @@ RelWithDebInfo pour le symboliser. Session dediee a ouvrir. Enfin,
 deux directives gravees : le manuel Live est LA BIBLE produit
 (jamais DSP), et VCV Rack (GPL) est la litterature d'implementation
 des effets natifs a venir.
+
+**2026-08-25 (session 1 de l'ordre grave — LE CRASH 0xe06d7363 est
+mort) :** la session bornee a tenu en une seule passe, et chaque outil
+paye hier a servi. Le handler a d'abord appris a parler (dbghelp au
+crash, PDB du RelWithDebInfo, et le what() de l'exception extrait de
+l'ExceptionRecord sous garde SEH). Le harnais de churn (60 fermetures
+de clients WS : propres, brutales post-auth, brutales en plein flux de
+tap) a tue le moteur jetable DU PREMIER COUP — et le log a tout dit :
+« WHAT: resource deadlock would occur », broadcastTelemetry ->
+sendToAll -> sendBinary vers un client mort -> ixwebsocket bascule
+setReadyState(CLOSED) et rappelle la callback Close SYNCHRONEMENT SUR
+LE MEME THREAD -> re-lock de connections_mutex_ -> self-lock detecte
+par la STL MSVC -> throw jamais rattrape. La fermeture d'un lien
+n'etait pas la gachette : c'etait L'ENVOI SUIVANT vers le parti. Fix :
+copie des cibles sous verrou, ENVOI HORS VERROU (sendToAll ET pumpTap,
+les shared_ptr du serveur ix tiennent l'objet pendant l'envoi) + une
+ceinture try/catch a la frontiere de la callback. Contre-epreuve : le
+meme harnais, 60/60, moteur vivant, zero crash-log, ceinture jamais
+sollicitee. Le harnais entre au depot (scripts/crash-churn.cjs) en
+attendant le gtest de la session 2. Le portable devra pull+rebuild
+pour recevoir le fix.

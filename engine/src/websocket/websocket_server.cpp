@@ -76,7 +76,18 @@ bool WebSocketServer::start(
         [this](std::shared_ptr<ix::ConnectionState> connectionState,
                ix::WebSocket& webSocket,
                const ix::WebSocketMessagePtr& msg) {
-            handleMessage(connectionState, webSocket, msg);
+            // Ceinture (crash 0xe06d7363) : une exception qui traverse
+            // cette frontiere remonte dans les threads d'ixwebsocket et
+            // tue le moteur - on attrape, on hurle, on continue.
+            try {
+                handleMessage(connectionState, webSocket, msg);
+            } catch (const std::exception& e) {
+                std::cerr << "WebSocket handler exception (survived): "
+                          << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "WebSocket handler unknown exception (survived)"
+                          << std::endl;
+            }
         }
     );
 
@@ -325,8 +336,17 @@ void WebSocketServer::pumpTap() {
     tap->set_dropped_blocks(ring.dropped.load(std::memory_order_relaxed));
 
     const std::string data = serializeWithLength(msg);
-    std::lock_guard<std::mutex> lock(connections_mutex_);
-    for (auto* ws : tap_subscribers_) {
+    // Meme regle que sendToAll : envoi HORS verrou (la reentrance Close
+    // sous ce mutex etait LE crash 0xe06d7363)
+    std::vector<std::shared_ptr<ix::WebSocket>> targets;
+    if (server_) {
+        auto clients = server_->getClients();
+        std::lock_guard<std::mutex> lock(connections_mutex_);
+        for (const auto& c : clients) {
+            if (tap_subscribers_.count(c.get())) targets.push_back(c);
+        }
+    }
+    for (const auto& ws : targets) {
         ws->sendBinary(data);
     }
 }
@@ -404,8 +424,23 @@ void WebSocketServer::broadcastTelemetry() {
 void WebSocketServer::sendToAll(const protocol::Message& msg) {
     std::string data = serializeWithLength(msg);
 
-    std::lock_guard<std::mutex> lock(connections_mutex_);
-    for (auto* ws : connections_) {
+    // COPIE SOUS VERROU, ENVOI HORS VERROU (crash 0xe06d7363, repro
+    // 2026-08-25) : un send vers un client parti brutalement echoue,
+    // ixwebsocket bascule setReadyState(CLOSED) et rappelle la callback
+    // Close SYNCHRONEMENT SUR CE THREAD - qui reprenait ce mutex :
+    // self-lock detecte par la STL MSVC = system_error("resource
+    // deadlock would occur") jamais rattrape, mort du moteur (les deux
+    // machines, le meme jour). Les shared_ptr du serveur ix gardent
+    // chaque objet vivant pendant l'envoi.
+    std::vector<std::shared_ptr<ix::WebSocket>> targets;
+    if (server_) {
+        auto clients = server_->getClients();
+        std::lock_guard<std::mutex> lock(connections_mutex_);
+        for (const auto& c : clients) {
+            if (connections_.count(c.get())) targets.push_back(c);
+        }
+    }
+    for (const auto& ws : targets) {
         ws->sendBinary(data);
     }
 }
