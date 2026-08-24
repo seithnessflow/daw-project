@@ -43,12 +43,19 @@ moteur, docs/deux-machines.md).
 ## La suite — ORDRE GRAVE AU RECADRAGE 2026-08-25 (tete de TODO.md ;
 ## ne bouge pas sans l'utilisateur ; hors-ordre = le nommer avant)
 
-1. CRASH 0xe06d7363 (bornee, 2 sessions max, sinon 3 options).
-2. daw_engine_test relinke en local (INCIDENT — les gtests sont la
-   culture de preuve ; ~demi-session, piege du chemin VST3/<config>).
-3. INVARIANT RE-PROUVE SUR UN VRAI PLUGIN (les 4 points du recadrage :
-   PDC ecrivain, badge fraicheur [arbitrage b attendu], preuve
-   redefinie non-determinisme, deux machines).
+1. [x] CRASH 0xe06d7363 SOLDE (2026-08-25, une session) : envoi hors
+   verrou (sendToAll/pumpTap), self-lock du Close synchrone
+   d'ixwebsocket = la cause ; harnais scripts/crash-churn.cjs 60/60 ;
+   handler auto-symbolisant (dbghelp + WHAT). LE PORTABLE DOIT
+   PULL+REBUILD pour recevoir le fix.
+2. [x] GTESTS LOCAUX RETABLIS (meme jour) : bundle SDK OFF epingle
+   (vst3sdk.cmake), fixtures plates VST3\again.vst3, refs
+   reconciliees ; 29/29 local, e2e 35/35.
+3. INVARIANT RE-PROUVE SUR UN VRAI PLUGIN — LA PROCHAINE : perimetre
+   = reponse ecrite du recadrage (PDC ecrivain, badge fraicheur,
+   preuve redefinie : meme BLOB par sha256 + cle fraiche + sonde
+   audio pair, deux machines). BLOQUE SUR : arbitrage (b) du badge
+   de fraicheur (oui/non utilisateur).
 4. Effets natifs (3 sessions, VCV Rack).
 5. Vague 3 (test ultime Massive).
 Directives corrigees : manuel Live = reference PONCTUELLE (plus une
