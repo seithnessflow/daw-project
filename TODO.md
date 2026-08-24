@@ -25,15 +25,34 @@
    Menage cosmetique restant : dossiers *.stale / *.bundle-old /
    Release historiques dans build-msvc (suppression bloquee par le
    classifieur ; inertes).
-3. L'INVARIANT RE-PROUVE SUR UN VRAI PLUGIN (la vraie session (3),
-   perimetre = les 4 points du recadrage, detail dans la reponse
-   ecrite du 2026-08-25) : PDC ecrivain (latence interne du plugin
-   declaree — le lecteur est fait et gteste), badge fraicheur
-   (arbitrage b attendu), preuve redefinie pour le non-determinisme
-   (meme BLOB par sha256 des deux cotes + cle fraiche + mesure audio
-   cote pair), deux machines.
+3. [~] L'INVARIANT RE-PROUVE SUR UN VRAI PLUGIN — MOITIE LOCALE FAITE
+   2026-08-25 : projet de preuve dedie inv-proof (clip kit + Valhalla
+   + RoughRider poses PAR LE PICKER du catalogue), stems publies par
+   le moteur (6e30b424 nœud Valhalla, 926ff7a0 = chaine complete),
+   QUATUOR codifie scripts/invariant-proof.ps1 (exit 0/1) : rendu
+   reel x2 BIT-DETERMINISTE (26AF5CAF...), pair-sans-plugin joue
+   « playing STEM 926ff7a0 » et produit LES MEMES OCTETS, chemin
+   bidon = echec bruyant (jamais un faux vert). La cle reste une CLE
+   DE CACHE (le determinisme est MESURE ici, pas promis). Moisson :
+   l'ear ne stageait pas les blobs stems/etat (corrige — le
+   pair-simule ne pouvait pas jouer) ; ear --verbose + lignes de
+   verite de chemin rejouees.
+   RESTE (3 suite) : PDC ECRIVAIN (latence interne du plugin declaree
+   au stem — lecteur fait/gteste, ecrivain ecrit 0 ; ring v7 champ
+   latence enfant) ; BADGE FRAICHEUR (b) (moteur -> signal ephemere
+   sf, badge STEM frais/perime/inconnu + spec) ; DEUX MACHINES
+   (portable : pull + rebuild [fix crash inclus] puis la jambe SANS
+   du quatuor chez lui). Piege pour la suite : mon interpretation
+   « OK » = oui a (b) — a infirmer si faux.
 4. EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
 5. VAGUE 3 (MIDI + instruments -> le test ultime Massive).
+6. AUDIT-5 « HARMONISATION » (souhait utilisateur 2026-08-25
+   « il faut harmoniser tout le code je pense », NOMME hors ordre et
+   range ici) : session d'audit dediee, regard neuf, LECTURE SEULE ->
+   rapport -> arbitrage par la grille (jamais une passe de coherence
+   en direct). Candidats connus d'avance : conventions fr/en des
+   commentaires, jumeaux de sondes scratchpad vs scripts/, menage
+   build-msvc (dossiers stale), table KNOWN_VST3_NAMES vs catalogue.
 
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)

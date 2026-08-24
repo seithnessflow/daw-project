@@ -145,6 +145,15 @@ mkdirSync(stageDir, { recursive: true });
   const stagedDoc = Automerge.load(readFileSync(docCopy));
   const hashes = new Set();
   for (const t of stagedDoc.tracks) for (const c of t.clips ?? []) if (c.assetHash) hashes.add(c.assetHash);
+  // Session 3 (2026-08-25) : les blobs de STEMS et d'ETAT sont des
+  // assets comme les autres - sans eux, le pair-simule (rendu sans
+  // modules) ne peut pas jouer la verite rendue, et l'etat capture
+  // n'est pas restaure. Attrape par le quatuor de preuve (rendu SANS
+  // = echec faute de stem stage).
+  for (const t of stagedDoc.tracks) for (const p of t.chain ?? []) {
+    if (p.stemHash) hashes.add(p.stemHash);
+    if (p.stateHash) hashes.add(p.stateHash);
+  }
   const missing = [];
   for (const h of hashes) {
     const name = `${h}.wav`;
@@ -172,6 +181,19 @@ if (render.status !== 0) {
   console.error('ear: RENDER FAILED (loud, as designed):');
   console.error((render.stderr || render.stdout || '').split('\n').slice(-15).join('\n'));
   process.exit(1);
+}
+// Organe (2026-08-25) : sur succes le journal du rendu etait AVALE -
+// impossible de savoir quel chemin chaque noeud a pris (vrai plugin ou
+// stem). --verbose le rejoue ; sans lui, les lignes de VERITE DE CHEMIN
+// (STEM / out-of-process / unresolved) passent toujours.
+{
+  const log = (render.stderr || '') + (render.stdout || '');
+  const verbose = args.includes('--verbose');
+  for (const line of log.split('\n')) {
+    if (verbose || /STEM|stem |out-of-process|unresolved|proxy/i.test(line)) {
+      console.error('render| ' + line.trim());
+    }
+  }
 }
 
 // ---- Gate -----------------------------------------------------------------

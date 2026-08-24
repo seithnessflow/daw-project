@@ -923,3 +923,25 @@ meme harnais, 60/60, moteur vivant, zero crash-log, ceinture jamais
 sollicitee. Le harnais entre au depot (scripts/crash-churn.cjs) en
 attendant le gtest de la session 2. Le portable devra pull+rebuild
 pour recevoir le fix.
+
+**2026-08-25 (session 3, moitie locale — L'INVARIANT PROUVE SUR DE
+VRAIS PLUGINS) :** le projet de preuve inv-proof est ne par les gestes
+du produit lui-meme (un clip du kit, Valhalla et RoughRider choisis AU
+PICKER du catalogue), le moteur a publie ses stems, et le quatuor a
+rendu son verdict : le rendu reel est BIT-DETERMINISTE sur cette
+chaine (deux passes, memes octets), le pair-sans-plugin dit « playing
+STEM 926ff7a0 » et produit EXACTEMENT les memes octets que le
+producteur, et le chemin bidon echoue bruyamment — jamais un faux
+vert. La cle de stem reste une cle de cache : le determinisme est
+MESURE, pas promis. La preuve est un script rejouable
+(scripts/invariant-proof.ps1, exit 0/1). Le chemin a paye deux
+moissons : l'ear ne stageait NI les stems NI les blobs d'etat (le
+pair-simule ne pouvait pas jouer — attrape par le quatuor, corrige),
+et une fausse piste instructive : quatre rendus identiques qui
+semblaient accuser l'outil accusaient en fait le DOCUMENT (le jam de
+la veille avait retire les devices de ma-piece — personne ne mentait).
+Enfin, deux ecarts NOMMES avant d'agir, regle du recadrage : « OK,
+continue » lu comme oui a l'arbitrage (b) de la fraicheur (a infirmer
+si faux), et « harmoniser tout le code » range en AUDIT-5 au TODO
+plutot qu'execute en direct. Reste de la session 3 : PDC ecrivain,
+badge de fraicheur, et la jambe deux-machines.
