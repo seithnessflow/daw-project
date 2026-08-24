@@ -985,3 +985,24 @@ veille MASQUAIT le code de sortie du watch. Fixture resolue
 multi-candidats (helpers.resolveAgainModule), sentinelle reparee
 (une seule commande, le watch EST le verdict). gtests 30/30,
 e2e 36/36.
+
+**2026-08-25 (nuit — session 4.2 : EQ 3 bandes + compresseur, et le
+bug int qui mentait a tout le monde) :** les deux musicaux natifs sont
+la, dans le moule du chassis : biquads RBJ (litterature, pas manuel)
+recalcules hors callback et publies en atomic<double>, etat DF2T en
+double ; compresseur feed-forward (detecteur crete stereo-lie,
+attaque/release one-pole, gain en dB, makeup), zero latence, unites
+vraies au panneau (dB, Hz, Q, ratio, ms). Preuves du brief au gtest :
+reponse mesuree a 3 frequences (+-1 dB), 4:1 verifie numeriquement sur
+signal CONSTANT (l'enveloppe d'un detecteur crete ondule sous la crete
+d'un sinus - le test s'est rendu exact au lieu d'affaiblir sa
+tolerance), identite sous le seuil, determinisme octets. 32/32.
+LA MOISSON DE LA NUIT : trois rendus au bit identique malgre un
+document change ont deroule le fil jusqu'a un bug de fond - Automerge
+JS stocke un nombre ENTIER comme int, jamais f64, et le parseur C++ ne
+tentait qu'AMitemToF64 : echec SILENCIEUX, parametre lu 0.0. Un
+makeup a 12, un seuil a -30, un low a +6 - tous muets ; un fader de
+piste pose PILE sur un entier mentait pareil (masterGain et track.gain
+corriges du meme coup). itemToDouble (f64 -> int -> uint) partout ou
+un flottant du web entre au moteur. Contre-epreuve : meme document,
++9.02 dB de RMS - l'EQ et le comp mordent. e2e 36/36.

@@ -94,16 +94,29 @@ std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& pro
     if (proc_def.type == GainNode::TYPE) {
         return makeGainNode(proc_def);
     }
+    auto get = [&](const char* k, float dv) {
+        auto it = proc_def.params.find(k);
+        return it != proc_def.params.end() ? it->second : dv;
+    };
     if (proc_def.type == UtilityNode::TYPE) {
-        auto get = [&](const char* k, float dv) {
-            auto it = proc_def.params.find(k);
-            return it != proc_def.params.end() ? it->second : dv;
-        };
         return std::make_unique<UtilityNode>(
             proc_def.id, get(UtilityNode::PARAM_GAIN, 1.0f),
             get(UtilityNode::PARAM_PAN, 0.0f),
             get(UtilityNode::PARAM_MONO, 0.0f) >= 0.5f,
             get(UtilityNode::PARAM_PHASE, 0.0f) >= 0.5f);
+    }
+    if (proc_def.type == Eq3Node::TYPE) {
+        return std::make_unique<Eq3Node>(
+            proc_def.id, get("lowGainDb", 0.0f), get("lowFreq", 120.0f),
+            get("peakGainDb", 0.0f), get("peakFreq", 1000.0f),
+            get("peakQ", 0.9f), get("highGainDb", 0.0f),
+            get("highFreq", 6000.0f));
+    }
+    if (proc_def.type == CompressorNode::TYPE) {
+        return std::make_unique<CompressorNode>(
+            proc_def.id, get("thresholdDb", -24.0f), get("ratio", 4.0f),
+            get("attackMs", 10.0f), get("releaseMs", 100.0f),
+            get("makeupDb", 0.0f));
     }
     return nullptr;
 }

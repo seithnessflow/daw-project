@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio_graph.h"
+#include "compressor_node.h"          // session 4.2: clone path
+#include "eq3_node.h"                 // session 4.2: clone path
 #include "utility_node.h"             // session 4.1: clone path
 #include "../audio/audio_callback.h"  // for INTERNAL_BLOCK_SIZE
 
@@ -312,6 +314,24 @@ std::unique_ptr<AudioGraph> GraphBuilder::build(
                     processor->getParameter(UtilityNode::PARAM_PAN),
                     processor->getParameter(UtilityNode::PARAM_MONO) >= 0.5f,
                     processor->getParameter(UtilityNode::PARAM_PHASE) >= 0.5f));
+            } else if (processor->getType() == Eq3Node::TYPE) {
+                new_track.chain.push_back(std::make_unique<Eq3Node>(
+                    processor->getId(),
+                    processor->getParameter("lowGainDb"),
+                    processor->getParameter("lowFreq"),
+                    processor->getParameter("peakGainDb"),
+                    processor->getParameter("peakFreq"),
+                    processor->getParameter("peakQ"),
+                    processor->getParameter("highGainDb"),
+                    processor->getParameter("highFreq")));
+            } else if (processor->getType() == CompressorNode::TYPE) {
+                new_track.chain.push_back(std::make_unique<CompressorNode>(
+                    processor->getId(),
+                    processor->getParameter("thresholdDb"),
+                    processor->getParameter("ratio"),
+                    processor->getParameter("attackMs"),
+                    processor->getParameter("releaseMs"),
+                    processor->getParameter("makeupDb")));
             }
             // Add other processor types here
         }

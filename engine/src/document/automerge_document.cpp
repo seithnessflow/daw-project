@@ -13,6 +13,28 @@ extern "C" {
 
 namespace daw::document {
 
+namespace {
+// Automerge JS stocke un nombre ENTIER comme int/uint, jamais f64 - un
+// slider pose a 12 arrivait en int et AMitemToF64 echouait EN SILENCE :
+// parametre lu 0.0 (comp transparent, EQ muet, makeup ignore - trouve
+// session 4.2 par le rendu au bit identique malgre le doc change).
+// Toute lecture de flottant venue du web passe ICI.
+bool itemToDouble(AMitem* item, double* out) {
+    if (AMitemToF64(item, out)) return true;
+    int64_t i = 0;
+    if (AMitemToInt(item, &i)) {
+        *out = static_cast<double>(i);
+        return true;
+    }
+    uint64_t u = 0;
+    if (AMitemToUint(item, &u)) {
+        *out = static_cast<double>(u);
+        return true;
+    }
+    return false;
+}
+}  // namespace
+
 AutomergeDocument::AutomergeDocument() = default;
 
 AutomergeDocument::~AutomergeDocument() {
@@ -300,7 +322,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
     if (result && AMresultStatus(result) == AM_STATUS_OK) {
         AMitem* item = AMresultItem(result);
         double f64;
-        if (AMitemToF64(item, &f64)) {
+        if (itemToDouble(item, &f64)) {
             out.master_gain = static_cast<float>(f64);
         }
     }
@@ -351,7 +373,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                         r = AMmapGet(doc_, trackId, AMstr("gain"), nullptr);
                         if (r && AMresultStatus(r) == AM_STATUS_OK) {
                             AMitem* it = AMresultItem(r);
-                            if (AMitemToF64(it, &f64Val)) {
+                            if (itemToDouble(it, &f64Val)) {
                                 track.gain = static_cast<float>(f64Val);
                             }
                         }
@@ -556,7 +578,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                                                 if (kr) AMresultFree(kr);
                                                                 kr = AMmapGet(doc_, pairObjId, AMstr("value"), nullptr);
                                                                 if (kr && AMresultStatus(kr) == AM_STATUS_OK) {
-                                                                    AMitemToF64(AMresultItem(kr), &value);
+                                                                    itemToDouble(AMresultItem(kr), &value);
                                                                 }
                                                                 if (kr) AMresultFree(kr);
                                                                 if (!key.empty()) {

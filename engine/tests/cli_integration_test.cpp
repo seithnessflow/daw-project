@@ -11,6 +11,8 @@
 #include "../src/graph/audio_graph.h"
 #include "../src/graph/clip_player.h"
 #include "../src/graph/utility_node.h"
+#include "../src/graph/eq3_node.h"
+#include "../src/graph/compressor_node.h"
 #include "../src/graph/plugin_registry.h"
 #include "../src/render/offline_render.h"
 #include "../src/render/stem_render.h"
@@ -371,6 +373,148 @@ bool testUtilityNode() {
         n2.prepare(48000, 256);
         n1.process(a.data(), a.data(), 256, 0);
         n2.process(b.data(), b.data(), 256, 0);
+        if (std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) != 0) {
+            std::cout << "FAILED: deux rendus frais different\n";
+            return false;
+        }
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Session 4.2 : EQ 3 bandes - reponse MESUREE sur sinus a trois
+// frequences, dans la tolerance (brief), + determinisme octets.
+bool testEq3Node() {
+    std::cout << "Test: EQ3 node (response at 3 freqs)... ";
+    using daw::graph::Eq3Node;
+    constexpr uint32_t kSr = 48000;
+    constexpr uint32_t kN = 48000;  // 1 s
+
+    // low +6 dB @120, peak -6 dB @1000 (Q .9), high +6 dB @6000
+    auto measure = [&](double freq) {
+        Eq3Node n("eq", 6.0f, 120.0f, -6.0f, 1000.0f, 0.9f, 6.0f, 6000.0f);
+        n.prepare(kSr, 256);
+        n.reset();
+        std::vector<float> b(kN * 2);
+        for (uint32_t i = 0; i < kN; ++i) {
+            const float v = 0.25f * static_cast<float>(
+                std::sin(2.0 * 3.14159265358979323846 * freq * i / kSr));
+            b[i * 2] = v;
+            b[i * 2 + 1] = v;
+        }
+        n.process(b.data(), b.data(), kN, 0);
+        // RMS de la seconde moitie (regime etabli)
+        double acc = 0.0;
+        for (uint32_t i = kN / 2; i < kN; ++i) acc += double(b[i * 2]) * b[i * 2];
+        const double rms = std::sqrt(acc / (kN / 2));
+        const double in_rms = 0.25 / std::sqrt(2.0);
+        return 20.0 * std::log10(rms / in_rms);
+    };
+
+    struct Point { double f, expected, tol; };
+    const Point pts[] = {
+        {50.0, 6.0, 1.0},     // plateau du low shelf
+        {1000.0, -6.0, 1.0},  // centre du peak
+        {12000.0, 6.0, 1.0},  // plateau du high shelf
+    };
+    for (const auto& p : pts) {
+        const double got = measure(p.f);
+        if (std::fabs(got - p.expected) > p.tol) {
+            std::cout << "FAILED: " << p.f << " Hz attendu " << p.expected
+                      << " dB, mesure " << got << " dB\n";
+            return false;
+        }
+    }
+
+    // Determinisme : deux noeuds frais, memes octets
+    {
+        std::vector<float> a(4096 * 2), b(4096 * 2);
+        for (uint32_t i = 0; i < 4096; ++i) {
+            const float v = 0.3f * static_cast<float>(
+                std::sin(2.0 * 3.14159265358979323846 * 440.0 * i / kSr));
+            a[i * 2] = a[i * 2 + 1] = v;
+            b[i * 2] = b[i * 2 + 1] = v;
+        }
+        Eq3Node n1("e", 3.0f, 120.0f, -2.0f, 900.0f, 1.2f, 4.0f, 7000.0f);
+        Eq3Node n2("e", 3.0f, 120.0f, -2.0f, 900.0f, 1.2f, 4.0f, 7000.0f);
+        n1.prepare(kSr, 256);
+        n2.prepare(kSr, 256);
+        n1.process(a.data(), a.data(), 4096, 0);
+        n2.process(b.data(), b.data(), 4096, 0);
+        if (std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) != 0) {
+            std::cout << "FAILED: deux rendus frais different\n";
+            return false;
+        }
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// Session 4.2 : compresseur - au-dessus du seuil, ratio 4:1 ->
+// reduction VERIFIEE NUMERIQUEMENT (brief) ; sous le seuil, identite ;
+// determinisme octets.
+bool testCompressorNode() {
+    std::cout << "Test: Compressor node (4:1 numeric)... ";
+    using daw::graph::CompressorNode;
+    constexpr uint32_t kSr = 48000;
+    constexpr uint32_t kN = 48000;  // 1 s
+
+    // 1. Signal CONSTANT -6.02 dB (l'enveloppe d'un detecteur crete
+    // s'assoit EXACTEMENT dessus - un sinus la fait onduler sous la
+    // crete et fausserait la theorie), seuil -18, ratio 4 -> sortie
+    // attendue thr + over/ratio = -18 + 12/4 = -15 dB, a 0.1 dB pres.
+    {
+        CompressorNode n("c", -18.0f, 4.0f, 5.0f, 100.0f, 0.0f);
+        n.prepare(kSr, 256);
+        n.reset();
+        std::vector<float> b(kN * 2, 0.5f);
+        n.process(b.data(), b.data(), kN, 0);
+        double acc = 0.0;
+        for (uint32_t i = kN / 2; i < kN; ++i) acc += b[i * 2];
+        const double mean = acc / (kN / 2);
+        const double out_db = 20.0 * std::log10(mean);
+        if (std::fabs(out_db - (-15.0)) > 0.1) {
+            std::cout << "FAILED: attendu -15 dB, mesure " << out_db << " dB\n";
+            return false;
+        }
+    }
+
+    // 2. Sous le seuil : identite (gain 1, makeup 0 dB)
+    {
+        CompressorNode n("c2", -18.0f, 4.0f, 5.0f, 100.0f, 0.0f);
+        n.prepare(kSr, 256);
+        n.reset();
+        std::vector<float> in(4096 * 2), out(4096 * 2);
+        for (uint32_t i = 0; i < 4096; ++i) {
+            const float v = 0.05f * static_cast<float>(
+                std::sin(2.0 * 3.14159265358979323846 * 500.0 * i / kSr));
+            in[i * 2] = in[i * 2 + 1] = v;
+        }
+        out = in;
+        n.process(out.data(), out.data(), 4096, 0);
+        if (std::memcmp(in.data(), out.data(), in.size() * sizeof(float)) != 0) {
+            std::cout << "FAILED: sous le seuil pas une identite\n";
+            return false;
+        }
+    }
+
+    // 3. Determinisme : deux noeuds frais, memes octets
+    {
+        std::vector<float> a(8192 * 2), b(8192 * 2);
+        for (uint32_t i = 0; i < 8192; ++i) {
+            const float v = 0.6f * static_cast<float>(
+                std::sin(2.0 * 3.14159265358979323846 * 220.0 * i / kSr));
+            a[i * 2] = a[i * 2 + 1] = v;
+            b[i * 2] = b[i * 2 + 1] = v;
+        }
+        CompressorNode n1("c3", -20.0f, 3.0f, 8.0f, 80.0f, 3.0f);
+        CompressorNode n2("c3", -20.0f, 3.0f, 8.0f, 80.0f, 3.0f);
+        n1.prepare(kSr, 256);
+        n2.prepare(kSr, 256);
+        n1.process(a.data(), a.data(), 8192, 0);
+        n2.process(b.data(), b.data(), 8192, 0);
         if (std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) != 0) {
             std::cout << "FAILED: deux rendus frais different\n";
             return false;
@@ -2876,6 +3020,8 @@ int main(int argc, char* argv[]) {
     run(testAudioGraphConstruction);
     run(testGainNodeProcessing);
     run(testUtilityNode);
+    run(testEq3Node);
+    run(testCompressorNode);
     run(testRingBuffer);
     run(testDocumentSerialization);
     run(testDocumentClipsRoundTrip);

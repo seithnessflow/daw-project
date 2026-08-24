@@ -188,6 +188,10 @@ add_library(daw_engine_lib STATIC
     src/graph/gain_node.cpp
     src/graph/utility_node.h
     src/graph/utility_node.cpp
+    src/graph/eq3_node.h
+    src/graph/eq3_node.cpp
+    src/graph/compressor_node.h
+    src/graph/compressor_node.cpp
     src/graph/clip_player.h
     src/graph/clip_player.cpp
     src/graph/audio_graph.h

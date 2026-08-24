@@ -348,6 +348,22 @@ const NATIVE_PARAM_SPECS: Record<string, Record<string, ParamSpec>> = {
     mono: { min: 0, max: 1, step: 1, fmt: (v) => (v >= 0.5 ? 'mono' : 'stereo') },
     phase: { min: 0, max: 1, step: 1, fmt: (v) => (v >= 0.5 ? 'inv' : 'nor') },
   },
+  'builtin.eq3': {
+    lowGainDb: { min: -15, max: 15, step: 0.1, fmt: (v) => `${v.toFixed(1)} dB` },
+    lowFreq: { min: 20, max: 500, step: 1, fmt: (v) => `${Math.round(v)} Hz` },
+    peakGainDb: { min: -15, max: 15, step: 0.1, fmt: (v) => `${v.toFixed(1)} dB` },
+    peakFreq: { min: 100, max: 8000, step: 10, fmt: (v) => `${Math.round(v)} Hz` },
+    peakQ: { min: 0.3, max: 4, step: 0.05, fmt: (v) => `Q ${v.toFixed(2)}` },
+    highGainDb: { min: -15, max: 15, step: 0.1, fmt: (v) => `${v.toFixed(1)} dB` },
+    highFreq: { min: 1000, max: 16000, step: 50, fmt: (v) => `${Math.round(v)} Hz` },
+  },
+  'builtin.comp': {
+    thresholdDb: { min: -60, max: 0, step: 0.5, fmt: (v) => `${v.toFixed(1)} dB` },
+    ratio: { min: 1, max: 20, step: 0.1, fmt: (v) => `${v.toFixed(1)}:1` },
+    attackMs: { min: 0.1, max: 100, step: 0.1, fmt: (v) => `${v.toFixed(1)} ms` },
+    releaseMs: { min: 5, max: 1000, step: 5, fmt: (v) => `${Math.round(v)} ms` },
+    makeupDb: { min: 0, max: 24, step: 0.5, fmt: (v) => `+${v.toFixed(1)} dB` },
+  },
 };
 
 const KNOWN_VST3_NAMES: Record<string, string> = {
@@ -405,6 +421,16 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   utilBtn.dataset.role = 'add-utility';
   utilBtn.textContent = 'utility (builtin)';
   menu.appendChild(utilBtn);
+
+  // Session 4.2 : EQ 3 bandes + compresseur natifs
+  const eqBtn = document.createElement('button');
+  eqBtn.dataset.role = 'add-eq3';
+  eqBtn.textContent = 'eq 3 bandes (builtin)';
+  menu.appendChild(eqBtn);
+  const compBtn = document.createElement('button');
+  compBtn.dataset.role = 'add-comp';
+  compBtn.textContent = 'compresseur (builtin)';
+  menu.appendChild(compBtn);
 
   // 2.5-decouverte : le catalogue du moteur, effets tries par nom.
   // Choisir remplit uid+nom ; le champ uid reste la voie experte.
@@ -491,6 +517,31 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
       params: [
         { key: 'gain', value: 1 }, { key: 'pan', value: 0 },
         { key: 'mono', value: 0 }, { key: 'phase', value: 0 },
+      ],
+    });
+    close();
+  });
+  eqBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.eq3', name: 'EQ Three',
+      bypass: false,
+      params: [
+        { key: 'lowGainDb', value: 0 }, { key: 'lowFreq', value: 120 },
+        { key: 'peakGainDb', value: 0 }, { key: 'peakFreq', value: 1000 },
+        { key: 'peakQ', value: 0.9 },
+        { key: 'highGainDb', value: 0 }, { key: 'highFreq', value: 6000 },
+      ],
+    });
+    close();
+  });
+  compBtn.addEventListener('click', () => {
+    onAddDevice({
+      id: `dev-${Date.now()}`, type: 'builtin.comp', name: 'Compressor',
+      bypass: false,
+      params: [
+        { key: 'thresholdDb', value: -24 }, { key: 'ratio', value: 4 },
+        { key: 'attackMs', value: 10 }, { key: 'releaseMs', value: 100 },
+        { key: 'makeupDb', value: 0 },
       ],
     });
     close();

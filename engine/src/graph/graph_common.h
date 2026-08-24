@@ -19,6 +19,8 @@
  */
 
 #include "clip_player.h"
+#include "compressor_node.h"
+#include "eq3_node.h"
 #include "gain_node.h"
 #include "utility_node.h"
 #include "../document/schema.h"
