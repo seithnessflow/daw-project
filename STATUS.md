@@ -62,7 +62,7 @@ interdisait le produit).
 |-----------|---------|---------------------------|-------|
 | Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` **40/40** (noyau natif complet : Utility/EQ3/Comp/Drive/Delay, preuves exactes) ; crash 0xe06d7363 SOLDE (envoi hors verrou) ; handler auto-symbolisant (dbghelp+WHAT) ; --start-stopped, --editors, --vst3-dir (scan+cache) ; ring v7 (latence plugin + gui_edit_seq). **AUDIT-5 (2026-08-25, test-first, master vert)** : A1 int/f64 (itemToUint), A2 precision cle de stem (stem-v2), A4 merge + push a la reconnexion, A6/A7 warnings periode & sample-rate, A8 sample_rate sur le fil, 1.1 params map->liste ordonnee (clot l'ordre de A2), B5 validation des chemins (path traversal) |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
-| Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 7/7 |
+| Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 9/9. **AUDIT-5 F1** : auth par token partage OPT-IN (env DAW_SERVER_TOKEN) — WS premier message `auth:<token>` + `Authorization: Bearer` sur /assets, comparaison temps constant ; retrocompatible (sans env var = dev inchange) ; ferme C2-distante quand le serveur est expose par un tunnel |
 | Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 36/36 (specs moteur-reel : port 47821 LIBRE requis) ; sync transport L1a/b/c VERT DEUX MACHINES ; catalogue PluginCatalog (91 classes) + picker ; fenetrage v1 (GUI natives des plugins, reglages qui voyagent par stems) ; badge fraicheur 3 etats (sf, ne ment jamais par omission) ; 5 devices natifs au menu, unites vraies ; ear --vst3 + positions des clics, self-test 7/7 |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.

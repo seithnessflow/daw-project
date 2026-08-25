@@ -33,13 +33,19 @@ Session d'AUDIT-5 + premiers correctifs, en deux temps :
      stem laisse par A2 ; aligne moteur/web/SCHEMA.md).
    - B5 validation des chemins issus du document (path traversal +
      injection URL) : helper isPathComponentSafe aux 4 frontieres.
-   gtests 40/40, e2e verifies en local pour les items inter-etages.
+   - F retrait de GraphBuilder mort (jumeau divergent).
+   - F1 AUTH SERVEUR (la trouvaille secu critique) : token partage
+     OPT-IN (DAW_SERVER_TOKEN), WS premier message + Bearer /assets,
+     retrocompatible ; serveur+moteur+web faits, smoke + e2e verts.
+     Ferme C2-distante (le tunnel exposait le serveur sans auth).
+   gtests 40/40, cargo 9/9, e2e verifies en local (items inter-etages).
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier push b84fd89 (B5). CI VERTE confirmee jusqu'a f360092 (A8/1.1
-inclus). Le run de b84fd89 (B5) tournait a la cloture : VERDICT A
-CONFIRMER au demarrage (verifie en local : gtests 40/40, B5 additif).
+Dernier push 67579a0 (F1 clients). CI VERTE confirmee jusqu'a 7f9a1fd
+(B5, GraphBuilder, F1 serveur inclus, tous success). Le run de 67579a0
+(F1 clients) tournait a la cloture : VERDICT A CONFIRMER au demarrage
+(verifie en local : e2e retrocompat 7 passed, smoke moteur token OK).
 Piege paye : A4-1a (17f21a8) a d'abord ete ROUGE en CI — un renommage
 de log moteur (« Document loaded ») a casse un contrat e2e (countInFile) ;
 corrige en 0e2089b. LECON : verifier les APPELANTS d'un log avant de le
