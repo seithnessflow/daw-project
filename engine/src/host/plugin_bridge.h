@@ -121,6 +121,17 @@ public:
                      : 0;
     }
 
+    /**
+     * Fenetre GUI a la demande (v9) : ecrit l'etat DESIRE de la fenetre du
+     * plugin dans le ring (0/1). L'enfant compare a l'etat courant de sa
+     * fenetre a chaque tour de boucle serve et ouvre/ferme. No-op si le pont
+     * n'est pas demarre. Thread de controle (le message kEditor).
+     */
+    void setEditorOpen(bool open) {
+        if (ring_)
+            ring_->editor_open.store(open ? 1u : 0u, std::memory_order_release);
+    }
+
     [[nodiscard]] bool isRunning() const { return ring_ != nullptr; }
     [[nodiscard]] const std::string& error() const { return error_; }
 

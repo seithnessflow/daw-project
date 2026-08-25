@@ -156,6 +156,7 @@ private:
     void handleTransportCommand(const protocol::TransportCommand& cmd);
     void handleSetMonitor(const protocol::SetMonitor& cmd);
     void handleTapControl(ix::WebSocket* ws, const protocol::TapControl& cmd);
+    void handleEditor(const protocol::EditorControl& cmd);  // v9 : fenetre GUI a la demande
 
     // Send helpers
     void sendToAll(const protocol::Message& msg);

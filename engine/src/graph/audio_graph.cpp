@@ -288,6 +288,20 @@ AudioTrack* AudioGraph::getTrackById(const std::string& id) noexcept {
     return nullptr;
 }
 
+ProcessorNode* AudioGraph::getNodeById(const std::string& id) noexcept {
+    // v9 : lookup node de chaine par proc id (fenetre GUI a la demande). Le
+    // graphe est immuable une fois actif ; le control thread le sonde via le
+    // slot atomique. Lineaire sur les chaines (peu de nodes) - pas de map.
+    for (auto& track : tracks_) {
+        for (auto& node : track.chain) {
+            if (node && node->getId() == id) {
+                return node.get();
+            }
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::tuple<std::string, float, float>> AudioGraph::getMeters() const noexcept {
     std::vector<std::tuple<std::string, float, float>> meters;
     meters.reserve(tracks_.size());

@@ -777,13 +777,20 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     // sert l'audio avec ou sans fenetre.
 #ifdef _WIN32
     EditorWindow editor_win;
-    if (editor) {
-        std::string title = module_path;
-        const auto slash = title.find_last_of("/\\");
-        if (slash != std::string::npos) title = title.substr(slash + 1);
-        openEditorGuarded(editor_win, inst.module, inst.component,
-                          inst.host_app, title);
+    std::string editor_title = module_path;
+    {
+        const auto slash = editor_title.find_last_of("/\\");
+        if (slash != std::string::npos) editor_title = editor_title.substr(slash + 1);
     }
+    if (editor) {
+        openEditorGuarded(editor_win, inst.module, inst.component,
+                          inst.host_app, editor_title);
+    }
+    // v9 : etat DESIRE de la fenetre qu'on a honore en dernier. On agit sur
+    // les TRANSITIONS de ring->editor_open (le message kEditor), pas sur le
+    // niveau : une ouverture qui echoue (plugin headless) n'est PAS reessayee
+    // a chaque tour - seulement quand l'utilisateur re-bascule.
+    bool last_editor_want = editor;
 #else
     (void)editor;
 #endif
@@ -827,6 +834,21 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     while (ring->shutdown.load(std::memory_order_acquire) == 0) {
         serveStateRequest();
 #ifdef _WIN32
+        // v9 : fenetre GUI a la demande. Le moteur ecrit l'etat desire sur le
+        // message kEditor ; on ouvre/ferme sur la transition (meme thread que
+        // le pump - la fenetre appartient a ce thread).
+        {
+            const bool want = ring->editor_open.load(std::memory_order_acquire) != 0;
+            if (want != last_editor_want) {
+                last_editor_want = want;
+                if (want) {
+                    openEditorGuarded(editor_win, inst.module, inst.component,
+                                      inst.host_app, editor_title);
+                } else {
+                    editor_win.close();
+                }
+            }
+        }
         editor_win.pump();  // meme thread, cout borne (PeekMessage draine)
 #endif
         const uint64_t newest = ring->input_seq.load(std::memory_order_acquire);

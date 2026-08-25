@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 8;       // v8: MIDI event FIFO (v7: plugin_latency_samples)
+inline constexpr uint32_t kLayoutVersion = 9;       // v9: editor_open (moteur->enfant) - loge dans le padding de shutdown, offsets inchanges (v8: MIDI FIFO)
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kMidiQueueSlots = 256;    // power of two; note events per block, drained by the child
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
@@ -85,6 +85,14 @@ struct SharedAudioRing {
 
     // ---- Lifecycle ----
     std::atomic<uint32_t> shutdown;     // engine sets 1; child exits cleanly
+    // ---- Fenetre GUI a la demande (v9) : moteur -> enfant --------------------
+    // Etat DESIRE de la fenetre du plugin (0 = fermee, 1 = ouverte). Le moteur
+    // l'ecrit sur le message kEditor (bouton box de la piste) ; l'enfant compare
+    // a l'etat courant de sa fenetre a chaque tour de boucle serve et
+    // ouvre/ferme en consequence. Loge dans le padding naturel entre shutdown
+    // (uint32) et child_heartbeat (uint64, aligne 8) : offsets suivants
+    // inchanges. L'ouverture au spawn (--editor) reste une voie parallele.
+    std::atomic<uint32_t> editor_open;
     std::atomic<uint64_t> child_heartbeat;  // child bumps per processed block
 
     // ---- State side-channel (2.5-etat, v4) ----
@@ -159,6 +167,7 @@ static_assert(offsetof(SharedAudioRing, param_read_idx) == 40);
 static_assert(offsetof(SharedAudioRing, param_ids) == 48);
 static_assert(offsetof(SharedAudioRing, param_values) == 48 + kParamQueueSlots * 4);
 static_assert(offsetof(SharedAudioRing, shutdown) == 48 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, editor_open) == 52 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, child_heartbeat) == 56 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, state_request_seq) == 64 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, state_ready_seq) == 72 + kParamQueueSlots * 12);

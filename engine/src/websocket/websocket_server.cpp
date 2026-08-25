@@ -252,6 +252,9 @@ void WebSocketServer::handleMessage(
                 case protocol::Message::kTapControl:
                     handleTapControl(&webSocket, message.tap_control());
                     break;
+                case protocol::Message::kEditor:
+                    handleEditor(message.editor());
+                    break;
                 default:
                     break;
             }
@@ -363,6 +366,21 @@ void WebSocketServer::handleSetMonitor(const protocol::SetMonitor& cmd) {
     if (track) {
         track->solo.store(cmd.solo(), std::memory_order_relaxed);
         track->mute.store(cmd.mute(), std::memory_order_relaxed);
+    }
+}
+
+void WebSocketServer::handleEditor(const protocol::EditorControl& cmd) {
+    if (!graph_slot_) return;
+    // Meme discipline que handleSetMonitor : une copie shared_ptr garde le
+    // graphe vivant meme si le control thread le swappe pendant l'appel.
+    auto graph = graph_slot_->load(std::memory_order_acquire);
+    if (!graph) return;
+    // v9 : fenetre GUI a la demande. Le node (ProxyNode) ecrit l'etat desire
+    // dans le ring de SON enfant ; l'enfant ouvre/ferme sur la transition. Les
+    // nodes non-plugin ignorent (no-op de base). Un node absent (rebuild en
+    // vol, id inconnu) = silencieux : le clic suivant re-tentera.
+    if (auto* node = graph->getNodeById(cmd.node_id())) {
+        node->setEditorOpen(cmd.open());
     }
 }
 

@@ -150,6 +150,12 @@ public:
     [[nodiscard]] AudioTrack* getTrackById(const std::string& id) noexcept;
 
     /**
+     * Get a chain node by its proc id (v9 : fenetre GUI a la demande).
+     * Control thread ; le graphe est immuable une fois actif.
+     */
+    [[nodiscard]] ProcessorNode* getNodeById(const std::string& id) noexcept;
+
+    /**
      * Set the sample rate.
      */
     void setSampleRate(uint32_t sample_rate) noexcept {

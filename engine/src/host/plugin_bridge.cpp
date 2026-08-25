@@ -99,6 +99,10 @@ bool PluginBridge::createSegment() {
     ring_->magic = kRingMagic;
     ring_->layout_version = kLayoutVersion;
     ring_->block_size = kRingBlockSize;
+    // v9 : etat desire de la fenetre GUI. Avec --editors l'enfant ouvre au
+    // spawn -> l'etat desire doit demarrer a 1, sinon la boucle serve
+    // refermerait aussitot. Sinon 0 : ouverture seulement sur message kEditor.
+    ring_->editor_open.store(spawn_editors_ ? 1u : 0u, std::memory_order_release);
     return true;
 }
 

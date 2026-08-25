@@ -78,6 +78,14 @@ public:
     void prepare(uint32_t, uint32_t) override {}
     void reset() noexcept override {}
 
+    /** v9 : fenetre GUI a la demande. Ecrit l'etat desire dans le ring ;
+     *  l'enfant (boucle serve) ouvre/ferme sur la transition. Control thread,
+     *  atomic - la fenetre appartient au thread serve de l'enfant. */
+    void setEditorOpen(bool open) noexcept override {
+        if (ring_)
+            ring_->editor_open.store(open ? 1u : 0u, std::memory_order_release);
+    }
+
     /** v8 MIDI : notes (positions absolues) que ce node-instrument joue,
      *  emises dans le ring par bloc dans process(). Vide = pas d'instrument. */
     void setNotes(std::vector<ScheduledNote> notes) { notes_ = std::move(notes); }

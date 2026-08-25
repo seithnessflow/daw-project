@@ -97,6 +97,14 @@ public:
      * or delay lines to prevent audio artifacts.
      */
     virtual void reset() noexcept = 0;
+
+    /**
+     * Fenetre GUI a la demande (v9) : ouvrir/fermer la fenetre native du
+     * plugin de ce node. Control thread (message kEditor). Defaut : no-op -
+     * seuls les nodes qui hebergent un plugin hors-process (ProxyNode) la
+     * portent, via l'atomic editor_open du ring vers l'enfant.
+     */
+    virtual void setEditorOpen(bool /*open*/) noexcept {}
 };
 
 }  // namespace daw::graph
