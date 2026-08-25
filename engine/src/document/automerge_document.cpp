@@ -214,6 +214,46 @@ bool AutomergeDocument::loadFromBytes(const uint8_t* data, size_t size) {
     return true;
 }
 
+bool AutomergeDocument::mergeFromBytes(const uint8_t* data, size_t size) {
+    if (!doc_) {
+        // First contact: no local doc to preserve, adopt the incoming one.
+        return loadFromBytes(data, size);
+    }
+
+    // Load the incoming FULL document as a separate doc to merge FROM.
+    AMresult* srcResult = AMload(data, size);
+    if (!checkResult(srcResult, "AMload (merge source)")) {
+        return false;
+    }
+    AMdoc* src = nullptr;
+    if (!AMitemToDoc(AMresultItem(srcResult), &src) || !src) {
+        last_error_ = "Failed to get document from merge source";
+        AMresultFree(srcResult);
+        return false;
+    }
+
+    // Merge src INTO doc_: local changes preserved, remote integrated
+    // (AUDIT-5 A4: reconnection must not clobber engine-authored stemHash/
+    // stateHash the server has not yet seen). doc_ mutates in place; its
+    // owning doc_result_ stays valid. src is done once AMmerge returns.
+    AMresult* mergeResult = AMmerge(doc_, src);
+    AMresultFree(srcResult);
+    if (!checkResult(mergeResult, "AMmerge")) {
+        return false;
+    }
+    AMresultFree(mergeResult);
+
+    // Validate by reading, same discipline as loadFromBytes.
+    ProjectDef def;
+    if (!readDocument(def)) {
+        last_error_ = "Failed to read merged document: " + last_error_;
+        return false;
+    }
+
+    notifyChange();
+    return true;
+}
+
 bool AutomergeDocument::saveToFile(const std::string& path) const {
     std::vector<uint8_t> data = toBytes();
     if (data.empty()) {

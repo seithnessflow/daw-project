@@ -848,6 +848,77 @@ bool testStemKeyPrecision() {
     return true;
 }
 
+// AUDIT-5 A4: on reconnection the server resends the whole document and the
+// engine callback used loadFromBytes (REPLACE) - clobbering an engine-authored
+// stemHash the server had not yet seen (the engine is the ONLY author of that
+// field, and the ONLY stage with no outbox). mergeFromBytes must preserve the
+// local change AND integrate the server's. This test proves both halves: a
+// replace loses the local stem, a merge keeps it.
+bool testDocMergePreservesLocal() {
+    std::cout << "Test: doc merge preserves local change (A4)... ";
+    using namespace daw::document;
+
+    // Common root: one track with one vst3 node.
+    AutomergeDocument base;
+    if (!base.create(48000)) { std::cout << "FAILED: create\n"; return false; }
+    TrackDef t; t.id = "t1"; t.name = "T1"; t.gain = 1.0f;
+    ProcessorDef node; node.id = "n1"; node.type = "vst3";
+    node.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    t.chain.push_back(node);
+    base.addTrack(t);
+    const std::vector<uint8_t> baseBytes = base.toBytes();
+
+    // Server doc: base + an unrelated change the engine never saw.
+    AutomergeDocument server;
+    server.loadFromBytes(baseBytes.data(), baseBytes.size());
+    server.setMasterGain(0.3f);
+    const std::vector<uint8_t> serverBytes = server.toBytes();
+
+    auto makeEngineWithLocalStem = [&]() {
+        AutomergeDocument e;
+        e.loadFromBytes(baseBytes.data(), baseBytes.size());
+        e.setProcessorStem("t1", "n1", "aabbccdd", "key-L", 0);
+        return e;  // movable
+    };
+    auto hasLocalStem = [](const AutomergeDocument& d) {
+        const auto p = d.getDocument();
+        return !p.tracks.empty() && !p.tracks[0].chain.empty()
+               && p.tracks[0].chain[0].stem_hash == "aabbccdd";
+    };
+
+    // 1) REPLACE (a plain load) LOSES the local stem - this is the bug the
+    //    merge exists to fix; assert it so the test keeps its teeth.
+    {
+        AutomergeDocument e = makeEngineWithLocalStem();
+        e.loadFromBytes(serverBytes.data(), serverBytes.size());
+        if (hasLocalStem(e)) {
+            std::cout << "FAILED: a plain load kept the local stem - the test "
+                         "can no longer prove merge is needed\n";
+            return false;
+        }
+    }
+
+    // 2) MERGE preserves the local stem AND integrates the server change.
+    {
+        AutomergeDocument e = makeEngineWithLocalStem();
+        if (!e.mergeFromBytes(serverBytes.data(), serverBytes.size())) {
+            std::cout << "FAILED: merge returned false: " << e.getLastError() << "\n";
+            return false;
+        }
+        if (!hasLocalStem(e)) {
+            std::cout << "FAILED: merge lost the local stem (a REPLACE would do this)\n";
+            return false;
+        }
+        if (std::fabs(e.getDocument().master_gain - 0.3f) > 1e-6f) {
+            std::cout << "FAILED: merge did not integrate the server change\n";
+            return false;
+        }
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
 // Test 7: Document clips round-trip
 bool testDocumentClipsRoundTrip() {
     std::cout << "Test: Document clips round-trip... ";
@@ -3271,6 +3342,7 @@ int main(int argc, char* argv[]) {
     run(testDocumentSerialization);
     run(testWebAuthoredIntFields);
     run(testStemKeyPrecision);
+    run(testDocMergePreservesLocal);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);

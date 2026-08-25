@@ -228,8 +228,8 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   recalcule UNE fois. Reste note dans le code : troncature f64->float et
   ordre map (A1/1.1) attendent le refactor params-liste.
 
-**A4 — CADRE pour session dediee (PAS fait : zone sensible format doc,
-e2e de non-regression obligatoires).** Confirme par le code :
+**A4 — SOUS-PARTIE 1a FAITE 2026-08-25 (merge non destructif + cablage).**
+Reste 1b (push) + 2 (outbox) pour la session suivante. Confirme par le code :
 - `server_client.cpp:53` : `received_initial_` remis a false a CHAQUE
   Open -> toute reconnexion retraite le doc serveur comme initial.
 - `main.cpp:1114` : `loadFromBytes` = REPLACE -> un change local non
@@ -242,11 +242,14 @@ e2e de non-regression obligatoires).** Confirme par le code :
   serveur : un merge est SANS conflit de racine (le moteur n'a pas de
   graine, mais il n'en a pas besoin s'il adopte celle du serveur).
 Decoupage propose :
-  1a. callback : `if (!doc.isLoaded()) loadFromBytes` (adoption) `else
-      mergeFromBytes` (reconnexion, preserve le local). Nouvelle methode
-      `mergeFromBytes` (AMmerge / load+AMgetChanges+apply). Test unit :
-      un change local survit a la reception d'un doc serveur qui ne l'a
-      pas. -> PRESERVE.
+  1a. [FAIT] `mergeFromBytes` (AMmerge du doc entrant charge comme src) +
+      callback `if (!doc.isLoaded()) loadFromBytes else mergeFromBytes`.
+      Garde `testDocMergePreservesLocal` (replace PERD le stem local /
+      merge le preserve + integre le change serveur). Smoke silencieux
+      serveur+moteur reel : « Document adopted: 2 tracks » (chemin
+      premiere-connexion non regresse). gtests 37/37. Merge SANS push =
+      deja strictement mieux que replace (le local n'est plus PERDU),
+      sans regression (branche premiere-connexion bit-identique).
   1b. push a la reconnexion : `getMissingChangesFrom(remote)` puis
       sendChange de chaque manquant (jumeau du web wiring.ts:105). Sans
       1b, le change survit mais n'est jamais PARTAGE (le settle

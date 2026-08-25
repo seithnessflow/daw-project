@@ -1108,14 +1108,26 @@ int doPlayWithServer(const Options& opts) {
     // Handle initial document. NETWORK THREAD: document work only, no
     // graph construction here (R1) - bump the version, the builder follows.
     server_client.setDocumentCallback([&](const std::vector<uint8_t>& data) {
-        std::cout << "Received initial document (" << data.size() << " bytes)\n";
         {
             std::lock_guard<std::mutex> lock(doc_mutex);
-            if (!doc.loadFromBytes(data.data(), data.size())) {
-                std::cerr << "Failed to load document: " << doc.getLastError() << "\n";
+            // AUDIT-5 A4: first contact ADOPTS the server doc; a later
+            // (re)connection MERGES it, so engine-authored stemHash/stateHash
+            // produced meanwhile survive instead of being clobbered by the
+            // resent full document. (Sharing those back to the server - the
+            // reconnect PUSH - is the next sub-part; merge alone already stops
+            // the loss.)
+            const bool first = !doc.isLoaded();
+            const bool ok = first
+                                ? doc.loadFromBytes(data.data(), data.size())
+                                : doc.mergeFromBytes(data.data(), data.size());
+            if (!ok) {
+                std::cerr << (first ? "Failed to load document: "
+                                    : "Failed to merge document: ")
+                          << doc.getLastError() << "\n";
                 return;
             }
-            std::cout << "Document loaded: " << doc.getDocument().tracks.size() << " tracks\n";
+            std::cout << (first ? "Document adopted: " : "Document merged: ")
+                      << doc.getDocument().tracks.size() << " tracks\n";
         }
         doc_version.fetch_add(1, std::memory_order_release);
     });

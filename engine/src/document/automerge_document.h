@@ -97,6 +97,15 @@ public:
     bool applyChange(const uint8_t* change_data, size_t size);
 
     /**
+     * AUDIT-5 A4: merge an incoming FULL document INTO this one instead of
+     * replacing it. On (re)connection the server resends the whole doc; a
+     * plain load would clobber engine-authored fields (stemHash/stateHash)
+     * the server has not yet seen. Merge preserves local changes and
+     * integrates remote ones. With no doc loaded yet it adopts (== load).
+     */
+    bool mergeFromBytes(const uint8_t* data, size_t size);
+
+    /**
      * Generate sync message for peer.
      *
      * @return Sync message bytes, or empty if nothing to sync
