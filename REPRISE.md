@@ -34,20 +34,32 @@ VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier commit **19d8ac0** (lanceurs). Serie de la seance :
-2ffdacc F3, 89692bd F4, bb10cf1 F6, e08ca25 F1, ecea0a0 F2, 4bdcabb F7,
-2650ac4 F5, 19d8ac0 lanceurs. Ce depot n'a PAS de remote / pas de CI
-observee cette seance (travail local, tout committe). Le moteur a ete
-rebuild plusieurs fois (ring v8->v9, pan, session) ; binaires a jour dans
-engine\build-msvc. gtests **41/41** au dernier run.
+Dernier commit **f60bf11** (menu principal). Le depot A un remote
+(**origin = github seithnessflow/daw-project**, branche master) : la tour
+est **24 commits EN AVANCE** sur origin/master (60ab807) — TOUT ce travail
+(T1-T8, F1-F7, lanceurs, docs, menu) est **NON POUSSE**. Le portable est
+PILE a origin/master (donc sans rien de tout ca). gtests **41/41**, binaires
+moteur a jour (ring v9, pan, session) dans engine\build-msvc.
+POINT OUVERT (a decider) : pousser les 24 commits declenche la CI (non
+validee post-rework) ; la suite e2e locale a ete lancee comme garde-fou
+(verdict a consigner ci-dessous) AVANT tout push / test portable.
+
+## MENU PRINCIPAL (2026-08-26, f60bf11)
+
+Ecran de selection de projets a une URL STABLE (racine, sans ?project=) :
+l'utilisateur bookmarke `localhost:5173/#stoken=<token epingle>` et choisit /
+cree un projet. Middleware vite /api/projects + ui/menu.ts (masque les
+artefacts e2e timestampes). daw.ps1 ouvre desormais cette URL. Store local
+decrasse (954 -> 18 projets, backup dans le scratchpad ; server/projects
+gitignore).
 
 ## RESTE / a surveiller
 
-- **SIGNALEMENT (niveau 2, pas notre code)** : le doc `studio` se
-  REINITIALISE par moments — pendant les tests F5, des ajouts web
-  (session clips) DISPARAISSAIENT entre deux runs. Sent une persistance
-  serveur fragile (le serveur ne persiste pas / re-lit le .am du disque ?).
-  A regarder en session dediee ; sans rapport avec la refonte UI.
+- **Le « bug persistance studio » d'hier ETAIT UN FAUX BUG** (diagnostique
+  2026-08-26) : mes scripts de test ecrivaient `.etok.tmp` DANS `web/` ->
+  vite crashait en EBUSY -> web a moitie synchro. La PERSISTANCE EST SOLIDE
+  (verifie disque + reload). LECON : aucun temp de test dans `web/`.
+  studio.am est foreign-rooted (pre-graine) mais le web l'adopte.
 - **Detail non fait (assume)** : la restructure en onglets Rack/Piano-roll
   de la colonne droite (F7) — laissee, l'empilement actuel fonctionne.
 - **Zombies plugin_host** : au rebuild moteur, `taskkill` echoue sur eux ;

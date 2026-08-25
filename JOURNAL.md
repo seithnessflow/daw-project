@@ -1111,3 +1111,35 @@ SIGNALEMENT (niveau 2, pas mon code) : le doc `studio` se REINITIALISE
 par moments (mes ajouts web disparaissaient entre deux runs de test) —
 sent une persistance serveur fragile, a regarder en session dediee.
 Tout committe (2ffdacc..19d8ac0). Stack coupee proprement.
+
+**2026-08-26 (session away « pendant que je joue » : non-bug persistance,
+menu principal) :** chantier autonome pendant que l'utilisateur joue a LoL,
+avec sa consigne « teste aussi sur le portable » et « fais un menu principal
+avec selection des projets ».
+- FAUX BUG PERSISTANCE ELUCIDE : le « reset de studio » (le web montrait 2
+  pistes = le seed au lieu des 6 de studio) que j'avais signale hier n'etait
+  PAS un defaut produit. Cause : mes scripts de test ecrivaient `.etok.tmp`
+  DANS `web/` (surveille par vite) -> le FSWatcher de vite crashait en EBUSY
+  en boucle -> le web restait en sync a moitie (seed transitoire). Preuve :
+  avec vite stable, le web charge bien les 6 pistes de studio. La persistance
+  est SOLIDE (verifie : projet frais, addTrack+flush -> ecrit atomiquement sur
+  le disque -> survit au reload ; FileStore fait load->apply_incremental->
+  write_atomic + garde deps manquantes). studio.am EST foreign-rooted (racine
+  fa64dc, pre-graine, 395 changes, vs seed 1fd680 actor da5eed00) mais le web
+  l'adopte quand meme. LECON GRAVEE (CLAUDE.md/TODO) : aucun fichier temp de
+  test dans `web/` -> scratchpad uniquement.
+- MENU PRINCIPAL (f60bf11) : ecran de selection de projets a une URL STABLE
+  (racine, sans ?project=) pour « ouvrir la meme URL a chaque fois ».
+  Middleware vite /api/projects (liste server/projects/*.am par recence,
+  dev-local), ui/menu.ts (esthetique etabli, ouvrir = naviguer ?project=<id>
+  en PRESERVANT le fragment #stoken/#token, masque les artefacts e2e
+  timestampes), main.ts branche menu vs app selon ?project=, daw.ps1 ouvre
+  l'URL stable. Verifie (liste, ouvrir studio -> 6 pistes fragment preserve,
+  creer un projet -> navigation, 0 erreur). Store local decrasse : 954 -> 18
+  projets (backup conserve ; 934 artefacts e2e timestampes ; server/projects
+  gitignore).
+- PORTABLE : joignable (TX15/flow, vieux tunnel cloudflare encore vivant)
+  mais a origin/master (60ab807) = 24 commits DERRIERE la tour (sans T1-T8 ni
+  F1-F7 ni menu). Le tester exige un push (-> CI non validee post-rework) +
+  rebuild distant -> j'ai d'abord lance la suite e2e locale comme garde-fou
+  du rework avant tout push (verdict a consigner).

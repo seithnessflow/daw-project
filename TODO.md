@@ -122,10 +122,18 @@ RESTE UI (petit, non bloquant) :
 
 ## PRIORITES A LA REPRISE (a arbitrer avec l'utilisateur — ordre grave)
 
-1. **BUG persistance doc `studio`** (signale 2026-08-25, niveau 2) : le
-   doc se REINITIALISE par moments (ajouts web perdus entre deux runs) —
-   persistance serveur fragile. Session de diagnostic dediee (regard neuf).
-2. **Reprendre le CAP produit** : l'UI etant finie, revenir a l'axe
+0. [x] ~~BUG persistance doc `studio`~~ **FAUSSE ALERTE — DIAGNOSTIQUE ET
+   CLOS 2026-08-25.** Le « reset » (studio montre 2 pistes = le seed au lieu
+   de 6) etait un ARTEFACT DE TEST, pas un defaut produit : mes scripts
+   ecrivaient `.etok.tmp` DANS `web/` (surveille par vite) -> le watcher de
+   vite crashait en EBUSY en boucle -> le web restait en sync a moitie
+   (seed transitoire). La PERSISTANCE EST SOLIDE (verifie : projet frais,
+   ajout+flush -> ecrit sur le disque atomiquement -> survit au reload).
+   studio.am est foreign-rooted (racine `fa64dc`, pre-graine, 395 changes,
+   vs seed `1fd680`) MAIS le web l'adopte quand meme (6 pistes). LECON
+   GRAVEE : aucun fichier temp de test dans `web/` (vite le surveille) ->
+   scratchpad uniquement.
+1. **Reprendre le CAP produit** : l'UI etant finie, revenir a l'axe
    differenciateur (ORDRE GRAVE ci-dessus : item 3 badges fraicheur
    deux-machines bloque sur geste laptop, item 5 VAGUE 3 MIDI+instruments =
    le test Massive, item 6 harmonisation AUDIT-5 a ratifier) ET la
