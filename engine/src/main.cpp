@@ -755,6 +755,19 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         }
         }
 
+        // v8 MIDI : notes ABSOLUES de la piste (tous clips), donnees au
+        // PREMIER vst3 de la chaine (l'instrument). Clip audio = pas de
+        // notes -> track_notes vide -> rien de change pour les effets.
+        std::vector<daw::host::ScheduledNote> track_notes;
+        for (const auto& clip_def : track_def.clips) {
+            for (const auto& n : clip_def.notes) {
+                const int64_t abs_start = clip_def.start_sample + n.start_sample;
+                track_notes.push_back(
+                    {n.pitch, n.velocity, abs_start, abs_start + n.length_samples});
+            }
+        }
+        bool notes_assigned = false;
+
         // Create processors (after the governing node when substituted)
         for (size_t proc_i = sub.active ? sub.resume_index : 0;
              proc_i < track_def.chain.size(); ++proc_i) {
@@ -791,9 +804,15 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                     // bypass rides the document into the node: the child
                     // stays warm, the dry path keeps the same latency, and
                     // the toggle is just another rebuild
-                    track.chain.push_back(std::make_unique<daw::host::ProxyNode>(
+                    auto pnode = std::make_unique<daw::host::ProxyNode>(
                         proc_def.id, handle->bridge->ring(), &handle->blocks_missed,
-                        proxy_depth, proc_def.bypass));
+                        proxy_depth, proc_def.bypass);
+                    // v8 : le premier vst3 de la piste joue les notes (instrument).
+                    if (!notes_assigned && !track_notes.empty()) {
+                        pnode->setNotes(track_notes);
+                        notes_assigned = true;
+                    }
+                    track.chain.push_back(std::move(pnode));
                 }
             } else {
                 // AUDIT R5: never silently drop - a peer hearing a

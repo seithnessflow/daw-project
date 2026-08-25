@@ -22,6 +22,7 @@ import { ctx, els, sendLastChange } from './context';
 import { updateInsertMarker, refreshOverview, updateGridVars } from './navigation';
 import { refreshPalette } from './placement';
 import { renderPresence } from './presence_view';
+import { renderPianoRoll } from '../ui/piano_roll';
 import { cssId } from '../document/sanitize';
 
 /**
@@ -185,6 +186,37 @@ export function renderTracks(force = false): void {
       renderTracks(true);
     },
   ));
+
+  // v8 MIDI : piano-roll pour le clip MIDI de la piste (assetHash vide = MIDI).
+  // Bouton "+ clip MIDI" si la piste n'en a pas ; sinon la grille du premier.
+  if (selectedTrack) {
+    const midiClip = selectedTrack.clips.find((c) => !c.assetHash);
+    const slot = document.createElement('div');
+    slot.className = 'piano-roll-slot';
+    const head = document.createElement('div');
+    head.className = 'piano-roll-head';
+    head.textContent = 'PIANO-ROLL';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'midi-add-btn';
+    addBtn.dataset.role = 'add-midi';
+    addBtn.textContent = midiClip ? '+ autre clip' : '+ clip MIDI';
+    addBtn.addEventListener('click', () => {
+      ctx.project!.addMidiClip(selectedTrack.id, 0, 96000);  // 2 s @48k
+      sendLastChange();
+      renderTracks(true);
+    });
+    head.appendChild(addBtn);
+    slot.appendChild(head);
+    if (midiClip) {
+      const roll = document.createElement('div');
+      renderPianoRoll(roll, ctx.project!, selectedTrack.id, midiClip, () => {
+        sendLastChange();
+        renderTracks(true);
+      });
+      slot.appendChild(roll);
+    }
+    els.deviceViewSlot.appendChild(slot);
+  }
 
   // Waveforms inside the freshly built clips (cached peaks draw
   // synchronously; new assets stream in from the store)

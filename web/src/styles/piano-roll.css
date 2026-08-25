@@ -1,0 +1,49 @@
+/* ---- Piano-roll (v8 MIDI) ------------------------------------- */
+.piano-roll-slot {
+  margin: 0 -14px;
+  padding: 0 14px;
+  border-top: 1px solid var(--hair);
+  background: linear-gradient(rgba(255, 255, 255, 0.012), transparent 20px), var(--surface);
+}
+.piano-roll-head {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--text-3); padding: 7px 0 4px;
+}
+.midi-add-btn {
+  font-size: 10px; padding: 2px 8px; border-radius: var(--r);
+  background: var(--surface-2); color: var(--text-2);
+  letter-spacing: normal; text-transform: none;
+}
+.midi-add-btn:hover { background: #333; color: var(--text); }
+
+.piano-roll { overflow-x: auto; padding: 4px 0 10px; }
+.pr-grid {
+  display: grid;
+  grid-template-columns: 34px repeat(var(--steps), minmax(22px, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  min-width: 560px;
+  width: 100%;
+}
+.pr-key {
+  background: var(--surface-2); color: var(--text-3);
+  font-size: 8px; font-family: Consolas, monospace;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 4px; height: 15px;
+}
+.pr-key.pr-black { background: var(--surface); }
+.pr-cell {
+  height: 15px; padding: 0; border: none; border-radius: 0;
+  background: var(--surface-3);
+  cursor: pointer;
+  transition: background-color 60ms ease;
+}
+.pr-cell.pr-row-black { background: var(--surface-2); }
+.pr-cell.pr-beat { box-shadow: inset 1px 0 0 var(--hair-strong); }
+.pr-cell:hover { background: var(--potion-dim); }
+.pr-cell.pr-on {
+  background: var(--potion);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.pr-cell.pr-on:hover { background: #a493f2; }

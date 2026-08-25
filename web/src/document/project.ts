@@ -11,7 +11,7 @@
  */
 
 import * as Automerge from '@automerge/automerge';
-import { ProjectDef, TrackDef, ClipDef, ProcessorDef } from './schema';
+import { ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef } from './schema';
 import { UndoJournal, type InverseOp } from './undo';
 import { seedBytes } from './seed';
 
@@ -403,6 +403,41 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.clips.push(clip);
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * v8 MIDI : cree un clip MIDI (pas d'asset, notes editables au piano-roll)
+   * et rend son id. Un clip a assetHash vide + notes = clip MIDI ; l'instrument
+   * en tete de chaine de la piste le joue.
+   */
+  addMidiClip(trackId: string, startSample: number, lengthSamples: number): string {
+    const id = 'clip-' + Math.random().toString(36).slice(2, 10);
+    const clip: ClipDef = {
+      id, assetHash: '', startSample, lengthSamples, offsetSamples: 0, notes: [],
+    };
+    this.addClip(trackId, clip);
+    return id;
+  }
+
+  /**
+   * v8 MIDI : bascule une note (ajoute si absente au meme pitch+debut, sinon
+   * retire) - le geste du piano-roll. Undo des notes = raffinement ulterieur.
+   */
+  toggleNote(trackId: string, clipId: string, note: NoteDef): void {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+    this.doc = Automerge.change(this.doc, (d) => {
+      const c = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId);
+      if (!c) return;
+      if (!c.notes) c.notes = [];
+      const i = c.notes.findIndex(
+        (n) => n.pitch === note.pitch && n.startSample === note.startSample);
+      if (i >= 0) c.notes.splice(i, 1);
+      else c.notes.push(note);
     });
     this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }

@@ -73,6 +73,13 @@ std::string computeStemKey(const document::TrackDef& track,
         k << "|clip=" << c.asset_hash << "," << c.start_sample << ","
           << c.length_samples << "," << c.offset_samples << ","
           << c.fade_in_samples << "," << c.fade_out_samples;
+        // v8 MIDI : les notes font partie de l'entree du rendu - une note
+        // editee = stem perime (sinon un pair entendrait l'ancien rendu).
+        for (const auto& n : c.notes) {
+            k << ",n=" << static_cast<int>(n.pitch) << ":"
+              << static_cast<int>(n.velocity) << ":" << n.start_sample << ":"
+              << n.length_samples;
+        }
     }
     for (size_t i = 0; i <= node_index; ++i) {
         const auto& p = track.chain[i];

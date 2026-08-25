@@ -497,20 +497,28 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
     if (!menu.hidden) {
       uidInput.classList.remove('invalid');
       // Le catalogue au moment de l'OUVERTURE (il arrive apres l'auth)
-      const fx = pluginCatalog
-        .filter((e) => e.subCategories.includes('Fx'))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      // v8 : effets ET instruments. Un instrument (subcat Instrument/Synth)
+      // genere le son a partir de notes ; on le tague pour le distinguer.
+      const isInst = (e: CatalogEntry) =>
+        e.subCategories.includes('Instrument') || e.subCategories.includes('Synth');
+      const usable = pluginCatalog
+        .filter((e) => e.subCategories.includes('Fx') || isInst(e))
+        .sort((a, b) => {
+          // instruments d'abord (ce sont les sources), puis effets, par nom
+          const ai = isInst(a) ? 0 : 1, bi = isInst(b) ? 0 : 1;
+          return ai !== bi ? ai - bi : a.name.localeCompare(b.name);
+        });
       catalogSelect.innerHTML = '';
       const ph = document.createElement('option');
       ph.value = '';
-      ph.textContent = fx.length
-        ? `— catalogue (${fx.length} effets) —`
+      ph.textContent = usable.length
+        ? `— catalogue (${usable.length}) —`
         : '— catalogue vide (moteur sans --vst3-dir) —';
       catalogSelect.appendChild(ph);
-      for (const e of fx) {
+      for (const e of usable) {
         const o = document.createElement('option');
         o.value = e.uid;
-        o.textContent = `${e.name}  (${e.vendor})`;
+        o.textContent = `${isInst(e) ? '[inst] ' : ''}${e.name}  (${e.vendor})`;
         catalogSelect.appendChild(o);
       }
     }
