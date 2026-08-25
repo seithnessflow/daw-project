@@ -255,6 +255,16 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   une map aurait trie). Non-regression : gtests 39/39, e2e local
   fader-to-engine + devices 6 passed. Note : change encore les cle de stem
   (absorbe par le recalcul one-shot de stem-v2).
+- **B5** validation des chemins : helper `isPathComponentSafe`
+  (`util/path_safety.h` : bloque separateurs `/ \`, `..`, control chars ;
+  DELIBEREMENT permissif sinon pour ne casser ni les sha256 ni les
+  placeholders de test). Applique aux 4 frontieres ou une chaine du
+  DOCUMENT devient un chemin fichier : asset_hash (read, graph_common),
+  stem_hash (read, resolveStemSubstitution), node_id (WRITE tmp,
+  stem_render), fetch hash (WRITE + URL, main.cpp fetchAssetFromServer).
+  Ferme le path traversal (lecture ET ecriture) + l'injection CRLF d'URL.
+  Garde `testPathComponentSafety`. gtests 40/40. Reste (dette) : valider
+  aussi state_hash au read local (main.cpp:490) — couvert par le fetch.
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route

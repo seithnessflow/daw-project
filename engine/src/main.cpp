@@ -20,6 +20,7 @@
 #include "graph/plugin_registry.h"
 #include "render/stem_render.h"
 #include "util/crash_handler.h"
+#include "util/path_safety.h"
 #include "host/plugin_bridge.h"
 #include "host/plugin_scan.h"
 #include "host/proxy_node.h"
@@ -556,6 +557,14 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
     static std::set<std::string> failed_this_session;
     if (server_ws_url.empty() || hash.empty() ||
         failed_this_session.count(hash) > 0) {
+        return false;
+    }
+    // AUDIT-5 B5: hash comes from the document -> it is a path component on
+    // WRITE (tmp/final below) and goes into the request URL. Reject traversal
+    // and control chars (CRLF header injection) before either.
+    if (!daw::util::isPathComponentSafe(hash)) {
+        std::cerr << "WARNING: unsafe asset hash rejected (path/URL): " << hash
+                  << " - fetch refused. AUDIT-5 B5.\n";
         return false;
     }
 

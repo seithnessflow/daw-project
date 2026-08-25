@@ -4,6 +4,7 @@
 #include "offline_render.h"
 #include "../document/automerge_document.h"
 #include "../util/sha256.h"
+#include "../util/path_safety.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -138,6 +139,12 @@ StemRenderResult renderTrackStem(const document::ProjectDef& project,
     config.sample_rate = project.sample_rate;
     config.bit_depth = 32;  // IEEE float: the stem is LOSSLESS truth
 
+    // AUDIT-5 B5: node_id comes from the document and becomes a filename -
+    // a hostile "../.." must not escape assets_dir on WRITE.
+    if (!daw::util::isPathComponentSafe(node_id)) {
+        out.error = "unsafe node id (path traversal?): " + node_id;
+        return out;
+    }
     const fs::path tmp_wav =
         fs::path(assets_dir) / ("stem-" + node_id + ".tmp.wav");
     std::error_code ec;

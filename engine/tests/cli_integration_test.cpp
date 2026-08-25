@@ -23,6 +23,7 @@
 #include "../src/host/plugin_bridge.h"
 #include "../src/host/proxy_node.h"
 #include "../src/util/sha256.h"
+#include "../src/util/path_safety.h"
 #include "../src/websocket/websocket_server.h"
 
 #include <ixwebsocket/IXNetSystem.h>
@@ -1009,6 +1010,36 @@ bool testProcessorParamOrder() {
     // getParam still resolves by key regardless of position.
     if (std::fabs(params[0].second - 1.0f) > 1e-6f) {
         std::cout << "FAILED: value mismatch after roundtrip\n";
+        return false;
+    }
+    std::cout << "OK\n";
+    return true;
+}
+
+// AUDIT-5 B5: document strings joined into filesystem paths (asset/state/
+// stem hash, node id) must not let a hostile peer escape the assets dir.
+bool testPathComponentSafety() {
+    std::cout << "Test: path component safety (B5)... ";
+    using daw::util::isPathComponentSafe;
+    const bool safe =
+        isPathComponentSafe("aabbccdd") &&
+        isPathComponentSafe("64ec2954caaa0011223344556677889900aabbccddeeff0011") &&
+        isPathComponentSafe("chainhash") &&
+        isPathComponentSafe("n1") &&
+        isPathComponentSafe("dev-1756000000000");
+    const bool blocked =
+        !isPathComponentSafe("../evil") &&
+        !isPathComponentSafe("a/b") &&
+        !isPathComponentSafe("a\\b") &&
+        !isPathComponentSafe("..") &&
+        !isPathComponentSafe(std::string("x\ry")) &&
+        !isPathComponentSafe("");
+    if (!safe) {
+        std::cout << "FAILED: a legitimate component (hex/placeholder/id) was rejected\n";
+        return false;
+    }
+    if (!blocked) {
+        std::cout << "FAILED: a traversal/separator/control component was allowed\n";
         return false;
     }
     std::cout << "OK\n";
@@ -3441,6 +3472,7 @@ int main(int argc, char* argv[]) {
     run(testDocMergePreservesLocal);
     run(testGetChangesNotIn);
     run(testProcessorParamOrder);
+    run(testPathComponentSafety);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "graph_common.h"
 
+#include "../util/path_safety.h"
+
 #include <iostream>
 
 namespace daw::graph {
@@ -31,6 +33,12 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
     info.fade_out_samples = fade_out < half ? fade_out : half;
     player.setClip(info);
 
+    // AUDIT-5 B5: a document-supplied hash must never become a path escape.
+    if (!daw::util::isPathComponentSafe(clip_def.asset_hash)) {
+        std::cerr << "WARNING: unsafe asset hash rejected (path traversal?): "
+                  << clip_def.asset_hash << " - clip silenced. AUDIT-5 B5.\n";
+        return player;  // no asset -> silent clip, never an arbitrary open
+    }
     const std::string asset_path = assets_dir + "/" + clip_def.asset_hash + ".wav";
     const AudioAsset* asset = asset_cache.loadOrGet(asset_path);
     if (asset) {
@@ -73,6 +81,12 @@ StemSubstitution resolveStemSubstitution(
     const auto& node = track_def.chain[governing];
     if (node.stem_hash.empty()) return out;  // no stem: current behavior
                                              // (node skipped, signaled)
+    // AUDIT-5 B5: a document-supplied stem hash must never escape assets_dir.
+    if (!daw::util::isPathComponentSafe(node.stem_hash)) {
+        std::cerr << "WARNING: unsafe stem hash rejected (path traversal?): "
+                  << node.stem_hash << " - no substitution. AUDIT-5 B5.\n";
+        return out;
+    }
 
     const std::string stem_path = assets_dir + "/" + node.stem_hash + ".wav";
     const AudioAsset* asset = asset_cache.loadOrGet(stem_path);
