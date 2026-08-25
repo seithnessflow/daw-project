@@ -7,6 +7,7 @@
 
 import type { Project } from '../document/project';
 import type { ServerClient } from '../network/server_client';
+import type { Presence } from '../network/presence';
 import type { EngineClient } from '../network/engine_client';
 import type { TransportSync } from '../network/transport_sync';
 import type { Library } from '../ui/library';
@@ -61,6 +62,7 @@ export const ctx = {
   serverClient: null as ServerClient | null,
   engineClient: null as EngineClient | null,
   transportSync: null as TransportSync | null,
+  presence: null as Presence | null,
   library: null as Library | null,
   overview: null as Overview | null,
 

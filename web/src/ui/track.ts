@@ -645,6 +645,27 @@ function createDevicePanel(
       : proc.type);
   title.appendChild(name);
 
+  // Editor button (vst3 only): toggle the plugin's native GUI window on
+  // demand (per node). The web tracks the intended state locally; the
+  // engine opens/closes the child's EditorWindow on the message.
+  if (proc.type === 'vst3') {
+    const ed = document.createElement('button');
+    ed.className = 'device-editor';
+    ed.dataset.role = 'editor';
+    ed.dataset.procId = proc.id;
+    ed.setAttribute('aria-pressed', 'false');
+    ed.textContent = '⊞';  // squared plus - "open window"
+    ed.title = 'Ouvrir / fermer la fenetre du plugin';
+    ed.addEventListener('click', () => {
+      const open = ed.getAttribute('aria-pressed') !== 'true';
+      ed.setAttribute('aria-pressed', open ? 'true' : 'false');
+      panel.dispatchEvent(new CustomEvent('editor-toggle', {
+        detail: { procId: proc.id, open }, bubbles: true,
+      }));
+    });
+    title.appendChild(ed);
+  }
+
   // 2.5-etat: the engine-captured state, visible (8 hex of the blob
   // hash + version). Absent until the hosting machine first captures.
   if (proc.stateHash) {

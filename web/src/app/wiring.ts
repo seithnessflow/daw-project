@@ -29,6 +29,8 @@ import { toggleHelp, isHelpOpen } from '../ui/help';
 import { JamChannel } from '../network/jam';
 import { JamAudio } from '../network/jam_audio';
 import { SessionClock } from '../network/session_clock';
+import { Presence } from '../network/presence';
+import { renderPresence } from './presence_view';
 import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
@@ -176,6 +178,12 @@ export async function init(): Promise<void> {
   // silently - the rule written the day the harness tripped on it.
   engineClient.tokenRefresher = fetchLocalToken;
   ctx.engineClient = engineClient;
+  // Editor button (per vst3 device, ui/track.ts) -> open/close the plugin
+  // GUI window via the engine.
+  els.tracks.addEventListener('editor-toggle', (e) => {
+    const d = (e as CustomEvent).detail as { procId: string; open: boolean };
+    engineClient.setEditor(d.procId, d.open);
+  });
   engineClient.onConnect = () => {
     els.engineStatus.classList.add('connected');
     els.engineStatus.dataset.state = 'connected';
@@ -244,6 +252,16 @@ export async function init(): Promise<void> {
   // only measures and shows itself.
   const clock = new SessionClock(serverClient);
   (window as any).__dawClock = clock;
+
+  // Multiplayer presence: who is here and what they have selected, over
+  // the same signal relay. The roster and the remote-selection flags
+  // repaint on every change; renderTracks re-applies the flags after it
+  // rebuilds the heads.
+  const presence = new Presence(serverClient);
+  ctx.presence = presence;
+  (window as any).__dawPresence = presence;
+  presence.onChange = () => renderPresence(presence);
+  renderPresence(presence); // paint the roster (self) immediately
   let clkBadge: HTMLElement | null = null;
   clock.onStateChange = () => {
     const peers = clock.peers();

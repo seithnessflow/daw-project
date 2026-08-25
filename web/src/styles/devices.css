@@ -222,6 +222,28 @@
 .device-name {
   color: var(--text);
 }
+/* ---- Editor toggle (vst3 native GUI window) ---------------------- */
+/* Same lamp grammar as .device-toggle: OPEN window = lit potion, closed
+   = neutral. aria-pressed='true' means the editor window is open. */
+.device-editor {
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1px transparent;
+}
+.device-editor:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.device-editor[aria-pressed='true'] {
+  color: var(--potion);
+  background: rgba(141, 122, 230, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(141, 122, 230, 0.4),
+    0 0 6px rgba(141, 122, 230, 0.3);
+}
 .device-body {
   padding: 8px 9px;
   display: flex;

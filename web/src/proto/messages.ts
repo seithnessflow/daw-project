@@ -81,7 +81,18 @@ export interface TapControl {
   enabled: boolean;
 }
 
-/** Transport position (sent at 30 Hz) */
+/**
+ * Transport position (sent at 30 Hz)
+ * Client -> Engine: open/close a plugin's native GUI window on demand.
+ * Per-node toggle (the --editors flag only opened them ALL at spawn).
+ */
+export interface EditorControl {
+  /** the chain node whose plugin window to toggle */
+  nodeId: string;
+  /** true = show the GUI, false = close it */
+  open: boolean;
+}
+
 export interface TransportPosition {
   positionSamples: number;
   isPlaying: boolean;
@@ -216,6 +227,10 @@ export interface Message {
   /** S8a */
   tapControl?:
     | TapControl
+    | undefined;
+  /** open/close a plugin GUI window */
+  editor?:
+    | EditorControl
     | undefined;
   /** Engine -> Client */
   position?: TransportPosition | undefined;
@@ -509,6 +524,95 @@ export const TapControl: MessageFns<TapControl> = {
   fromPartial<I extends Exact<DeepPartial<TapControl>, I>>(object: I): TapControl {
     const message = createBaseTapControl();
     message.enabled = object.enabled ?? false;
+    return message;
+  },
+};
+
+function createBaseEditorControl(): EditorControl {
+  return { nodeId: "", open: false };
+}
+
+export const EditorControl: MessageFns<EditorControl> = {
+  encode(message: EditorControl, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.nodeId !== "") {
+      writer.uint32(10).string(message.nodeId);
+    }
+    if (message.open !== false) {
+      writer.uint32(16).bool(message.open);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EditorControl {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEditorControl();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.nodeId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.open = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): EditorControl {
+    return {
+      nodeId: isSet(object.nodeId)
+        ? globalThis.String(object.nodeId)
+        : isSet(object.node_id)
+        ? globalThis.String(object.node_id)
+        : "",
+      open: isSet(object.open) ? globalThis.Boolean(object.open) : false,
+    };
+  },
+
+  toJSON(message: EditorControl): unknown {
+    const obj: any = {};
+    if (message.nodeId !== "") {
+      obj.nodeId = message.nodeId;
+    }
+    if (message.open !== false) {
+      obj.open = message.open;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EditorControl>, I>>(base?: I): EditorControl {
+    return EditorControl.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EditorControl>, I>>(object: I): EditorControl {
+    const message = createBaseEditorControl();
+    message.nodeId = object.nodeId ?? "";
+    message.open = object.open ?? false;
     return message;
   },
 };
@@ -1453,6 +1557,7 @@ function createBaseMessage(): Message {
     transport: undefined,
     setMonitor: undefined,
     tapControl: undefined,
+    editor: undefined,
     position: undefined,
     meters: undefined,
     engineState: undefined,
@@ -1472,6 +1577,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.tapControl !== undefined) {
       TapControl.encode(message.tapControl, writer.uint32(58).fork()).join();
+    }
+    if (message.editor !== undefined) {
+      EditorControl.encode(message.editor, writer.uint32(82).fork()).join();
     }
     if (message.position !== undefined) {
       TransportPosition.encode(message.position, writer.uint32(26).fork()).join();
@@ -1529,6 +1637,14 @@ export const Message: MessageFns<Message> = {
             }
 
             message.tapControl = TapControl.decode(reader, reader.uint32());
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.editor = EditorControl.decode(reader, reader.uint32());
             continue;
           }
           case 3: {
@@ -1604,6 +1720,7 @@ export const Message: MessageFns<Message> = {
         : isSet(object.tap_control)
         ? TapControl.fromJSON(object.tap_control)
         : undefined,
+      editor: isSet(object.editor) ? EditorControl.fromJSON(object.editor) : undefined,
       position: isSet(object.position) ? TransportPosition.fromJSON(object.position) : undefined,
       meters: isSet(object.meters) ? Meters.fromJSON(object.meters) : undefined,
       engineState: isSet(object.engineState)
@@ -1635,6 +1752,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.tapControl !== undefined) {
       obj.tapControl = TapControl.toJSON(message.tapControl);
+    }
+    if (message.editor !== undefined) {
+      obj.editor = EditorControl.toJSON(message.editor);
     }
     if (message.position !== undefined) {
       obj.position = TransportPosition.toJSON(message.position);
@@ -1670,6 +1790,9 @@ export const Message: MessageFns<Message> = {
       : undefined;
     message.tapControl = (object.tapControl !== undefined && object.tapControl !== null)
       ? TapControl.fromPartial(object.tapControl)
+      : undefined;
+    message.editor = (object.editor !== undefined && object.editor !== null)
+      ? EditorControl.fromPartial(object.editor)
       : undefined;
     message.position = (object.position !== undefined && object.position !== null)
       ? TransportPosition.fromPartial(object.position)

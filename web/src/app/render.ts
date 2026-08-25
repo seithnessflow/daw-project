@@ -21,6 +21,7 @@ import { fillWaveforms } from '../ui/waveform';
 import { ctx, els, sendLastChange } from './context';
 import { updateInsertMarker, refreshOverview, updateGridVars } from './navigation';
 import { refreshPalette } from './placement';
+import { renderPresence } from './presence_view';
 import { cssId } from '../document/sanitize';
 
 /**
@@ -59,6 +60,10 @@ export function renderTracks(force = false): void {
   const selectedTrack =
     doc.tracks.find((t) => t.id === ctx.selectedTrackId) ?? null;
 
+  // Presence: the local selection is the single funnel here, so tell the
+  // multiplayer layer from one place (idempotent - only broadcasts on change).
+  ctx.presence?.setSelection(ctx.selectedTrackId);
+
   // V1.4: the snap grid vars follow the zoom (lanes draw the rule)
   updateGridVars();
 
@@ -88,6 +93,7 @@ export function renderTracks(force = false): void {
       updateClipFadesUI(track, doc.sampleRate || 48000);
     }
     if (selectedTrack) updateDeviceViewUI(selectedTrack.chain);
+    if (ctx.presence) renderPresence(ctx.presence);
     return;
   }
 
@@ -188,4 +194,6 @@ export function renderTracks(force = false): void {
   if (ctx.engineClient) {
     life.applyMonitorShade(ctx.engineClient.monitorSnapshot());
   }
+  // Heads were just rebuilt - re-place the remote-selection flags on them.
+  if (ctx.presence) renderPresence(ctx.presence);
 }

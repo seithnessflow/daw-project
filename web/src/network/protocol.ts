@@ -34,7 +34,8 @@ export type DecodedMessage =
 export type EncodeMessage =
   | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean } }
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
-  | { type: 'tapControl'; data: { enabled: boolean } };
+  | { type: 'tapControl'; data: { enabled: boolean } }
+  | { type: 'editor'; data: { nodeId: string; open: boolean } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -64,6 +65,11 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
     case 'tapControl':
       protoMessage = {
         tapControl: { enabled: msg.data.enabled },
+      };
+      break;
+    case 'editor':
+      protoMessage = {
+        editor: { nodeId: msg.data.nodeId, open: msg.data.open },
       };
       break;
   }

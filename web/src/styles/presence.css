@@ -1,0 +1,44 @@
+/* ---- Multiplayer presence ------------------------------------- */
+/* Roster in the topbar status cluster: one dot per person here. */
+.presence-roster {
+  gap: 3px;
+  padding: 2px 6px;
+}
+.presence-roster.presence-alone {
+  opacity: 0.6; /* just you - dimmed, still shows your colour */
+}
+.peer-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #10100f;
+  background: var(--peer, #888);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--peer, #888) 60%, transparent);
+  cursor: default;
+}
+
+/* Remote selection: coloured flags in the title row, right after the
+   track name - in flow, so they never sit over the M/S buttons. */
+.peer-flags {
+  display: inline-flex;
+  gap: 3px;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+.peer-flag {
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 7px;
+  color: #10100f;
+  background: var(--peer, #888);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--peer, #888) 55%, transparent);
+  white-space: nowrap;
+}

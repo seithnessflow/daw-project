@@ -38,6 +38,13 @@ message TapControl {
 // =============================================================================
 
 // Transport position (sent at 30 Hz)
+// Client -> Engine: open/close a plugin's native GUI window on demand.
+// Per-node toggle (the --editors flag only opened them ALL at spawn).
+message EditorControl {
+    string node_id = 1;   // the chain node whose plugin window to toggle
+    bool open = 2;        // true = show the GUI, false = close it
+}
+
 message TransportPosition {
     int64 position_samples = 1;
     bool is_playing = 2;
@@ -119,6 +126,7 @@ message Message {
         TransportCommand transport = 1;
         SetMonitor set_monitor = 2;
         TapControl tap_control = 7;   // S8a
+        EditorControl editor = 10;    // open/close a plugin GUI window
 
         // Engine -> Client
         TransportPosition position = 3;

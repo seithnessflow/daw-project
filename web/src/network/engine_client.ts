@@ -182,6 +182,14 @@ export class EngineClient {
     }
   }
 
+  /** Open/close a plugin's native GUI window (per chain node). */
+  setEditor(nodeId: string, open: boolean): void {
+    const message = encodeMessage({ type: 'editor', data: { nodeId, open } });
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(message);
+    }
+  }
+
   setLoop(enabled: boolean): void {
     const message = encodeMessage({
       type: 'transport',

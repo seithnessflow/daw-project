@@ -30,12 +30,17 @@
 }
 .track-selected .track-head,
 .track-selected:hover .track-head {
-  background: linear-gradient(rgba(141, 122, 230, 0.06), transparent),
+  background: linear-gradient(rgba(141, 122, 230, 0.11), transparent),
     var(--surface-3);
-  box-shadow: inset -1px 0 0 var(--potion-dim);
+  box-shadow: inset -2px 0 0 var(--potion);
 }
 .track-selected .track-name {
   color: #fff;
+}
+/* The track-color strip lights up potion so the selected row reads at a
+   glance from its LEFT edge too (its own colour stays visible under the glow) */
+.track-selected .track-color {
+  box-shadow: 0 0 7px 1px var(--potion);
 }
 .ruler-spacer {
   padding: 0 10px;

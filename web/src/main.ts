@@ -17,6 +17,7 @@ import './styles/overview.css';
 import './styles/timeline.css';
 import './styles/trackhead.css';
 import './styles/devices.css';
+import './styles/presence.css';
 import './styles/life.css';
 import './styles/touch-modes.css';
 import './styles/starter.css';
