@@ -748,6 +748,106 @@ bool testDocumentSerialization() {
     return true;
 }
 
+// Test: web-authored (Automerge-JS) documents store integers as INT, not
+// UINT. schemaVersion/sampleRate were read with AMitemToUint (strict) and
+// fell back silently to the default -> every non-48k project rendered at
+// 48k and the v2 migration gate was dead code (AUDIT-5 A1). Repro with
+// REAL JS-authored bytes (sampleRate=96000, schemaVersion=2,
+// masterGain=0.5). masterGain (read via itemToDouble, which already
+// tolerates int/f64) is the POSITIVE CONTROL: it must be read right,
+// proving the doc loads and only the strict-uint fields are the bug.
+// Bytes: @automerge/automerge, actor a5a5..., time 0 - regenerate with
+// the same three values if the schema ever changes.
+bool testWebAuthoredIntFields() {
+    std::cout << "Test: web-authored int fields (int/f64 read)... ";
+
+    static const uint8_t kWebDoc[] = {
+        0x85,0x6f,0x4a,0x83,0xe8,0x5a,0x47,0x02,0x00,0xa8,0x01,0x01,
+        0x0c,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,0xa5,
+        0xa5,0x01,0x45,0xfd,0x85,0xaa,0x9d,0xd6,0x18,0xdb,0x32,0x74,
+        0x8d,0x0d,0x0b,0x04,0x2d,0xe6,0xa2,0x9d,0x42,0x25,0x34,0x8b,
+        0xf1,0x60,0x30,0xbf,0xb0,0x76,0x49,0x62,0x47,0x6d,0x06,0x01,
+        0x02,0x03,0x02,0x13,0x02,0x23,0x02,0x40,0x02,0x56,0x02,0x08,
+        0x15,0x2c,0x21,0x02,0x23,0x06,0x34,0x01,0x42,0x04,0x56,0x06,
+        0x57,0x0c,0x80,0x01,0x02,0x7f,0x00,0x7f,0x01,0x7f,0x04,0x7f,
+        0x00,0x7f,0x00,0x7f,0x07,0x7c,0x0a,0x6d,0x61,0x73,0x74,0x65,
+        0x72,0x47,0x61,0x69,0x6e,0x0a,0x73,0x61,0x6d,0x70,0x6c,0x65,
+        0x52,0x61,0x74,0x65,0x0d,0x73,0x63,0x68,0x65,0x6d,0x61,0x56,
+        0x65,0x72,0x73,0x69,0x6f,0x6e,0x06,0x74,0x72,0x61,0x63,0x6b,
+        0x73,0x04,0x00,0x7f,0x03,0x02,0x7f,0x7f,0x03,0x04,0x03,0x01,
+        0x7f,0x02,0x7c,0x85,0x01,0x34,0x14,0x00,0x00,0x00,0x00,0x00,
+        0x00,0x00,0xe0,0x3f,0x80,0xee,0x05,0x02,0x04,0x00,0x00,
+    };
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.loadFromBytes(kWebDoc, sizeof(kWebDoc))) {
+        std::cout << "FAILED: load failed: " << doc.getLastError() << "\n";
+        return false;
+    }
+    const auto& p = doc.getDocument();
+
+    // Positive control: masterGain (f64) must survive - proves the doc
+    // loaded and that only the int-typed fields are at issue.
+    if (std::fabs(p.master_gain - 0.5f) > 1e-6f) {
+        std::cout << "FAILED: masterGain misread (" << p.master_gain
+                  << ") - the doc did not load as expected\n";
+        return false;
+    }
+    // The bug: a JS-authored INT sampleRate must be read, not defaulted.
+    if (p.sample_rate != 96000) {
+        std::cout << "FAILED: sampleRate read as " << p.sample_rate
+                  << " (expected 96000; a JS INT fell through to the 48000 default)\n";
+        return false;
+    }
+    if (p.schema_version != 2) {
+        std::cout << "FAILED: schemaVersion read as " << p.schema_version
+                  << " (expected 2; a JS INT fell through to the default)\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// AUDIT-5 A2: computeStemKey serialized float params through a default
+// ostringstream (6 significant figures). Two DISTINCT float values that
+// agree to 6 sig-figs - a normalized 0..1 knob nudged by ~1 ULP, routine
+// during a drag - collapsed to the SAME key, so a stale stem read FRESH
+// and a peer without the plugin heard the wrong render (the badge lied).
+// The key must distinguish any two distinct floats.
+bool testStemKeyPrecision() {
+    std::cout << "Test: stem key float precision... ";
+
+    using namespace daw::document;
+    const float v1 = 0.5f;
+    const float v2 = std::nextafter(0.5f, 1.0f);  // distinct float, ~6e-8 away
+    if (v1 == v2) {
+        std::cout << "FAILED: test setup - values not distinct\n";
+        return false;
+    }
+
+    auto makeTrack = [](float mix) {
+        TrackDef t;
+        ProcessorDef node;
+        node.type = "vst3";
+        node.uid = "84E8DE5F92554F5396FAE4133C935A18";
+        node.params["0"] = mix;
+        t.chain.push_back(node);
+        return t;
+    };
+
+    const std::string ka = daw::render::computeStemKey(makeTrack(v1), 0, 48000, "ver");
+    const std::string kb = daw::render::computeStemKey(makeTrack(v2), 0, 48000, "ver");
+    if (ka == kb) {
+        std::cout << "FAILED: two distinct float params produced the SAME stem "
+                     "key (6-sig-fig serialization) - a stale stem would read fresh\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
 // Test 7: Document clips round-trip
 bool testDocumentClipsRoundTrip() {
     std::cout << "Test: Document clips round-trip... ";
@@ -3169,6 +3269,8 @@ int main(int argc, char* argv[]) {
     run(testDelayNode);
     run(testRingBuffer);
     run(testDocumentSerialization);
+    run(testWebAuthoredIntFields);
+    run(testStemKeyPrecision);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);

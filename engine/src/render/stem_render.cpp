@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <limits>
 #include <sstream>
 #include <vector>
 
@@ -53,7 +55,16 @@ std::string computeStemKey(const document::TrackDef& track,
     // Canonical, order-stable text over every INPUT of the render.
     // A changed key = a stale stem (UI state, never a playback block).
     std::ostringstream k;
-    k << "stem-v1|sr=" << sample_rate;
+    // AUDIT-5 A2: max_digits10 (=9 for float) so two DISTINCT floats never
+    // serialize alike - a 6-sig-fig collision (a knob nudged by ~1 ULP)
+    // declared a stale stem fresh and a plugin-less peer heard the wrong
+    // render. Key format bumped to v2: every existing stem re-renders once
+    // (freshness is UI state, never a playback block). Note the deeper debt
+    // (AUDIT-5 A1/1.1): params are already f64->float truncated at read and
+    // iterated in map (lexicographic) order, not document order - both wait
+    // on the params-list refactor.
+    k << std::setprecision(std::numeric_limits<float>::max_digits10);
+    k << "stem-v2|sr=" << sample_rate;
     const auto& node = track.chain[node_index];
     k << "|uid=" << node.uid << "|ver=" << module_version_tag;
     k << "|state=" << node.state_hash << ":" << node.state_version;

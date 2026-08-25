@@ -33,6 +33,21 @@ bool itemToDouble(AMitem* item, double* out) {
     }
     return false;
 }
+
+// Symetrique de itemToDouble : le web (Automerge-JS) ecrit un entier en
+// INT, le moteur en UINT - schemaVersion/sampleRate doivent etre lus quelle
+// que soit la source (AUDIT-5 A1 : AMitemToUint strict lisait 0 sur un INT
+// du web -> tout projet non-48k rendu a 48k, garde de migration morte).
+// Ces deux champs ne sont jamais des flottants, pas de branche f64.
+bool itemToUint(AMitem* item, uint64_t* out) {
+    if (AMitemToUint(item, out)) return true;
+    int64_t i = 0;
+    if (AMitemToInt(item, &i) && i >= 0) {
+        *out = static_cast<uint64_t>(i);
+        return true;
+    }
+    return false;
+}
 }  // namespace
 
 AutomergeDocument::AutomergeDocument() = default;
@@ -299,7 +314,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
     if (result && AMresultStatus(result) == AM_STATUS_OK) {
         AMitem* item = AMresultItem(result);
         uint64_t val;
-        if (AMitemToUint(item, &val)) {
+        if (itemToUint(item, &val)) {
             out.schema_version = static_cast<uint32_t>(val);
         }
     }
@@ -310,7 +325,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
     if (result && AMresultStatus(result) == AM_STATUS_OK) {
         AMitem* item = AMresultItem(result);
         uint64_t val;
-        if (AMitemToUint(item, &val)) {
+        if (itemToUint(item, &val)) {
             out.sample_rate = static_cast<uint32_t>(val);
         }
     }
