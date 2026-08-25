@@ -180,6 +180,9 @@ export async function init(): Promise<void> {
   // silently - the rule written the day the harness tripped on it.
   engineClient.tokenRefresher = fetchLocalToken;
   ctx.engineClient = engineClient;
+  // Sonde de pilotage (doctrine window.__daw*) : permet d'injecter des
+  // meters synthetiques pour verifier les VU sans jouer d'audio reel.
+  (window as unknown as { __dawEngine?: unknown }).__dawEngine = engineClient;
   // Editor button (per vst3 device, ui/track.ts) -> open/close the plugin
   // GUI window via the engine.
   els.tracks.addEventListener('editor-toggle', (e) => {
@@ -477,6 +480,21 @@ export async function init(): Promise<void> {
     els.masterVuR.style.width = `${Math.min(100, masterRight * 100)}%`;
     els.masterVuL.classList.toggle('clipping', masterLeft > CLIP);
     els.masterVuR.classList.toggle('clipping', masterRight > CLIP);
+    // F3 : la tranche MASTER de la console mixage (les meters par piste ne
+    // portent pas le master - le moteur l'emet separement, ici).
+    const mm = document.querySelector<HTMLElement>('.mx-vu[data-track-id="__master__"]');
+    if (mm) {
+      const bl = mm.children[0] as HTMLElement | undefined;
+      const br = mm.children[1] as HTMLElement | undefined;
+      if (bl) {
+        bl.style.height = `${Math.min(100, masterLeft * 100)}%`;
+        bl.classList.toggle('clipping', masterLeft > CLIP);
+      }
+      if (br) {
+        br.style.height = `${Math.min(100, masterRight * 100)}%`;
+        br.classList.toggle('clipping', masterRight > CLIP);
+      }
+    }
     // T3 : VU inter-device. Les entrees dont l'id est un proc id (pas une
     // piste) alimentent le mini-VU apres chaque device de la chaine.
     for (const m of meters) {

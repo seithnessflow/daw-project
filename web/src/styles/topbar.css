@@ -100,11 +100,17 @@ h1 {
   height: 4px;
   width: 0%;
   border-radius: 2px;
-  background: var(--green);
+  /* F3 : LED cuivre -> ambre -> rouge. Le gradient est ANCRE a la largeur
+     du VU (background-size fixe), donc la couleur suit le niveau reel : la
+     crete n'atteint le rouge que quand la barre approche du bout. */
+  background: linear-gradient(90deg,
+    var(--copper) 0%, #e6a552 55%, #f0913a 78%, #e03131 100%);
+  background-size: 90px 100%;
+  background-repeat: no-repeat;
   transition: width 60ms linear;
 }
 .master-vu-bar.clipping {
-  background: #e03131;  /* > -1 dBFS: the ear's red line */
+  background: #e03131;  /* > -1 dBFS: the ear's red line, full red */
 }
 #master-gain {
   width: 110px;
