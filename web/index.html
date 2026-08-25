@@ -84,7 +84,13 @@
       <div class="col-split" data-split="rack" role="separator"
            aria-orientation="vertical" tabindex="0"
            title="Glisser pour redimensionner (double-clic : defaut)"></div>
-      <div class="col col-rack">
+      <div class="col col-rack" data-rack-tab="rack">
+        <div class="rack-tabs" role="tablist" aria-label="Panneau droit">
+          <button class="rack-tab" data-role="rack-tab" data-tab="rack"
+                  role="tab" aria-selected="true">Rack</button>
+          <button class="rack-tab" data-role="rack-tab" data-tab="piano"
+                  role="tab" aria-selected="false">Piano-roll</button>
+        </div>
         <div class="device-view-slot" id="device-view-slot"></div>
       </div>
     </div>

@@ -53,9 +53,35 @@
 .col-arrange .tracks { border-radius: 0; box-shadow: none; }
 .col-arrange #add-track-btn { margin: 6px 8px; flex: 0 0 auto; }
 
-/* droite : le rack device + piano-roll (scroll). #device-view-slot y vit. */
-.col-rack { background: var(--surface); overflow-y: auto; }
-.col-rack .device-view-slot { margin: 0; }
+/* droite : rack device / piano-roll en ONGLETS (F7). La tete d'onglets coiffe,
+   #device-view-slot scrolle en dessous ; render.ts rend les DEUX, le CSS
+   n'en montre qu'un selon data-rack-tab. */
+.col-rack { background: var(--surface); overflow: hidden; }
+.col-rack .device-view-slot { margin: 0; flex: 1; min-height: 0; overflow-y: auto; }
+.rack-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px 0;
+  flex: 0 0 auto;
+  box-shadow: inset 0 -1px 0 var(--hair);
+}
+.rack-tab {
+  padding: 7px 14px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  border-radius: 7px 7px 0 0;
+  transition: color 90ms ease, background-color 90ms ease, box-shadow 90ms ease;
+}
+.rack-tab:hover { color: var(--text-2); }
+.rack-tab[aria-selected="true"] {
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hair), inset 0 2px 0 var(--copper);
+}
+/* visibilite selon l'onglet actif */
+.col-rack[data-rack-tab="rack"] .piano-roll-slot { display: none; }
+.col-rack[data-rack-tab="piano"] #device-view { display: none; }
 
 /* les slots vides (starter/overview absents) ne prennent pas de place */
 #starter-slot:empty, #overview-slot:empty, #library-slot:empty { display: none; }

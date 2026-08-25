@@ -84,6 +84,9 @@ export function renderSession(): void {
       const cell = document.createElement('button');
       cell.className = 'ss-slot' + (clip ? ' filled' : '') + (isPlaying ? ' playing' : '');
       cell.style.setProperty('--hue', String(trackHue(t.id)));
+      cell.dataset.ssTrack = t.id;          // clic droit contextuel
+      cell.dataset.ssScene = sc.id;
+      if (clip) cell.dataset.ssClip = clip.id;
       if (clip) {
         const nn = clip.notes?.length ?? 0;
         const icon = isPlaying ? '&#9632;' : '&#9654;';  // stop / play

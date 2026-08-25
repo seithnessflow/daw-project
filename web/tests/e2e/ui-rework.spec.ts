@@ -42,6 +42,22 @@ test.describe('Refonte UI : commutateur de paradigmes (T6)', () => {
   });
 });
 
+test.describe('Refonte UI : onglets Rack / Piano-roll (F7)', () => {
+  test('bascule Rack<->Piano + persistance localStorage', async ({ page }) => {
+    await open(page, `ui-racktab-${Date.now()}`);
+    const col = page.locator('.col-rack');
+    await expect(col).toHaveAttribute('data-rack-tab', 'rack');
+
+    await page.locator('[data-role="rack-tab"][data-tab="piano"]').click();
+    await expect(col).toHaveAttribute('data-rack-tab', 'piano');
+    expect(await page.evaluate(() => localStorage.getItem('daw-rack-tab'))).toBe('piano');
+
+    await page.reload();
+    await waitForServerConnection(page);
+    await expect(page.locator('.col-rack')).toHaveAttribute('data-rack-tab', 'piano');
+  });
+});
+
 test.describe('Refonte UI : splitters de colonnes (F7)', () => {
   test('drag redimensionne + persiste en localStorage + survit au reload', async ({ page }) => {
     const id = `ui-split-${Date.now()}`;

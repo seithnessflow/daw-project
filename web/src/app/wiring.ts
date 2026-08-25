@@ -34,6 +34,8 @@ import { renderPresence } from './presence_view';
 import { renderBrowser } from '../ui/browser';
 import { initParadigm } from './paradigm';
 import { initSplitters } from './splitters';
+import { initRackTabs } from './rack_tabs';
+import { initContextMenu } from './context_menu_dispatch';
 import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
@@ -543,6 +545,8 @@ export async function init(): Promise<void> {
   renderBrowser();  // T4 : etat initial (vide, "scan…") des le montage
   initParadigm();   // T6 : le commutateur Arrangement/Session/Mixage
   initSplitters();  // F7 : colonnes redimensionnables (largeurs persistees)
+  initRackTabs();   // F7 : onglets Rack / Piano-roll (colonne droite)
+  initContextMenu(); // clic droit contextuel selon la zone
 
   // ---- Transport controls -------------------------------------------------
   els.playBtn.addEventListener('click', startPlayback);
