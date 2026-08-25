@@ -70,6 +70,15 @@ public:
     /** Latest-value parameter channel (last state wins). */
     void setParam(uint32_t param_id, double normalized);
 
+    /**
+     * MIDI (v8) : pousse UN evenement de note pour le bloc courant (thread
+     * de controle, FIFO SPSC). L'enfant le draine dans l'IEventList VST3
+     * avant process(). C'est le canal qui fait SONNER un instrument.
+     * sample_offset = position dans le bloc (0..blockSize-1).
+     */
+    void sendMidiNote(bool note_on, uint8_t pitch, uint8_t velocity,
+                      uint8_t channel, uint32_t sample_offset);
+
     // ---- State side-channel (2.5-etat) -----------------------------------
     // The blob travels via `<segment>.state`, never through the ring.
 

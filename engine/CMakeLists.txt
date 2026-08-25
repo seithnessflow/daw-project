@@ -293,6 +293,12 @@ add_executable(create_test_doc
 )
 target_link_libraries(create_test_doc PRIVATE daw_engine_lib)
 
+# v8 MIDI : fabrique un doc "clip MIDI + instrument" pour tester le son.
+add_executable(create_midi_doc
+    tests/create_midi_doc.cpp
+)
+target_link_libraries(create_midi_doc PRIVATE daw_engine_lib)
+
 # =============================================================================
 # VST3 SDK + plugin host (ADR-017, 2.4a) - lives in its own file because the
 # CI cache of the SDK build tree is keyed on ITS hash, not on this file's:

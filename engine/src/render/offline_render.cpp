@@ -258,6 +258,19 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
             }
         }
 
+        // v8 MIDI : notes ABSOLUES de la piste (tous clips), donnees au
+        // PREMIER node vst3 de la chaine (l'instrument). Un clip audio
+        // classique n'a pas de notes -> track_notes vide -> rien de change.
+        std::vector<host::ScheduledNote> track_notes;
+        for (const auto& clip_def : track_def.clips) {
+            for (const auto& n : clip_def.notes) {
+                const int64_t abs_start = clip_def.start_sample + n.start_sample;
+                track_notes.push_back(
+                    {n.pitch, n.velocity, abs_start, abs_start + n.length_samples});
+            }
+        }
+        bool notes_assigned = false;
+
         // Create processors (after the governing node when substituted)
         for (size_t proc_i = sub.active ? sub.resume_index : 0;
              proc_i < track_def.chain.size(); ++proc_i) {
@@ -328,6 +341,11 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
                     }
                 }
                 auto node = std::make_unique<host::SyncProxyNode>(proc_def.id, bridge.get());
+                // v8 : le premier vst3 de la piste joue les notes (instrument).
+                if (!notes_assigned && !track_notes.empty()) {
+                    node->setNotes(track_notes);
+                    notes_assigned = true;
+                }
                 sync_nodes_.push_back(node.get());
                 bridges_.push_back(std::move(bridge));
                 track.chain.push_back(std::move(node));

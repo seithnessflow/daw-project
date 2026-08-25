@@ -354,6 +354,14 @@ void PluginBridge::setParam(uint32_t param_id, double normalized) {
     ring_->param_write_idx.store(w + 1, std::memory_order_release);
 }
 
+void PluginBridge::sendMidiNote(bool note_on, uint8_t pitch, uint8_t velocity,
+                                uint8_t channel, uint32_t sample_offset) {
+    if (!ring_) return;
+    // Le FIFO SPSC vit dans le ring : un seul ecrivain a la fois (ici le
+    // thread de controle, offline ; le ProxyNode en live). Voir pushMidiEvent.
+    pushMidiEvent(ring_, note_on, pitch, velocity, channel, sample_offset);
+}
+
 bool PluginBridge::processBlockSync(const float* in_l, const float* in_r,
                                     float* out_l, float* out_r,
                                     uint32_t n, uint32_t timeout_ms) {

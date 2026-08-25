@@ -551,6 +551,43 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                                 }
                                             }
                                             if (cr) AMresultFree(cr);
+
+                                            // v8 MIDI : notes = liste d'objets
+                                            // {pitch, velocity, startSample, lengthSamples}
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("notes"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemValType(AMresultItem(cr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                                                const AMobjId* notesId = AMitemObjId(AMresultItem(cr));
+                                                const size_t ncount = AMobjSize(doc_, notesId, nullptr);
+                                                for (size_t ni = 0; ni < ncount; ++ni) {
+                                                    AMresult* nr = AMlistGet(doc_, notesId, ni, nullptr);
+                                                    if (nr && AMresultStatus(nr) == AM_STATUS_OK &&
+                                                        AMitemValType(AMresultItem(nr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                                                        const AMobjId* noteObj = AMitemObjId(AMresultItem(nr));
+                                                        NoteDef note;
+                                                        int64_t nv;
+                                                        AMresult* fr = AMmapGet(doc_, noteObj, AMstr("pitch"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.pitch = static_cast<uint8_t>(nv);
+                                                        if (fr) AMresultFree(fr);
+                                                        fr = AMmapGet(doc_, noteObj, AMstr("velocity"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.velocity = static_cast<uint8_t>(nv);
+                                                        if (fr) AMresultFree(fr);
+                                                        fr = AMmapGet(doc_, noteObj, AMstr("startSample"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.start_sample = nv;
+                                                        if (fr) AMresultFree(fr);
+                                                        fr = AMmapGet(doc_, noteObj, AMstr("lengthSamples"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.length_samples = nv;
+                                                        if (fr) AMresultFree(fr);
+                                                        clip.notes.push_back(note);
+                                                    }
+                                                    if (nr) AMresultFree(nr);
+                                                }
+                                            }
+                                            if (cr) AMresultFree(cr);
                                         }
                                     }
                                     if (clipResult) AMresultFree(clipResult);
@@ -1097,6 +1134,37 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
         if (clip.fade_out_samples != 0) {
             cr = AMmapPutInt(doc_, clipObjId, AMstr("fadeOutSamples"), clip.fade_out_samples);
             if (cr) results_to_free.push_back(cr);
+        }
+
+        // v8 MIDI : notes (liste d'objets {pitch,velocity,startSample,
+        // lengthSamples}), seulement si non vide (clip audio = pas de champ).
+        if (!clip.notes.empty()) {
+            cr = AMmapPutObject(doc_, clipObjId, AMstr("notes"), AM_OBJ_TYPE_LIST);
+            if (cr && AMresultStatus(cr) == AM_STATUS_OK) {
+                const AMobjId* notesId = AMitemObjId(AMresultItem(cr));
+                results_to_free.push_back(cr);
+                for (size_t ni = 0; ni < clip.notes.size(); ++ni) {
+                    const auto& n = clip.notes[ni];
+                    AMresult* nr = AMlistPutObject(doc_, notesId, ni, true, AM_OBJ_TYPE_MAP);
+                    if (nr && AMresultStatus(nr) == AM_STATUS_OK) {
+                        const AMobjId* noteObj = AMitemObjId(AMresultItem(nr));
+                        results_to_free.push_back(nr);
+                        AMresult* fr;
+                        fr = AMmapPutInt(doc_, noteObj, AMstr("pitch"), n.pitch);
+                        if (fr) results_to_free.push_back(fr);
+                        fr = AMmapPutInt(doc_, noteObj, AMstr("velocity"), n.velocity);
+                        if (fr) results_to_free.push_back(fr);
+                        fr = AMmapPutInt(doc_, noteObj, AMstr("startSample"), n.start_sample);
+                        if (fr) results_to_free.push_back(fr);
+                        fr = AMmapPutInt(doc_, noteObj, AMstr("lengthSamples"), n.length_samples);
+                        if (fr) results_to_free.push_back(fr);
+                    } else if (nr) {
+                        results_to_free.push_back(nr);
+                    }
+                }
+            } else if (cr) {
+                results_to_free.push_back(cr);
+            }
         }
     }
 

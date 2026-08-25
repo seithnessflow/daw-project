@@ -43,8 +43,9 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 7;       // v7: plugin_latency_samples (v6: gui_edit_seq)
+inline constexpr uint32_t kLayoutVersion = 8;       // v8: MIDI event FIFO (v7: plugin_latency_samples)
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
+inline constexpr uint32_t kMidiQueueSlots = 256;    // power of two; note events per block, drained by the child
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
 inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
@@ -119,6 +120,22 @@ struct SharedAudioRing {
     // uint64 pour garder les offsets multiples de 8 (pas de padding).
     std::atomic<uint64_t> plugin_latency_samples;
 
+    // ---- MIDI event channel (v8): SPSC FIFO, meme moule que les params ----
+    // L'ENGINE (thread de controle) pousse les evenements de note du bloc ;
+    // l'ENFANT les DRAINE dans l'IEventList VST3 avant process(). Meme
+    // discipline d'indices que le FIFO param (slots plain, ordonnes par les
+    // index). Les notes sont TRANSITOIRES : jamais rejouees a un cold restart
+    // (contrairement aux params) - un restart envoie un all-notes-off. Plein
+    // = on ecrase la plus VIEILLE (avance read_idx), le controle ne stalle
+    // jamais (un debordement > 256 notes/bloc n'est jamais legitime).
+    std::atomic<uint64_t> midi_write_idx;
+    std::atomic<uint64_t> midi_read_idx;
+    uint8_t  midi_type[kMidiQueueSlots];      // 0 = note-off, 1 = note-on
+    uint8_t  midi_pitch[kMidiQueueSlots];     // 0..127
+    uint8_t  midi_velocity[kMidiQueueSlots];  // 0..127
+    uint8_t  midi_channel[kMidiQueueSlots];   // 0..15
+    uint32_t midi_offset[kMidiQueueSlots];    // offset en samples DANS le bloc
+
     // ---- Planar audio, double-buffered: [slot][channel][frame] ----
     float in[kRingSlots][kRingChannels][kRingBlockSize];
     float out[kRingSlots][kRingChannels][kRingBlockSize];
@@ -147,11 +164,44 @@ static_assert(offsetof(SharedAudioRing, state_request_seq) == 64 + kParamQueueSl
 static_assert(offsetof(SharedAudioRing, state_ready_seq) == 72 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, gui_edit_seq) == 80 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, plugin_latency_samples) == 88 + kParamQueueSlots * 12);
-static_assert(offsetof(SharedAudioRing, in) == 96 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, midi_write_idx) == 96 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, midi_read_idx) == 104 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, midi_type) == 112 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, midi_pitch) == 112 + kParamQueueSlots * 12 + kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, midi_velocity) == 112 + kParamQueueSlots * 12 + 2 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, midi_channel) == 112 + kParamQueueSlots * 12 + 3 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, midi_offset) == 112 + kParamQueueSlots * 12 + 4 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, in) == 112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, out) ==
-              96 + kParamQueueSlots * 12 + kRingSlots * kRingChannels * kRingBlockSize * 4);
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  kRingSlots * kRingChannels * kRingBlockSize * 4);
 static_assert(sizeof(SharedAudioRing) ==
-              96 + kParamQueueSlots * 12 + 2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
+
+// Ecrit UN evenement de note dans le FIFO MIDI (SPSC, single writer). Utilise
+// par PluginBridge (offline, thread de controle) ET ProxyNode (live, thread
+// audio) - JAMAIS les deux sur le meme ring simultanement (regle
+// un-producteur-par-ring, cf. proxy_node.h). RT-safe : que des atomics et des
+// ecritures de slots plain, aucune alloc/syscall. Plein = ecrase la plus
+// vieille (avance read_idx), l'ecrivain ne stalle jamais.
+inline void pushMidiEvent(SharedAudioRing* ring, bool note_on, uint8_t pitch,
+                          uint8_t velocity, uint8_t channel,
+                          uint32_t sample_offset) noexcept {
+    const uint64_t w = ring->midi_write_idx.load(std::memory_order_relaxed);
+    uint64_t r = ring->midi_read_idx.load(std::memory_order_acquire);
+    if (w - r >= kMidiQueueSlots) {
+        ring->midi_read_idx.compare_exchange_strong(r, r + 1,
+                                                    std::memory_order_acq_rel);
+    }
+    const uint32_t slot = static_cast<uint32_t>(w % kMidiQueueSlots);
+    ring->midi_type[slot] = note_on ? 1 : 0;
+    ring->midi_pitch[slot] = pitch;
+    ring->midi_velocity[slot] = velocity;
+    ring->midi_channel[slot] = channel;
+    ring->midi_offset[slot] = sample_offset;
+    ring->midi_write_idx.store(w + 1, std::memory_order_release);
+}
 
 }  // namespace daw::host

@@ -6,7 +6,7 @@
 namespace daw::host {
 
 void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
-                        int64_t /*position_samples*/) noexcept {
+                        int64_t position_samples) noexcept {
     // Contract breach (no ring, or a partial tail block the fixed-size ring
     // cannot carry): dry pass-through, counted. The live callback always
     // cuts 256-frame chunks, so this fires only on misuse.
@@ -34,6 +34,15 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
     } else {
         std::memset(in_l, 0, kRingBlockSize * sizeof(float));
         std::memset(in_r, 0, kRingBlockSize * sizeof(float));
+    }
+    // v8 MIDI : emet les notes de ce bloc dans le ring AVANT de publier
+    // input_seq (l'enfant draine le MIDI en traitant ce bloc). RT-safe :
+    // que des atomics + slots plain. Un effet a notes_ vide (rien n'est emis).
+    if (!notes_.empty()) {
+        emitBlockNotes(notes_, position_samples, kRingBlockSize,
+                       [this](bool on, uint8_t pitch, uint8_t vel, uint32_t off) {
+                           pushMidiEvent(ring_, on, pitch, vel, 0, off);
+                       });
     }
     ring_->input_seq.store(seq, std::memory_order_release);
 

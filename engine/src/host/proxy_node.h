@@ -35,9 +35,11 @@
 
 #include "../graph/processor_node.h"
 #include "shared_audio_ring.h"
+#include "midi_schedule.h"
 
 #include <atomic>
 #include <string>
+#include <vector>
 
 namespace daw::host {
 
@@ -76,6 +78,10 @@ public:
     void prepare(uint32_t, uint32_t) override {}
     void reset() noexcept override {}
 
+    /** v8 MIDI : notes (positions absolues) que ce node-instrument joue,
+     *  emises dans le ring par bloc dans process(). Vide = pas d'instrument. */
+    void setNotes(std::vector<ScheduledNote> notes) { notes_ = std::move(notes); }
+
 private:
     std::string type_{TYPE};
     std::string id_;
@@ -83,6 +89,7 @@ private:
     std::atomic<uint64_t>* missed_ = nullptr;
     uint32_t depth_ = 1;
     bool bypass_ = false;
+    std::vector<ScheduledNote> notes_;
 };
 
 }  // namespace daw::host

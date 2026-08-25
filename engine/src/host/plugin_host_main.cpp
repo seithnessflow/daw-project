@@ -23,6 +23,7 @@
 #include "public.sdk/source/vst/hosting/hostclasses.h"
 #include "public.sdk/source/vst/hosting/module.h"
 #include "public.sdk/source/vst/hosting/parameterchanges.h"
+#include "public.sdk/source/vst/hosting/eventlist.h"
 
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/gui/iplugview.h"
@@ -445,6 +446,7 @@ struct PluginInstance {
     Steinberg::FUnknownPtr<Steinberg::Vst::IAudioProcessor> processor;
     Steinberg::Vst::HostApplication host_app;
     bool active = false;
+    Steinberg::int32 num_audio_in = 1;  // v8 : 0 pour un instrument
 
     bool setup(const std::string& module_path, const std::string& uid_str,
                double sample_rate, std::string& error) {
@@ -482,12 +484,23 @@ struct PluginInstance {
             return false;
         }
 
-        Vst::SpeakerArrangement stereo = Vst::SpeakerArr::kStereo;
-        if (processor->setBusArrangements(&stereo, 1, &stereo, 1) != kResultOk) {
-            error = "setBusArrangements(stereo/stereo) refused";
+        // v8 : arrangement ADAPTATIF. Un effet = stereo in + stereo out ;
+        // un INSTRUMENT n'a PAS de bus d'entree audio (numIn == 0) et
+        // refusait setBusArrangements(stereo/stereo). On arrange exactement
+        // les bus que le plugin declare, tous en stereo.
+        const int32 numIn = component->getBusCount(Vst::kAudio, Vst::kInput);
+        const int32 numOut = component->getBusCount(Vst::kAudio, Vst::kOutput);
+        Vst::SpeakerArrangement inArr[8], outArr[8];
+        const int32 ni = numIn < 0 ? 0 : (numIn > 8 ? 8 : numIn);
+        const int32 no = numOut < 0 ? 0 : (numOut > 8 ? 8 : numOut);
+        for (int32 b = 0; b < ni; ++b) inArr[b] = Vst::SpeakerArr::kStereo;
+        for (int32 b = 0; b < no; ++b) outArr[b] = Vst::SpeakerArr::kStereo;
+        if (processor->setBusArrangements(inArr, ni, outArr, no) != kResultOk) {
+            error = "setBusArrangements refused";
             teardown();
             return false;
         }
+        num_audio_in = ni;  // le process s'adapte (instrument = 0 entree)
 
         Vst::ProcessSetup setup{};
         setup.processMode = Vst::kRealtime;
@@ -500,8 +513,8 @@ struct PluginInstance {
             return false;
         }
 
-        if (component->activateBus(Vst::kAudio, Vst::kInput, 0, true) != kResultOk ||
-            component->activateBus(Vst::kAudio, Vst::kOutput, 0, true) != kResultOk) {
+        if ((ni > 0 && component->activateBus(Vst::kAudio, Vst::kInput, 0, true) != kResultOk) ||
+            (no > 0 && component->activateBus(Vst::kAudio, Vst::kOutput, 0, true) != kResultOk)) {
             error = "activateBus refused";
             teardown();
             return false;
@@ -913,6 +926,45 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }
 #endif
 
+        // v8 MIDI : draine le FIFO de notes dans l'IEventList de CE bloc
+        // (meme discipline SPSC que les params). C'est le canal qui fait
+        // SONNER un instrument : sans lui, un synthe ne recoit aucune note.
+        Vst::EventList event_list{static_cast<int32>(daw::host::kMidiQueueSlots)};
+        while (true) {
+            uint64_t r = ring->midi_read_idx.load(std::memory_order_relaxed);
+            if (r >= ring->midi_write_idx.load(std::memory_order_acquire)) break;
+            const uint32_t mslot = static_cast<uint32_t>(r % daw::host::kMidiQueueSlots);
+            const uint8_t mtype = ring->midi_type[mslot];
+            const uint8_t mpitch = ring->midi_pitch[mslot];
+            const uint8_t mvel = ring->midi_velocity[mslot];
+            const uint8_t mchan = ring->midi_channel[mslot];
+            const uint32_t moff = ring->midi_offset[mslot];
+            // Reclame le slot AVANT de faire confiance a la paire (course
+            // file-pleine, comme les params).
+            if (!ring->midi_read_idx.compare_exchange_strong(
+                    r, r + 1, std::memory_order_acq_rel)) {
+                continue;
+            }
+            Vst::Event ev{};
+            ev.busIndex = 0;
+            ev.sampleOffset = static_cast<int32>(moff);
+            ev.flags = Vst::Event::kIsLive;
+            if (mtype == 1) {
+                ev.type = Vst::Event::kNoteOnEvent;
+                ev.noteOn.channel = mchan;
+                ev.noteOn.pitch = mpitch;
+                ev.noteOn.velocity = static_cast<float>(mvel) / 127.0f;
+                ev.noteOn.noteId = -1;
+            } else {
+                ev.type = Vst::Event::kNoteOffEvent;
+                ev.noteOff.channel = mchan;
+                ev.noteOff.pitch = mpitch;
+                ev.noteOff.velocity = static_cast<float>(mvel) / 127.0f;
+                ev.noteOff.noteId = -1;
+            }
+            event_list.addEvent(ev);
+        }
+
         // Zero-copy: VST3 channel pointers aim straight into the segment
         float* in_ch[2] = {ring->in[slot][0], ring->in[slot][1]};
         float* out_ch[2] = {ring->out[slot][0], ring->out[slot][1]};
@@ -927,11 +979,15 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         data.processMode = Vst::kRealtime;
         data.symbolicSampleSize = Vst::kSample32;
         data.numSamples = kHostBlockSize;
-        data.numInputs = 1;
+        // v8 : un instrument declare 0 bus d'entree audio -> numInputs 0,
+        // inputs nullptr (passer un bus fantome fait echouer les plugins
+        // stricts). L'audio de l'instrument vient des notes, pas de l'entree.
+        data.numInputs = inst.num_audio_in;
         data.numOutputs = 1;
-        data.inputs = &in_bus;
+        data.inputs = inst.num_audio_in > 0 ? &in_bus : nullptr;
         data.outputs = &out_bus;
         data.inputParameterChanges = &param_changes;
+        data.inputEvents = &event_list;  // v8 : les notes du bloc -> l'instrument
 
         if (inst.processor->process(data) != kResultOk) {
             std::cerr << "plugin_host error: process refused at seq " << seq << std::endl;

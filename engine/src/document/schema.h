@@ -70,6 +70,19 @@ struct ProcessorDef {
 };
 
 /**
+ * MIDI note (v8). Positions RELATIVES au debut du clip (comme les DAW :
+ * la note vit dans le clip, le clip est place sur la timeline). Un clip
+ * qui porte des notes est un clip MIDI ; l'instrument en tete de chaine
+ * de la piste les joue.
+ */
+struct NoteDef {
+    uint8_t pitch = 60;        // 0..127 (60 = do central)
+    uint8_t velocity = 100;    // 0..127
+    int64_t start_sample = 0;  // relatif au debut du clip
+    int64_t length_samples = 0;
+};
+
+/**
  * Clip definition.
  */
 struct ClipDef {
@@ -82,6 +95,8 @@ struct ClipDef {
     // default": an implicit 4 ms anti-click ramp (see graph_common).
     int64_t fade_in_samples = 0;
     int64_t fade_out_samples = 0;
+    // v8 MIDI : notes du clip (vide = clip audio classique).
+    std::vector<NoteDef> notes;
 };
 
 /**

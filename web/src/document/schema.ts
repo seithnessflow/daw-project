@@ -7,6 +7,14 @@
 
 export const SCHEMA_VERSION = 1;
 
+/** v8 MIDI : une note du clip. Positions RELATIVES au debut du clip. */
+export interface NoteDef {
+  pitch: number;         // 0..127
+  velocity: number;      // 0..127
+  startSample: number;   // relatif au debut du clip
+  lengthSamples: number;
+}
+
 export interface ClipDef {
   id: string;
   assetHash: string;
@@ -17,6 +25,8 @@ export interface ClipDef {
    *  an implicit 4 ms anti-click ramp. */
   fadeInSamples?: number;
   fadeOutSamples?: number;
+  /** v8 MIDI : notes du clip (absent/vide = clip audio classique). */
+  notes?: NoteDef[];
 }
 
 /** One parameter as a {key, value} pair - a LIST across every consumer

@@ -19,8 +19,10 @@
 
 #include "../graph/processor_node.h"
 #include "plugin_bridge.h"
+#include "midi_schedule.h"
 
 #include <string>
+#include <vector>
 
 namespace daw::host {
 
@@ -47,12 +49,17 @@ public:
     /** True once any exchange failed - the render must be declared failed. */
     [[nodiscard]] bool failed() const noexcept { return failed_; }
 
+    /** v8 MIDI : notes (positions absolues) que ce node-instrument joue.
+     *  Emises par bloc dans process(), avant l'echange. Vide = pas d'instrument. */
+    void setNotes(std::vector<ScheduledNote> notes) { notes_ = std::move(notes); }
+
 private:
     std::string type_{TYPE};
     std::string id_;
     PluginBridge* bridge_ = nullptr;
     bool bypass_ = false;
     bool failed_ = false;
+    std::vector<ScheduledNote> notes_;
 };
 
 }  // namespace daw::host

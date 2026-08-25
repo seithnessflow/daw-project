@@ -6,7 +6,7 @@
 namespace daw::host {
 
 void SyncProxyNode::process(float* output, const float* input, uint32_t frame_count,
-                            int64_t /*position_samples*/) noexcept {
+                            int64_t position_samples) noexcept {
     if (bypass_) {
         // Identity, zero latency, bridge untouched
         if (!input) {
@@ -27,6 +27,17 @@ void SyncProxyNode::process(float* output, const float* input, uint32_t frame_co
     for (uint32_t i = 0; i < frame_count; ++i) {
         in_l[i] = input ? input[2 * i] : 0.0f;
         in_r[i] = input ? input[2 * i + 1] : 0.0f;
+    }
+
+    // v8 MIDI : emet les notes de CE bloc AVANT l'echange - le FIFO doit
+    // etre rempli avant que processBlockSync ne publie input_seq (l'enfant
+    // draine le MIDI en traitant ce bloc). Un instrument recoit ainsi ses
+    // notes ; un effet a notes_ vide (rien n'est emis).
+    if (!notes_.empty()) {
+        emitBlockNotes(notes_, position_samples, frame_count,
+                       [this](bool on, uint8_t pitch, uint8_t vel, uint32_t off) {
+                           bridge_->sendMidiNote(on, pitch, vel, 0, off);
+                       });
     }
 
     if (!bridge_->processBlockSync(in_l, in_r, out_l, out_r, frame_count)) {
