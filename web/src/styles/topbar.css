@@ -12,10 +12,11 @@
 }
 h1 {
   margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  /* v2 brand moment: the potion pours into the name */
+  font-family: var(--disp);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  /* v3 brand moment: the potion pours into the name */
   background: linear-gradient(100deg, var(--text) 20%, var(--potion) 85%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -38,7 +39,7 @@ h1 {
   box-shadow: none; /* the CLUSTER carries the frame, not each key */
 }
 .position {
-  font-family: 'Cascadia Code', Consolas, monospace;
+  font-family: var(--mono);
   font-size: 15px;
   letter-spacing: 1px;
   color: #b7d9a8;
@@ -81,7 +82,7 @@ h1 {
   width: 110px;
 }
 .master-db {
-  font-family: 'Cascadia Code', Consolas, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   min-width: 52px;
   color: var(--text-2);

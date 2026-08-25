@@ -94,7 +94,7 @@
 }
 .device-add-vst input {
   flex: 1;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   background: #161616;
   color: var(--text);
@@ -110,7 +110,7 @@
 /* ---- S7: published-stem badge (the invariant, visible) ----------- */
 .device-stem {
   font-size: 9px;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   color: var(--potion);
   background: rgba(141, 122, 230, 0.12);
   border-radius: var(--r);
@@ -133,7 +133,7 @@
 /* ---- 2.5-etat: captured-state badge ------------------------------ */
 .device-state {
   font-size: 9px;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   color: var(--text-3);
   background: rgba(255, 255, 255, 0.06);
   border-radius: var(--r);
@@ -259,7 +259,7 @@
 .param-label {
   min-width: 32px;
   color: var(--text-2);
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
 }
 .param-row input {
   flex: 1;
@@ -267,7 +267,7 @@
 .param-value {
   min-width: 32px;
   text-align: right;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   color: var(--text-2);
 }
 .device-empty {

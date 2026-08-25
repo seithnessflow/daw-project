@@ -28,7 +28,7 @@
 }
 .pr-key {
   background: var(--surface-2); color: var(--text-3);
-  font-size: 8px; font-family: Consolas, monospace;
+  font-size: 8px; font-family: var(--mono);
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 4px; height: 15px;
 }

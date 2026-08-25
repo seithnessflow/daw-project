@@ -12,40 +12,54 @@
   box-sizing: border-box;
 }
 :root {
+  /* ============================================================
+     REFONTE v3 (2026-08-25, direction "etabli de studio" approuvee) :
+     graphite CHAUD (les surfaces sont des couches, pas des boites grises),
+     potion vif pour la marque, CUIVRE pour l'oeil du studio (VU, LED,
+     lampes) - la chaleur materielle qui nous distingue du froid generique.
+     Les noms de tokens sont stables ; seules les valeurs changent.
+     ============================================================ */
   /* Depth ramp: warm near-black, one step per layer */
-  --bg: #101012;
-  --surface: #18181b;
-  --surface-2: #1f1f23;
-  --surface-3: #27272c;
-  --surface-4: #303036;
-  --hair: rgba(255, 255, 255, 0.06);
-  --hair-strong: rgba(255, 255, 255, 0.12);
+  --bg: #0d0c10;
+  --surface: #16141b;
+  --surface-2: #1d1a23;
+  --surface-3: #26222e;
+  --surface-4: #302b3a;
+  --hair: rgba(255, 255, 255, 0.055);
+  --hair-strong: rgba(255, 255, 255, 0.13);
   /* Text: content bright, chrome dim */
-  --text: #dcdcdf;
-  --text-2: #97979d;
-  --text-3: #63636a;
-  /* State colors (unchanged roles) */
-  --amber: #d9a441;
-  --green: #58b368;
-  --blue: #4f8fd0;
+  --text: #f0edf5;
+  --text-2: #aea9bd;
+  --text-3: #7b7589;
+  /* State colors */
+  --amber: #e6a552;       /* etat chaud (mute, lampe device) - vire cuivre */
+  --copper: #e6a552;      /* accent materiel : VU, LED, chaleur */
+  --copper-dim: rgba(230, 165, 82, 0.15);
+  --green: #5fd08c;
+  --blue: #5aa2e0;
   --orange: #cf8a3c;
-  --red: #d05548;
-  /* v2: the potion accent - brand and selection moments only */
-  --potion: #8d7ae6;
-  --potion-dim: rgba(141, 122, 230, 0.35);
-  --r: 3px;
+  --red: #ec6a52;
+  /* v3: the potion accent - brand and selection moments */
+  --potion: #a58bff;
+  --potion-deep: #7a5bec;
+  --potion-dim: rgba(165, 139, 255, 0.35);
+  --r: 5px;
+  /* Typographies (bundle @fontsource, offline-safe ; fallback systeme) */
+  --disp: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --sans: "Hanken Grotesk", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
 }
 html,
 body {
   height: 100%;
 }
 body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--sans);
   font-size: 12px;
-  /* Subtle vignette: the stage is lit from the work area */
+  /* Subtle vignette: the stage is lit from the work area (potion glow) */
   background:
     radial-gradient(ellipse 120% 90% at 50% 0%,
-      rgba(141, 122, 230, 0.045), transparent 55%),
+      rgba(165, 139, 255, 0.05), transparent 55%),
     var(--bg);
   color: var(--text);
   margin: 0;

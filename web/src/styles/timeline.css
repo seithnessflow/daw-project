@@ -121,7 +121,7 @@
 .clip-name {
   flex: 0 0 13px;
   font-size: 9px;
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   color: rgba(255, 255, 255, 0.85);
   padding: 1px 5px 0;
   white-space: nowrap;
