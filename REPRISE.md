@@ -34,15 +34,18 @@ VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier commit **f60bf11** (menu principal). Le depot A un remote
-(**origin = github seithnessflow/daw-project**, branche master) : la tour
-est **24 commits EN AVANCE** sur origin/master (60ab807) — TOUT ce travail
-(T1-T8, F1-F7, lanceurs, docs, menu) est **NON POUSSE**. Le portable est
-PILE a origin/master (donc sans rien de tout ca). gtests **41/41**, binaires
-moteur a jour (ring v9, pan, session) dans engine\build-msvc.
-POINT OUVERT (a decider) : pousser les 24 commits declenche la CI (non
-validee post-rework) ; la suite e2e locale a ete lancee comme garde-fou
-(verdict a consigner ci-dessous) AVANT tout push / test portable.
+Dernier commit **60f2c35**. **TOUT EST POUSSE sur origin/master** (github
+seithnessflow/daw-project) : T1-T8, F1-F7, lanceurs, docs, menu, filet e2e,
+fix bouton editeur. La tour ET le portable sont a jour.
+- **CI** : build-linux VERT (C++ sur GCC ok) ; test-e2e re-lance apres le fix
+  clip-selection (VERDICT A CONFIRMER au demarrage - PREMIER point de synchro ;
+  run 32908752460).
+- **PORTABLE valide** : pull, moteur rebuild, gtests **41/41** (dont F5).
+- **Bug trouve+corrige par le filet** : le bouton BOX (GUI plugin) etait casse
+  depuis T5 (event 'editor-toggle' ne remontait plus, device-view en colonne
+  separee) -> listener sur `document`.
+- Suite e2e locale : 43/45 (les 2 restants = sync-resilience env local +
+  clip-selection, ce dernier fixe apres).
 
 ## MENU PRINCIPAL (2026-08-26, f60bf11)
 

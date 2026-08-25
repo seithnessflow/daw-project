@@ -1143,3 +1143,32 @@ avec selection des projets ».
   F1-F7 ni menu). Le tester exige un push (-> CI non validee post-rework) +
   rebuild distant -> j'ai d'abord lance la suite e2e locale comme garde-fou
   du rework avant tout push (verdict a consigner).
+
+**2026-08-26 (suite : filet e2e du rework, VRAI BUG trouve, push, portable) :**
+- FILET DE REGRESSION du rework UI : 9 nouvelles specs Playwright (ui-rework
+  paradigmes/splitters, ui-mixer fader/pan, ui-rack knobs/editeur, ui-session
+  launch, ui-menu). Ces ~10 commits d'UI n'avaient AUCUNE spec permanente.
+- LE FILET A PAYE IMMEDIATEMENT : la spec ui-rack a trouve un VRAI BUG PRODUIT
+  - le bouton BOX (ouvrir la GUI d'un plugin) n'appelait plus setEditor.
+  Depuis la refonte T5, #device-view-slot vit dans une COLONNE SEPAREE, plus
+  un enfant de #tracks -> l'event 'editor-toggle' ne remontait plus au
+  listener sur els.tracks. Fix : ecouter sur `document`. (Ma verif F1 le
+  ratait car elle appelait setEditor DIRECT, pas le bouton.)
+- FAUX PROBLEMES DIAGNOSTIQUES (pas des regressions) : (a) les specs de sync
+  echouaient d'abord sur l'auth de mon serveur -Secure -> re-run non-secure ;
+  (b) 3 specs faisaient goto('/') attendant l'app sur 'default' -> le MENU a
+  change la semantique de `/` -> les specs nomment leur projet ; (c) le rework
+  a ajoute data-track-id aux VU du mixer -> le helper getTrackIds comptait les
+  pistes en double -> scope a #tracks ; (d) clip-selection : la poignee de
+  bord d'un clip minuscule fait 2px, un clic-pixel la rate (flake historique,
+  logique de gesture/render INCHANGEE) -> dispatch des events pointer direct.
+- PUSH : les regressions du rework soldees, suite locale 43/45 (2 restants =
+  env local sync-resilience spawn serveur + le flake clip-selection, fixe
+  apres). Pousse sur origin/master (26 commits, 60ab807..eed3e9a puis
+  clip-selection 60f2c35).
+- CI : build-linux VERT (mes changements C++ compilent sur GCC/Linux). Premier
+  test-e2e rouge sur clip-selection (le flake 2px) -> fixe + repousse.
+- PORTABLE VALIDE : pull (HEAD eed3e9a), moteur REBUILD (ring v9+pan+session
+  compilent+lient sur son MSVC), gtests 41/41 (dont F5 session loop). Friction
+  notee : PowerShell du portable a l'execution de scripts DESACTIVEE -> passer
+  par cmd (npm.cmd) et pas les shims .ps1.
