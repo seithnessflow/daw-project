@@ -115,10 +115,15 @@ temps, TOUT verifie en pilotant le vrai navigateur/moteur :
 Commits 2ffdacc..19d8ac0.
 
 RESTE UI (petit, non bloquant) :
-- [ ] Onglets Rack/Piano-roll dans la colonne droite (F7 laisse ;
-      l'empilement actuel fonctionne).
+- [x] Onglets Rack/Piano-roll (colonne droite) - FAIT 2026-08-26 (7223b1d).
+- [x] CLIC DROIT CONTEXTUEL par zone - FAIT 2026-08-26 (clip/piste/device/
+      slot/mixer, actions sur les methodes existantes ; ui-context-menu.spec).
+- [ ] Rough edge cosmetique : les clips affichent leur id brut
+      (kick-1787427956972) - le regex de nom ne strippe qu'UN suffixe -digits.
+- [ ] Renommer piste/clip (manque une methode schema renameTrack) - candidat
+      pour enrichir le menu contextuel.
 - [ ] A TERME (horizon utilisateur) : drag-and-drop / mod complet de
-      l'interface (les splitters en sont la fondation).
+      l'interface (les splitters + onglets en sont la fondation).
 
 ## PRIORITES A LA REPRISE (a arbitrer avec l'utilisateur — ordre grave)
 

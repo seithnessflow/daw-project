@@ -34,9 +34,11 @@ VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier commit **60f2c35**. **TOUT EST POUSSE sur origin/master** (github
-seithnessflow/daw-project) : T1-T8, F1-F7, lanceurs, docs, menu, filet e2e,
-fix bouton editeur. La tour ET le portable sont a jour.
+Dernier commit **7223b1d**. **TOUT EST POUSSE sur origin/master** (github
+seithnessflow/daw-project), **CI VERTE** a chaque push : T1-T8, F1-F7,
+lanceurs, docs, menu, filet e2e, fix bouton editeur, **onglets Rack/Piano-roll
++ CLIC DROIT CONTEXTUEL par zone**. Le portable est a jour jusqu'a eed3e9a
+(pull + rebuild + 41/41) - un `git pull` le remet a niveau si besoin.
 - **CI VERTE** (run 32908752460) : build-linux ✓ (C++ sur GCC) + test-e2e ✓
   (6m27s, suite complete verte apres le fix clip-selection). Rien a confirmer.
 - **PORTABLE valide** : pull, moteur rebuild, gtests **41/41** (dont F5).
