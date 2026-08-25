@@ -323,10 +323,13 @@ par-dessus un morceau identifié comme mal conçu.
   2. Mal conçu, même isolé → REFONTE PLANIFIÉE : session(s) bornée(s) dédiée(s),
      avec test de non-régression, AVANT que quoi que ce soit ne s'y adosse.
   3. Défaut cosmétique ou spéculatif → dette datée avec déclencheur mesurable.
-- Remplacement de techno : jamais en direct. Dossier en 5 lignes d'abord
-  (défaut prouvé, remplaçant, coût de migration, risque, critère de succès),
-  décision explicite, puis sessions bornées. Précédent : samod (escaladé,
-  décision B, veille avec critère de sortie).
+- Nouvelles technos : BIENVENUES (regle assouplie, arbitrage utilisateur
+  2026-08-25 — l'ancienne « jamais en direct, dossier 5 lignes » est levee).
+  Une techno qui aide, surtout en OUTILLAGE/TEST (ex : Python numpy/soundfile
+  pour l'analyse audio deterministe), s'adopte directement — noter juste le
+  pourquoi en une ligne. Seule nuance de bon sens conservee : remplacer un
+  PILIER PRODUIT deja en place (langage moteur, CRDT de sync) coute une
+  migration — le signaler avant de le faire, pas l'interdire.
 - Le cap (VST3) reprend dès que les items 1 et 2 issus du dernier audit sont
   soldés — il peut être retardé par la qualité, jamais dilué par elle.
 - Toute commande > 30 s part en arrière-plan IMMÉDIATEMENT, et tu enchaînes sur
