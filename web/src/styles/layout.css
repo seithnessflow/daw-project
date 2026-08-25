@@ -1,0 +1,40 @@
+/* ---- Espace de travail 3 colonnes (Refonte T5) -----------------
+   browser | arrangement | rack. Le body reste flex-column (topbar +
+   workspace) ; la workspace est la grille qui remplit le reste. */
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--col-browser, 208px) minmax(0, 1fr) var(--col-rack, 340px);
+  gap: 0;
+  overflow: hidden;
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  background: var(--surface);
+}
+.col {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--hair);
+}
+.col:last-child { border-right: none; }
+
+/* gauche : le navigateur (rempli en T4) */
+.col-browser { background: var(--surface-2); }
+#browser-slot { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* centre : l'arrangement. #tracks grandit (flex:1 hérité de timeline.css),
+   le KIT/overview coiffent, + add track en pied. */
+.col-arrange { overflow: hidden; }
+.col-arrange .tracks { border-radius: 0; box-shadow: none; }
+.col-arrange #add-track-btn { margin: 6px 8px; flex: 0 0 auto; }
+
+/* droite : le rack device + piano-roll (scroll). #device-view-slot y vit. */
+.col-rack { background: var(--surface); overflow-y: auto; }
+.col-rack .device-view-slot { margin: 0; }
+
+/* les slots vides (starter/overview absents) ne prennent pas de place */
+#starter-slot:empty, #overview-slot:empty, #library-slot:empty { display: none; }

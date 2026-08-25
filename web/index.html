@@ -62,17 +62,24 @@
       </div>
     </div>
 
-    <div id="starter-slot"></div>
-
-    <div id="library-slot"></div>
-
-    <div id="overview-slot"></div>
-
-    <div class="tracks" id="tracks"></div>
-
-    <button id="add-track-btn" class="addtrack">+ add track</button>
-
-    <div class="device-view-slot" id="device-view-slot"></div>
+    <!-- Refonte T5 : espace de travail 3 colonnes. Les slots gardent leurs
+         id (le JS les remplit par id, jamais par position) - on ne fait que
+         les RE-PARENTER dans des colonnes. -->
+    <div class="workspace">
+      <div class="col col-browser">
+        <div id="browser-slot"></div>
+      </div>
+      <div class="col col-arrange">
+        <div id="starter-slot"></div>
+        <div id="library-slot"></div>
+        <div id="overview-slot"></div>
+        <div class="tracks" id="tracks"></div>
+        <button id="add-track-btn" class="addtrack">+ add track</button>
+      </div>
+      <div class="col col-rack">
+        <div class="device-view-slot" id="device-view-slot"></div>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

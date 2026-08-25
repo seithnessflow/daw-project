@@ -31,6 +31,7 @@ import { JamAudio } from '../network/jam_audio';
 import { SessionClock } from '../network/session_clock';
 import { Presence } from '../network/presence';
 import { renderPresence } from './presence_view';
+import { renderBrowser } from '../ui/browser';
 import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
@@ -485,7 +486,9 @@ export async function init(): Promise<void> {
     setPluginCatalog(entries);
     (window as any).__dawPlugins = entries;
     console.log(`Plugin catalog: ${entries.length} classe(s)`);
+    renderBrowser();  // T4 : le rail se peuple quand le catalogue arrive
   };
+  renderBrowser();  // T4 : etat initial (vide, "scan…") des le montage
 
   // ---- Transport controls -------------------------------------------------
   els.playBtn.addEventListener('click', startPlayback);

@@ -1,0 +1,37 @@
+/* ---- Rail navigateur (Refonte T4) ----------------------------- */
+.browser-head {
+  display: flex; gap: 3px; padding: 8px; flex: 0 0 auto;
+  border-bottom: 1px solid var(--hair);
+}
+.browser-tab {
+  flex: 1; font-family: var(--mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 5px 4px; border-radius: var(--r);
+  background: var(--bg); color: var(--text-3);
+}
+.browser-tab.on { background: var(--surface-3); color: var(--text); }
+.browser-list {
+  padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  overflow-y: auto; flex: 1; min-height: 0;
+}
+.browser-empty {
+  color: var(--text-3); font-size: 10px; padding: 14px 8px; font-family: var(--mono);
+}
+.browser-item {
+  display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+  border-radius: var(--r); background: transparent; color: var(--text-2);
+  text-align: left; width: 100%;
+}
+.browser-item:hover { background: var(--surface-3); color: var(--text); }
+.bi-ic {
+  width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center;
+  font-size: 9px; flex: 0 0 auto;
+}
+.bi-ic.inst { background: rgba(165, 139, 255, 0.16); color: var(--potion); }
+.bi-ic.fx { background: var(--copper-dim); color: var(--copper); }
+.bi-name {
+  font-size: 11px; flex: 1; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.bi-vendor {
+  font-family: var(--mono); font-size: 8px; color: var(--text-3); flex: 0 0 auto;
+}
