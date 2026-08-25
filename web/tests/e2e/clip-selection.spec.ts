@@ -52,12 +52,21 @@ test.describe('Clip selection and delete (session B)', () => {
       .click({ position: { x: 500, y: 20 } });
     await expect(page.locator('.clip[aria-selected="true"]')).toHaveCount(0);
 
-    // 2. Plain click on a resize EDGE -> selects (the missing branch)
-    const edge = page.locator('.clip-edge-right').first();
-    const ebox = (await edge.boundingBox())!;
-    await page.mouse.move(ebox.x + ebox.width / 2, ebox.y + ebox.height / 2);
-    await page.mouse.down();
-    await page.mouse.up();   // no movement: a plain click
+    // 2. Plain click on a resize EDGE -> selects (the missing branch).
+    // La poignee de bord d'un clip minuscule fait ~2px : un clic-pixel
+    // (mouse OU .click) la rate de facon deterministe dans cette version de
+    // Playwright. On dispatche les events pointer DIRECTEMENT sur l'element
+    // bord (pointerdown sur le bord -> beginClipResize ; pointerup SANS
+    // mouvement -> branche de selection) : on teste le chemin de code exact,
+    // sans dependre d'un hit-test sur 2px.
+    await page.evaluate(() => {
+      const edge = document.querySelector('.clip-edge-right') as HTMLElement;
+      const r = edge.getBoundingClientRect();
+      const o = { bubbles: true, cancelable: true, button: 0,
+        clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 };
+      edge.dispatchEvent(new PointerEvent('pointerdown', o));
+      window.dispatchEvent(new PointerEvent('pointerup', o));  // beginClipResize ecoute sur window
+    });
     await expect(page.locator('.clip[aria-selected="true"]')).toHaveCount(1);
 
     // 4. Delete removes the clip - DOM and document
