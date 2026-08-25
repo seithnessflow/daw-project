@@ -378,6 +378,8 @@ void WebSocketServer::broadcastTelemetry() {
     auto* pos = pos_msg.mutable_position();
     pos->set_position_samples(device_->getTransport().getPosition());
     pos->set_is_playing(device_->getTransport().isPlaying());
+    // AUDIT-5 A8: carry the real device rate so the web stops hardcoding 48000.
+    pos->set_sample_rate(device_->getSampleRate());
 
     // Build meters message
     protocol::Message meters_msg;

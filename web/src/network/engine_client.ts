@@ -255,6 +255,11 @@ export class EngineClient {
     switch (msg.type) {
       case 'position':
         this.lastPlaying = msg.data.isPlaying ?? false;
+        // AUDIT-5 A8: use the engine's real rate when it sends one; an old
+        // engine (or field absent) reports 0 -> keep the 48000 fallback.
+        if (msg.data.sampleRate && msg.data.sampleRate > 0) {
+          this.sampleRate = msg.data.sampleRate;
+        }
         this.onPosition?.(msg.data.positionSamples, this.sampleRate);
         break;
       case 'meters':

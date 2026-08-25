@@ -41,6 +41,10 @@ message TapControl {
 message TransportPosition {
     int64 position_samples = 1;
     bool is_playing = 2;
+    // AUDIT-5 A8: the engine's real device sample rate, so the web stops
+    // hardcoding 48000 (the playhead drifts 8.8% on a 44.1k device).
+    // Additive: 0 (absent, old engine) -> the web keeps its 48000 fallback.
+    uint32 sample_rate = 3;
 }
 
 // Per-track meter levels

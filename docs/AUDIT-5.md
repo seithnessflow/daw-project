@@ -238,6 +238,14 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
 - **B1 (doc)** SECURITY.md re-cadre : C2-distante = LIVE pas futur (F1),
   H3 = Low Windows / High POSIX (mesure), M1 garde caduque, M4 a moitie
   fait (retirer `?token=`), B3 marque fait.
+- **A8/3.3** le sample rate du moteur traverse enfin le fil : champ
+  additif `sample_rate=3` dans TransportPosition (proto, messages.ts
+  regenere), rempli par le moteur (`device_->getSampleRate()`), lu par
+  le web (`engine_client` remplace le 48000 en dur quand le moteur en
+  envoie un ; 0/absent = fallback conserve, retrocompatible). Fin de la
+  derive 8.8% de la playhead sur un device 44.1k. Contrat inter-etages
+  verifie : moteur compile, tsc web 0, e2e local fader-to-engine +
+  transport-loop 6 passed.
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route
