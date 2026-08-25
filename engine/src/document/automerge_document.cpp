@@ -672,7 +672,8 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                                                 }
                                                                 if (kr) AMresultFree(kr);
                                                                 if (!key.empty()) {
-                                                                    proc.params[key] = static_cast<float>(value);
+                                                                    // 1.1: append in DOCUMENT order (each key unique).
+                                                                    proc.setParam(key, static_cast<float>(value));
                                                                 }
                                                             }
                                                         }

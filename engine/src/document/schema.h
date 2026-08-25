@@ -10,8 +10,8 @@
  */
 
 #include <cstdint>
-#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace daw::document {
@@ -35,7 +35,24 @@ struct ProcessorDef {
     std::string type;
     std::string uid;  // vst3 only; empty otherwise
     bool bypass = false;  // 2.4d: document state, driven from the tab
-    std::map<std::string, float> params;
+    // AUDIT-5 1.1: an ORDERED list of pairs, not a map - SCHEMA.md says the
+    // params are iterable by index across every stage (the web already uses
+    // a list), and the STEM KEY must serialize them in DOCUMENT order, not
+    // lexicographic map order. setParam upserts while preserving order.
+    std::vector<std::pair<std::string, float>> params;
+
+    void setParam(const std::string& key, float value) {
+        for (auto& p : params) {
+            if (p.first == key) { p.second = value; return; }
+        }
+        params.emplace_back(key, value);
+    }
+    [[nodiscard]] float getParam(const std::string& key, float dflt = 0.0f) const {
+        for (const auto& p : params) {
+            if (p.first == key) return p.second;
+        }
+        return dflt;
+    }
     // 2.5-etat (ADDITIF, SCHEMA-V2-DESIGN 2): opaque plugin state as a
     // content-addressed reference into the store - the blob itself
     // NEVER enters the CRDT. state_version is an LWW counter (two

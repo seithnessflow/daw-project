@@ -831,7 +831,7 @@ bool testStemKeyPrecision() {
         ProcessorDef node;
         node.type = "vst3";
         node.uid = "84E8DE5F92554F5396FAE4133C935A18";
-        node.params["0"] = mix;
+        node.setParam("0", mix);
         t.chain.push_back(node);
         return t;
     };
@@ -967,6 +967,50 @@ bool testGetChangesNotIn() {
         return false;
     }
 
+    std::cout << "OK\n";
+    return true;
+}
+
+// AUDIT-5 1.1: params are an ORDERED list, not a map. Document order must
+// survive a roundtrip (a map would sort them). This closes the A2 "order"
+// debt (the stem key now serializes params in document order) and matches
+// SCHEMA.md + the web (which already uses a list).
+bool testProcessorParamOrder() {
+    std::cout << "Test: processor param order preserved (1.1)... ";
+    using namespace daw::document;
+
+    AutomergeDocument doc;
+    if (!doc.create(48000)) { std::cout << "FAILED: create\n"; return false; }
+    TrackDef t; t.id = "t1"; t.name = "T1"; t.gain = 1.0f;
+    ProcessorDef n; n.id = "n1"; n.type = "vst3";
+    n.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    n.setParam("zzz", 1.0f);  // deliberately non-lexicographic order
+    n.setParam("aaa", 2.0f);
+    n.setParam("mmm", 3.0f);
+    t.chain.push_back(n);
+    doc.addTrack(t);
+
+    const std::vector<uint8_t> bytes = doc.toBytes();
+    AutomergeDocument doc2;
+    doc2.loadFromBytes(bytes.data(), bytes.size());
+    const auto p = doc2.getDocument();
+    if (p.tracks.empty() || p.tracks[0].chain.empty()) {
+        std::cout << "FAILED: no chain node after roundtrip\n";
+        return false;
+    }
+    const auto& params = p.tracks[0].chain[0].params;
+    if (params.size() != 3 || params[0].first != "zzz" ||
+        params[1].first != "aaa" || params[2].first != "mmm") {
+        std::cout << "FAILED: param order not preserved (got";
+        for (const auto& pr : params) std::cout << " " << pr.first;
+        std::cout << " - a map would have sorted them aaa/mmm/zzz)\n";
+        return false;
+    }
+    // getParam still resolves by key regardless of position.
+    if (std::fabs(params[0].second - 1.0f) > 1e-6f) {
+        std::cout << "FAILED: value mismatch after roundtrip\n";
+        return false;
+    }
     std::cout << "OK\n";
     return true;
 }
@@ -1328,14 +1372,14 @@ bool testDocumentChainRoundTrip() {
     p1.type = "vst3";
     p1.uid = "84E8DE5F92554F5396FAE4133C935A18";
     p1.bypass = true;  // 2.4d: bypass is document state
-    p1.params["0"] = 0.5f;
-    p1.params["3"] = 0.25f;
+    p1.setParam("0", 0.5f);
+    p1.setParam("3", 0.25f);
     track.chain.push_back(p1);
 
     daw::document::ProcessorDef p2;
     p2.id = "p2";
     p2.type = "builtin.gain";
-    p2.params["gain"] = 0.8f;
+    p2.setParam("gain", 0.8f);
     track.chain.push_back(p2);
 
     if (!doc1.addTrack(track)) {
@@ -1878,9 +1922,9 @@ bool testRealPluginMda() {
     proc.id = "p1";
     proc.type = "vst3";
     proc.uid = kOverdriveUid;
-    proc.params["0"] = 0.8f;
-    proc.params["1"] = 0.2f;
-    proc.params["2"] = 0.6f;
+    proc.setParam("0", 0.8f);
+    proc.setParam("1", 0.2f);
+    proc.setParam("2", 0.6f);
     track.chain.push_back(proc);
     if (!doc.addTrack(track)) {
         std::cout << "FAILED: addTrack\n";
@@ -2019,7 +2063,7 @@ bool testStemInvariant() {
     proc.id = "p1";
     proc.type = "vst3";
     proc.uid = kAGainAudioUid;
-    proc.params["0"] = 0.5f;
+    proc.setParam("0", 0.5f);
     track.chain.push_back(proc);
     if (!doc.addTrack(track)) {
         std::cout << "FAILED: addTrack\n";
@@ -2142,7 +2186,7 @@ bool testStemInvariant() {
     }
     const auto snap = doc.getDocument();
     auto changed = snap.tracks[0];
-    changed.chain[0].params["0"] = 0.7f;
+    changed.chain[0].setParam("0", 0.7f);
     if (daw::render::computeStemKey(changed, 0, 48000, vtag) == stem.stem_key) {
         std::cout << "FAILED: key blind to a param change\n";
         return false;
@@ -2714,7 +2758,7 @@ bool testDocumentChainRender() {
     proc.id = "p1";
     proc.type = "vst3";
     proc.uid = kAGainAudioUid;
-    proc.params["0"] = 0.5f;  // VST3 param id 0 (AGain gain), normalized
+    proc.setParam("0", 0.5f);  // VST3 param id 0 (AGain gain), normalized
     track.chain.push_back(proc);
     if (!doc.addTrack(track)) {
         std::cout << "FAILED: addTrack: " << doc.getLastError() << "\n";
@@ -3396,6 +3440,7 @@ int main(int argc, char* argv[]) {
     run(testStemKeyPrecision);
     run(testDocMergePreservesLocal);
     run(testGetChangesNotIn);
+    run(testProcessorParamOrder);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);

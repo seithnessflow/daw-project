@@ -106,10 +106,7 @@ std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& pro
     if (proc_def.type == GainNode::TYPE) {
         return makeGainNode(proc_def);
     }
-    auto get = [&](const char* k, float dv) {
-        auto it = proc_def.params.find(k);
-        return it != proc_def.params.end() ? it->second : dv;
-    };
+    auto get = [&](const char* k, float dv) { return proc_def.getParam(k, dv); };
     if (proc_def.type == UtilityNode::TYPE) {
         return std::make_unique<UtilityNode>(
             proc_def.id, get(UtilityNode::PARAM_GAIN, 1.0f),
@@ -144,11 +141,7 @@ std::unique_ptr<ProcessorNode> makeBuiltinNode(const document::ProcessorDef& pro
 }
 
 std::unique_ptr<GainNode> makeGainNode(const document::ProcessorDef& proc_def) {
-    float gain = 1.0f;
-    auto it = proc_def.params.find("gain");
-    if (it != proc_def.params.end()) {
-        gain = it->second;
-    }
+    const float gain = proc_def.getParam("gain", 1.0f);
     return std::make_unique<GainNode>(proc_def.id, gain);
 }
 

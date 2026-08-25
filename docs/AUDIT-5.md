@@ -246,6 +246,15 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   derive 8.8% de la playhead sur un device 44.1k. Contrat inter-etages
   verifie : moteur compile, tsc web 0, e2e local fader-to-engine +
   transport-loop 6 passed.
+- **1.1** params moteur `std::map` -> `std::vector<pair>` ordonne
+  (`schema.h` + setParam/getParam ; les nœuds passent par getParam, la
+  lecture du doc append en ordre, l'ecriture et computeStemKey iterent en
+  ordre). CLOT la dette d'ORDRE de A2 (la cle de stem serialise en ordre
+  document, plus lexico), aligne le moteur sur SCHEMA.md + le web (deja en
+  liste). Garde `testProcessorParamOrder` (zzz/aaa/mmm survit au roundtrip,
+  une map aurait trie). Non-regression : gtests 39/39, e2e local
+  fader-to-engine + devices 6 passed. Note : change encore les cle de stem
+  (absorbe par le recalcul one-shot de stem-v2).
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route
