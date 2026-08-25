@@ -30,11 +30,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(miniaudio)
 
 # dr_libs - single header libraries (dr_wav)
+# Epingle (AUDIT-5 B3, 2026-08-25) : master mouvant = parseur WAV de chaque
+# asset pair + feed du hash de rendu deterministe (56729beb...). SHA du build
+# vert 34/34 (commit 2026-08-20, dr_flac deadlock fix). GIT_SHALLOW retire :
+# un fetch par SHA arbitraire n'est pas garanti en clone shallow.
 FetchContent_Declare(
     dr_libs
     GIT_REPOSITORY https://github.com/mackron/dr_libs.git
-    GIT_TAG master
-    GIT_SHALLOW TRUE
+    GIT_TAG b55a0d9a30b91ad8901f89ecf05f76a33186c185
 )
 FetchContent_MakeAvailable(dr_libs)
 
