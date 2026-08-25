@@ -254,6 +254,41 @@ bool AutomergeDocument::mergeFromBytes(const uint8_t* data, size_t size) {
     return true;
 }
 
+std::vector<std::vector<uint8_t>> AutomergeDocument::getChangesNotIn(
+    const uint8_t* remote_data, size_t remote_size) {
+    std::vector<std::vector<uint8_t>> out;
+    if (!doc_) return out;
+
+    // Load the remote (server) document to diff against.
+    AMresult* remoteResult = AMload(remote_data, remote_size);
+    if (!remoteResult || AMresultStatus(remoteResult) != AM_STATUS_OK) {
+        if (remoteResult) AMresultFree(remoteResult);
+        return out;
+    }
+    AMdoc* remote = nullptr;
+    if (!AMitemToDoc(AMresultItem(remoteResult), &remote) || !remote) {
+        AMresultFree(remoteResult);
+        return out;
+    }
+
+    // Changes present in OUR doc but not in the remote (== what to push).
+    AMresult* changesResult = AMgetChangesAdded(remote, doc_);
+    if (changesResult && AMresultStatus(changesResult) == AM_STATUS_OK) {
+        AMitems items = AMresultItems(changesResult);
+        AMitem* item = nullptr;
+        while ((item = AMitemsNext(&items, 1)) != nullptr) {
+            AMchange* change = nullptr;
+            if (AMitemToChange(item, &change) && change) {
+                const AMbyteSpan bytes = AMchangeRawBytes(change);
+                out.emplace_back(bytes.src, bytes.src + bytes.count);
+            }
+        }
+    }
+    if (changesResult) AMresultFree(changesResult);
+    AMresultFree(remoteResult);
+    return out;
+}
+
 bool AutomergeDocument::saveToFile(const std::string& path) const {
     std::vector<uint8_t> data = toBytes();
     if (data.empty()) {

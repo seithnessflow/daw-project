@@ -1108,14 +1108,13 @@ int doPlayWithServer(const Options& opts) {
     // Handle initial document. NETWORK THREAD: document work only, no
     // graph construction here (R1) - bump the version, the builder follows.
     server_client.setDocumentCallback([&](const std::vector<uint8_t>& data) {
+        std::vector<std::vector<uint8_t>> to_push;
         {
             std::lock_guard<std::mutex> lock(doc_mutex);
             // AUDIT-5 A4: first contact ADOPTS the server doc; a later
             // (re)connection MERGES it, so engine-authored stemHash/stateHash
             // produced meanwhile survive instead of being clobbered by the
-            // resent full document. (Sharing those back to the server - the
-            // reconnect PUSH - is the next sub-part; merge alone already stops
-            // the loss.)
+            // resent full document.
             const bool first = !doc.isLoaded();
             const bool ok = first
                                 ? doc.loadFromBytes(data.data(), data.size())
@@ -1126,10 +1125,26 @@ int doPlayWithServer(const Options& opts) {
                           << doc.getLastError() << "\n";
                 return;
             }
-            std::cout << (first ? "Document adopted: " : "Document merged: ")
-                      << doc.getDocument().tracks.size() << " tracks\n";
+            // "Document loaded" is a LOG CONTRACT consumed by the e2e specs
+            // (fader-to-engine countInFile) - keep the phrase, add the mode.
+            std::cout << "Document loaded (" << (first ? "adopted" : "merged")
+                      << "): " << doc.getDocument().tracks.size() << " tracks\n";
+            // A4 (1b): on reconnection, PUSH what the server is missing (the
+            // fields only the engine authors, preserved by the merge above)
+            // so the plugin-less peer actually receives them. Compute under
+            // the lock, send outside it.
+            if (!first) {
+                to_push = doc.getChangesNotIn(data.data(), data.size());
+            }
         }
         doc_version.fetch_add(1, std::memory_order_release);
+        for (const auto& ch : to_push) {
+            server_client.sendChange(ch);
+        }
+        if (!to_push.empty()) {
+            std::cout << "Pushed " << to_push.size()
+                      << " change(s) the server was missing\n";
+        }
     });
 
     // Handle document changes. NETWORK THREAD: apply + version bump only.

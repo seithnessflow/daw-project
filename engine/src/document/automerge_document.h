@@ -106,6 +106,16 @@ public:
     bool mergeFromBytes(const uint8_t* data, size_t size);
 
     /**
+     * AUDIT-5 A4 (1b): the changes THIS document has that the given remote
+     * document (full bytes) does not - what the engine must PUSH after a
+     * reconnection so the merge-preserved engine-authored fields actually
+     * reach the server. Mirrors the web's getMissingChanges. Empty when
+     * the remote already has everything (or nothing is loaded).
+     */
+    std::vector<std::vector<uint8_t>> getChangesNotIn(const uint8_t* remote_data,
+                                                      size_t remote_size);
+
+    /**
      * Generate sync message for peer.
      *
      * @return Sync message bytes, or empty if nothing to sync

@@ -919,6 +919,58 @@ bool testDocMergePreservesLocal() {
     return true;
 }
 
+// AUDIT-5 A4 (1b): after a reconnection merge preserves the engine's local
+// stemHash, but the server still lacks it. getChangesNotIn computes exactly
+// the changes to PUSH so the preserved field reaches the server. This proves
+// the changes are found AND that applying them gives the server the stem.
+bool testGetChangesNotIn() {
+    std::cout << "Test: getChangesNotIn (reconnect push, A4-1b)... ";
+    using namespace daw::document;
+
+    AutomergeDocument base;
+    if (!base.create(48000)) { std::cout << "FAILED: create\n"; return false; }
+    TrackDef t; t.id = "t1"; t.name = "T1"; t.gain = 1.0f;
+    ProcessorDef n; n.id = "n1"; n.type = "vst3";
+    n.uid = "84E8DE5F92554F5396FAE4133C935A18";
+    t.chain.push_back(n);
+    base.addTrack(t);
+    const std::vector<uint8_t> baseBytes = base.toBytes();
+
+    // Engine authored a local stem the server never saw.
+    AutomergeDocument engine;
+    engine.loadFromBytes(baseBytes.data(), baseBytes.size());
+    engine.setProcessorStem("t1", "n1", "aabbccdd", "key-L", 0);
+
+    // The server still only has base: what is it missing?
+    auto missing = engine.getChangesNotIn(baseBytes.data(), baseBytes.size());
+    if (missing.empty()) {
+        std::cout << "FAILED: no missing changes reported - the server would "
+                     "never receive the engine's stem\n";
+        return false;
+    }
+
+    // Applying the pushed changes onto the server doc must surface the stem.
+    AutomergeDocument server;
+    server.loadFromBytes(baseBytes.data(), baseBytes.size());
+    for (const auto& ch : missing) {
+        if (!server.applyChange(ch.data(), ch.size())) {
+            std::cout << "FAILED: server rejected a pushed change: "
+                      << server.getLastError() << "\n";
+            return false;
+        }
+    }
+    const auto p = server.getDocument();
+    const bool got = !p.tracks.empty() && !p.tracks[0].chain.empty()
+                     && p.tracks[0].chain[0].stem_hash == "aabbccdd";
+    if (!got) {
+        std::cout << "FAILED: server still lacks the stem after applying pushes\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
 // Test 7: Document clips round-trip
 bool testDocumentClipsRoundTrip() {
     std::cout << "Test: Document clips round-trip... ";
@@ -3343,6 +3395,7 @@ int main(int argc, char* argv[]) {
     run(testWebAuthoredIntFields);
     run(testStemKeyPrecision);
     run(testDocMergePreservesLocal);
+    run(testGetChangesNotIn);
     run(testDocumentClipsRoundTrip);
     run(testDocumentChainRoundTrip);
     run(testSha256AssetHash);
