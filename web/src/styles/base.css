@@ -97,7 +97,8 @@ button:disabled {
   cursor: default;
 }
 button:focus-visible,
-input:focus-visible {
+input:focus-visible,
+[tabindex]:focus-visible {
   outline: 1px solid var(--potion);
   outline-offset: 1px;
 }
@@ -121,5 +122,17 @@ input:focus-visible {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* F7 : respecter le reglage systeme "moins d'animation" (accessibilite +
+   confort). Les VU/meters gardent leur transition tres courte (deja ~60ms) ;
+   ici on neutralise les animations decoratives et adoucit les transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 

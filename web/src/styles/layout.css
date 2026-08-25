@@ -5,7 +5,8 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--col-browser, 208px) minmax(0, 1fr) var(--col-rack, 340px);
+  grid-template-columns:
+    var(--col-browser, 208px) 6px minmax(0, 1fr) 6px var(--col-rack, 340px);
   gap: 0;
   overflow: hidden;
   border-radius: var(--r);
@@ -21,6 +22,26 @@
   border-right: 1px solid var(--hair);
 }
 .col:last-child { border-right: none; }
+
+/* F7 : splitters redimensionnables entre colonnes (fondation dockable).
+   Poignee de 6px ; la ligne de saisie s'illumine au survol/drag. */
+.col-split {
+  cursor: col-resize;
+  background: var(--hair);
+  position: relative;
+  transition: background 90ms ease;
+}
+.col-split::after {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;  /* zone de saisie elargie sans deplacer le trait */
+}
+.col-split:hover,
+.col-split.dragging,
+.col-split:focus-visible {
+  background: var(--copper);
+  outline: none;
+}
 
 /* gauche : le navigateur (rempli en T4) */
 .col-browser { background: var(--surface-2); }

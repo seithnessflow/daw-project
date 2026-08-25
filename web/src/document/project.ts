@@ -198,6 +198,7 @@ export class Project {
         case 'deleteTrack': this.deleteTrack(op.trackId); break;
         case 'addProcessor': this.addProcessor(op.trackId, op.proc, op.index); break;
         case 'removeProcessor': this.removeProcessor(op.trackId, op.processorId); break;
+        case 'toggleNote': this.toggleNote(op.trackId, op.clipId, op.note); break;
       }
       emit?.();
     }
@@ -463,12 +464,14 @@ export class Project {
 
   /**
    * v8 MIDI : bascule une note (ajoute si absente au meme pitch+debut, sinon
-   * retire) - le geste du piano-roll. Undo des notes = raffinement ulterieur.
+   * retire) - le geste du piano-roll. F7 : undo-journalise (le toggle est son
+   * propre inverse - re-toggler la meme note annule le geste).
    */
   toggleNote(trackId: string, clipId: string, note: NoteDef): void {
     const clip = this.doc.tracks.find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return;
+    this.journal.capture({ type: 'toggleNote', trackId, clipId, note: { ...note } });
     this.doc = Automerge.change(this.doc, (d) => {
       const c = d.tracks.find((t) => t.id === trackId)
         ?.clips.find((x) => x.id === clipId);

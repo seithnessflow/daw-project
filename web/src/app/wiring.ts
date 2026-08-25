@@ -33,6 +33,7 @@ import { Presence } from '../network/presence';
 import { renderPresence } from './presence_view';
 import { renderBrowser } from '../ui/browser';
 import { initParadigm } from './paradigm';
+import { initSplitters } from './splitters';
 import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
@@ -535,6 +536,7 @@ export async function init(): Promise<void> {
   };
   renderBrowser();  // T4 : etat initial (vide, "scan…") des le montage
   initParadigm();   // T6 : le commutateur Arrangement/Session/Mixage
+  initSplitters();  // F7 : colonnes redimensionnables (largeurs persistees)
 
   // ---- Transport controls -------------------------------------------------
   els.playBtn.addEventListener('click', startPlayback);

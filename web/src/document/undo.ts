@@ -16,7 +16,7 @@
  * Outside replay, any local op clears redo.
  */
 
-import type { ClipDef, TrackDef, ProcessorDef } from './schema';
+import type { ClipDef, TrackDef, ProcessorDef, NoteDef } from './schema';
 
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
@@ -37,7 +37,10 @@ export type InverseOp =
   // V1.5: index restores the chain ORDER (a chain is a pipeline - putting
   // a device back at the end is not putting it back)
   | { type: 'addProcessor'; trackId: string; proc: ProcessorDef; index: number }
-  | { type: 'removeProcessor'; trackId: string; processorId: string };
+  | { type: 'removeProcessor'; trackId: string; processorId: string }
+  // F7 : le toggle de note est SON PROPRE inverse (re-toggler la meme note
+  // annule l'ajout/retrait) - on capture la note identique.
+  | { type: 'toggleNote'; trackId: string; clipId: string; note: NoteDef };
 
 interface UndoGroup {
   ops: InverseOp[];
@@ -63,6 +66,8 @@ function targetKey(op: InverseOp): string {
     case 'deleteTrack': return `track:${op.trackId}`;
     case 'addProcessor': return `proc:${op.trackId}:${op.proc.id}`;
     case 'removeProcessor': return `proc:${op.trackId}:${op.processorId}`;
+    case 'toggleNote':
+      return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:${op.note.startSample}`;
   }
 }
 
