@@ -109,6 +109,10 @@ struct TrackDef {
     std::string id;
     std::string name;
     float gain = 1.0f;
+    // F2 : panoramique -1 (gauche) .. 0 (centre) .. +1 (droite). Additif :
+    // 0 (centre) quand absent du document (anciens projets). Puissance egale
+    // applique en sortie de piste (audio_graph::processTrack).
+    float pan = 0.0f;
     std::vector<ClipDef> clips;
     std::vector<ProcessorDef> chain;
 };

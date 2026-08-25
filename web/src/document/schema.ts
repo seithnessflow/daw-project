@@ -69,6 +69,9 @@ export interface TrackDef {
   id: string;
   name: string;
   gain: number;
+  /** F2 : pan -1 (gauche) .. 0 (centre) .. +1 (droite). ADDITIF - absent sur
+   *  les anciens projets (le moteur retombe sur 0 centre). */
+  pan?: number;
   clips: ClipDef[];
   chain: ProcessorDef[];
 }

@@ -20,6 +20,7 @@ import type { ClipDef, TrackDef, ProcessorDef } from './schema';
 
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
+  | { type: 'setTrackPan'; trackId: string; pan: number }
   | { type: 'setMasterGain'; gain: number }
   | { type: 'setProcessorBypass'; trackId: string; processorId: string; bypass: boolean }
   | { type: 'setProcessorParam'; trackId: string; processorId: string; key: string; value: number }
@@ -48,6 +49,7 @@ interface UndoGroup {
 function targetKey(op: InverseOp): string {
   switch (op.type) {
     case 'setTrackGain': return `gain:${op.trackId}`;
+    case 'setTrackPan': return `pan:${op.trackId}`;
     case 'setMasterGain': return 'master';
     case 'setProcessorBypass': return `byp:${op.trackId}:${op.processorId}`;
     case 'setProcessorParam':

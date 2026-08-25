@@ -710,6 +710,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         track.id = track_def.id;
         track.name = track_def.name;
         track.gain.store(track_def.gain, std::memory_order_relaxed);
+        track.pan.store(track_def.pan, std::memory_order_relaxed);  // F2
 
         // S7: THE INVARIANT's reading half. Pre-fetch an unresolved
         // node's stem from the store (the asset road), then let the

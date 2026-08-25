@@ -196,6 +196,27 @@ void AudioGraph::processTrack(
         ++node_j;
     }
 
+    // F2 : panoramique en SORTIE de piste (post-chain). Post-chain
+    // volontairement : un instrument (ex Dexed) IGNORE son entree et genere un
+    // signal centre - le paner avant sa chaine ne ferait rien.
+    //   Loi LINEAIRE centre-neutre (pas puissance egale) : le canal proche
+    //   reste a l'unite, le canal oppose descend lineairement. Choix impose
+    //   par la neutralite du CENTRE (pan 0 == inchange) - obligatoire pour ne
+    //   pas alterer le hash offline deterministe ni la loudness des projets
+    //   existants. La puissance egale mettrait le centre a -3 dB (casse les
+    //   hash) ou le hard-pan a +3 dB (risque de clip) ET creerait une
+    //   discontinuite de -3 dB en frolant le centre. gl,gr continus en 0.
+    // pan -1 (G) .. 0 (centre) .. +1 (D). Le metering suit (post-pan).
+    const float pan_value = track.pan.load(std::memory_order_relaxed);
+    if (pan_value != 0.0f) {
+        const float gl = pan_value <= 0.0f ? 1.0f : (1.0f - pan_value);
+        const float gr = pan_value >= 0.0f ? 1.0f : (1.0f + pan_value);
+        for (uint32_t i = 0; i < frame_count; ++i) {
+            output[i * 2] *= gl;
+            output[i * 2 + 1] *= gr;
+        }
+    }
+
     // Calculate peaks for metering
     float peak_l = 0.0f;
     float peak_r = 0.0f;

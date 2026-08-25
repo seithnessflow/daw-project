@@ -235,6 +235,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         track.id = track_def.id;
         track.name = track_def.name;
         track.gain = track_def.gain;
+        track.pan = track_def.pan;  // F2 (pan==0 -> processTrack ne touche rien : hash inchange)
 
         // S7: THE INVARIANT's reading half - an unresolvable plugin
         // with a stem plays its rendered truth (decision shared with

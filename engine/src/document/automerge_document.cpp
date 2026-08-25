@@ -469,6 +469,17 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                         }
                         if (r) AMresultFree(r);
 
+                        // F2 : pan (absent -> defaut 0 centre ; itemToDouble
+                        // coerce INT->double, cf. piege CRDT int/f64)
+                        r = AMmapGet(doc_, trackId, AMstr("pan"), nullptr);
+                        if (r && AMresultStatus(r) == AM_STATUS_OK) {
+                            AMitem* it = AMresultItem(r);
+                            if (itemToDouble(it, &f64Val)) {
+                                track.pan = static_cast<float>(f64Val);
+                            }
+                        }
+                        if (r) AMresultFree(r);
+
                         // Read clips array
                         r = AMmapGet(doc_, trackId, AMstr("clips"), nullptr);
                         if (r && AMresultStatus(r) == AM_STATUS_OK) {
@@ -815,6 +826,9 @@ bool AutomergeDocument::writeDocument(const ProjectDef& def) {
         result = AMmapPutF64(doc_, trackObjId, AMstr("gain"), track.gain);
         if (result) results_to_free.push_back(result);
 
+        result = AMmapPutF64(doc_, trackObjId, AMstr("pan"), track.pan);  // F2
+        if (result) results_to_free.push_back(result);
+
         // Create clips array
         result = AMmapPutObject(doc_, trackObjId, AMstr("clips"), AM_OBJ_TYPE_LIST);
         if (result) results_to_free.push_back(result);
@@ -1089,6 +1103,9 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
     if (r) results_to_free.push_back(r);
 
     r = AMmapPutF64(doc_, trackObjId, AMstr("gain"), track.gain);
+    if (r) results_to_free.push_back(r);
+
+    r = AMmapPutF64(doc_, trackObjId, AMstr("pan"), track.pan);  // F2
     if (r) results_to_free.push_back(r);
 
     // Create clips array and populate with clips from track

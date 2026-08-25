@@ -31,6 +31,7 @@ struct AudioTrack {
     std::string id;
     std::string name;
     std::atomic<float> gain{1.0f};  // Track gain (atomic for real-time updates)
+    std::atomic<float> pan{0.0f};   // F2: -1..+1 pan (atomic, same mold as gain)
 
     std::vector<ClipPlayer> clips;
     std::vector<std::unique_ptr<ProcessorNode>> chain;
@@ -49,6 +50,7 @@ struct AudioTrack {
         : id(std::move(other.id))
         , name(std::move(other.name))
         , gain(other.gain.load(std::memory_order_relaxed))
+        , pan(other.pan.load(std::memory_order_relaxed))
         , clips(std::move(other.clips))
         , chain(std::move(other.chain))
         , solo(other.solo.load(std::memory_order_relaxed))
@@ -60,6 +62,7 @@ struct AudioTrack {
             id = std::move(other.id);
             name = std::move(other.name);
             gain.store(other.gain.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            pan.store(other.pan.load(std::memory_order_relaxed), std::memory_order_relaxed);
             clips = std::move(other.clips);
             chain = std::move(other.chain);
             solo.store(other.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);

@@ -10,10 +10,14 @@ import { ctx, sendLastChange, els } from './../app/context';
 import { renderTracks } from './../app/render';
 import { trackHue, formatGain } from './track';
 
+const fmtPan = (p: number): string =>
+  p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`;
+
 function strip(
   id: string, name: string, hue: number, gain: number,
   onGain: (g: number) => void, mono?: { mute: boolean; solo: boolean },
   onMon?: (kind: 'mute' | 'solo', on: boolean) => void,
+  pan?: number, onPan?: (p: number) => void,
 ): HTMLElement {
   const s = document.createElement('div');
   s.className = 'mx-strip';
@@ -52,7 +56,31 @@ function strip(
       ms.appendChild(btn);
     }
   }
-  s.append(nm, ms, body, db);
+  // F2 : pan au-dessus du fader (convention console). Absent pour le master
+  // (sortie stereo, pas de pan). Double-clic = recentrer.
+  s.append(nm, ms);
+  if (onPan) {
+    const panRow = document.createElement('div');
+    panRow.className = 'mx-pan';
+    const pv = document.createElement('span');
+    pv.className = 'mx-pan-val';
+    pv.textContent = fmtPan(pan ?? 0);
+    const pin = document.createElement('input');
+    pin.type = 'range'; pin.min = '-1'; pin.max = '1'; pin.step = '0.02';
+    pin.value = String(pan ?? 0); pin.className = 'mx-pan-slider';
+    pin.dataset.trackId = id;
+    pin.setAttribute('aria-label', `Pan ${name}`);
+    pin.addEventListener('input', () => {
+      pv.textContent = fmtPan(parseFloat(pin.value));
+      onPan(parseFloat(pin.value));
+    });
+    pin.addEventListener('dblclick', () => {
+      pin.value = '0'; pv.textContent = 'C'; onPan(0);
+    });
+    panRow.append(pv, pin);
+    s.append(panRow);
+  }
+  s.append(body, db);
   return s;
 }
 
@@ -73,6 +101,8 @@ export function renderMixer(): void {
       { mute: !!m.mute, solo: !!m.solo },
       (kind, on) => ctx.engineClient?.setMonitor(
         t.id, kind === 'solo' ? on : undefined, kind === 'mute' ? on : undefined),
+      t.pan ?? 0,
+      (p) => { ctx.project!.setTrackPan(t.id, p); sendLastChange(); renderTracks(); },
     ));
   }
   // Tranche MASTER (reutilise le master gain de la command bar)

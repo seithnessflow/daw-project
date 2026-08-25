@@ -58,6 +58,11 @@ std::string validateDocument(const ProjectDef& doc) {
                    << track.gain << " (must be 0.0-2.0). ";
         }
 
+        if (track.pan < -1.0f || track.pan > 1.0f) {  // F2
+            errors << "Track " << track.id << " has invalid pan "
+                   << track.pan << " (must be -1.0..1.0). ";
+        }
+
         // Validate clips
         for (size_t j = 0; j < track.clips.size(); ++j) {
             const auto& clip = track.clips[j];

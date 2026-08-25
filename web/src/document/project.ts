@@ -180,6 +180,7 @@ export class Project {
     for (const op of ops) {
       switch (op.type) {
         case 'setTrackGain': this.setTrackGain(op.trackId, op.gain); break;
+        case 'setTrackPan': this.setTrackPan(op.trackId, op.pan); break;
         case 'setMasterGain': this.setMasterGain(op.gain); break;
         case 'setProcessorBypass':
           this.setProcessorBypass(op.trackId, op.processorId, op.bypass); break;
@@ -214,6 +215,22 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.gain = Math.max(0, Math.min(2, gain));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * F2 : set track pan (-1 gauche .. 0 centre .. +1 droite). Meme moule que
+   * setTrackGain : capture inverse pour l'undo, clamp, change Automerge. Le
+   * moteur lit `pan` du doc et applique une puissance egale en sortie de piste.
+   */
+  setTrackPan(trackId: string, pan: number): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    if (!track) return;  // target gone (maybe remotely): silent no-op
+    this.journal.capture({ type: 'setTrackPan', trackId, pan: track.pan ?? 0 });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (t) t.pan = Math.max(-1, Math.min(1, pan));
     });
     this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }

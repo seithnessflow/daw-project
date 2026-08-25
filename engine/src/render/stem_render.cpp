@@ -126,6 +126,7 @@ StemRenderResult renderTrackStem(const document::ProjectDef& project,
     // stay LIVE on the reading side - the stem is pre-gain truth).
     document::TrackDef reduced = *track;
     reduced.gain = 1.0f;
+    reduced.pan = 0.0f;  // F2 : le stem reste centre (le pair applique SON pan de piste)
     reduced.chain.assign(track->chain.begin(),
                          track->chain.begin() +
                              static_cast<long long>(node_index) + 1);
