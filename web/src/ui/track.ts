@@ -626,6 +626,87 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   return wrap;
 }
 
+/**
+ * F4 : un knob rotatif qui PILOTE un <input type=range> (la source de
+ * verite - le contrat data-role=param reste intact). Drag vertical facon
+ * DAW (haut = +, 180 px = pleine course), clavier (fleches), et sync
+ * visuel sur chaque event `input` du slider (donc aussi les maj distantes,
+ * cf. updateDeviceViewUI qui appelle __knobSync apres avoir ecrit .value).
+ * Clic sans mouvement = aucun effet (regle d'ergonomie des poignees).
+ */
+function createKnob(input: HTMLInputElement): HTMLElement {
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 1);
+  const step = Number(input.step || 0.01) || 0.01;
+  const SWEEP = 270;  // deg (-135..+135)
+  const wrap = document.createElement('div');
+  wrap.className = 'knob';
+  wrap.tabIndex = 0;
+  wrap.setAttribute('role', 'slider');
+  wrap.setAttribute('aria-valuemin', String(min));
+  wrap.setAttribute('aria-valuemax', String(max));
+  const dial = document.createElement('div');
+  dial.className = 'knob-dial';
+  const ptr = document.createElement('div');
+  ptr.className = 'knob-pointer';
+  dial.appendChild(ptr);
+  wrap.appendChild(dial);
+
+  const sync = (): void => {
+    const t = max > min ? (Number(input.value) - min) / (max - min) : 0;
+    const clamped = Math.max(0, Math.min(1, t));
+    ptr.style.transform = `rotate(${-135 + clamped * SWEEP}deg)`;
+    dial.style.setProperty('--fill', `${clamped * SWEEP}deg`);
+    wrap.setAttribute('aria-valuenow', input.value);
+  };
+  (input as unknown as { __knobSync?: () => void }).__knobSync = sync;
+  input.addEventListener('input', sync);
+
+  const commit = (nv: number): void => {
+    const clamped = Math.max(min, Math.min(max, nv));
+    const snapped = Math.round(clamped / step) * step;
+    const str = String(Number(snapped.toFixed(6)));
+    if (str === input.value) return;
+    input.value = str;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  let dragging = false;
+  let startY = 0;
+  let startV = 0;
+  wrap.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startV = Number(input.value);
+    wrap.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    wrap.focus();  // pour que updateDeviceViewUI ne combatte pas la main
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    commit(startV + ((startY - e.clientY) / 180) * (max - min));
+  });
+  const end = (e: PointerEvent): void => {
+    dragging = false;
+    try { wrap.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+  };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  wrap.addEventListener('keydown', (e) => {
+    let d = 0;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') d = step;
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') d = -step;
+    else if (e.key === 'PageUp') d = step * 10;
+    else if (e.key === 'PageDown') d = -step * 10;
+    else return;
+    e.preventDefault();
+    commit(Number(input.value) + d);
+  });
+
+  sync();
+  return wrap;
+}
+
 function createDevicePanel(
   proc: ProcessorDef,
   onBypassToggle: (procId: string, bypass: boolean) => void,
@@ -749,11 +830,13 @@ function createDevicePanel(
     const label = document.createElement('span');
     label.className = 'param-label';
     label.textContent = proc.type === 'vst3' ? `p${p.key}` : p.key;
-    row.appendChild(label);
     // Session 4.1 : unites vraies quand le device declare ses specs
     // (dB, L/R, mono/stereo, inv) - le 0-1 nu reste le repli vst3
     const spec = NATIVE_PARAM_SPECS[proc.type]?.[p.key];
     const fmt = spec?.fmt ?? ((v: number) => v.toFixed(2));
+    // F4 : le <input range> reste la SOURCE DE VERITE (contrat : le JS lit
+    // .value par data-role=param ; onParamChange = l'unique entonnoir).
+    // Il est masque (CSS) et pilote par un knob rotatif visuel.
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.dataset.role = 'param';
@@ -763,6 +846,7 @@ function createDevicePanel(
     slider.step = String(spec?.step ?? 0.01);
     slider.value = String(p.value);
     slider.setAttribute('aria-label', `${proc.type} ${p.key}`);
+    slider.className = 'param-input';
     const valueEl = document.createElement('span');
     valueEl.className = 'param-value';
     valueEl.textContent = fmt(Number(p.value));
@@ -770,8 +854,10 @@ function createDevicePanel(
       valueEl.textContent = fmt(Number(slider.value));
       onParamChange(proc.id, p.key, parseFloat(slider.value));
     });
-    row.appendChild(slider);
-    row.appendChild(valueEl);
+    const knob = createKnob(slider);
+    // ordre DOM : knob, value, label, slider(masque). Le knob refait sa
+    // rotation sur chaque event input du slider (drag local ET maj distante).
+    row.append(knob, valueEl, label, slider);
     body.appendChild(row);
   }
   panel.appendChild(body);
@@ -841,13 +927,18 @@ export function updateDeviceViewUI(chain: ProcessorDef[]): void {
     for (const p of proc.params) {
       const slider = panel.querySelector(
         `[data-role="param"][data-param-key="${cssId(p.key)}"]`) as HTMLInputElement | null;
-      if (slider && document.activeElement !== slider) {
+      const row = slider?.closest('.param-row') ?? null;
+      // F4 : ne pas combattre la main sur le knob (le knob prend le focus au
+      // pointerdown) ; le slider lui-meme est masque et jamais focus.
+      if (slider && !row?.contains(document.activeElement)) {
         slider.value = String(p.value);
-        const valueEl = slider.nextElementSibling as HTMLElement | null;
+        const valueEl = row?.querySelector('.param-value') as HTMLElement | null;
         // Meme formatteur que le createur (regle des jumeaux)
         const fmt = NATIVE_PARAM_SPECS[proc.type]?.[p.key]?.fmt ??
           ((v: number) => v.toFixed(2));
         if (valueEl) valueEl.textContent = fmt(Number(p.value));
+        // le knob refait sa rotation depuis la nouvelle .value
+        (slider as unknown as { __knobSync?: () => void }).__knobSync?.();
       }
     }
   }

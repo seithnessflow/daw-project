@@ -265,30 +265,91 @@
     0 0 6px rgba(141, 122, 230, 0.3);
 }
 .device-body {
-  padding: 8px 9px;
+  padding: 10px 9px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 12px 10px;
+  justify-content: flex-start;
 }
+/* F4 : chaque param = un knob rotatif (colonne knob / valeur / label). */
 .param-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  font-size: 10px;
+  gap: 3px;
+  font-size: 9px;
+  width: 46px;
 }
 .param-label {
-  min-width: 32px;
-  color: var(--text-2);
+  color: var(--text-3);
   font-family: var(--mono);
-}
-.param-row input {
-  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .param-value {
-  min-width: 32px;
-  text-align: right;
   font-family: var(--mono);
-  color: var(--text-2);
+  font-size: 10px;
+  color: var(--copper);
+  font-variant-numeric: tabular-nums;
+}
+/* le <input range> reste dans le DOM (source de verite) mais invisible */
+.param-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  margin: -1px;
+}
+.knob {
+  width: 34px;
+  height: 34px;
+  cursor: ns-resize;
+  border-radius: 50%;
+  outline: none;
+  touch-action: none;
+}
+.knob:focus-visible {
+  box-shadow: 0 0 0 2px var(--potion);
+}
+/* anneau : la course remplie (--fill deg) en cuivre sur un rail sombre */
+.knob-dial {
+  --fill: 0deg;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(from -135deg,
+    var(--copper) var(--fill), var(--surface-2) var(--fill) 270deg,
+    transparent 270deg);
+  display: grid;
+  place-items: center;
+}
+/* le cap central (le corps du bouton) masque le centre de l'anneau */
+.knob-dial::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #4a453f, #262320 70%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+/* l'index : un trait du centre vers le bord, tourne avec la valeur */
+.knob-pointer {
+  position: absolute;
+  width: 2px;
+  height: 11px;
+  top: 6px;
+  border-radius: 1px;
+  background: var(--copper);
+  transform-origin: 50% 11px;
+  box-shadow: 0 0 3px rgba(230, 165, 82, 0.6);
 }
 .device-empty {
   color: var(--text-3);
