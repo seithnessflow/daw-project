@@ -40,6 +40,25 @@
   color: var(--text-3);
   margin-left: 8px;
 }
+/* F6 : dans le rail navigateur, la palette s'empile verticalement (chips
+   pleine largeur) - la bande horizontale ne tient pas dans la colonne. */
+.browser-list .library {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  margin: 0;
+}
+.browser-list .library-label {
+  margin: 0 0 4px;
+}
+.browser-list .sample-chip {
+  text-align: left;
+  border-radius: 6px;
+}
+.browser-list .library-hint {
+  margin: 6px 0 0;
+  line-height: 1.35;
+}
 body.sample-armed .track-lane {
   cursor: copy;
 }

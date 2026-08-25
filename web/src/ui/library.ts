@@ -34,8 +34,10 @@ export async function loadKit(): Promise<Kit | null> {
 export class Library {
   private armed: KitSample | null = null;
   readonly element: HTMLElement;
+  readonly count: number;
 
   constructor(kit: Kit) {
+    this.count = kit.samples.length;
     this.element = document.createElement('div');
     this.element.className = 'library';
     const label = document.createElement('span');

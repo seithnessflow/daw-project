@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Rail navigateur (Refonte T4) : le catalogue de plugins, a gauche. Onglets
- * Instruments / Effets, alimentes par window.__dawPlugins (le catalogue que
- * le moteur envoie apres le scan). Clic sur un item = ajoute le device a la
- * piste selectionnee (reutilise project.addProcessor, le meme chemin que
- * "+ device"). Les samples restent pour l'instant dans la barre KIT.
+ * Instruments / Effets / Samples, alimentes par window.__dawPlugins (le
+ * catalogue que le moteur envoie apres le scan) et par ctx.library (les
+ * samples du projet). Clic sur un instrument/effet = ajoute le device a la
+ * piste selectionnee (reutilise project.addProcessor). L'onglet Samples
+ * monte la palette existante (arm/place inchange) : SOURCE UNIQUE des
+ * samples (F6 - la barre KIT de l'arrangement est retiree).
  */
 
 import { ctx, sendLastChange } from '../app/context';
@@ -14,7 +16,7 @@ type Cat = { uid: string; name: string; vendor: string; subCategories: string };
 const isInst = (e: Cat) =>
   e.subCategories.includes('Instrument') || e.subCategories.includes('Synth');
 
-let tab: 'inst' | 'fx' = 'inst';
+let tab: 'inst' | 'fx' | 'samples' = 'inst';
 
 export function renderBrowser(): void {
   const slot = document.getElementById('browser-slot');
@@ -24,11 +26,14 @@ export function renderBrowser(): void {
   const fx = cat.filter((e) => e.subCategories.includes('Fx') && !isInst(e))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const nSamples = ctx.library?.count ?? 0;
+
   slot.replaceChildren();
   const head = document.createElement('div');
   head.className = 'browser-head';
   for (const [key, label, n] of [['inst', 'Instruments', inst.length],
-                                 ['fx', 'Effets', fx.length]] as const) {
+                                 ['fx', 'Effets', fx.length],
+                                 ['samples', 'Samples', nSamples]] as const) {
     const t = document.createElement('button');
     t.className = 'browser-tab' + (tab === key ? ' on' : '');
     t.textContent = `${label} ${n}`;
@@ -39,6 +44,22 @@ export function renderBrowser(): void {
 
   const list = document.createElement('div');
   list.className = 'browser-list';
+
+  // F6 : onglet Samples = la palette du projet (arm/place inchange). On
+  // remonte l'element existant de ctx.library (source unique des samples).
+  if (tab === 'samples') {
+    if (ctx.library) {
+      list.appendChild(ctx.library.element);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'browser-empty';
+      empty.textContent = 'depose un WAV sur une piste pour commencer';
+      list.appendChild(empty);
+    }
+    slot.appendChild(list);
+    return;
+  }
+
   const items = tab === 'inst' ? inst : fx;
   if (items.length === 0) {
     const empty = document.createElement('div');

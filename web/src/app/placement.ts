@@ -12,6 +12,7 @@ import { decodeDurationSec } from '../ui/waveform';
 import { SERVER_HTTP, assetAuthHeaders } from './context';
 import { ctx, sendLastChange, LAB_MODE } from './context';
 import { renderTracks } from './render';
+import { renderBrowser } from '../ui/browser';
 import { markLanded } from './gestures';
 
 /**
@@ -88,21 +89,19 @@ export function refreshPalette(): void {
   const key = [...byHash.keys()].sort().join(',');
   if (key === lastPaletteKey) return;
   lastPaletteKey = key;
-  const slot = document.getElementById('library-slot')!;
-  slot.innerHTML = '';
+  // F6 : les samples ne vivent plus dans l'arrangement (#library-slot vide) ;
+  // la SOURCE UNIQUE est l'onglet Samples du navigateur, qui monte
+  // ctx.library.element. On (re)construit la palette et on rafraichit le rail.
+  document.getElementById('library-slot')!.innerHTML = '';
   if (byHash.size === 0) {
-    const hint = document.createElement('div');
-    hint.className = 'empty-hint';
-    hint.textContent = 'drop a WAV on a lane to begin';
-    slot.appendChild(hint);
     ctx.library = null;
-    return;
+  } else {
+    const kit: Kit = {
+      sampleRate: sr,
+      samples: [...byHash.entries()].map(([hash, v]) =>
+        ({ name: v.name, hash, seconds: v.seconds })),
+    };
+    ctx.library = new Library(kit);
   }
-  const kit: Kit = {
-    sampleRate: sr,
-    samples: [...byHash.entries()].map(([hash, v]) =>
-      ({ name: v.name, hash, seconds: v.seconds })),
-  };
-  ctx.library = new Library(kit);
-  slot.appendChild(ctx.library.element);
+  renderBrowser();
 }
