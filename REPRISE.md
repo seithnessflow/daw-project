@@ -29,13 +29,17 @@ Session d'AUDIT-5 + premiers correctifs, en deux temps :
    - A6/A7 warnings bruyants (periode != 256 ; asset sample_rate mismatch).
    - A8 sample_rate du moteur sur le fil (fin de la playhead 48000 en dur).
    - B1 SECURITY.md re-cadre (C2-distante LIVE, H3 Windows Low...).
-   gtests 38/38, e2e verifies en local pour les items inter-etages.
+   - 1.1 params moteur map->liste ordonnee (clot l'ordre de la cle de
+     stem laisse par A2 ; aligne moteur/web/SCHEMA.md).
+   - B5 validation des chemins issus du document (path traversal +
+     injection URL) : helper isPathComponentSafe aux 4 frontieres.
+   gtests 40/40, e2e verifies en local pour les items inter-etages.
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier push 7533a36 (A8). CI 05d0adf..72afb0c = VERT confirme
-(A1/A2/A4/A6/A7/B1/B3). Le run de 7533a36 (A8) tournait a la cloture :
-VERDICT A CONFIRMER au demarrage (verifie en local : e2e 6 passed).
+Dernier push b84fd89 (B5). CI VERTE confirmee jusqu'a f360092 (A8/1.1
+inclus). Le run de b84fd89 (B5) tournait a la cloture : VERDICT A
+CONFIRMER au demarrage (verifie en local : gtests 40/40, B5 additif).
 Piege paye : A4-1a (17f21a8) a d'abord ete ROUGE en CI — un renommage
 de log moteur (« Document loaded ») a casse un contrat e2e (countInFile) ;
 corrige en 0e2089b. LECON : verifier les APPELANTS d'un log avant de le
