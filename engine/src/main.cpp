@@ -40,6 +40,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <cstdlib>
 #include <string>
 #include <thread>
 #include <csignal>
@@ -581,6 +582,13 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
     ix::HttpRequestArgsPtr args = http.createRequest();
     args->connectTimeout = 10;
     args->transferTimeout = 120;
+    // AUDIT-5 F1: attach the shared bearer token when DAW_SERVER_TOKEN is set
+    // (same machine as the server). No token = no header (dev default).
+    if (const char* tok = std::getenv("DAW_SERVER_TOKEN")) {
+        if (tok[0] != '\0') {
+            args->extraHeaders["Authorization"] = std::string("Bearer ") + tok;
+        }
+    }
     ix::HttpResponsePtr response = http.get(url, args);
     if (!response || response->statusCode != 200) {
         std::cerr << "Asset " << hash << ": not on server ("
@@ -643,6 +651,13 @@ bool putAssetToServer(const std::string& server_ws_url,
     ix::HttpRequestArgsPtr args = http.createRequest();
     args->connectTimeout = 10;
     args->transferTimeout = 120;
+    // AUDIT-5 F1: attach the shared bearer token when DAW_SERVER_TOKEN is set
+    // (same machine as the server). No token = no header (dev default).
+    if (const char* tok = std::getenv("DAW_SERVER_TOKEN")) {
+        if (tok[0] != '\0') {
+            args->extraHeaders["Authorization"] = std::string("Bearer ") + tok;
+        }
+    }
     std::string body(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     ix::HttpResponsePtr response = http.put(url, body, args);
     if (!response || (response->statusCode != 200 && response->statusCode != 201)) {

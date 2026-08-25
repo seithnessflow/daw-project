@@ -273,8 +273,14 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   comportement inchange. Ferme F1/C2-distante quand le serveur est expose
   par un tunnel : on definit le token, l'URL partagee porte le secret.
   Tests Rust auth_token 2/2 + les 3 tests d'integration existants verts.
-  RESTE (F1 clients, en cours) : le moteur et le web envoient le token
-  (moteur = env var ; web = fragment #stoken pour le tunnel).
+  F1 CLIENTS FAITS (meme jour) : moteur (token = env var) et web (token =
+  fragment #stoken, centralise dans context.ts SERVER_TOKEN/assetAuthHeaders)
+  envoient `auth:<token>` en premier message WS + `Authorization: Bearer`
+  sur /assets. Verifie : smoke moteur AVEC token = « Document loaded »,
+  SANS = Disconnected en boucle (refuse) ; e2e retrocompat fader+devices+
+  asset-fetch 7 passed (sans token = dev inchange) ; tsc web 0. RESTE
+  (activation, non bloquant) : le script tunnel genere le token et le pose
+  dans DAW_SERVER_TOKEN + l'URL #stoken (doc deux-machines.md).
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route

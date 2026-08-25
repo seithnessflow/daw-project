@@ -17,7 +17,7 @@ import { Overview } from '../ui/overview';
 import { mountStarter } from '../ui/starter';
 import {
   ctx, els, sendLastChange,
-  SERVER_URL, ENGINE_PORT, PROJECT_ID, LAB_MODE,
+  SERVER_URL, SERVER_TOKEN, ENGINE_PORT, PROJECT_ID, LAB_MODE,
 } from './context';
 import {
   setZoom, fitAll, snapStep, contentSeconds,
@@ -48,7 +48,9 @@ export async function init(): Promise<void> {
   // ---- Server (document) --------------------------------------------------
   let jamReassert: (() => void) | null = null;  // set once the jam exists
   let jamIsBroadcasting: (() => boolean) | null = null;
-  const serverClient = new ServerClient(SERVER_URL);
+  // AUDIT-5 F1: optional shared server token (context reads it from the
+  // #stoken fragment). Absent (dev) = no auth.
+  const serverClient = new ServerClient(SERVER_URL, SERVER_TOKEN);
   ctx.serverClient = serverClient;
   serverClient.onConnect = () => {
     els.serverStatus.classList.add('connected');

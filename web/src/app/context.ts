@@ -28,6 +28,16 @@ const serverBase = rawServer
 export const SERVER_URL = serverBase;
 /** HTTP side of the same server (assets store). ONE source of truth. */
 export const SERVER_HTTP = serverBase.replace(/^ws/, 'http');
+/** AUDIT-5 F1: optional shared server token from the URL fragment
+ *  (#stoken=...) - never hits the network. Absent (dev) = no auth. Used by
+ *  the WS handshake (ServerClient) and the /assets fetches (Bearer). */
+export const SERVER_TOKEN: string | undefined =
+  new URLSearchParams(window.location.hash.replace(/^#/, '')).get('stoken') ??
+  undefined;
+/** Bearer headers for an /assets request when a token is configured. */
+export function assetAuthHeaders(): Record<string, string> {
+  return SERVER_TOKEN ? { Authorization: `Bearer ${SERVER_TOKEN}` } : {};
+}
 // L1b piloting: ?engine=<port> points a tab at another local engine
 // (two engines, two tabs, one machine = the sync manip without a second
 // computer). The token endpoint already serves any port.

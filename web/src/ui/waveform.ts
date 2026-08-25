@@ -12,7 +12,7 @@
 // 1bis + ultra bug_009: SERVER_HTTP's single owner is app/context -
 // imported here for local use only, no re-export (the forwarding twin
 // is dead for real this time).
-import { SERVER_HTTP } from '../app/context';
+import { SERVER_HTTP, assetAuthHeaders } from '../app/context';
 
 /** Decode audio duration in seconds (shared AudioContext). */
 export async function decodeDurationSec(bytes: ArrayBuffer): Promise<number> {
@@ -35,7 +35,7 @@ async function loadPeaks(hash: string): Promise<PeaksEntry | null> {
   if (pending.has(hash)) return null;  // someone else is fetching
   pending.add(hash);
   try {
-    const res = await fetch(`${SERVER_HTTP}/assets/${hash}`);
+    const res = await fetch(`${SERVER_HTTP}/assets/${hash}`, { headers: assetAuthHeaders() });
     if (!res.ok) return null;
     const bytes = await res.arrayBuffer();
     audioCtx ??= new AudioContext({ sampleRate: 48000 });

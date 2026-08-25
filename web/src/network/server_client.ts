@@ -72,8 +72,13 @@ export class ServerClient {
     this.signalListeners.push(fn);
   }
 
-  constructor(baseUrl: string) {
+  /** AUDIT-5 F1: optional shared token (from the URL fragment #stoken).
+   *  Sent as an `auth:<token>` first message; absent = no auth (dev). */
+  private authToken: string | undefined;
+
+  constructor(baseUrl: string, authToken?: string) {
     this.url = baseUrl;
+    this.authToken = authToken;
   }
 
   /**
@@ -91,6 +96,12 @@ export class ServerClient {
         this.ws.onopen = () => {
           console.log('Server WebSocket connected');
           this.awaitingInitialDoc = true;
+          // AUDIT-5 F1: authenticate FIRST if a shared token is configured
+          // (from the URL fragment #stoken, which never leaves the browser).
+          // No token = no auth (dev default), the server expects nothing.
+          if (this.authToken) {
+            this.ws!.send(`auth:${this.authToken}`);
+          }
           this.startWatchdog();
           this.flushSignals();  // S8b: queued jam signals ship now
           this.onConnect?.();

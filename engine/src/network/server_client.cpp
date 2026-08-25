@@ -4,6 +4,7 @@
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
 
+#include <cstdlib>
 #include <iostream>
 
 namespace daw::network {
@@ -51,6 +52,15 @@ bool ServerClient::connect(const ServerConfig& config) {
                 std::cout << "ServerClient: Connected to server" << std::endl;
                 connected_ = true;
                 received_initial_ = false;
+                // AUDIT-5 F1: if a shared token is configured (same machine
+                // as the server), authenticate with an `auth:<token>` FIRST
+                // message before the server sends the doc. No env var = no
+                // auth (dev default), the server expects nothing.
+                if (const char* tok = std::getenv("DAW_SERVER_TOKEN")) {
+                    if (tok[0] != '\0' && ws_) {
+                        ws_->sendText(std::string("auth:") + tok);
+                    }
+                }
                 if (connection_callback_) {
                     connection_callback_(true);
                 }

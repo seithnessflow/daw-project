@@ -9,7 +9,7 @@
 import { TIMELINE } from '../ui/track';
 import { Library, type Kit } from '../ui/library';
 import { decodeDurationSec } from '../ui/waveform';
-import { SERVER_HTTP } from './context';
+import { SERVER_HTTP, assetAuthHeaders } from './context';
 import { ctx, sendLastChange, LAB_MODE } from './context';
 import { renderTracks } from './render';
 import { markLanded } from './gestures';
@@ -34,7 +34,7 @@ export async function handleFileDrop(
   const hash = Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0')).join('');
   const res = await fetch(`${SERVER_HTTP}/assets/${hash}`, {
-    method: 'PUT', body: bytes,
+    method: 'PUT', body: bytes, headers: assetAuthHeaders(),
   });
   if (res.status !== 201) {
     console.error(`asset store refused ${file.name}: ${res.status} ${await res.text()}`);
