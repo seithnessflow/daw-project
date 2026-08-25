@@ -13,6 +13,7 @@
 #include "processor_node.h"
 #include "clip_player.h"
 #include "gain_node.h"
+#include "../host/midi_schedule.h"  // F5 : ScheduledNote pour les slots Session
 
 #include <atomic>
 #include <memory>
@@ -27,6 +28,18 @@ namespace daw::graph {
  *
  * Contains clips and a processing chain.
  */
+/**
+ * F5 : un SLOT de session = un clip lancable (clip-launcher). Ses notes sont
+ * en positions LOCALES [0, loop_len) ; joue en boucle sur l'horloge de session
+ * quand il est lance. scene_id sert au handler (control thread) a retrouver
+ * l'index du slot a lancer.
+ */
+struct SessionSlot {
+    std::string scene_id;
+    int64_t loop_len = 0;
+    std::vector<daw::host::ScheduledNote> notes;
+};
+
 struct AudioTrack {
     std::string id;
     std::string name;
@@ -42,6 +55,20 @@ struct AudioTrack {
     std::atomic<bool> solo{false};
     std::atomic<bool> mute{false};
 
+    // F5 (launch Session). session_slots : construits en buildGraph (immuable
+    // une fois actif). launched_slot : index du slot lance (-1 = aucun), ecrit
+    // par le control thread (message launch), lu par le thread audio.
+    // launch_clock : valeur de l'horloge de session au lancement (rebasage).
+    // instrument_node : le node (ProxyNode) qui recoit le MIDI - pointeur NON
+    // possedant vers la chaine ; l'objet node est heap (unique_ptr), son adresse
+    // survit au move de la piste. prev_launched : etat vu par le thread audio
+    // au bloc precedent (detection de transition -> all-notes-off).
+    std::vector<SessionSlot> session_slots;
+    std::atomic<int32_t> launched_slot{-1};
+    std::atomic<int64_t> launch_clock{0};
+    ProcessorNode* instrument_node = nullptr;
+    int32_t prev_launched = -1;
+
     // Default constructor
     AudioTrack() = default;
 
@@ -54,7 +81,12 @@ struct AudioTrack {
         , clips(std::move(other.clips))
         , chain(std::move(other.chain))
         , solo(other.solo.load(std::memory_order_relaxed))
-        , mute(other.mute.load(std::memory_order_relaxed)) {}
+        , mute(other.mute.load(std::memory_order_relaxed))
+        , session_slots(std::move(other.session_slots))
+        , launched_slot(other.launched_slot.load(std::memory_order_relaxed))
+        , launch_clock(other.launch_clock.load(std::memory_order_relaxed))
+        , instrument_node(other.instrument_node)
+        , prev_launched(other.prev_launched) {}
 
     // Move assignment
     AudioTrack& operator=(AudioTrack&& other) noexcept {
@@ -67,6 +99,11 @@ struct AudioTrack {
             chain = std::move(other.chain);
             solo.store(other.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);
             mute.store(other.mute.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            session_slots = std::move(other.session_slots);
+            launched_slot.store(other.launched_slot.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            launch_clock.store(other.launch_clock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            instrument_node = other.instrument_node;
+            prev_launched = other.prev_launched;
         }
         return *this;
     }
@@ -157,6 +194,34 @@ public:
      * Control thread ; le graphe est immuable une fois actif.
      */
     [[nodiscard]] ProcessorNode* getNodeById(const std::string& id) noexcept;
+
+    // ---- F5 : launch des slots Session -----------------------------------
+    /**
+     * Horloge de SESSION (libre) : un compteur de samples que le callback fait
+     * avancer a CHAQUE bloc, meme transport a l'arret. Les slots lances s'y
+     * rebasent (independants de la position d'arrangement). Ecrit par le
+     * thread audio avant process, lu par processTrack.
+     */
+    void setSessionClock(int64_t clock) noexcept {
+        session_clock_.store(clock, std::memory_order_relaxed);
+    }
+
+    /**
+     * Y a-t-il au moins un slot lance ? Le callback l'utilise pour traiter le
+     * graphe MEME a l'arret (sinon les slots ne sonneraient qu'en lecture).
+     */
+    [[nodiscard]] bool anyLaunched() const noexcept {
+        return launched_count_.load(std::memory_order_relaxed) > 0;
+    }
+
+    /**
+     * Lancer / arreter un slot de session (control thread, message launch).
+     * stop=true -> arrete le slot lance de la piste. Sinon lance le slot de la
+     * scene scene_id. Rebase sur l'horloge de session courante. Retourne false
+     * si la piste (ou le slot) est introuvable.
+     */
+    bool launchSlot(const std::string& track_id, const std::string& scene_id,
+                    bool stop) noexcept;
 
     /**
      * Set the sample rate.
@@ -251,6 +316,10 @@ private:
     std::atomic<float> master_gain_{1.0f};
     std::atomic<float> master_peak_left_{0.0f};
     std::atomic<float> master_peak_right_{0.0f};
+
+    // F5 : horloge de session libre + nombre de slots lances (pour anyLaunched).
+    std::atomic<int64_t> session_clock_{0};
+    std::atomic<int32_t> launched_count_{0};
 
     size_t num_tracks_ = 0;
     std::unique_ptr<std::atomic<float>[]> peak_left_;

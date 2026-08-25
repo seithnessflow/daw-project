@@ -74,13 +74,17 @@ void audioCallback(
     const bool is_playing = ctx->transport->isPlaying();
     int64_t position = ctx->transport->getPosition();
 
-    if (!is_playing || !graph) {
-        // Not playing or no graph - output silence, and the meters SAY
-        // silence (relaxed stores; stale peaks were ghost-reported by
-        // telemetry forever after a stop)
+    // F5 : on traite le graphe en LECTURE, ou si un slot de session est lance
+    // (les slots jouent par-dessus un arrangement ARRETE - horloge de session
+    // libre, position d'arrangement gelee). L'horloge avance a chaque bloc.
+    const bool session_only = !is_playing && graph && graph->anyLaunched();
+    if ((!is_playing && !session_only) || !graph) {
+        // Not playing (and nothing launched) or no graph - output silence,
+        // and the meters SAY silence (relaxed stores; stale peaks were
+        // ghost-reported by telemetry forever after a stop)
         std::memset(out, 0, frame_count * 2 * sizeof(float));
         if (graph) graph->clearMeters();
-
+        ctx->session_clock += static_cast<int64_t>(frame_count);  // reste continue
         // Still send telemetry
         sendTelemetry(*ctx, 0.0f, 0.0f);
         return;
@@ -102,7 +106,10 @@ void audioCallback(
     bool any_failure = false;
 
     while (frames_written < frame_count) {
-        if (bounded && position >= loop_end) {
+        // La politique de boucle/fin ne s'applique qu'en LECTURE. En session
+        // seule, la position d'arrangement est GELEE (les slots vivent sur
+        // l'horloge de session, pas sur le transport).
+        if (is_playing && bounded && position >= loop_end) {
             if (looping) {
                 // Sample-accurate wrap BEFORE process: no rhythmic hole
                 // of up to a driver buffer at each turn of the loop.
@@ -120,12 +127,17 @@ void audioCallback(
         }
 
         // Calculate chunk size (up to INTERNAL_BLOCK_SIZE), bounded to the
-        // loop brace so the wrap lands exactly on loop_end.
+        // loop brace so the wrap lands exactly on loop_end (en lecture).
         const uint32_t remaining = frame_count - frames_written;
         uint32_t chunk = std::min(INTERNAL_BLOCK_SIZE, remaining);
-        if (bounded && position + static_cast<int64_t>(chunk) > loop_end) {
+        if (is_playing && bounded && position + static_cast<int64_t>(chunk) > loop_end) {
             chunk = static_cast<uint32_t>(loop_end - position);
         }
+
+        // F5 : l'horloge de session avance par SOUS-BLOC (sinon 2 sous-blocs
+        // d'un meme callback verraient la meme position de slot).
+        graph->setSessionClock(ctx->session_clock);
+        ctx->session_clock += static_cast<int64_t>(chunk);
 
         // Process this sub-block
         float* chunk_output = out + (frames_written * 2);  // stereo interleaved
@@ -143,7 +155,9 @@ void audioCallback(
             ctx->tap_ring->pushSamples(chunk_output, chunk);
         }
 
-        position += static_cast<int64_t>(chunk);
+        // La position d'arrangement n'avance qu'en LECTURE (gelee en session
+        // seule - sinon seek() ci-dessous la ferait deriver).
+        if (is_playing) position += static_cast<int64_t>(chunk);
         frames_written += chunk;
     }
 
@@ -157,7 +171,9 @@ void audioCallback(
     // position_ during playback: browser SEEKs arrive through the command
     // ring (applied above in processCommands), and the control thread no
     // longer writes it (keepalive uses setLooping, auto-stop removed).
-    ctx->transport->seek(position);
+    // F5 : en session seule (arret), la position est gelee -> on ne seek pas
+    // (sinon la tete d'arrangement deriverait pendant un jam de slots).
+    if (is_playing) ctx->transport->seek(position);
 
     // Calculate peaks over entire buffer and send telemetry
     const float peak_left = calculatePeak(out, frame_count, 0);

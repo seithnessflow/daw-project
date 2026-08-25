@@ -255,6 +255,9 @@ void WebSocketServer::handleMessage(
                 case protocol::Message::kEditor:
                     handleEditor(message.editor());
                     break;
+                case protocol::Message::kSessionLaunch:
+                    handleSessionLaunch(message.session_launch());
+                    break;
                 default:
                     break;
             }
@@ -381,6 +384,24 @@ void WebSocketServer::handleEditor(const protocol::EditorControl& cmd) {
     // vol, id inconnu) = silencieux : le clic suivant re-tentera.
     if (auto* node = graph->getNodeById(cmd.node_id())) {
         node->setEditorOpen(cmd.open());
+    }
+}
+
+void WebSocketServer::handleSessionLaunch(const protocol::SessionLaunch& cmd) {
+    if (!graph_slot_) return;
+    auto graph = graph_slot_->load(std::memory_order_acquire);
+    if (!graph) return;
+    // F5 : track_id vide = toute la scene (lancer/arreter chaque piste qui a un
+    // slot pour cette scene). Sinon la piste ciblee. launchSlot ignore les
+    // pistes sans slot pour cette scene (retourne false, silencieux).
+    if (cmd.track_id().empty()) {
+        for (size_t i = 0; i < graph->getTrackCount(); ++i) {
+            if (auto* t = graph->getTrack(i)) {
+                graph->launchSlot(t->id, cmd.scene_id(), cmd.stop());
+            }
+        }
+    } else {
+        graph->launchSlot(cmd.track_id(), cmd.scene_id(), cmd.stop());
     }
 }
 

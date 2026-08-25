@@ -190,6 +190,18 @@ export class EngineClient {
     }
   }
 
+  /**
+   * F5 : lancer / arreter un slot du clip-launcher (Session). trackId vide =
+   * toute la scene. C'est un signal LOCAL (presentation/performance), pas le
+   * document - les slots jouent sur l'horloge de session (libre).
+   */
+  sessionLaunch(sceneId: string, trackId: string, stop: boolean): void {
+    const message = encodeMessage({ type: 'sessionLaunch', data: { sceneId, trackId, stop } });
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(message);
+    }
+  }
+
   setLoop(enabled: boolean): void {
     const message = encodeMessage({
       type: 'transport',

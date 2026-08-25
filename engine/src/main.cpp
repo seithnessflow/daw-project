@@ -771,6 +771,20 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         }
         bool notes_assigned = false;
 
+        // F5 : les clips de SESSION (scene_id non vide) deviennent des slots
+        // lancables - notes LOCALES [0, loop_len), joues en boucle au launch.
+        for (const auto& clip_def : track_def.clips) {
+            if (clip_def.scene_id.empty()) continue;
+            daw::graph::SessionSlot slot;
+            slot.scene_id = clip_def.scene_id;
+            slot.loop_len = clip_def.length_samples;
+            for (const auto& n : clip_def.notes) {
+                slot.notes.push_back(
+                    {n.pitch, n.velocity, n.start_sample, n.start_sample + n.length_samples});
+            }
+            track.session_slots.push_back(std::move(slot));
+        }
+
         // Create processors (after the governing node when substituted)
         for (size_t proc_i = sub.active ? sub.resume_index : 0;
              proc_i < track_def.chain.size(); ++proc_i) {
@@ -816,6 +830,11 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
                         notes_assigned = true;
                     }
                     track.chain.push_back(std::move(pnode));
+                    // F5 : le premier vst3 est l'instrument -> il recoit le MIDI
+                    // de session (pointeur vers l'objet heap, stable au move).
+                    if (track.instrument_node == nullptr) {
+                        track.instrument_node = track.chain.back().get();
+                    }
                 }
             } else {
                 // AUDIT R5: never silently drop - a peer hearing a

@@ -105,6 +105,19 @@ public:
      * portent, via l'atomic editor_open du ring vers l'enfant.
      */
     virtual void setEditorOpen(bool /*open*/) noexcept {}
+
+    // ---- F5 : MIDI de session (thread audio) -----------------------------
+    // Defaut no-op : seul un node-instrument (ProxyNode) les porte, via le
+    // FIFO MIDI du ring. AUDIO THREAD (appeles par processTrack).
+    /** Emet UN evenement de note pour le bloc courant (offset dans le bloc). */
+    virtual void emitMidi(bool /*note_on*/, uint8_t /*pitch*/, uint8_t /*velocity*/,
+                          uint32_t /*sample_offset*/) noexcept {}
+    /** Quand true, le node n'emet PAS ses notes de timeline ce bloc (un slot
+     *  de session a pris la piste). Etat plein (meme thread), pas atomique. */
+    virtual void setSuppressTimelineNotes(bool /*on*/) noexcept {}
+    /** Coupe toutes les notes en cours (note-off 0..127 au sample 0). Appele
+     *  a la transition de launch pour ne laisser aucune note bloquee. */
+    virtual void allNotesOff() noexcept {}
 };
 
 }  // namespace daw::graph

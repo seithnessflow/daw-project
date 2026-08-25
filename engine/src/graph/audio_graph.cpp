@@ -152,18 +152,34 @@ void AudioGraph::processTrack(
     int64_t position_samples,
     size_t track_index
 ) noexcept {
+    // F5 : etat de launch de session (thread audio). Quand un slot est lance,
+    // il PREND la piste : les clips de timeline se taisent et l'instrument joue
+    // les notes BOUCLEES du slot au lieu de ses notes de timeline.
+    const int32_t launched = track.launched_slot.load(std::memory_order_acquire);
+    const bool session_active =
+        launched >= 0 && launched < static_cast<int32_t>(track.session_slots.size()) &&
+        track.instrument_node != nullptr;
+    // Transition (launch / stop / changement de slot) -> all-notes-off pour ne
+    // laisser aucune note bloquee de l'etat precedent.
+    if (launched != track.prev_launched) {
+        if (track.instrument_node) track.instrument_node->allNotesOff();
+        track.prev_launched = launched;
+    }
+
     // Clear track buffer
     std::memset(output, 0, frame_count * 2 * sizeof(float));
 
-    // Render all clips and mix
-    for (auto& clip : track.clips) {
-        if (clip.isActiveAt(position_samples, frame_count)) {
-            // Render clip into mix buffer
-            clip.render(mix_buffer_.data(), frame_count, position_samples);
+    // Render all clips and mix (sautes si un slot de session a pris la piste)
+    if (!session_active) {
+        for (auto& clip : track.clips) {
+            if (clip.isActiveAt(position_samples, frame_count)) {
+                // Render clip into mix buffer
+                clip.render(mix_buffer_.data(), frame_count, position_samples);
 
-            // Mix into track output
-            for (uint32_t i = 0; i < frame_count * 2; ++i) {
-                output[i] += mix_buffer_[i];
+                // Mix into track output
+                for (uint32_t i = 0; i < frame_count * 2; ++i) {
+                    output[i] += mix_buffer_[i];
+                }
             }
         }
     }
@@ -172,6 +188,24 @@ void AudioGraph::processTrack(
     const float gain_value = track.gain.load(std::memory_order_relaxed);
     for (uint32_t i = 0; i < frame_count * 2; ++i) {
         output[i] *= gain_value;
+    }
+
+    // F5 : notes de session bouclees vers l'instrument, AVANT la chaine (le
+    // node draine son ring en process()). Le flag suppress coupe ses notes de
+    // timeline ce bloc. Rebasage sur l'horloge de session (libre).
+    if (track.instrument_node) {
+        track.instrument_node->setSuppressTimelineNotes(session_active);
+    }
+    if (session_active) {
+        const SessionSlot& slot = track.session_slots[launched];
+        const int64_t base = session_clock_.load(std::memory_order_relaxed) -
+                             track.launch_clock.load(std::memory_order_relaxed);
+        ProcessorNode* inst = track.instrument_node;
+        daw::host::emitSessionLoop(
+            slot.notes, slot.loop_len, base, frame_count,
+            [inst](bool on, uint8_t p, uint8_t v, uint32_t off) {
+                inst->emitMidi(on, p, v, off);
+            });
     }
 
     // Process through chain, en mesurant le pic APRES CHAQUE device (T3 :
@@ -321,6 +355,37 @@ ProcessorNode* AudioGraph::getNodeById(const std::string& id) noexcept {
         }
     }
     return nullptr;
+}
+
+bool AudioGraph::launchSlot(const std::string& track_id,
+                            const std::string& scene_id, bool stop) noexcept {
+    // F5 : control thread (message launch). Le graphe est immuable une fois
+    // actif ; on ne touche que les atomics de launch de la piste.
+    AudioTrack* track = getTrackById(track_id);
+    if (!track) return false;
+    const int32_t prev = track->launched_slot.load(std::memory_order_relaxed);
+    if (stop) {
+        if (prev >= 0) {
+            track->launched_slot.store(-1, std::memory_order_release);
+            launched_count_.fetch_sub(1, std::memory_order_relaxed);
+        }
+        return true;
+    }
+    int32_t idx = -1;
+    for (size_t i = 0; i < track->session_slots.size(); ++i) {
+        if (track->session_slots[i].scene_id == scene_id) {
+            idx = static_cast<int32_t>(i);
+            break;
+        }
+    }
+    if (idx < 0) return false;  // pas de slot pour cette scene sur cette piste
+    // launch_clock AVANT launched_slot (release) : le thread audio lit
+    // launched_slot (acquire) puis launch_clock -> voit un rebasage coherent.
+    track->launch_clock.store(session_clock_.load(std::memory_order_relaxed),
+                              std::memory_order_relaxed);
+    track->launched_slot.store(idx, std::memory_order_release);
+    if (prev < 0) launched_count_.fetch_add(1, std::memory_order_relaxed);
+    return true;
 }
 
 std::vector<std::tuple<std::string, float, float>> AudioGraph::getMeters() const noexcept {

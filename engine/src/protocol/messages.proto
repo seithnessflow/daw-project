@@ -45,6 +45,15 @@ message EditorControl {
     bool open = 2;        // true = show the GUI, false = close it
 }
 
+// F5 : Client -> Engine. Lancer / arreter un slot du clip-launcher (Session).
+// Les slots jouent en boucle sur l'horloge de session (independants du
+// transport d'arrangement). track_id vide = tous les pistes de la scene.
+message SessionLaunch {
+    string scene_id = 1;   // la scene (ligne) du slot a lancer
+    string track_id = 2;   // la piste (colonne) ; vide = toute la scene
+    bool stop = 3;         // true = arreter (le slot de track_id, ou toute la scene)
+}
+
 message TransportPosition {
     int64 position_samples = 1;
     bool is_playing = 2;
@@ -127,6 +136,7 @@ message Message {
         SetMonitor set_monitor = 2;
         TapControl tap_control = 7;   // S8a
         EditorControl editor = 10;    // open/close a plugin GUI window
+        SessionLaunch session_launch = 11;  // F5 : lancer/arreter un slot Session
 
         // Engine -> Client
         TransportPosition position = 3;

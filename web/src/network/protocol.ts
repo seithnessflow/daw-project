@@ -35,7 +35,8 @@ export type EncodeMessage =
   | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean } }
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
   | { type: 'tapControl'; data: { enabled: boolean } }
-  | { type: 'editor'; data: { nodeId: string; open: boolean } };
+  | { type: 'editor'; data: { nodeId: string; open: boolean } }
+  | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -70,6 +71,15 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
     case 'editor':
       protoMessage = {
         editor: { nodeId: msg.data.nodeId, open: msg.data.open },
+      };
+      break;
+    case 'sessionLaunch':
+      protoMessage = {
+        sessionLaunch: {
+          sceneId: msg.data.sceneId,
+          trackId: msg.data.trackId,
+          stop: msg.data.stop,
+        },
       };
       break;
   }

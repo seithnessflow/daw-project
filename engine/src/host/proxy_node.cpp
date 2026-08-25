@@ -38,7 +38,10 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
     // v8 MIDI : emet les notes de ce bloc dans le ring AVANT de publier
     // input_seq (l'enfant draine le MIDI en traitant ce bloc). RT-safe :
     // que des atomics + slots plain. Un effet a notes_ vide (rien n'est emis).
-    if (!notes_.empty()) {
+    // F5 : quand un slot de session a pris la piste (suppress_notes_), les
+    // notes de TIMELINE se taisent - c'est processTrack qui emet les notes
+    // BOUCLEES du slot (via emitMidi) avant cet appel.
+    if (!notes_.empty() && !suppress_notes_) {
         emitBlockNotes(notes_, position_samples, kRingBlockSize,
                        [this](bool on, uint8_t pitch, uint8_t vel, uint32_t off) {
                            pushMidiEvent(ring_, on, pitch, vel, 0, off);

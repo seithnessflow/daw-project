@@ -127,6 +127,12 @@ struct AudioCallbackContext {
 
     // Sample rate for calculations
     uint32_t sample_rate = 48000;
+
+    // F5 : horloge de SESSION libre. Avance de frame_count a chaque callback,
+    // meme transport a l'arret. Les slots lances s'y rebasent (independants de
+    // la position d'arrangement). Touchee UNIQUEMENT par le thread audio (pas
+    // d'atomic : un seul ecrivain/lecteur, le callback lui-meme).
+    int64_t session_clock = 0;
 };
 
 /**

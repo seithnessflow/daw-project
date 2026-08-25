@@ -157,6 +157,7 @@ private:
     void handleSetMonitor(const protocol::SetMonitor& cmd);
     void handleTapControl(ix::WebSocket* ws, const protocol::TapControl& cmd);
     void handleEditor(const protocol::EditorControl& cmd);  // v9 : fenetre GUI a la demande
+    void handleSessionLaunch(const protocol::SessionLaunch& cmd);  // F5 : launch Session
 
     // Send helpers
     void sendToAll(const protocol::Message& msg);

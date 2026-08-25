@@ -184,6 +184,9 @@ export async function init(): Promise<void> {
   // Sonde de pilotage (doctrine window.__daw*) : permet d'injecter des
   // meters synthetiques pour verifier les VU sans jouer d'audio reel.
   (window as unknown as { __dawEngine?: unknown }).__dawEngine = engineClient;
+  // Sonde de pilotage : flush du dernier changement vers le serveur (replique
+  // ce que l'UI fait apres chaque mutation - utile aux tests scriptes).
+  (window as unknown as { __dawFlush?: unknown }).__dawFlush = sendLastChange;
   // Editor button (per vst3 device, ui/track.ts) -> open/close the plugin
   // GUI window via the engine.
   els.tracks.addEventListener('editor-toggle', (e) => {

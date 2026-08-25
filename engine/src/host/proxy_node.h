@@ -90,6 +90,19 @@ public:
      *  emises dans le ring par bloc dans process(). Vide = pas d'instrument. */
     void setNotes(std::vector<ScheduledNote> notes) { notes_ = std::move(notes); }
 
+    // ---- F5 : MIDI de session (thread audio, via processTrack) ------------
+    void emitMidi(bool note_on, uint8_t pitch, uint8_t velocity,
+                  uint32_t sample_offset) noexcept override {
+        if (ring_) pushMidiEvent(ring_, note_on, pitch, velocity, 0, sample_offset);
+    }
+    void setSuppressTimelineNotes(bool on) noexcept override {
+        suppress_notes_ = on;
+    }
+    void allNotesOff() noexcept override {
+        if (!ring_) return;
+        for (uint8_t p = 0; p < 128; ++p) pushMidiEvent(ring_, false, p, 0, 0, 0);
+    }
+
 private:
     std::string type_{TYPE};
     std::string id_;
@@ -98,6 +111,7 @@ private:
     uint32_t depth_ = 1;
     bool bypass_ = false;
     std::vector<ScheduledNote> notes_;
+    bool suppress_notes_ = false;  // F5 : un slot de session a pris la piste
 };
 
 }  // namespace daw::host

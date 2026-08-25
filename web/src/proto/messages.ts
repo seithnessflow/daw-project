@@ -93,6 +93,20 @@ export interface EditorControl {
   open: boolean;
 }
 
+/**
+ * F5 : Client -> Engine. Lancer / arreter un slot du clip-launcher (Session).
+ * Les slots jouent en boucle sur l'horloge de session (independants du
+ * transport d'arrangement). track_id vide = tous les pistes de la scene.
+ */
+export interface SessionLaunch {
+  /** la scene (ligne) du slot a lancer */
+  sceneId: string;
+  /** la piste (colonne) ; vide = toute la scene */
+  trackId: string;
+  /** true = arreter (le slot de track_id, ou toute la scene) */
+  stop: boolean;
+}
+
 export interface TransportPosition {
   positionSamples: number;
   isPlaying: boolean;
@@ -231,6 +245,10 @@ export interface Message {
   /** open/close a plugin GUI window */
   editor?:
     | EditorControl
+    | undefined;
+  /** F5 : lancer/arreter un slot Session */
+  sessionLaunch?:
+    | SessionLaunch
     | undefined;
   /** Engine -> Client */
   position?: TransportPosition | undefined;
@@ -613,6 +631,115 @@ export const EditorControl: MessageFns<EditorControl> = {
     const message = createBaseEditorControl();
     message.nodeId = object.nodeId ?? "";
     message.open = object.open ?? false;
+    return message;
+  },
+};
+
+function createBaseSessionLaunch(): SessionLaunch {
+  return { sceneId: "", trackId: "", stop: false };
+}
+
+export const SessionLaunch: MessageFns<SessionLaunch> = {
+  encode(message: SessionLaunch, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sceneId !== "") {
+      writer.uint32(10).string(message.sceneId);
+    }
+    if (message.trackId !== "") {
+      writer.uint32(18).string(message.trackId);
+    }
+    if (message.stop !== false) {
+      writer.uint32(24).bool(message.stop);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SessionLaunch {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSessionLaunch();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.sceneId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.trackId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.stop = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SessionLaunch {
+    return {
+      sceneId: isSet(object.sceneId)
+        ? globalThis.String(object.sceneId)
+        : isSet(object.scene_id)
+        ? globalThis.String(object.scene_id)
+        : "",
+      trackId: isSet(object.trackId)
+        ? globalThis.String(object.trackId)
+        : isSet(object.track_id)
+        ? globalThis.String(object.track_id)
+        : "",
+      stop: isSet(object.stop) ? globalThis.Boolean(object.stop) : false,
+    };
+  },
+
+  toJSON(message: SessionLaunch): unknown {
+    const obj: any = {};
+    if (message.sceneId !== "") {
+      obj.sceneId = message.sceneId;
+    }
+    if (message.trackId !== "") {
+      obj.trackId = message.trackId;
+    }
+    if (message.stop !== false) {
+      obj.stop = message.stop;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SessionLaunch>, I>>(base?: I): SessionLaunch {
+    return SessionLaunch.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SessionLaunch>, I>>(object: I): SessionLaunch {
+    const message = createBaseSessionLaunch();
+    message.sceneId = object.sceneId ?? "";
+    message.trackId = object.trackId ?? "";
+    message.stop = object.stop ?? false;
     return message;
   },
 };
@@ -1558,6 +1685,7 @@ function createBaseMessage(): Message {
     setMonitor: undefined,
     tapControl: undefined,
     editor: undefined,
+    sessionLaunch: undefined,
     position: undefined,
     meters: undefined,
     engineState: undefined,
@@ -1580,6 +1708,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.editor !== undefined) {
       EditorControl.encode(message.editor, writer.uint32(82).fork()).join();
+    }
+    if (message.sessionLaunch !== undefined) {
+      SessionLaunch.encode(message.sessionLaunch, writer.uint32(90).fork()).join();
     }
     if (message.position !== undefined) {
       TransportPosition.encode(message.position, writer.uint32(26).fork()).join();
@@ -1645,6 +1776,14 @@ export const Message: MessageFns<Message> = {
             }
 
             message.editor = EditorControl.decode(reader, reader.uint32());
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.sessionLaunch = SessionLaunch.decode(reader, reader.uint32());
             continue;
           }
           case 3: {
@@ -1721,6 +1860,11 @@ export const Message: MessageFns<Message> = {
         ? TapControl.fromJSON(object.tap_control)
         : undefined,
       editor: isSet(object.editor) ? EditorControl.fromJSON(object.editor) : undefined,
+      sessionLaunch: isSet(object.sessionLaunch)
+        ? SessionLaunch.fromJSON(object.sessionLaunch)
+        : isSet(object.session_launch)
+        ? SessionLaunch.fromJSON(object.session_launch)
+        : undefined,
       position: isSet(object.position) ? TransportPosition.fromJSON(object.position) : undefined,
       meters: isSet(object.meters) ? Meters.fromJSON(object.meters) : undefined,
       engineState: isSet(object.engineState)
@@ -1755,6 +1899,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.editor !== undefined) {
       obj.editor = EditorControl.toJSON(message.editor);
+    }
+    if (message.sessionLaunch !== undefined) {
+      obj.sessionLaunch = SessionLaunch.toJSON(message.sessionLaunch);
     }
     if (message.position !== undefined) {
       obj.position = TransportPosition.toJSON(message.position);
@@ -1793,6 +1940,9 @@ export const Message: MessageFns<Message> = {
       : undefined;
     message.editor = (object.editor !== undefined && object.editor !== null)
       ? EditorControl.fromPartial(object.editor)
+      : undefined;
+    message.sessionLaunch = (object.sessionLaunch !== undefined && object.sessionLaunch !== null)
+      ? SessionLaunch.fromPartial(object.sessionLaunch)
       : undefined;
     message.position = (object.position !== undefined && object.position !== null)
       ? TransportPosition.fromPartial(object.position)

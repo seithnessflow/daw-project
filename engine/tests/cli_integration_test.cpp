@@ -3435,6 +3435,66 @@ bool testRegistryEviction() {
     return true;
 }
 
+// F5 : le planificateur de boucle de session (rebasage + wrap + all-notes-off
+// + ordre d'offset). Helper pur, teste sans plugin.
+static bool testSessionLoopSchedule() {
+    std::cout << "Test: Session loop schedule (F5)... ";
+    using daw::host::ScheduledNote;
+    struct Ev { bool on; uint8_t pitch; uint8_t vel; uint32_t off; };
+    auto run = [](const std::vector<ScheduledNote>& notes, int64_t L,
+                  int64_t base, uint32_t frames) {
+        std::vector<Ev> out;
+        daw::host::emitSessionLoop(notes, L, base, frames,
+            [&](bool on, uint8_t p, uint8_t v, uint32_t o) {
+                out.push_back({on, p, v, o});
+            });
+        return out;
+    };
+
+    // 1) boucle simple : note-on tombe dans le bloc, rebase sur base
+    {
+        std::vector<ScheduledNote> n = {{60, 100, 100, 300}};  // pitch,vel,start,end
+        auto e = run(n, 1000, 0, 256);
+        if (e.size() != 1 || !e[0].on || e[0].pitch != 60 || e[0].off != 100) {
+            std::cout << "FAIL (simple on)\n"; return false;
+        }
+        // rebasage : base=1000 (2e iteration) -> meme offset local
+        auto e2 = run(n, 1000, 1000, 256);
+        if (e2.size() != 1 || e2[0].off != 100) { std::cout << "FAIL (rebase)\n"; return false; }
+    }
+
+    // 2) wrap : le bloc franchit la couture -> all-notes-off a la couture
+    {
+        std::vector<ScheduledNote> n = {{60, 100, 50, 150}};
+        auto e = run(n, 200, 180, 64);  // local [180,244), couture a offset 20
+        // attendu : uniquement l'all-notes-off de couture (offset 20, off, pitch 60)
+        if (e.size() != 1 || e[0].on || e[0].pitch != 60 || e[0].off != 20) {
+            std::cout << "FAIL (wrap all-notes-off)\n"; return false;
+        }
+    }
+
+    // 3) ordre : a offset egal, note-off AVANT note-on (retrigger propre)
+    {
+        std::vector<ScheduledNote> n = {{60, 100, 0, 100}, {64, 100, 100, 150}};
+        auto e = run(n, 500, 0, 256);  // A on@0 off@100 ; B on@100 off@150
+        int iAoff = -1, iBon = -1;
+        for (int i = 0; i < (int)e.size(); ++i) {
+            if (!e[i].on && e[i].pitch == 60 && e[i].off == 100) iAoff = i;
+            if (e[i].on && e[i].pitch == 64 && e[i].off == 100) iBon = i;
+        }
+        if (iAoff < 0 || iBon < 0 || iAoff > iBon) {
+            std::cout << "FAIL (off-before-on at equal offset)\n"; return false;
+        }
+        // offsets globalement croissants
+        for (size_t i = 1; i < e.size(); ++i) {
+            if (e[i].off < e[i-1].off) { std::cout << "FAIL (offset order)\n"; return false; }
+        }
+    }
+
+    std::cout << "OK (rebase, wrap all-notes-off, off-before-on ordering)\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -3484,6 +3544,7 @@ int main(int argc, char* argv[]) {
     run(testClipFadesRender);
     run(testProcessorStateInDocument);
     run(testWebSocketAuth);
+    run(testSessionLoopSchedule);  // F5
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);
