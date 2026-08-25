@@ -227,9 +227,22 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   distincts a ~1 ULP != meme cle). Effet : chaque stem existant se
   recalcule UNE fois. Reste note dans le code : troncature f64->float et
   ordre map (A1/1.1) attendent le refactor params-liste.
+- **A6** warning bruyant si periode device % 256 != 0 (`audio_device.cpp`,
+  via INTERNAL_BLOCK_SIZE) : le « ~47% bypass silencieux » devient visible.
+  Additif (periode 512 des tests = multiple, pas de bruit). Le vrai fix
+  (chunks partiels + depth depuis la vraie periode) reste dedie.
+- **A7/B2** warning bruyant si asset.sample_rate != graph rate
+  (`graph_common.cpp makeClipPlayer`) : le « pitch faux + derive
+  silencieux » devient visible. Additif (fixtures 48k). Le vrai fix
+  (resample a l'import ou refus) reste dedie.
+- **B1 (doc)** SECURITY.md re-cadre : C2-distante = LIVE pas futur (F1),
+  H3 = Low Windows / High POSIX (mesure), M1 garde caduque, M4 a moitie
+  fait (retirer `?token=`), B3 marque fait.
 
-**A4 — SOUS-PARTIE 1a FAITE 2026-08-25 (merge non destructif + cablage).**
-Reste 1b (push) + 2 (outbox) pour la session suivante. Confirme par le code :
+**A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
+Reste 2 (outbox persistant). Regression CI corrigee en cours de route
+(contrat de log e2e « Document loaded » casse par un renommage, restaure).
+Confirme par le code :
 - `server_client.cpp:53` : `received_initial_` remis a false a CHAQUE
   Open -> toute reconnexion retraite le doc serveur comme initial.
 - `main.cpp:1114` : `loadFromBytes` = REPLACE -> un change local non

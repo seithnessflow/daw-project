@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 
 namespace daw::audio {
 
@@ -155,6 +156,19 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     actual_sample_rate_ = device_->sampleRate;
     actual_buffer_size_ = device_->playback.internalPeriodSizeInFrames;
     callback_context_.sample_rate = actual_sample_rate_;
+
+    // AUDIT-5 A6: a device period that is not a multiple of the 256-frame
+    // internal block makes the plugin proxy bypass the partial chunk - that
+    // audio goes DRY, silently, while telemetry only says "plugin late". A
+    // real WASAPI shared-mode period (e.g. 480) hits this. Be loud (the real
+    // fix - handle partial chunks / clamp depth from the true period - is a
+    // dedicated session).
+    if (actual_buffer_size_ % INTERNAL_BLOCK_SIZE != 0) {
+        std::cerr << "WARNING: device period " << actual_buffer_size_
+                  << " frames is not a multiple of " << INTERNAL_BLOCK_SIZE
+                  << " - plugins bypass the partial chunk (silently dry). "
+                     "Prefer a power-of-two buffer. AUDIT-5 A6.\n";
+    }
 
     // Get device name
     char name[256];

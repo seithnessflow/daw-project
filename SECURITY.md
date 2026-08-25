@@ -34,26 +34,44 @@ et suivi dans TODO.md.*
 
 ## RESTE, par priorite (suivi TODO « SECURITE »)
 
-- **C2 (moitie distante)** : secret partage pour un VRAI pair distant
-  (aujourd'hui client natif sans Origin = exempt) — a faire au 1er pair.
-  NOTE 1bis (2026-08-23) : `DAW_SERVER_BIND=0.0.0.0` existe pour le
-  smoke deux machines — sur un bind non-loopback, tout processus du LAN
-  est un « client natif » exempt avec acces complet aux projets. Le
-  defaut RESTE loopback ; l'ouverture est un opt-in de test sur reseau
-  prive, jamais un mode de production tant que C2-distant n'est pas fait.
+- **C2 (moitie distante) — RE-CADRE LIVE, PAS FUTUR (AUDIT-5 F1,
+  2026-08-25)** : le serveur n'a AUCUNE auth. La procedure deux-machines
+  documentee (`cloudflared tunnel --url http://localhost:3000`,
+  docs/deux-machines.md) publie ce serveur loopback sur une URL HTTPS
+  PUBLIQUE a CHAQUE smoke : quiconque a l'URL lit tout le projet, ecrit
+  des changes que le moteur applique sans validation, R/W le store, et
+  REJOINT le jam (ecoute du master, cf. F2 : relais signal verbatim,
+  identite `from` auto-declaree). Ce n'est donc ni « au 1er pair » ni
+  reserve a `DAW_SERVER_BIND=0.0.0.0` — c'est vrai a chaque tunnel ouvert.
+  Mitigation minimale (~5 lignes Rust) : token partage en header verifie
+  AVANT l'upgrade WS et sur `/assets`, OU Cloudflare Access. L'auth
+  complete se concoit avec le critere 3 (identites/invitations). D'ici
+  la : traiter l'URL du tunnel comme un mot de passe, ne JAMAIS laisser
+  un tunnel ouvert hors test. Detail complet + F2..F11 : docs/AUDIT-5.md.
 - **H2 (reste)** : sortir le parse Automerge de dessous store_lock (ou
   le borner davantage).
-- **H3** (session dediee) : fichiers token + `.shm` owner-only + O_EXCL
-  (permissions par defaut aujourd'hui) — touche la CREATION DU SEGMENT
-  DU RING (adjacent au thread sacre) : traite a part, verification sans
-  economie. AUDIT-4 ajoute : le tmp partage du PUT assets (A4-15.1)
-  se regle du meme geste (nom unique).
-- **M1** : arg du class_uid non quote dans la ligne de commande enfant
-  (aujourd'hui garde par la table --vst3-module) — valider
-  `^[0-9A-Fa-f]{32}$`.
-- **M4** : token moteur dans l'URL — design a decider (la page vite ne
-  peut lire un fichier local same-origin ; faible enjeu en dev
-  localhost). Consigne.
+- **H3 — RE-CADRE (AUDIT-5, mesure 2026-08-25)** : sur Windows les
+  permissions par defaut de `%TEMP%` sont DEJA owner-only (System +
+  Administrators + l'utilisateur ; mesure ACL) — un autre utilisateur
+  local NON-admin ne peut ni lire le token ni ouvrir le `.shm`. Donc
+  H3 = **Low sur Windows** (reste : `CREATE_NEW`/`O_EXCL` contre un
+  meme-utilisateur qui pre-cree le chemin — pas une frontiere) et
+  **High sur POSIX/CI** (`/tmp` world-writable, token mode 0644 : le
+  vrai risque, branche `#else` de writeTokenFile). Le tmp partage du PUT
+  assets (A4-15.1) se regle du meme geste (nom unique).
+- **M1 — la garde ne tient PLUS (AUDIT-5)** : l'arg class_uid non quote
+  etait « garde par la table --vst3-module », mais depuis 2.5-decouverte
+  la map est AUSSI peuplee par le scan `--vst3-dir` (uid pris dans les
+  metadonnees du plugin) — le uid n'est plus CLI-controle. Valider
+  `^[0-9A-Fa-f]{32}$` a la frontiere (lie F5/F9).
+- **M4 — A MOITIE FAIT (AUDIT-5)** : le token passe par le FRAGMENT
+  (#token, scrub immediat via replaceState, jamais au reseau) — bon
+  chemin. RESTE : la branche legacy `?token=` (query) subsiste et n'est
+  PAS scrubee (reste en historique/Referer) — la supprimer. Ce n'est
+  plus « un design a decider », c'est un retrait.
+- **B3 dr_libs epingle FAIT 2026-08-25** (commit 2681ea8) : le parseur
+  dr_wav de chaque asset pair etait sur `GIT_TAG master` ; epingle sur
+  un SHA. (AUDIT-5 F3/B3.)
 - **L1** : overflow signe `start_sample+length_samples`
   (`clip_player.cpp`).
 - **L2** : PUT assets bufferise 512 Mo en RAM — streamer/limiter.

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "graph_common.h"
 
+#include <iostream>
+
 namespace daw::graph {
 
 ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
@@ -33,6 +35,16 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
     const AudioAsset* asset = asset_cache.loadOrGet(asset_path);
     if (asset) {
         player.setAsset(asset);
+        // AUDIT-5 A7/B2: there is no sample-rate conversion. A clip whose asset
+        // rate differs from the graph rate plays at the WRONG PITCH and drifts,
+        // silently. Say it loud (the real fix - resample on import, or refuse -
+        // is a dedicated session; the debt is in TODO/AUDIT-5).
+        if (asset->sample_rate != 0 && asset->sample_rate != sample_rate) {
+            std::cerr << "WARNING: asset " << clip_def.asset_hash.substr(0, 8)
+                      << " is " << asset->sample_rate << " Hz but the graph runs at "
+                      << sample_rate << " Hz - it plays at the WRONG PITCH and drifts "
+                         "(no resampling yet). AUDIT-5 A7/B2.\n";
+        }
     }
 
     return player;
