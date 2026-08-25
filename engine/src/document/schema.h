@@ -97,6 +97,9 @@ struct ClipDef {
     int64_t fade_out_samples = 0;
     // v8 MIDI : notes du clip (vide = clip audio classique).
     std::vector<NoteDef> notes;
+    // T7 Session : si non vide, ce clip est un SLOT du clip-launcher (pas
+    // la timeline) - le moteur l'IGNORE en construisant le graphe timeline.
+    std::string scene_id;
 };
 
 /**

@@ -27,6 +27,9 @@ export interface ClipDef {
   fadeOutSamples?: number;
   /** v8 MIDI : notes du clip (absent/vide = clip audio classique). */
   notes?: NoteDef[];
+  /** T7 Session : si present, ce clip est un SLOT du clip-launcher (scene
+   *  sceneId), pas un clip de la timeline. Le moteur l'ignore en timeline. */
+  sceneId?: string;
 }
 
 /** One parameter as a {key, value} pair - a LIST across every consumer
@@ -70,6 +73,13 @@ export interface TrackDef {
   chain: ProcessorDef[];
 }
 
+/** T7 (Session) : une scene = une LIGNE du clip-launcher (un groupe de
+ *  clips lancables ensemble). Les clips de session portent sceneId. */
+export interface SceneDef {
+  id: string;
+  name: string;
+}
+
 export interface ProjectDef {
   schemaVersion: number;
   sampleRate: number;
@@ -77,6 +87,8 @@ export interface ProjectDef {
    *  documents means 1.0 (every consumer defaults it). */
   masterGain?: number;
   tracks: TrackDef[];
+  /** T7 : scenes du clip-launcher (absent = pas de vue Session). */
+  scenes?: SceneDef[];
   [key: string]: unknown;  // Index signature for Automerge compatibility
 }
 
