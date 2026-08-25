@@ -174,9 +174,26 @@ void AudioGraph::processTrack(
         output[i] *= gain_value;
     }
 
-    // Process through chain
+    // Process through chain, en mesurant le pic APRES CHAQUE device (T3 :
+    // VU inter-device). Le tap est RT-safe (boucle de pic + store atomique).
+    const size_t chain_off = track_index < track_chain_offset_.size()
+                                 ? track_chain_offset_[track_index] : 0;
+    size_t node_j = 0;
     for (auto& processor : track.chain) {
         processor->process(output, output, frame_count, position_samples);
+        float npl = 0.0f, npr = 0.0f;
+        for (uint32_t i = 0; i < frame_count; ++i) {
+            const float al = std::fabs(output[i * 2]);
+            const float ar = std::fabs(output[i * 2 + 1]);
+            if (al > npl) npl = al;
+            if (ar > npr) npr = ar;
+        }
+        const size_t gi = chain_off + node_j;
+        if (gi < num_nodes_) {
+            node_peak_left_[gi].store(npl, std::memory_order_relaxed);
+            node_peak_right_[gi].store(npr, std::memory_order_relaxed);
+        }
+        ++node_j;
     }
 
     // Calculate peaks for metering
@@ -211,6 +228,25 @@ void AudioGraph::prepare(uint32_t sample_rate, uint32_t max_block_size) {
     for (size_t i = 0; i < num_tracks_; ++i) {
         peak_left_[i].store(0.0f, std::memory_order_relaxed);
         peak_right_[i].store(0.0f, std::memory_order_relaxed);
+    }
+
+    // T3 : metrologie par DEVICE (VU inter-device). Table plate + offset/piste.
+    node_ids_.clear();
+    track_chain_offset_.clear();
+    track_chain_offset_.reserve(tracks_.size());
+    for (auto& track : tracks_) {
+        track_chain_offset_.push_back(node_ids_.size());
+        for (auto& processor : track.chain) {
+            node_ids_.push_back(processor->getId());
+        }
+    }
+    num_nodes_ = node_ids_.size();
+    const size_t alloc_n = num_nodes_ ? num_nodes_ : 1;
+    node_peak_left_ = std::make_unique<std::atomic<float>[]>(alloc_n);
+    node_peak_right_ = std::make_unique<std::atomic<float>[]>(alloc_n);
+    for (size_t i = 0; i < num_nodes_; ++i) {
+        node_peak_left_[i].store(0.0f, std::memory_order_relaxed);
+        node_peak_right_[i].store(0.0f, std::memory_order_relaxed);
     }
 
     // Prepare all processors
@@ -261,6 +297,15 @@ std::vector<std::tuple<std::string, float, float>> AudioGraph::getMeters() const
             tracks_[i].id,
             peak_left_[i].load(std::memory_order_relaxed),
             peak_right_[i].load(std::memory_order_relaxed)
+        );
+    }
+
+    // T3 : pic par DEVICE (id = proc id) - le web mappe procId -> VU.
+    for (size_t k = 0; k < num_nodes_; ++k) {
+        meters.emplace_back(
+            node_ids_[k],
+            node_peak_left_[k].load(std::memory_order_relaxed),
+            node_peak_right_[k].load(std::memory_order_relaxed)
         );
     }
 

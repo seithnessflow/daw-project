@@ -181,6 +181,10 @@ public:
             peak_left_[i].store(0.0f, std::memory_order_relaxed);
             peak_right_[i].store(0.0f, std::memory_order_relaxed);
         }
+        for (size_t k = 0; k < num_nodes_; ++k) {  // T3 : pics device
+            node_peak_left_[k].store(0.0f, std::memory_order_relaxed);
+            node_peak_right_[k].store(0.0f, std::memory_order_relaxed);
+        }
         master_peak_left_.store(0.0f, std::memory_order_relaxed);
         master_peak_right_.store(0.0f, std::memory_order_relaxed);
     }
@@ -242,6 +246,17 @@ private:
     size_t num_tracks_ = 0;
     std::unique_ptr<std::atomic<float>[]> peak_left_;
     std::unique_ptr<std::atomic<float>[]> peak_right_;
+
+    // Refonte T3 : pic par DEVICE (VU inter-device). Un tableau plat sur
+    // toute la chaine de toutes les pistes ; track_chain_offset_[t] = index
+    // global ou commence la chaine de la piste t. RT-safe (atomics pre-alloues
+    // en prepare, ecrits par le thread audio apres chaque node, lus par
+    // getMeters). Les ids sont les proc ids (le web mappe procId -> VU).
+    size_t num_nodes_ = 0;
+    std::vector<std::string> node_ids_;
+    std::vector<size_t> track_chain_offset_;
+    std::unique_ptr<std::atomic<float>[]> node_peak_left_;
+    std::unique_ptr<std::atomic<float>[]> node_peak_right_;
 
     /**
      * Process a single track.

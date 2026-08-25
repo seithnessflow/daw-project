@@ -279,6 +279,15 @@ export function createDeviceView(
   for (const proc of track.chain) {
     chainEl.appendChild(
       createDevicePanel(proc, onBypassToggle, onParamChange, onRemoveDevice));
+    // T3 : mini-VU inter-device apres chaque device (alimente par onMeters
+    // qui cible data-proc-id). Le differenciateur : le niveau apres CHAQUE
+    // plugin, lisible d'un coup d'oeil - qu'aucun DAW grand public n'offre.
+    const vu = document.createElement('div');
+    vu.className = 'device-vu';
+    vu.dataset.procId = proc.id;
+    vu.title = 'niveau apres ce device';
+    vu.appendChild(document.createElement('i'));
+    chainEl.appendChild(vu);
   }
   if (track.chain.length === 0) {
     const empty = document.createElement('div');

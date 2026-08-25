@@ -160,9 +160,29 @@
 }
 .device-chain {
   display: flex;
-  gap: 16px;
+  gap: 10px;
   align-items: stretch;
   overflow-x: auto;
+}
+/* T3 : VU inter-device. Degrade vert->ambre->rouge en fond ; un cache
+   sombre descend du haut (hauteur = 100 - niveau) -> ce qui reste = le pic
+   apres ce device. Alimente par onMeters (data-proc-id). LE differenciateur. */
+.device-vu {
+  flex: 0 0 auto;
+  width: 9px;
+  align-self: center;
+  height: 50px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: linear-gradient(var(--red), var(--amber) 26%, var(--green) 52%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--hair);
+}
+.device-vu > i {
+  display: block;
+  width: 100%;
+  height: 100%; /* plein cache = silence ; onMeters reduit la hauteur */
+  background: #0a0908;
+  transition: height 70ms linear;
 }
 /* Bible Ableton : le signal circule de gauche a droite - le chevron
    entre deux cartes rend la SERIE visible (lumiere seule, pas de

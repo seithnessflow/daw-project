@@ -476,6 +476,17 @@ export async function init(): Promise<void> {
     els.masterVuR.style.width = `${Math.min(100, masterRight * 100)}%`;
     els.masterVuL.classList.toggle('clipping', masterLeft > CLIP);
     els.masterVuR.classList.toggle('clipping', masterRight > CLIP);
+    // T3 : VU inter-device. Les entrees dont l'id est un proc id (pas une
+    // piste) alimentent le mini-VU apres chaque device de la chaine.
+    for (const m of meters) {
+      const cover = document.querySelector<HTMLElement>(
+        `.device-vu[data-proc-id="${m.trackId}"] > i`);
+      if (cover) {
+        const pk = Math.min(100, Math.max(m.peakLeft, m.peakRight) * 100);
+        // Le cache descend du haut ; ce qui reste (le degrade) = le niveau.
+        cover.style.height = `${100 - pk}%`;
+      }
+    }
   };
   engineClient.onState = (state) => {
     life.setEngineState(state.pluginBlocksMissed);
