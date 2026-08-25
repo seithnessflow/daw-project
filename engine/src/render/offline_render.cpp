@@ -109,6 +109,30 @@ RenderResult OfflineRenderer::render(
     // buffers hold INTERNAL_BLOCK_SIZE frames). Driving it with
     // config.block_size used to silently render silence for every full-size
     // block: process() returned false and the result was never checked.
+    // DETERMINISME (2026-08-25) : PRE-ROLL. Un plugin a etat interne
+    // (filtre, enveloppe, rampe de denormals) produit un transitoire de
+    // demarrage qui depend de son etat d'ENTREE, pas seulement de l'audio
+    // rendu -> stem non reproductible (mesure Python/numpy sur Rift : les
+    // deux rendus different sur les 40 premieres ms puis sont identiques au
+    // bit pres). On fait tourner le graphe sur la fenetre AVANT `start`
+    // (silence pour un stem qui commence a 0 : positions hors de tout clip,
+    // que la boucle principale sait deja rendre en silence), sortie JETEE,
+    // pour amener chaque plugin a un etat canonique determine par l'entree.
+    // On ne re-rend JAMAIS [start, start+preroll) (ca contaminerait les
+    // effets a queue - reverb/delay). ~170 ms @48k, marge large sur le
+    // transitoire observe ; sous-multiple d'INTERNAL_BLOCK_SIZE.
+    constexpr int64_t kPreRollFrames = 8192;
+    for (int64_t warm = start - kPreRollFrames; warm < start; ) {
+        const uint32_t warm_frames = static_cast<uint32_t>(
+            std::min(start - warm, static_cast<int64_t>(audio::INTERNAL_BLOCK_SIZE)));
+        std::fill(float_buffer.begin(), float_buffer.end(), 0.0f);
+        if (!graph->process(float_buffer.data(), warm_frames, warm)) {
+            result.error = "Graph pre-roll failed at sample " + std::to_string(warm);
+            return result;
+        }
+        warm += warm_frames;
+    }
+
     int64_t position = start;
     while (position < end) {
         // Calculate block size for this iteration

@@ -124,24 +124,42 @@ bool enumerateWithChild(const std::string& host_exe, const std::string& module,
         CloseHandle(read_h);
         return false;
     }
-    // Lire jusqu'a EOF ; le timeout est gere par la mort du process
+    // Lire avec une ECHEANCE. Bug paye 2026-08-25 : un ReadFile aveugle
+    // jusqu'a EOF DEADLOCKAIT tout le scan quand un plugin demo bloque sur
+    // son dialogue d'activation (il ne ferme jamais son pipe -> ReadFile
+    // ne rend jamais, et le WaitForSingleObject 15 s en aval n'etait JAMAIS
+    // atteint). On sonde le pipe et on TUE le probe qui deborde le budget.
     char buf[4096];
-    DWORD n = 0;
-    while (ReadFile(read_h, buf, sizeof(buf), &n, nullptr) && n > 0) {
-        payload.append(buf, buf + n);
-        if (payload.size() > (1u << 20)) break;  // 1 Mo = jamais legitime
+    const ULONGLONG deadline = GetTickCount64() + 15000;
+    bool timed_out = false;
+    for (;;) {
+        DWORD avail = 0;
+        if (!PeekNamedPipe(read_h, nullptr, 0, nullptr, &avail, nullptr)) {
+            break;  // pipe casse = l'enfant a ferme sa sortie (fini)
+        }
+        if (avail > 0) {
+            DWORD n = 0;
+            if (!ReadFile(read_h, buf, sizeof(buf), &n, nullptr) || n == 0) break;
+            payload.append(buf, buf + n);
+            if (payload.size() > (1u << 20)) break;  // 1 Mo = jamais legitime
+        } else if (GetTickCount64() > deadline) {
+            TerminateProcess(pi.hProcess, 1);
+            log << "scan: TIMEOUT (probe fige, plugin sans reponse) sur " << module << "\n";
+            timed_out = true;
+            break;
+        } else {
+            Sleep(20);  // pas de donnees encore : petite attente, pas de busy-loop
+        }
     }
     CloseHandle(read_h);
-    const DWORD wait = WaitForSingleObject(pi.hProcess, 15000);
-    if (wait != WAIT_OBJECT_0) {
-        TerminateProcess(pi.hProcess, 1);
-        log << "scan: TIMEOUT sur " << module << "\n";
-    }
+    // Reap borne : un enfant tue peut trainer s'il est coince en noyau -
+    // on ne bloque PAS le scan a l'attendre (sinon meme deadlock deplace).
+    WaitForSingleObject(pi.hProcess, 2000);
     DWORD code = 1;
     GetExitCodeProcess(pi.hProcess, &code);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    if (wait != WAIT_OBJECT_0 || code != 0) return false;
+    if (timed_out || code != 0) return false;
 #else
     // Controle-plan uniquement : popen suffit (POSIX = CI)
     const std::string cmd = "\"" + host_exe + "\" --enumerate \"" + module +
