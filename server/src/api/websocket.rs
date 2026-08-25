@@ -66,6 +66,30 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
 
     let (mut sender, mut receiver) = socket.split();
 
+    // AUDIT-5 F1: when a token is configured, the client must authenticate
+    // with an `auth:<token>` FIRST message before anything else (mirrors the
+    // engine's first-message auth - keeps the secret out of the URL and logs).
+    // No token configured (dev default) = no auth, unchanged behaviour.
+    if let Some(expected) = &state.auth_token {
+        let ok = match tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            receiver.next(),
+        )
+        .await
+        {
+            Ok(Some(Ok(Message::Text(t)))) => t
+                .strip_prefix("auth:")
+                .map(|got| crate::constant_time_eq(got.as_bytes(), expected.as_bytes()))
+                .unwrap_or(false),
+            _ => false,
+        };
+        if !ok {
+            tracing::warn!("Rejected ws: bad or missing auth token");
+            let _ = sender.send(Message::Close(None)).await;
+            return;
+        }
+    }
+
     // Register session
     let mut rx = {
         let mut sync_state = state.sync_state.write().await;

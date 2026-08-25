@@ -27,11 +27,22 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // AUDIT-5 F1: opt-in shared token. Set DAW_SERVER_TOKEN to require auth
+    // (tunnel/exposed mode); unset (dev default) keeps the current no-auth
+    // behaviour. An empty value is treated as unset.
+    let auth_token = std::env::var("DAW_SERVER_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty());
+    if auth_token.is_some() {
+        tracing::info!("Auth: shared token REQUIRED (DAW_SERVER_TOKEN set)");
+    }
+
     // Initialize state
     let state = Arc::new(AppState {
         store: Box::new(document::FileStore::new("./projects")?),
         sync_state: RwLock::new(SyncState::new()),
         store_lock: tokio::sync::Mutex::new(()),
+        auth_token,
     });
 
     // CORS layer for browser access (audit C2: was allow_origin(Any) -

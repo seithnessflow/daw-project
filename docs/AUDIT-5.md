@@ -265,6 +265,16 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   Ferme le path traversal (lecture ET ecriture) + l'injection CRLF d'URL.
   Garde `testPathComponentSafety`. gtests 40/40. Reste (dette) : valider
   aussi state_hash au read local (main.cpp:490) — couvert par le fetch.
+- **F1 (serveur) FAIT** : auth par token partage OPT-IN (env
+  `DAW_SERVER_TOKEN`). Choix elegant = reutiliser le modele eprouve du
+  moteur (premier message `auth:<token>` sur le WS, jamais dans l'URL/les
+  logs ; `Authorization: Bearer` sur /assets ; comparaison temps constant
+  `constant_time_eq`). RETROCOMPATIBLE : sans env var (dev), aucune auth,
+  comportement inchange. Ferme F1/C2-distante quand le serveur est expose
+  par un tunnel : on definit le token, l'URL partagee porte le secret.
+  Tests Rust auth_token 2/2 + les 3 tests d'integration existants verts.
+  RESTE (F1 clients, en cours) : le moteur et le web envoient le token
+  (moteur = env var ; web = fragment #stoken pour le tunnel).
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route

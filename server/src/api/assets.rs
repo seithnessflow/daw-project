@@ -14,14 +14,30 @@
 //! same atomic temp+rename write mold as FileStore).
 
 use axum::body::Bytes;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 
 use super::origin::origin_allowed;
+use crate::AppState;
 
 const ASSETS_DIR: &str = "./assets";
+
+/// AUDIT-5 F1: when a token is configured, /assets requires
+/// `Authorization: Bearer <token>`. No token configured = open (unchanged).
+fn bearer_ok(headers: &HeaderMap, expected: &Option<String>) -> bool {
+    match expected {
+        None => true,
+        Some(tok) => headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .map(|got| crate::constant_time_eq(got.as_bytes(), tok.as_bytes()))
+            .unwrap_or(false),
+    }
+}
 
 /// The hash is a PATH COMPONENT: hex only, bounded length, or nothing.
 fn asset_file(hash: &str) -> Option<std::path::PathBuf> {
@@ -31,9 +47,16 @@ fn asset_file(hash: &str) -> Option<std::path::PathBuf> {
     Some(std::path::Path::new(ASSETS_DIR).join(format!("{hash}.wav")))
 }
 
-pub async fn get_asset(headers: HeaderMap, Path(hash): Path<String>) -> impl IntoResponse {
+pub async fn get_asset(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(hash): Path<String>,
+) -> impl IntoResponse {
     if !origin_allowed(&headers) {
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
+    if !bearer_ok(&headers, &state.auth_token) {
+        return (StatusCode::UNAUTHORIZED, "missing or bad token").into_response();
     }
     let Some(path) = asset_file(&hash) else {
         return (StatusCode::BAD_REQUEST, "hash must be hex (<= 64 chars)").into_response();
@@ -49,9 +72,17 @@ pub async fn get_asset(headers: HeaderMap, Path(hash): Path<String>) -> impl Int
     }
 }
 
-pub async fn put_asset(headers: HeaderMap, Path(hash): Path<String>, body: Bytes) -> impl IntoResponse {
+pub async fn put_asset(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(hash): Path<String>,
+    body: Bytes,
+) -> impl IntoResponse {
     if !origin_allowed(&headers) {
         return (StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
+    if !bearer_ok(&headers, &state.auth_token) {
+        return (StatusCode::UNAUTHORIZED, "missing or bad token").into_response();
     }
     let Some(path) = asset_file(&hash) else {
         return (StatusCode::BAD_REQUEST, "hash must be hex (<= 64 chars)").into_response();
