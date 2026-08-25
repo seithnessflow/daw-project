@@ -10,6 +10,13 @@ Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
 Etat : **VERT** (smoke S7 deux machines, 2026-08-23) — le portable, sans
 aucun module VST3, a rendu l'octet-pour-octet de la tour a travers le
 store et l'a JOUE dans ses haut-parleurs. Details : critere 6.
+RE-PROUVE 2026-08-25 SUR VRAIS PLUGINS DU COMMERCE (Valhalla + RoughRider,
+pas AGain) : portable TX15 sans ces modules -> rendu inv-proof byte-exact
+a la tour (179F804E..., deux rendus frais compares), ligne de verite
+« playing STEM 926ff7a0 for an unresolved plugin ». Reserves (JOURNAL
+2026-08-25) : rendu OFFLINE via ear (pas le chemin reseau vivant, deja
+S7), blobs poses par scp, invariant de LECTURE (le stem fut produit par
+la tour), badges fraicheur de la-bas non observes en live.
 SYNC TRANSPORT LINK (L1a+L1b+L1c, 2026-08-24) : **VERT DEUX
 MACHINES** — PLAY sur la tour, le portable demarre sur l'ancre
 (calage 10,7 ms = 1 buffer) et joue la piece entiere audible, ecart

@@ -1034,3 +1034,27 @@ lisait 0.0), et des organes qui disent desormais OU et POURQUOI
 ta:3, mappings verbatim). CI verte jusqu'a 8ebe73d ; b4dc522 en vol a
 la fermeture — VERDICT A LIRE EN PREMIER a la reprise. Stack coupee
 proprement (tunnel compris) ; daw.ps1 rallume tout.
+
+**2026-08-25 (jambe deux machines, vrais plugins) :** l'invariant
+re-prouve DEUX MACHINES sur de vrais plugins du commerce (Valhalla
+Supermassive + RoughRider3), la moitie distante de l'item 3. Tunnel
+cloudflared relance cote portable (geste humain), liaison.ps1 branchee
+(tx15\flow OK), doc inv-proof.am + les 5 blobs (dont le stem de chaine
+complete 926ff7a0) transferes par scp, jambe SANS module lancee par ssh
+(`npm run ear --project inv-proof`). Le portable TX15, sans aucun de
+ces modules, rend « playing STEM 926ff7a0 for an unresolved plugin »,
+EAR green, hash 179F804E... — OCTET POUR OCTET identique a la tour
+(deux rendus FRAIS compares, pas un hash perime : premier piege evite,
+un vieux 26AF5CAF de session anterieure trainait dans web/ear/). Un
+pair sans le plugin produit la verite publiee, sur vrais plugins, deux
+machines. RESERVES HONNETES a garder : (1) rendu OFFLINE via ear, pas
+le chemin reseau vivant WS+store HTTP (celui-la deja prouve en S7 avec
+AGain) ; (2) blobs poses par scp, pas tires du store HTTP par le moteur
+du portable ; (3) le stem 926ff7a0 fut produit par la tour en session
+ANTERIEURE — le portable le LIT, donc c'est l'invariant de LECTURE qui
+est vert deux machines sur vrais plugins, pas la regeneration ; (4)
+badges fraicheur « de la-bas » en live non observes (demandent stack
+live + l'oreille de l'utilisateur devant le portable — pas de son de ma
+propre initiative). Friction utilisateur : sshd etait en Manual ->
+passe Automatic via UAC (a noter dans deux-machines.md). Vivants cote
+portable a la fin : sshd Running, cloudflared PID 2444 detache.

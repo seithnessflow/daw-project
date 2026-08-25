@@ -56,10 +56,16 @@
    in-place a l'arrivee du stem n'avait pas le procId), chemins
    --vst3-module RELATIFS resolus contre l'EXE (plus jamais le cwd),
    mapping logue verbatim au demarrage (organe).
-   RESTE (3 suite) : DEUX MACHINES (portable : pull + rebuild [fix
-   crash + ring v7 !] puis scripts/invariant-proof.ps1 jambe SANS
-   chez lui + badges fraicheur observes de la-bas). Piege : mon
-   interpretation « OK » = oui a (b) — a infirmer si faux.
+   RESTE (3 suite) : DEUX MACHINES — [x] portable pull+rebuild (HEAD
+   f5a8a51, 43/43, gtests 34/34) + [x] JAMBE SANS FAITE 2026-08-25 :
+   inv-proof rendu byte-exact a la tour (179F804E..., vrais plugins
+   Valhalla+RoughRider, « playing STEM 926ff7a0 for an unresolved
+   plugin »), JOURNAL 2026-08-25. RESERVES a lever si on veut le VERT
+   plein : (a) refaire la jambe par le CHEMIN RESEAU VIVANT (portable
+   pointe le serveur tour par tunnel, TIRE doc+stems du store HTTP,
+   pas de scp) ; (b) observer les badges fraicheur DE LA-BAS en live
+   (stack live + oreille utilisateur devant le portable — son requis).
+   Piege : mon interpretation « OK » = oui a badge (b) — a infirmer si faux.
 4. [~] EFFETS NATIFS (3 sessions arbitrees, VCV Rack litterature).
    4.1 UTILITY + CHASSIS — FAIT 2026-08-25 : UtilityNode
    (gain/pan/mono/phase, matrice 2x2 hors callback, lissage demarrant
@@ -80,9 +86,16 @@
    « il faut harmoniser tout le code je pense », NOMME hors ordre et
    range ici) : session d'audit dediee, regard neuf, LECTURE SEULE ->
    rapport -> arbitrage par la grille (jamais une passe de coherence
-   en direct). Candidats connus d'avance : conventions fr/en des
-   commentaires, jumeaux de sondes scratchpad vs scripts/, menage
-   build-msvc (dossiers stale), table KNOWN_VST3_NAMES vs catalogue.
+   en direct). RAPPORT ECRIT 2026-08-25 : docs/AUDIT-5.md (6 lectures
+   paralleles + revue externe, ~40 trouvailles, arbitrage propose a
+   RATIFIER). Titre : l'invariant produit est VERT sur plugin trivial
+   seulement (AGain) ; 3 des « 4 endroits ou le premier vrai plugin
+   casse » localises (cle de stem 6 chiffres, livraison moteur,
+   arbitrage d'ecrivain). Familles A(correctness)/B(secu)/C(gels)/
+   D(perf)/E(perennite)/F(coherence). Quick wins < 1h identifies
+   (dr_libs sur SHA, validation hex des chemins, F1 re-cadre live).
+   Candidats connus d'avance couverts : conventions fr/en des
+   commentaires, jumeaux, menage build-msvc, KNOWN_VST3_NAMES.
 
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)

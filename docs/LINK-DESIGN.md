@@ -132,3 +132,40 @@ geste manuel (pas de re-lecture automatique).
 
 Chaque session livre sa manip visible/audible. L2 attend la vague 2 ;
 L3 tempo-LWW arrive avec elle.
+
+## 7. Politique latence/synchro heterogene (intrant utilisateur 2026-08-25)
+
+A TRANCHER a la session PDC/L2, pas de code avant. Constat utilisateur :
+il faudra un CHOIX explicite de politique latence+synchro EN FONCTION de
+l'heterogeneite des pairs — chacun a sa propre connexion (RTT), sa propre
+latence moteur (taille de buffer device) et ses propres latences plugin
+(PDC de chaque chaine). On ne peut pas supposer un monde homogene.
+
+Ce que ca croise (deja cartographie) :
+- Le PDC LIVE n'existe pas aujourd'hui (AUDIT-5 A5) : la latence est
+  declaree partout mais AUCUN alignement inter-pistes en live. C'est le
+  prealable TECHNIQUE ; la politique ci-dessous est la decision AU-DESSUS.
+- La synchro transport (L1a/b) suit deja le RTT et la derive par paire.
+  Mais elle synchronise des POSITIONS de lecture, pas des latences de
+  traitement — deux machines calees a la meme position peuvent quand meme
+  sortir le son a des instants differents si leurs PDC/buffers different.
+
+Axes du choix (a peser, non tranches) :
+1. ALIGNER SUR LE PLUS LENT : chaque pair retarde sa sortie jusqu'au max
+   des (latence moteur + PDC + une marge reseau) de tous les pairs.
+   Tout le monde synchrone, mais latence commune haute (le pair le plus
+   mal loti impose sa latence a tous — injouable pour du jeu live).
+2. COMPENSATION LOCALE SEULE : chaque pair compense son propre PDC/buffer,
+   le skew inter-machines subsiste (borne par L1a). Simple, jouable en
+   local, mais l'ecoute croisee peut flanger.
+3. SKEW TOLERE BORNE : on accepte un desalignement inter-machines tant
+   qu'il reste sous un seuil (a chiffrer), au-dela on degrade (suspension
+   jam facon L1c, deja le modele pour l'ecoute).
+Facteur transverse : la POLITIQUE peut dependre du MODE (edition asynchrone
+= tolerant ; jam temps reel = strict ; ecoute d'un pair = son PDC a lui).
+Lien lieux-d'ecoute (TODO 2bis) : « ecouter chez un pair » = adopter SA
+latence, pas la mienne — la politique doit etre exprimable PAR lieu d'ecoute.
+
+REFUS implicite a garder : pas de latence commune imposee en dur (option 1
+seule) — elle tue le jeu live, le refus grave d'ADR-019 sur le monitoring
+distant a latence de jeu en decoule deja.
