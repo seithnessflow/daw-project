@@ -261,32 +261,4 @@ private:
     ) noexcept;
 };
 
-/**
- * Graph builder - constructs AudioGraph from document data.
- */
-class GraphBuilder {
-public:
-    /**
-     * Set the asset cache for loading clips.
-     */
-    void setAssetCache(AssetCache* cache) {
-        asset_cache_ = cache;
-    }
-
-    /**
-     * Build a graph from track data.
-     *
-     * @param tracks Track data (id, name, gain, clips, chain)
-     * @param sample_rate Sample rate
-     * @return Built audio graph
-     */
-    std::unique_ptr<AudioGraph> build(
-        const std::vector<AudioTrack>& tracks,
-        uint32_t sample_rate
-    );
-
-private:
-    AssetCache* asset_cache_ = nullptr;
-};
-
 }  // namespace daw::graph
