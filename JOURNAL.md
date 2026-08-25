@@ -1058,3 +1058,56 @@ live + l'oreille de l'utilisateur devant le portable — pas de son de ma
 propre initiative). Friction utilisateur : sshd etait en Manual ->
 passe Automatic via UAC (a noter dans deux-machines.md). Vivants cote
 portable a la fin : sshd Running, cloudflared PID 2444 detache.
+
+**2026-08-25 (refonte UI T1-T8 + finition F1-F7 — l'interface finie) :**
+grosse seance UI, deux temps. (1) REFONTE TOTALE demandee (« rework l'UI
+totalement... un max d'options ») : concept « l'etabli Magic Potion »
+(atelier modulaire, graphite chaud + potion + cuivre materiel), livre en
+8 commits T1-T8 (command bar, rail navigateur, VU inter-device, vue
+Session clip-launcher, console Mixage, commutateur de paradigmes
+Arrangement/Session/Mixage — presentation LOCALE par onglet). Contrat
+d'id tenu (le JS lit les slots par id, jamais par position -> re-parenter
+ne casse rien). (2) FINITION F1-F7 (chantier « finir l'interface », plan
+approuve), chaque tranche verifiee EN PILOTANT le vrai navigateur/moteur :
+- F3 : bug du VU master de la console (le moteur emet les pics master a
+  part de getMeters) + LED cuivre. F4 : knobs rotatifs du rack (le
+  `<input range>` reste la source de verite, masque, pilote par le knob).
+  F6 : onglet Samples du navigateur = source UNIQUE (barre KIT retiree).
+  F7 : splitters de colonnes redimensionnables (largeurs en localStorage),
+  undo des notes (dette midi_schedule soldee), reduced-motion/focus.
+- F1 : bouton BOX (fenetre GUI de plugin A LA DEMANDE) — le trou etait
+  100% moteur. Ring v9 : champ atomic editor_open (moteur->enfant) loge
+  dans le padding de shutdown -> offsets INCHANGES, un static_assert.
+  L'enfant ouvre/ferme sur la TRANSITION. Verifie sur Dexed (close+reopen
+  -> 2e « editor window open », patch restaure). REGLE ENFIN le cas
+  Massive X (« je peux pas lancer un massive X ») : ouvrir la GUI, choisir
+  un preset.
+- F2 : pan de piste. Applique POST-CHAIN (un instrument ignore son entree
+  -> paner avant sa chaine ne ferait rien). LOI LINEAIRE centre-neutre
+  (pas puissance egale) : impose par la neutralite du centre (pan 0 ==
+  inchange -> hash offline + loudness des projets existants preserves) et
+  pour eviter la discontinuite -3 dB en frolant le centre. Verifie au
+  rendu offline (pan -1 -> L=0.32/R=0).
+- F5 : LAUNCH LIVE des slots Session — ESCALADE ARCHITECTURE reconnue
+  (le plan la sous-estimait) : le callback ne traitait l'audio que
+  transport EN LECTURE. Choix utilisateur = « la solution la plus
+  elegante et performante » -> HORLOGE DE SESSION LIBRE : le callback
+  avance un compteur a chaque bloc meme a l'arret et traite le graphe si
+  un slot est lance ; la position d'arrangement reste GELEE (pas de seek
+  hors lecture). Un vrai clip-launcher : on jam PAR-DESSUS un arrangement
+  arrete. Scheduler emitSessionLoop (rebase + wrap + all-notes-off a la
+  couture, ordre d'offset croissant car l'enfant draine le FIFO sans
+  trier) TESTE UNITAIREMENT (nouveau gtest). Verifie bout en bout sur
+  Dexed, transport A L'ARRET : le slot lance sonne (peak 0.125), stop ->
+  silence exact (0 note bloquee). 41/41 gtests.
+Piege paye (mon TEST, pas le code) : les mutateurs de project.ts ne
+synchronisent pas seuls — l'UI appelle sendLastChange APRES ; mon script
+appelait addSessionClip/toggleNote sans flush -> le moteur ne recevait
+rien (buildGraph session_slots=0). Diagnostic par logs [F5] control-thread
+(retires apres). Hook __dawFlush ajoute (doctrine window.__daw*).
+Demande utilisateur en fin de seance : lanceurs double-cliquables
+start-daw.cmd / stop-daw.cmd (delegue a daw.ps1 -Secure, ouvre le site).
+SIGNALEMENT (niveau 2, pas mon code) : le doc `studio` se REINITIALISE
+par moments (mes ajouts web disparaissaient entre deux runs de test) —
+sent une persistance serveur fragile, a regarder en session dediee.
+Tout committe (2ffdacc..19d8ac0). Stack coupee proprement.

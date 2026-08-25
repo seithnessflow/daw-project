@@ -2,7 +2,7 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-23 (recadrage differenciateur, ADR-019).*
+2026-08-25 (finition UI F1-F7 : l'interface est finie ; ring v9).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 
@@ -60,10 +60,10 @@ interdisait le produit).
 
 | Composant | Compile | Verifie fonctionnellement | Notes |
 |-----------|---------|---------------------------|-------|
-| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` **40/40** (noyau natif complet : Utility/EQ3/Comp/Drive/Delay, preuves exactes) ; crash 0xe06d7363 SOLDE (envoi hors verrou) ; handler auto-symbolisant (dbghelp+WHAT) ; --start-stopped, --editors, --vst3-dir (scan+cache) ; ring v7 (latence plugin + gui_edit_seq). **AUDIT-5 (2026-08-25, test-first, master vert)** : A1 int/f64 (itemToUint), A2 precision cle de stem (stem-v2), A4 merge + push a la reconnexion, A6/A7 warnings periode & sample-rate, A8 sample_rate sur le fil, 1.1 params map->liste ordonnee (clot l'ordre de A2), B5 validation des chemins (path traversal) |
+| Engine C++ (MSVC) | ✅ | ✅ | `daw_engine_test.exe` **41/41** (noyau natif complet : Utility/EQ3/Comp/Drive/Delay, preuves exactes ; + test scheduler de boucle Session) ; crash 0xe06d7363 SOLDE (envoi hors verrou) ; handler auto-symbolisant (dbghelp+WHAT) ; --start-stopped, --editors, --vst3-dir (scan+cache). **Finition UI F1/F2/F5 (2026-08-25)** : ring **v9** (editor_open moteur->enfant = fenetre GUI de plugin A LA DEMANDE, loge dans le padding de shutdown -> offsets inchanges) ; **pan de piste** post-chain, loi lineaire centre-neutre (pan 0 == inchange, hash preserve) ; **LAUNCH SESSION** = horloge de session LIBRE (le callback traite le graphe meme transport a l'arret si un slot est lance ; position d'arrangement gelee), emitSessionLoop (rebase+wrap+all-notes-off, teste). **AUDIT-5 (test-first, master vert)** : A1 int/f64 (itemToUint), A2 precision cle de stem (stem-v2), A4 merge + push a la reconnexion, A6/A7 warnings periode & sample-rate, A8 sample_rate sur le fil, 1.1 params map->liste ordonnee, B5 validation des chemins (path traversal) |
 | Engine C++ (GCC/CI) | ✅ | ✅ | CI verte depuis run #48 (2026-08-22), hash + plugin_host inclus |
 | Server Rust | ✅ | ✅ | Ecoute sur 127.0.0.1:3000, cargo test 9/9. **AUDIT-5 F1** : auth par token partage OPT-IN (env DAW_SERVER_TOKEN) — WS premier message `auth:<token>` + `Authorization: Bearer` sur /assets, comparaison temps constant ; retrocompatible (sans env var = dev inchange) ; ferme C2-distante quand le serveur est expose par un tunnel |
-| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 36/36 (specs moteur-reel : port 47821 LIBRE requis) ; sync transport L1a/b/c VERT DEUX MACHINES ; catalogue PluginCatalog (91 classes) + picker ; fenetrage v1 (GUI natives des plugins, reglages qui voyagent par stems) ; badge fraicheur 3 etats (sf, ne ment jamais par omission) ; 5 devices natifs au menu, unites vraies ; ear --vst3 + positions des clics, self-test 7/7 |
+| Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 36/36 (specs moteur-reel : port 47821 LIBRE requis) ; sync transport L1a/b/c VERT DEUX MACHINES ; catalogue PluginCatalog (91 classes) + picker ; badge fraicheur 3 etats ; ear --vst3 + positions des clics, self-test 7/7. **REFONTE UI « etabli Magic Potion » (T1-T8) + FINITION F1-F7 (2026-08-25)** : etabli 3 colonnes (navigateur / arrangement / rack) avec splitters redimensionnables (largeurs localStorage) ; commutateur de paradigmes Arrangement/Session/Mixage (presentation LOCALE par onglet) ; console Mixage reelle (VU par piste + master, faders, pan, M/S) ; vue Session clip-launcher FONCTIONNELLE (launch live des slots, etat « en lecture ») ; navigateur Instruments/Effets/Samples (source unique des samples) ; rack en knobs rotatifs, bouton BOX (GUI plugin a la demande) ; undo des notes ; reduced-motion/focus |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
 
@@ -95,6 +95,8 @@ cd engine\build-msvc
 scripts\daw.ps1          # serveur + moteur + web + navigateur (token dans l'URL)
 scripts\daw.ps1 -Stop
 ```
+Ou, double-cliquables (racine du projet) : **start-daw.cmd** (lance tout +
+ouvre le site sur studio, token epingle) / **stop-daw.cmd** (arrete tout).
 
 ### Web
 ```powershell

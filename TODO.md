@@ -97,6 +97,41 @@
    Candidats connus d'avance couverts : conventions fr/en des
    commentaires, jumeaux, menage build-msvc, KNOWN_VST3_NAMES.
 
+## UI — REFONTE « ETABLI MAGIC POTION » + FINITION (2026-08-25) : FINIE
+
+Directive « rework l'UI totalement... un max d'options ». Livre en deux
+temps, TOUT verifie en pilotant le vrai navigateur/moteur :
+- [x] REFONTE T1-T8 : etabli 3 colonnes, command bar cuivre, VU
+      inter-device, vue Session (clip-launcher), console Mixage, commutateur
+      de paradigmes Arrangement/Session/Mixage (presentation LOCALE/onglet).
+- [x] F3 VU master mixer (bug) + LED cuivre ; F4 knobs rotatifs du rack ;
+      F6 onglet Samples (source unique) ; F7 splitters redimensionnables
+      (localStorage) + undo des notes + reduced-motion/focus. [web]
+- [x] F1 bouton BOX : fenetre GUI plugin A LA DEMANDE (ring v9). Regle le
+      cas Massive X. F2 pan de piste (post-chain, loi lineaire centre-neutre).
+      F5 launch LIVE des slots Session = HORLOGE DE SESSION LIBRE (jam
+      par-dessus un arrangement arrete). 41/41 gtests. [moteur]
+- [x] Lanceurs double-cliquables start-daw.cmd / stop-daw.cmd.
+Commits 2ffdacc..19d8ac0.
+
+RESTE UI (petit, non bloquant) :
+- [ ] Onglets Rack/Piano-roll dans la colonne droite (F7 laisse ;
+      l'empilement actuel fonctionne).
+- [ ] A TERME (horizon utilisateur) : drag-and-drop / mod complet de
+      l'interface (les splitters en sont la fondation).
+
+## PRIORITES A LA REPRISE (a arbitrer avec l'utilisateur — ordre grave)
+
+1. **BUG persistance doc `studio`** (signale 2026-08-25, niveau 2) : le
+   doc se REINITIALISE par moments (ajouts web perdus entre deux runs) —
+   persistance serveur fragile. Session de diagnostic dediee (regard neuf).
+2. **Reprendre le CAP produit** : l'UI etant finie, revenir a l'axe
+   differenciateur (ORDRE GRAVE ci-dessus : item 3 badges fraicheur
+   deux-machines bloque sur geste laptop, item 5 VAGUE 3 MIDI+instruments =
+   le test Massive, item 6 harmonisation AUDIT-5 a ratifier) ET la
+   direction P2P engines (gros chantier archi — PROPOSER, pas construire).
+3. Le petit reste UI ci-dessus, au fil de l'eau.
+
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)
 

@@ -1,73 +1,65 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Ecrit le 2026-08-25 (session AUDIT-5). VOLATILE : etat dans STATUS.md,
-file dans TODO.md, recit dans JOURNAL.md, audit dans docs/AUDIT-5.md.*
+*Ecrit le 2026-08-25 (fin de seance UI : refonte T1-T8 + finition F1-F7).
+VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 
 ## Ou on en est (30 secondes)
 
-Session d'AUDIT-5 + premiers correctifs, en deux temps :
+**L'INTERFACE EST FINIE.** Grosse seance UI en deux temps :
 
-1. LA JAMBE DEUX MACHINES (ordre grave item 3) EST VERTE sur de VRAIS
-   plugins (Valhalla + RoughRider) : le portable, sans ces modules, rend
-   inv-proof byte-exact a la tour (179F804E...). Reserves consignees
-   (offline/scp/lecture, badges live de la-bas non observes) — JOURNAL
-   2026-08-25.
+1. REFONTE TOTALE « l'etabli Magic Potion » (T1-T8, 8 commits, deja livree
+   avant cette reprise) : etabli 3 colonnes (navigateur / arrangement /
+   rack), command bar cuivre, commutateur de paradigmes
+   Arrangement / Session / Mixage (presentation LOCALE par onglet).
 
-2. AUDIT TRANSVERSAL (6 lectures paralleles + revue externe) ->
-   docs/AUDIT-5.md, ~40 trouvailles, arbitrage par la grille. Titre :
-   l'invariant produit etait VERT sur AGain seulement ; 3 des « 4
-   endroits ou le premier vrai plugin casse » localises et CORRIGES.
+2. FINITION F1-F7 (chantier « finir l'interface », plan approuve), TOUT
+   livre et verifie en PILOTANT le vrai navigateur/moteur :
+   - **F3** VU master du mixer (bug) + LED cuivre ; **F4** knobs rotatifs
+     du rack ; **F6** onglet Samples du navigateur (source unique) ;
+     **F7** splitters de colonnes (localStorage) + undo des notes +
+     reduced-motion/focus. [tout web]
+   - **F1** bouton BOX = fenetre GUI de plugin **A LA DEMANDE** (ring v9,
+     editor_open moteur->enfant). REGLE le cas Massive X : ouvrir la GUI,
+     choisir un preset. Verifie sur Dexed.
+   - **F2** pan de piste (post-chain, loi lineaire centre-neutre : pan 0
+     inchange -> hash/loudness preserves). Verifie au rendu offline.
+   - **F5** launch LIVE des slots Session = **HORLOGE DE SESSION LIBRE**
+     (choix utilisateur « la plus elegante ») : les slots jouent en boucle
+     PAR-DESSUS un arrangement ARRETE. Verifie bout en bout (Dexed sonne
+     transport a l'arret, stop -> silence exact, 0 note bloquee). 41/41
+     gtests (dont le nouveau test du scheduler emitSessionLoop).
 
-3. CORRECTIFS LIVRES, test-first (rouge avant fix), MASTER VERT :
-   - B3 dr_libs epingle (fin de master mouvant).
-   - A1 int/f64 : schemaVersion/sampleRate d'un doc web (INT) etaient lus
-     0/48000 en silence -> helper itemToUint.
-   - A2 cle de stem : 6 chiffres significatifs faisaient collisionner deux
-     valeurs de knob -> badge « frais » menteur -> setprecision + stem-v2.
-   - A4 merge non destructif (1a) + push a la reconnexion (1b) : le moteur
-     ne perd plus / partage enfin les champs qu'il est SEUL a ecrire.
-   - A6/A7 warnings bruyants (periode != 256 ; asset sample_rate mismatch).
-   - A8 sample_rate du moteur sur le fil (fin de la playhead 48000 en dur).
-   - B1 SECURITY.md re-cadre (C2-distante LIVE, H3 Windows Low...).
-   - 1.1 params moteur map->liste ordonnee (clot l'ordre de la cle de
-     stem laisse par A2 ; aligne moteur/web/SCHEMA.md).
-   - B5 validation des chemins issus du document (path traversal +
-     injection URL) : helper isPathComponentSafe aux 4 frontieres.
-   - F retrait de GraphBuilder mort (jumeau divergent).
-   - F1 AUTH SERVEUR (la trouvaille secu critique) : token partage
-     OPT-IN (DAW_SERVER_TOKEN), WS premier message + Bearer /assets,
-     retrocompatible ; serveur+moteur+web faits, smoke + e2e verts.
-     Ferme C2-distante (le tunnel exposait le serveur sans auth).
-   gtests 40/40, cargo 9/9, e2e verifies en local (items inter-etages).
+3. Lanceurs double-cliquables **start-daw.cmd** / **stop-daw.cmd** (demande
+   utilisateur) : delegue a daw.ps1 -Secure, ouvre le site sur studio.
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-Dernier push 67579a0 (F1 clients). CI VERTE confirmee jusqu'a 7f9a1fd
-(B5, GraphBuilder, F1 serveur inclus, tous success). Le run de 67579a0
-(F1 clients) tournait a la cloture : VERDICT A CONFIRMER au demarrage
-(verifie en local : e2e retrocompat 7 passed, smoke moteur token OK).
-Piege paye : A4-1a (17f21a8) a d'abord ete ROUGE en CI — un renommage
-de log moteur (« Document loaded ») a casse un contrat e2e (countInFile) ;
-corrige en 0e2089b. LECON : verifier les APPELANTS d'un log avant de le
-renommer (les logs moteur sont un contrat e2e).
+Dernier commit **19d8ac0** (lanceurs). Serie de la seance :
+2ffdacc F3, 89692bd F4, bb10cf1 F6, e08ca25 F1, ecea0a0 F2, 4bdcabb F7,
+2650ac4 F5, 19d8ac0 lanceurs. Ce depot n'a PAS de remote / pas de CI
+observee cette seance (travail local, tout committe). Le moteur a ete
+rebuild plusieurs fois (ring v8->v9, pan, session) ; binaires a jour dans
+engine\build-msvc. gtests **41/41** au dernier run.
 
-## RESTE (ordre grave + arbitrage AUDIT-5)
+## RESTE / a surveiller
 
-Ordre grave : 3-fin badges fraicheur de la-bas (BLOQUE sur geste laptop) ;
-5 VAGUE 3 MIDI+instruments (test Massive) ; 6 AUDIT-5 (EN COURS).
-Arbitrage AUDIT-5, gros restants (chacun = session dediee) :
-- A4-2 outbox persistant (sync sensible) ;
-- A5 PDC LIVE inexistant — pas au-dela de la vague MIDI ;
-- A3 arbitrage d'ecrivain stem (avec PLACEMENT/SCHEMA v2) ;
-- 1.1 refactor params map->liste (debloque A2-ordre + 1.3...) ;
-- F1 auth serveur (LIVE a chaque tunnel — mitigation token header) ;
-- B5 validation hex des chemins (ATTENTION : verifier les formats de
-  hash des fixtures avant d'imposer isHex) ;
-- Famille F cohesion (SCHEMA.md menteur, SPLITTER, jumeaux).
+- **SIGNALEMENT (niveau 2, pas notre code)** : le doc `studio` se
+  REINITIALISE par moments — pendant les tests F5, des ajouts web
+  (session clips) DISPARAISSAIENT entre deux runs. Sent une persistance
+  serveur fragile (le serveur ne persiste pas / re-lit le .am du disque ?).
+  A regarder en session dediee ; sans rapport avec la refonte UI.
+- **Detail non fait (assume)** : la restructure en onglets Rack/Piano-roll
+  de la colonne droite (F7) — laissee, l'empilement actuel fonctionne.
+- **Zombies plugin_host** : au rebuild moteur, `taskkill` echoue sur eux ;
+  `Get-Process plugin_host | Stop-Process -Force` (ou wmic call terminate)
+  marche. LNK1168 sur plugin_host.exe = un zombie tient le fichier.
+- **Reprise du CAP produit** : l'UI etant finie, le prochain grand chantier
+  reste l'axe differenciateur / P2P (cf TODO.md ORDRE GRAVE + le grand
+  chantier P2P engines note en memoire). Rien d'ouvert a mi-course.
 
-## A surveiller
+## Relancer
 
-- Verdict CI de 7533a36 (A8) — premier point de synchro.
-- Crash-*.log = moisson permanente (handler auto-symbolisant).
-- Warnings A6/A7 dans les logs moteur = signal d'un asset/device mal
-  configure (avant, c'etait faux en silence).
+`start-daw.cmd` (double-clic) OU `scripts\daw.ps1 -Secure`. Bookmark
+stable : `http://localhost:5173/?project=studio#stoken=<token epingle
+~/.daw-server-token>`. Rebuild moteur : `engine\rebuild_msvc.bat` (tuer
+les plugin_host zombies d'abord). Tests : `engine\build-msvc\daw_engine_test.exe`.

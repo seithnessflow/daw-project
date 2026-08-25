@@ -57,6 +57,35 @@ daw-project/
 | `web/src/main.ts` | Point d'entree web |
 | `web/src/document/project.ts` | Wrapper Automerge |
 
+## REPRISE RAPIDE — marche a suivre a CHAQUE demarrage
+
+Rituel d'ouverture (demande utilisateur 2026-08-25), dans l'ordre, sans
+scanner le projet :
+
+1. **Lire, dans cet ordre, rien d'autre** : `REPRISE.md` (le digest 30 s
+   de la session precedente : ou on en est, le point de synchro A LIRE EN
+   PREMIER, quoi surveiller) -> `STATUS.md` (etat des composants et
+   criteres) -> l'entree `TODO.md` de la tache du jour (le bloc PRIORITES
+   A LA REPRISE en tete resume ce qui attend).
+2. **Honorer le point de synchro** : si REPRISE annonce un verdict CI / un
+   build / un test en attente, le lever AVANT de coder (regle : aucune
+   session ne s'ouvre en ignorant un verdict promis).
+3. **Plan en 3 lignes max** (hypothese, actions, critere de succes) puis
+   agir. Si c'est de l'execution cadree, le dire en premiere ligne.
+4. **Relancer la stack seulement si besoin** de voir/entendre :
+   `start-daw.cmd` (double-clic) ou `scripts\daw.ps1 -Secure` -> serveur +
+   moteur + web + navigateur sur studio (token epingle `~/.daw-server-token`,
+   bookmark stable `?project=studio#stoken=<token>`). Arret : `stop-daw.cmd`.
+5. **Avant tout rebuild moteur** : tuer les `plugin_host.exe` zombies
+   (`Get-Process plugin_host | Stop-Process -Force` ; `taskkill` echoue sur
+   eux) — sinon LNK1168 (l'exe est verrouille). Rebuild :
+   `engine\rebuild_msvc.bat`. Sanite : `engine\build-msvc\daw_engine_test.exe`
+   (doit etre tout vert).
+6. **Verifier qu'aucune tache d'arriere-plan de la veille ne survit**
+   (moteur/serveur/vite/plugin_host orphelins) avant d'en relancer.
+
+Detail des regles de session : voir « RÉGIME DE SESSION » plus bas.
+
 ## Commandes de build
 
 ### Engine (PowerShell avec VS Build Tools)
