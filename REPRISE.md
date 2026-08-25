@@ -1,48 +1,63 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Ecrit le 2026-08-25 (nuit). VOLATILE : etat dans STATUS.md, file dans
-TODO.md, recit dans JOURNAL.md.*
+*Ecrit le 2026-08-25 (session AUDIT-5). VOLATILE : etat dans STATUS.md,
+file dans TODO.md, recit dans JOURNAL.md, audit dans docs/AUDIT-5.md.*
 
 ## Ou on en est (30 secondes)
 
-Les iterations autonomes ont solde, dans l'ordre grave :
-- (1) crash 0xe06d7363, (2) gtests locaux, (3-locale) invariant prouve
-  sur vrais plugins (quatuor, PDC, fraicheur), et LES TROIS SESSIONS
-  D'EFFETS NATIFS :
-  4.1 Utility (exact au bit), 4.2 EQ3+Comp (reponse 3 freqs, 4:1
-  numerique), 4.3 Drive (oversampling 4x, alias -80 dB vs -15 naif,
-  PREMIER NATIF A LATENCE : getLatencySamples=16, stems declarent
-  plugins+natifs) + Delay (echo exact a l'echantillon).
-  LE NOYAU NATIF DU BRIEF EST COMPLET (5 devices, unites vraies,
-  preuves gtest 34/34, e2e 36/36).
-- DEUX BUGS DE FOND en moisson : int/f64 Automerge (un nombre ENTIER
-  du web etait lu 0.0 par le moteur - params, masterGain, track.gain)
-  et la fixture multi-OS de la CI (+ sentinelle reparee : le watch
-  seul, son exit code EST le verdict).
-- CI verte jusqu'a 8ebe73d ; b4dc522 (4.3) EN SENTINELLE = premier
-  point de synchro si absent.
+Session d'AUDIT-5 + premiers correctifs, en deux temps :
 
-## La manip (2 min)
+1. LA JAMBE DEUX MACHINES (ordre grave item 3) EST VERTE sur de VRAIS
+   plugins (Valhalla + RoughRider) : le portable, sans ces modules, rend
+   inv-proof byte-exact a la tour (179F804E...). Reserves consignees
+   (offline/scp/lecture, badges live de la-bas non observes) — JOURNAL
+   2026-08-25.
 
-Onglet ma-piece -> piste -> + device : CINQ natifs (utility, eq 3
-bandes, compresseur, drive, delay) + le catalogue 72 effets. Tout en
-unites vraies, tout convergent, tout s'entend.
+2. AUDIT TRANSVERSAL (6 lectures paralleles + revue externe) ->
+   docs/AUDIT-5.md, ~40 trouvailles, arbitrage par la grille. Titre :
+   l'invariant produit etait VERT sur AGain seulement ; 3 des « 4
+   endroits ou le premier vrai plugin casse » localises et CORRIGES.
 
-## RESTE (ordre grave)
+3. CORRECTIFS LIVRES, test-first (rouge avant fix), MASTER VERT :
+   - B3 dr_libs epingle (fin de master mouvant).
+   - A1 int/f64 : schemaVersion/sampleRate d'un doc web (INT) etaient lus
+     0/48000 en silence -> helper itemToUint.
+   - A2 cle de stem : 6 chiffres significatifs faisaient collisionner deux
+     valeurs de knob -> badge « frais » menteur -> setprecision + stem-v2.
+   - A4 merge non destructif (1a) + push a la reconnexion (1b) : le moteur
+     ne perd plus / partage enfin les champs qu'il est SEUL a ecrire.
+   - A6/A7 warnings bruyants (periode != 256 ; asset sample_rate mismatch).
+   - A8 sample_rate du moteur sur le fil (fin de la playhead 48000 en dur).
+   - B1 SECURITY.md re-cadre (C2-distante LIVE, H3 Windows Low...).
+   gtests 38/38, e2e verifies en local pour les items inter-etages.
 
-3-fin. JAMBE DEUX MACHINES : le portable DOIT pull + rebuild (fix
-   crash + ring v7) puis jambe SANS du quatuor chez lui + fraicheur
-   observee. BLOQUE sur un geste laptop.
-5. Vague 3 (MIDI + instruments -> test ultime Massive).
-6. AUDIT-5 harmonisation (consigne).
-Reserves 4.x : sonde de latence vst3 reelle (soothe2 pend),
-harm-13 documente dans le test drive, pan constant-power de PISTE
-(TODO 3c) distinct du pan balance d'Utility.
+## Point de synchro (A LIRE EN PREMIER)
+
+Dernier push 7533a36 (A8). CI 05d0adf..72afb0c = VERT confirme
+(A1/A2/A4/A6/A7/B1/B3). Le run de 7533a36 (A8) tournait a la cloture :
+VERDICT A CONFIRMER au demarrage (verifie en local : e2e 6 passed).
+Piege paye : A4-1a (17f21a8) a d'abord ete ROUGE en CI — un renommage
+de log moteur (« Document loaded ») a casse un contrat e2e (countInFile) ;
+corrige en 0e2089b. LECON : verifier les APPELANTS d'un log avant de le
+renommer (les logs moteur sont un contrat e2e).
+
+## RESTE (ordre grave + arbitrage AUDIT-5)
+
+Ordre grave : 3-fin badges fraicheur de la-bas (BLOQUE sur geste laptop) ;
+5 VAGUE 3 MIDI+instruments (test Massive) ; 6 AUDIT-5 (EN COURS).
+Arbitrage AUDIT-5, gros restants (chacun = session dediee) :
+- A4-2 outbox persistant (sync sensible) ;
+- A5 PDC LIVE inexistant — pas au-dela de la vague MIDI ;
+- A3 arbitrage d'ecrivain stem (avec PLACEMENT/SCHEMA v2) ;
+- 1.1 refactor params map->liste (debloque A2-ordre + 1.3...) ;
+- F1 auth serveur (LIVE a chaque tunnel — mitigation token header) ;
+- B5 validation hex des chemins (ATTENTION : verifier les formats de
+  hash des fixtures avant d'imposer isHex) ;
+- Famille F cohesion (SCHEMA.md menteur, SPLITTER, jumeaux).
 
 ## A surveiller
 
-- Crash-*.log / <segment>.log = moisson permanente (handler
-  auto-symbolisant, PDB en place).
-- Piege scripts : backslashes manges par JS (\a) - slashes avant.
-- Arbitrages interpretes a infirmer si faux : « OK » = oui au badge
-  fraicheur (b).
+- Verdict CI de 7533a36 (A8) — premier point de synchro.
+- Crash-*.log = moisson permanente (handler auto-symbolisant).
+- Warnings A6/A7 dans les logs moteur = signal d'un asset/device mal
+  configure (avant, c'etait faux en silence).
