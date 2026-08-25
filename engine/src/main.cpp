@@ -742,6 +742,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         // runs - then both live and offline paths call the identical
         // makeClipPlayer (S3: the clip-geometry twin lives in one place).
         for (const auto& clip_def : track_def.clips) {
+            if (!clip_def.scene_id.empty()) continue;  // T7 : slot Session, pas timeline
             if (!opts.server_url.empty()) {
                 const std::string asset_path =
                     assets_dir + "/" + clip_def.asset_hash + ".wav";
@@ -760,6 +761,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         // notes -> track_notes vide -> rien de change pour les effets.
         std::vector<daw::host::ScheduledNote> track_notes;
         for (const auto& clip_def : track_def.clips) {
+            if (!clip_def.scene_id.empty()) continue;  // T7 : slot Session ignore
             for (const auto& n : clip_def.notes) {
                 const int64_t abs_start = clip_def.start_sample + n.start_sample;
                 track_notes.push_back(

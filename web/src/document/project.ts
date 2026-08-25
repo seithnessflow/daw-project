@@ -421,6 +421,29 @@ export class Project {
     return id;
   }
 
+  /** T7 Session : ajoute une scene (une LIGNE du clip-launcher) et rend son id. */
+  addScene(name: string): string {
+    const id = 'scene-' + Math.random().toString(36).slice(2, 8);
+    this.doc = Automerge.change(this.doc, (d) => {
+      if (!d.scenes) d.scenes = [];
+      (d.scenes as unknown[]).push({ id, name });
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    return id;
+  }
+
+  /** T7 Session : cree un SLOT (clip MIDI de session) sur une piste dans une
+   *  scene. Porte sceneId -> le moteur l'ignore en timeline. */
+  addSessionClip(trackId: string, sceneId: string): string {
+    const id = 'clip-' + Math.random().toString(36).slice(2, 10);
+    const clip: ClipDef = {
+      id, assetHash: '', startSample: 0, lengthSamples: 96000, offsetSamples: 0,
+      notes: [], sceneId,
+    };
+    this.addClip(trackId, clip);
+    return id;
+  }
+
   /**
    * v8 MIDI : bascule une note (ajoute si absente au meme pitch+debut, sinon
    * retire) - le geste du piano-roll. Undo des notes = raffinement ulterieur.

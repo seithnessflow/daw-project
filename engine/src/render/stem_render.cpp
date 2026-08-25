@@ -70,6 +70,7 @@ std::string computeStemKey(const document::TrackDef& track,
     k << "|uid=" << node.uid << "|ver=" << module_version_tag;
     k << "|state=" << node.state_hash << ":" << node.state_version;
     for (const auto& c : track.clips) {
+        if (!c.scene_id.empty()) continue;  // T7 : slot Session, hors timeline
         k << "|clip=" << c.asset_hash << "," << c.start_sample << ","
           << c.length_samples << "," << c.offset_samples << ","
           << c.fade_in_samples << "," << c.fade_out_samples;

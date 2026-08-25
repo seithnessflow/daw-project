@@ -552,6 +552,15 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                             }
                                             if (cr) AMresultFree(cr);
 
+                                            // T7 Session : sceneId (present = slot de session, ignore en timeline)
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("sceneId"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToStr(AMresultItem(cr), &strVal)) {
+                                                clip.scene_id = std::string(
+                                                    reinterpret_cast<const char*>(strVal.src), strVal.count);
+                                            }
+                                            if (cr) AMresultFree(cr);
+
                                             // v8 MIDI : notes = liste d'objets
                                             // {pitch, velocity, startSample, lengthSamples}
                                             cr = AMmapGet(doc_, clipObjId, AMstr("notes"), nullptr);

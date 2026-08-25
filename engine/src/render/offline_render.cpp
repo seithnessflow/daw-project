@@ -252,6 +252,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         } else {
             // Load clips (shared geometry+asset builder, S3)
             for (const auto& clip_def : track_def.clips) {
+                if (!clip_def.scene_id.empty()) continue;  // T7 : slot Session, pas timeline
                 track.clips.push_back(
                     graph::makeClipPlayer(clip_def, asset_dir, asset_cache_,
                                           sample_rate));
@@ -263,6 +264,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         // classique n'a pas de notes -> track_notes vide -> rien de change.
         std::vector<host::ScheduledNote> track_notes;
         for (const auto& clip_def : track_def.clips) {
+            if (!clip_def.scene_id.empty()) continue;  // T7 : slot Session ignore
             for (const auto& n : clip_def.notes) {
                 const int64_t abs_start = clip_def.start_sample + n.start_sample;
                 track_notes.push_back(
