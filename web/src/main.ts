@@ -37,7 +37,14 @@ import './styles/life.css';
 import './styles/touch-modes.css';
 import './styles/starter.css';
 import './styles/help.css';
+import './styles/menu.css';
 
-import { init } from './app/wiring';
-
-init().catch(console.error);
+// Menu principal (2026-08-25) : sans ?project= dans l'URL, on affiche le
+// selecteur de projets (bookmark stable a la racine) plutot que de booter
+// 'default'. Avec ?project=, l'app demarre comme avant. Import dynamique :
+// le menu ne tire pas tout le moteur/document.
+if (new URLSearchParams(window.location.search).has('project')) {
+  void import('./app/wiring').then(({ init }) => init().catch(console.error));
+} else {
+  void import('./ui/menu').then(({ mountMenu }) => mountMenu(document.body).catch(console.error));
+}

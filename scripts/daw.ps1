@@ -145,9 +145,13 @@ if (-not $webReady) { Write-Error "Web (vite) did not come up on 5173" }
 # the local /api/engine-token endpoint (zero-paste path).
 # F1: the server token rides the fragment (#stoken) alongside the engine
 # token - neither ever leaves the browser. The web reads #stoken (context.ts).
-$frag = "token=$token"
-if ($serverToken) { $frag += "&stoken=$serverToken" }
-$url = "http://localhost:5173/?project=$PROJECT&starter=1#$frag"
+# Menu principal (2026-08-26) : URL STABLE a la racine (pas de ?project=) ->
+# l'ecran de selection des projets. Seul le stoken EPINGLE ride le fragment
+# (le token moteur s'auto-recupere via /api/engine-token) : la meme URL a
+# chaque lancement, bookmarkable. Ouvrir un projet depuis le menu preserve le
+# fragment. (Le moteur reste demarre sur '$PROJECT' pour l'audio.)
+$url = "http://localhost:5173/"
+if ($serverToken) { $url += "#stoken=$serverToken" }
 
 # ---- Open the browser (unless muted verification run) ----
 if (-not $Mute) { Start-Process $url }
