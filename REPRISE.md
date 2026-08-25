@@ -37,9 +37,8 @@ VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 Dernier commit **60f2c35**. **TOUT EST POUSSE sur origin/master** (github
 seithnessflow/daw-project) : T1-T8, F1-F7, lanceurs, docs, menu, filet e2e,
 fix bouton editeur. La tour ET le portable sont a jour.
-- **CI** : build-linux VERT (C++ sur GCC ok) ; test-e2e re-lance apres le fix
-  clip-selection (VERDICT A CONFIRMER au demarrage - PREMIER point de synchro ;
-  run 32908752460).
+- **CI VERTE** (run 32908752460) : build-linux ✓ (C++ sur GCC) + test-e2e ✓
+  (6m27s, suite complete verte apres le fix clip-selection). Rien a confirmer.
 - **PORTABLE valide** : pull, moteur rebuild, gtests **41/41** (dont F5).
 - **Bug trouve+corrige par le filet** : le bouton BOX (GUI plugin) etait casse
   depuis T5 (event 'editor-toggle' ne remontait plus, device-view en colonne
