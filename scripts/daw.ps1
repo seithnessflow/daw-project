@@ -58,11 +58,24 @@ Remove-Item $tokenFile -ErrorAction SilentlyContinue
 # and engine start (both are children, so they inherit DAW_SERVER_TOKEN) ----
 $serverToken = $null
 if ($Secure) {
-    $tb = New-Object byte[] 32
-    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($tb)
-    $serverToken = -join ($tb | ForEach-Object { $_.ToString('x2') })
-    $env:DAW_SERVER_TOKEN = $serverToken
-    Write-Status "Secure mode: auth ON (server + engine require the token)."
+    # Token STABLE pour un BOOKMARK PERMANENT : ordre env > fichier persistant
+    # > nouveau (ecrit dans le fichier). Le meme token a chaque lancement ->
+    # l'URL bookmarkee (#stoken=...) ne casse jamais. Un pre-set env >=16 gagne
+    # (pour partager le meme token avec une autre machine).
+    $tokenPin = Join-Path $HOME '.daw-server-token'
+    if ($env:DAW_SERVER_TOKEN -and $env:DAW_SERVER_TOKEN.Length -ge 16) {
+        $serverToken = $env:DAW_SERVER_TOKEN
+    } elseif ((Test-Path $tokenPin) -and ((Get-Content $tokenPin -Raw).Trim().Length -ge 16)) {
+        $serverToken = (Get-Content $tokenPin -Raw).Trim()
+        $env:DAW_SERVER_TOKEN = $serverToken
+    } else {
+        $tb = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($tb)
+        $serverToken = -join ($tb | ForEach-Object { $_.ToString('x2') })
+        [System.IO.File]::WriteAllText($tokenPin, $serverToken)  # persiste, sans BOM
+        $env:DAW_SERVER_TOKEN = $serverToken
+    }
+    Write-Status "Secure mode: auth ON (token epingle: $tokenPin)."
 } else {
     Remove-Item Env:\DAW_SERVER_TOKEN -ErrorAction SilentlyContinue
 }
