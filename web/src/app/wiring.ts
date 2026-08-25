@@ -188,8 +188,11 @@ export async function init(): Promise<void> {
   // ce que l'UI fait apres chaque mutation - utile aux tests scriptes).
   (window as unknown as { __dawFlush?: unknown }).__dawFlush = sendLastChange;
   // Editor button (per vst3 device, ui/track.ts) -> open/close the plugin
-  // GUI window via the engine.
-  els.tracks.addEventListener('editor-toggle', (e) => {
+  // GUI window via the engine. Ecoute sur document (l'event bubble) : depuis
+  // la refonte T5 le device-view vit dans une COLONNE SEPAREE (#device-view-
+  // slot, col-rack), plus un enfant de #tracks -> l'ancien listener sur
+  // els.tracks ne recevait plus l'event (bug attrape par ui-rack.spec).
+  document.addEventListener('editor-toggle', (e) => {
     const d = (e as CustomEvent).detail as { procId: string; open: boolean };
     engineClient.setEditor(d.procId, d.open);
   });

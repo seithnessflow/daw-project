@@ -34,6 +34,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+// Le menu (2026-08-26) a change la semantique de `/` (racine = selecteur de
+// projets, plus l'app sur 'default'). Ces specs nomment desormais un projet
+// FRAIS (le 'default' local etait pollue par les runs -> count faux).
+const projectId = `crit3-${Date.now()}`;
+
 test.describe('Criterion 3: Two-tab convergence', () => {
   test('online sync - gain change in tab1 appears in tab2', async ({ browser }) => {
     // Create two independent browser contexts (like two users)
@@ -50,8 +55,8 @@ test.describe('Criterion 3: Two-tab convergence', () => {
 
     try {
       // Navigate both tabs
-      await page1.goto('/');
-      await page2.goto('/');
+      await page1.goto(`/?project=${projectId}`);
+      await page2.goto(`/?project=${projectId}`);
 
       // Wait for server connection
       await waitForServerConnection(page1);
@@ -109,8 +114,8 @@ test.describe('Criterion 3: Two-tab convergence', () => {
     setupConsoleCollection(page2, logs2);
 
     try {
-      await page1.goto('/');
-      await page2.goto('/');
+      await page1.goto(`/?project=${projectId}`);
+      await page2.goto(`/?project=${projectId}`);
 
       await waitForServerConnection(page1);
       await waitForServerConnection(page2);
@@ -174,8 +179,8 @@ test.describe('Add track sync', () => {
     const page2 = await context2.newPage();
 
     try {
-      await page1.goto('/');
-      await page2.goto('/');
+      await page1.goto(`/?project=${projectId}`);
+      await page2.goto(`/?project=${projectId}`);
 
       await waitForServerConnection(page1);
       await waitForServerConnection(page2);

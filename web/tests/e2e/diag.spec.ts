@@ -22,7 +22,7 @@ test('diagnostic - check sync flow', async ({ page }) => {
   });
 
   // Navigate
-  await page.goto('/');
+  await page.goto('/?project=default');
 
   // Wait for server connection
   await waitForServerConnection(page, 5000);

@@ -180,7 +180,9 @@ export async function waitForServerConnection(page: Page, timeout = 10000): Prom
  */
 export async function getTrackGain(page: Page, trackId: string): Promise<number> {
   const value = await page.evaluate((id) => {
-    const track = document.querySelector(`[data-track-id="${id}"]`);
+    // #tracks : la tete de piste de l'ARRANGEMENT (pas la tranche mixer, qui
+    // porte le meme data-track-id depuis la refonte mais n'a pas de gain).
+    const track = document.querySelector(`#tracks [data-track-id="${id}"]`);
     const input = track?.querySelector('[data-role="gain"]') as HTMLInputElement;
     return input ? parseFloat(input.value) : -1;
   }, trackId);
@@ -192,7 +194,7 @@ export async function getTrackGain(page: Page, trackId: string): Promise<number>
  */
 export async function setTrackGain(page: Page, trackId: string, gain: number): Promise<void> {
   await page.evaluate(({ id, g }) => {
-    const track = document.querySelector(`[data-track-id="${id}"]`);
+    const track = document.querySelector(`#tracks [data-track-id="${id}"]`);
     const input = track?.querySelector('[data-role="gain"]') as HTMLInputElement;
     if (input) {
       input.value = g.toString();
@@ -255,7 +257,11 @@ export async function waitForServerDisconnected(page: Page, timeout = 15000): Pr
  */
 export async function getTrackIds(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const tracks = document.querySelectorAll('[data-track-id]');
+    // SCOPE a l'arrangement (#tracks) : depuis la refonte, la console Mixage
+    // (.mx-vu) et d'autres vues portent AUSSI data-track-id (toujours dans le
+    // DOM, cachees) - un querySelectorAll global compterait les pistes en
+    // double/triple. Les tetes de piste de l'arrangement vivent sous #tracks.
+    const tracks = document.querySelectorAll('#tracks [data-track-id]');
     return Array.from(tracks).map(t => t.getAttribute('data-track-id') || '');
   });
 }

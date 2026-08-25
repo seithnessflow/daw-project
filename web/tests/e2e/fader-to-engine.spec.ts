@@ -403,7 +403,7 @@ test.describe('Milestone: Fader to Engine', () => {
 
 test.describe('Engine connection status', () => {
   test('page shows engine connection status', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?project=default');
 
     const serverStatus = await page.locator('#server-status').isVisible().catch(() => false);
     const engineStatus = await page.locator('#engine-status').isVisible().catch(() => false);
