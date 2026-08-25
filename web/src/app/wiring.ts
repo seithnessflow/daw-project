@@ -487,6 +487,21 @@ export async function init(): Promise<void> {
         // Le cache descend du haut ; ce qui reste (le degrade) = le niveau.
         cover.style.height = `${100 - pk}%`;
       }
+      // T8 : VU de la console mixage (2 barres L/R par piste).
+      const mvu = document.querySelector<HTMLElement>(
+        `.mx-vu[data-track-id="${m.trackId}"]`);
+      if (mvu) {
+        const bl = mvu.children[0] as HTMLElement | undefined;
+        const br = mvu.children[1] as HTMLElement | undefined;
+        if (bl) {
+          bl.style.height = `${Math.min(100, m.peakLeft * 100)}%`;
+          bl.classList.toggle('clipping', m.peakLeft > CLIP);
+        }
+        if (br) {
+          br.style.height = `${Math.min(100, m.peakRight * 100)}%`;
+          br.classList.toggle('clipping', m.peakRight > CLIP);
+        }
+      }
     }
   };
   engineClient.onState = (state) => {

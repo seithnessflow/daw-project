@@ -8,6 +8,7 @@
  */
 
 import { renderSession } from '../ui/session';
+import { renderMixer } from '../ui/mixer';
 
 const KEY = 'daw-paradigm';
 
@@ -18,6 +19,7 @@ function apply(view: string): void {
   }
   try { localStorage.setItem(KEY, view); } catch { /* private mode: ignore */ }
   if (view === 'session') renderSession();
+  if (view === 'mixage') renderMixer();
 }
 
 export function initParadigm(): void {

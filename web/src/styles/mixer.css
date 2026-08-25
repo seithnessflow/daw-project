@@ -1,0 +1,52 @@
+/* ---- Vue Mixage (console, Refonte T8) ------------------------- */
+#mixer-slot { display: none; overflow-x: auto; flex: 1; min-height: 0; }
+body[data-paradigm="mixage"] #tracks,
+body[data-paradigm="mixage"] #library-slot,
+body[data-paradigm="mixage"] #overview-slot,
+body[data-paradigm="mixage"] #add-track-btn,
+body[data-paradigm="mixage"] #session-slot { display: none !important; }
+body[data-paradigm="mixage"] #mixer-slot { display: flex; }
+
+.mx-console {
+  display: flex; gap: 2px; padding: 12px; align-items: stretch;
+  height: 100%; min-height: 0;
+}
+.mx-strip {
+  width: 70px; flex: 0 0 auto; background: var(--surface-2); border-radius: var(--r);
+  padding: 9px 6px; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.mx-strip.mx-master {
+  background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--copper-dim);
+  margin-left: 10px;
+}
+.mx-name {
+  font-size: 10px; font-weight: 600; color: hsl(var(--hue) 45% 68%);
+  text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mx-master .mx-name {
+  color: var(--copper); font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+}
+.mx-ms { display: flex; gap: 3px; }
+.mx-ms button {
+  width: 18px; height: 16px; font-family: var(--mono); font-size: 8px; font-weight: 700;
+  border-radius: 3px; background: var(--surface-3); color: var(--text-3);
+}
+.mx-mute[aria-pressed="true"] { background: var(--copper); color: #241605; }
+.mx-solo[aria-pressed="true"] { background: var(--blue); color: #06131f; }
+.mx-body {
+  flex: 1; display: flex; gap: 6px; align-items: stretch; justify-content: center;
+  min-height: 90px; padding: 4px 0;
+}
+.mx-vu {
+  width: 10px; display: flex; gap: 1px; background: #0a0908; border-radius: 3px;
+  overflow: hidden; padding: 1px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.mx-vu > i {
+  flex: 1; align-self: flex-end; height: 0%; background: var(--green);
+  border-radius: 2px; transition: height 70ms linear;
+}
+.mx-vu > i.clipping { background: var(--red); }
+.mx-fader { writing-mode: vertical-lr; direction: rtl; width: 22px; }
+.mx-db { font-family: var(--mono); font-size: 9px; color: var(--text-2); }

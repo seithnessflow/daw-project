@@ -24,6 +24,7 @@ import { refreshPalette } from './placement';
 import { renderPresence } from './presence_view';
 import { renderPianoRoll } from '../ui/piano_roll';
 import { renderSession } from '../ui/session';
+import { renderMixer } from '../ui/mixer';
 import { cssId } from '../document/sanitize';
 
 /**
@@ -229,6 +230,7 @@ export function renderTracks(force = false): void {
   }
   // Heads were just rebuilt - re-place the remote-selection flags on them.
   if (ctx.presence) renderPresence(ctx.presence);
-  // T7 : la grille Session suit le doc (slots, scenes). Cheap si cachee.
+  // T7/T8 : la grille Session et la console Mixage suivent le doc. Cheap si cachees.
   renderSession();
+  renderMixer();
 }
