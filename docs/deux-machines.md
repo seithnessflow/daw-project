@@ -112,6 +112,40 @@ regle firewall.*
 - Plan B si SSH indisponible : traces par git — chaque machine ecrit
   son journal dans un fichier, pousse/tire ; moins confortable, suffit.
 
+## 5. Tester TON plugin entre 2 PC (l'invariant en vrai, securise F1)
+
+Scenario cible : tu poses un VST3 sur la TOUR ; le PORTABLE, qui ne l'a
+pas, l'entend quand meme (via le stem). F1 (AUDIT-5) securise le tunnel.
+
+TOUR (host, a le plugin) :
+1. `scripts\daw.ps1 -Secure` : stack avec AUTH. Le TOKEN s'affiche a la fin
+   (et dans #stoken de l'URL locale) - note-le.
+2. Onglet -> `+ device` -> choisis ton plugin dans le catalogue (le dossier
+   VST3 standard est scanne). Le moteur rend son STEM et le publie au
+   serveur (badge STEM).
+3. `scripts\tunnel-daw.ps1` : expose le serveur (URL publique dans
+   daw-tunnel-daw.err). Le serveur EXIGE le token -> plus une porte ouverte.
+
+PORTABLE (guest, SANS le plugin) - pull + rebuild d'abord (fix crash + ring
+v7, section plus haut) :
+4. Son web pointe vers le serveur tour :
+   `http://localhost:5173/?project=studio&server=<tunnel-host>#stoken=<TOKEN>`
+   (relais ws->wss local si besoin, section 3). Le #stoken authentifie,
+   jamais envoye au reseau.
+5. Son moteur tire les stems du serveur tour et les JOUE :
+   `set DAW_SERVER_TOKEN=<TOKEN>` puis
+   `daw_engine.exe --server wss://<tunnel-host> --project studio --play ...`
+   (le moteur lit DAW_SERVER_TOKEN -> auth WS premier message + Bearer
+   sur /assets).
+6. Le portable, sans ton plugin, entend son effet : l'invariant, en vivant,
+   deux machines, securise.
+
+RESERVE HONNETE : le CHEMIN LIVE guest (portable qui JOUE le stem recu par
+le reseau) est prouve au smoke S7 (2026-08-23, AGain) ; la version VRAI
+plugin + F1 n'a pas encore ete refaite bout-en-bout (la jambe 2026-08-25 =
+rendu offline byte-exact). Prochaine fois que le tunnel portable est up :
+derouler 4-6 et confirmer a l'oreille.
+
 ## Reste ouvert
 
 - Horodatage UTC-milliseconde dans les logs moteur : micro-session

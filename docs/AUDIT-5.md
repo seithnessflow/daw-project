@@ -279,8 +279,12 @@ FAITS, chacun reproduit par un test qui echoue AVANT le fix :
   sur /assets. Verifie : smoke moteur AVEC token = « Document loaded »,
   SANS = Disconnected en boucle (refuse) ; e2e retrocompat fader+devices+
   asset-fetch 7 passed (sans token = dev inchange) ; tsc web 0. RESTE
-  (activation, non bloquant) : le script tunnel genere le token et le pose
-  dans DAW_SERVER_TOKEN + l'URL #stoken (doc deux-machines.md).
+  (activation) FAIT : `daw.ps1 -Secure` genere le token, le met en env
+  (serveur+moteur l'heritent) + dans l'URL #stoken ; teste local (moteur
+  s'authentifie, « Document loaded »). Procedure deux-machines « teste ton
+  plugin » ecrite : docs/deux-machines.md section 5 (host = daw.ps1 -Secure
+  + tunnel ; guest = ?server + #stoken + DAW_SERVER_TOKEN). Reserve : le
+  chemin LIVE guest avec vrai plugin + F1 pas encore refait bout-en-bout.
 
 **A4 — 1a+1b FAITES 2026-08-25 (merge non destructif + push reconnexion).**
 Reste 2 (outbox persistant). Regression CI corrigee en cours de route

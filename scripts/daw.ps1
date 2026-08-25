@@ -18,7 +18,13 @@
 #>
 param(
     [switch]$Stop,
-    [switch]$Mute
+    [switch]$Mute,
+    # AUDIT-5 F1: -Secure generates a shared token, requires it on the server
+    # (DAW_SERVER_TOKEN, inherited by server + engine) and puts it in the URL
+    # fragment (#stoken, never sent to the network). USE IT before exposing
+    # the server by a tunnel - it closes the no-auth hole. Without it (local
+    # dev default) there is no auth, behaviour unchanged.
+    [switch]$Secure
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,6 +53,19 @@ if (-not (Test-Path $engineExe)) {
 # Fresh token: the browser must get THIS run's token
 Remove-Item $tokenFile -ErrorAction SilentlyContinue
 & $startStack -Stop 2>$null | Out-Null   # clean slate
+
+# ---- F1: shared server token, set in THIS shell's env BEFORE the server
+# and engine start (both are children, so they inherit DAW_SERVER_TOKEN) ----
+$serverToken = $null
+if ($Secure) {
+    $tb = New-Object byte[] 32
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($tb)
+    $serverToken = -join ($tb | ForEach-Object { $_.ToString('x2') })
+    $env:DAW_SERVER_TOKEN = $serverToken
+    Write-Status "Secure mode: auth ON (server + engine require the token)."
+} else {
+    Remove-Item Env:\DAW_SERVER_TOKEN -ErrorAction SilentlyContinue
+}
 
 # ---- Server (reuse start-stack's server bring-up: builds/binds/waits) ----
 & $startStack -Component server
@@ -111,7 +130,11 @@ if (-not $webReady) { Write-Error "Web (vite) did not come up on 5173" }
 # 1pre: token in the FRAGMENT (never sent to any server, absent from
 # logs/history/Referer). The page reads #token first, then falls back to
 # the local /api/engine-token endpoint (zero-paste path).
-$url = "http://localhost:5173/?project=$PROJECT&starter=1#token=$token"
+# F1: the server token rides the fragment (#stoken) alongside the engine
+# token - neither ever leaves the browser. The web reads #stoken (context.ts).
+$frag = "token=$token"
+if ($serverToken) { $frag += "&stoken=$serverToken" }
+$url = "http://localhost:5173/?project=$PROJECT&starter=1#$frag"
 
 # ---- Open the browser (unless muted verification run) ----
 if (-not $Mute) { Start-Process $url }
@@ -121,4 +144,17 @@ Write-Status "Ready. $url"
 Write-Host "  Ecran de depart : charge un demo, ou pars vierge."
 Write-Host "  Joue : Espace. Pose : glisse un WAV sur un couloir."
 Write-Host "  Arret : scripts\daw.ps1 -Stop"
+if ($serverToken) {
+    Write-Host ""
+    Write-Status "SECURE (auth ON). Server token (share only via a #fragment):"
+    Write-Host "  $serverToken" -ForegroundColor Yellow
+    Write-Host "  Deux machines (teste ton plugin, cf docs/deux-machines.md) :"
+    Write-Host "   1. pose ton plugin ici (menu + device), il publie son stem ;"
+    Write-Host "   2. scripts\tunnel-daw.ps1  -> URL publique du serveur ;"
+    Write-Host "   3. sur l'AUTRE PC : ouvre son web avec"
+    Write-Host "        ?server=<tunnel-host>#stoken=$serverToken"
+    Write-Host "      et lance son moteur avec"
+    Write-Host "        DAW_SERVER_TOKEN=$serverToken  --server wss://<tunnel-host>"
+    Write-Host "      -> il entend le stem sans avoir le plugin."
+}
 if ($Mute) { Write-Host "  (mute: no audio, no browser opened - verification mode)" -ForegroundColor Yellow }
