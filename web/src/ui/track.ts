@@ -521,6 +521,20 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
     menu.hidden = !menu.hidden;
     btn.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
     if (!menu.hidden) {
+      // 2026-08-27 : le menu est en position FIXED cale sur le bouton -
+      // en absolute DANS le scroller du rack (panneau bas de ~260px), il
+      // etait TRONQUE par l'overflow, et tout clic dedans (humain qui
+      // scrolle, Playwright qui actionne) laissait le rack scrolle hors
+      // champ (devices a x negatif - vu en spec). Fixed = jamais clippe.
+      const r = btn.getBoundingClientRect();
+      menu.style.position = 'fixed';
+      menu.style.left = `${r.left}px`;
+      const below = r.bottom + 4;
+      const h = Math.min(window.innerHeight * 0.6, 420);
+      menu.style.top = below + h <= window.innerHeight
+        ? `${below}px` : `${Math.max(8, r.top - h - 4)}px`;
+      menu.style.maxHeight = `${h}px`;
+      menu.style.overflowY = 'auto';
       uidInput.classList.remove('invalid');
       // Le catalogue au moment de l'OUVERTURE (il arrive apres l'auth)
       // v8 : effets ET instruments. Un instrument (subcat Instrument/Synth)
@@ -782,6 +796,14 @@ function createDevicePanel(
       }));
     });
     title.appendChild(ed);
+    // Geste Ableton-like (vague « gestes complets » 2026-08-27) : le
+    // DOUBLE-CLIC sur la barre de titre ouvre/ferme la fenetre du plugin -
+    // le geste le plus decouvrable ; le drag D2 garde son seuil de 5 px,
+    // les boutons de la barre gardent leurs clics (exclus).
+    title.addEventListener('dblclick', (e) => {
+      if ((e.target as HTMLElement).closest('button, input, .knob')) return;
+      ed.click();
+    });
   }
 
   // 2.5-etat: the engine-captured state, visible (8 hex of the blob

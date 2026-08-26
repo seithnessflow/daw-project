@@ -98,3 +98,11 @@ body.device-reorder-active {
   z-index: 1000;
   pointer-events: none;        /* jamais une cible : pur affichage */
 }
+
+/* ---- Vague gestes complets (2026-08-27) : le RACK est une cible ------- */
+/* Deposer un instrument/effet dans la Device View (geste Ableton) : le
+   panneau s illumine pendant le survol. */
+.dnd-drop-rack {
+  box-shadow: inset 0 0 0 2px var(--potion, #8d7ae6);
+  background: rgba(141, 122, 230, 0.06);
+}

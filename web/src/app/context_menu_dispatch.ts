@@ -9,6 +9,8 @@
 
 import { ctx, sendLastChange } from './context';
 import { isEditorOpen, markEditorOpen } from '../ui/track';
+import { addDeviceToTrack } from './placement';
+import { orderedTracks } from '../document/schema';
 import { renderTracks } from './render';
 import { showContextMenu, type MenuItem } from '../ui/context_menu';
 import { startInlineRename } from '../ui/inline_rename';
@@ -25,6 +27,29 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
   const project = ctx.project;
   if (!project) return null;
   const doc = () => project.getDocument();
+
+  // ---- ITEM DU NAVIGATEUR (instrument / effet, vague gestes 2026-08-27) --
+  const biEl = closest(target, '.browser-item[data-uid]');
+  if (biEl) {
+    const uid = biEl.dataset.uid!;
+    const name = biEl.querySelector('.bi-name')?.textContent ?? 'plugin';
+    const kind = biEl.querySelector('.bi-ic.inst')
+      ? ('instrument' as const) : ('effect' as const);
+    const d = doc();
+    const selId = ctx.selectedTrackId &&
+      d.tracks.some((t) => t.id === ctx.selectedTrackId)
+      ? ctx.selectedTrackId : orderedTracks(d)[0]?.id ?? null;
+    const selName = d.tracks.find((t) => t.id === selId)?.name;
+    return [
+      { label: selName ? `Ajouter a « ${selName} »` : 'Ajouter (aucune piste)',
+        disabled: !selId, onClick: () => {
+          if (selId) addDeviceToTrack({ kind, uid, name }, selId);
+        } },
+      { label: 'Nouvelle piste avec ce plugin', onClick: () => {
+        addDeviceToTrack({ kind, uid, name }, null);
+      } },
+    ];
+  }
 
   // ---- CLIP (arrangement) ----
   const clipEl = closest(target, '#tracks .clip[data-clip-id]');

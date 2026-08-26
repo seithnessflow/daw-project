@@ -7,7 +7,7 @@
  */
 
 import { TIMELINE } from '../ui/track';
-import { clipDisplayName } from '../document/schema';
+import { clipDisplayName, orderedTracks } from '../document/schema';
 import { Library, loadKit, type Kit, type KitSample } from '../ui/library';
 import { decodeDurationSec } from '../ui/waveform';
 import { SERVER_HTTP, assetAuthHeaders } from './context';
@@ -154,9 +154,23 @@ function addDeviceFromDrop(
   payload: { kind: 'instrument' | 'effect'; uid: string; name: string },
   trackEl: HTMLElement | null,
 ): void {
+  addDeviceToTrack(payload, trackEl?.getAttribute('data-track-id') ?? null);
+}
+
+/**
+ * Le NOYAU partage des trois entrees (drop sur piste/zone vide, drop sur le
+ * RACK, clic droit du navigateur - vague « gestes complets » 2026-08-27) :
+ * addProcessor sur la piste (a `index` si fourni - le drop sur le rack vise
+ * une POSITION de chaine), ou NOUVELLE piste si trackId null. UN groupe
+ * d'undo ; la piste devient la selection (une action montre TOUS ses effets).
+ */
+export function addDeviceToTrack(
+  payload: { kind: 'instrument' | 'effect'; uid: string; name: string },
+  trackId: string | null,
+  index?: number,
+): void {
   if (!ctx.project) return;
   ctx.project.beginUndoGroup();
-  let trackId = trackEl?.getAttribute('data-track-id') ?? null;
   if (!trackId) {
     // Meme moule de TrackDef que le bouton + add track (wiring.ts, recopie
     // sans le modifier) - la forme doit rester jumelle.
@@ -179,11 +193,34 @@ function addDeviceFromDrop(
     name: payload.name,
     bypass: false,
     params: [],
-  });
+  }, index);
   ctx.project.endUndoGroup();
   ctx.selectedTrackId = trackId;
   sendLastChange();
   renderTracks(true);
+}
+
+/** La piste que le RACK affiche : la selection si elle existe encore,
+ *  sinon la premiere en ordre d'affichage (le meme fallback que le rendu). */
+function shownRackTrackId(): string | null {
+  const d = ctx.project?.getDocument();
+  if (!d) return null;
+  if (ctx.selectedTrackId && d.tracks.some((t) => t.id === ctx.selectedTrackId)) {
+    return ctx.selectedTrackId;
+  }
+  return orderedTracks(d)[0]?.id ?? null;
+}
+
+/** Index d'insertion dans la chaine sous le curseur (milieux horizontaux
+ *  des panneaux - jumeau assume de device_reorder.slotAt, meme geometrie). */
+function rackInsertIndex(clientX: number): number {
+  let slot = 0;
+  for (const el of document.querySelectorAll<HTMLElement>(
+    '#device-view .device-chain .device[data-proc-id]')) {
+    const r = el.getBoundingClientRect();
+    if (r.left + r.width / 2 < clientX) slot++;
+  }
+  return slot;
 }
 
 /**
@@ -272,6 +309,35 @@ export function installBrowserDnd(): void {
       if (!trackEl && !emptyZone) return;
       addDeviceFromDrop(payload, trackEl);
     }
+  });
+
+  // ---- Le RACK est aussi une cible (geste Ableton : deposer un plugin
+  // dans la Device View, a une POSITION de la chaine). Samples refuses
+  // (un sample n'est pas un device). Piste = celle que le rack affiche.
+  els.deviceViewSlot.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes(DND_MIME)) return;
+    if (e.dataTransfer.types.includes(DND_SAMPLE_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    els.deviceViewSlot.classList.add('dnd-drop-rack');
+  });
+  els.deviceViewSlot.addEventListener('dragleave', (e) => {
+    const to = e.relatedTarget as Node | null;
+    if (!to || !els.deviceViewSlot.contains(to)) {
+      els.deviceViewSlot.classList.remove('dnd-drop-rack');
+    }
+  });
+  els.deviceViewSlot.addEventListener('drop', (e) => {
+    const raw = e.dataTransfer?.getData(DND_MIME);
+    els.deviceViewSlot.classList.remove('dnd-drop-rack');
+    if (!raw) return;
+    e.preventDefault();
+    let payload: BrowserDragPayload;
+    try { payload = JSON.parse(raw) as BrowserDragPayload; } catch { return; }
+    if (payload.kind !== 'instrument' && payload.kind !== 'effect') return;
+    const trackId = shownRackTrackId();
+    if (!trackId) return;
+    addDeviceToTrack(payload, trackId, rackInsertIndex(e.clientX));
   });
 
   // Un drag annule (Escape, lache hors cible) doit eteindre le feedback :
