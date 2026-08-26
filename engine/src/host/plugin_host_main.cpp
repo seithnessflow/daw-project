@@ -397,14 +397,16 @@ struct EditorWindow {
         // reste redimensionnable a la main (WM_SIZE -> onSize).
         ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
-        // 2026-08-26 : AMENER AU PREMIER PLAN. Un process d'arriere-plan n'a
-        // pas le droit de voler le focus (SetForegroundWindow peut echouer,
-        // tant pis) mais l'aller-retour TOPMOST garantit le dessus de la
-        // pile Z - sans lui la fenetre naissait DERRIERE le navigateur et
-        // l'utilisateur concluait que BOX ne faisait rien (retour du jour).
+        // 2026-08-26 : DEVANT, toujours. La fenetre nait TOPMOST et le reste
+        // tant qu'elle est ouverte (modele Ableton : les fenetres de plugin
+        // flottent au-dessus du DAW). L'aller-retour TOPMOST->NOTOPMOST
+        // essaye d'abord ne garantissait PAS le dessus depuis un process
+        // d'arriere-plan (retour utilisateur : « les fenetres doivent
+        // s'ouvrir devant chrome »). Le focus reste au navigateur (NOACTIVATE
+        // + SetForegroundWindow d'arriere-plan echoue en silence, tant pis) -
+        // ce qui compte est de VOIR la fenetre. Choix v1 a revisiter si le
+        // « devant tout, meme les autres apps » gene.
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         SetForegroundWindow(hwnd);
         std::cerr << "plugin_host: editor window open (" << title << ")" << std::endl;

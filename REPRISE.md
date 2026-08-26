@@ -40,7 +40,9 @@ premier point de synchro de la prochaine session s'il n'est pas note ici.
 Retour utilisateur en direct : « BOX n'ouvre pas le plugin ». Diagnostic
 pilote : les fenetres s'OUVRAIENT... derriere Chrome, et --editors (daw.ps1)
 ouvrait TOUT au spawn en desaccord avec l'etat du bouton. Corrige :
-fenetre amenee AU PREMIER PLAN a l'ouverture (aller-retour TOPMOST), la
+fenetre TOPMOST tant qu'elle est ouverte (modele Ableton ; l'aller-retour
+TOPMOST->NOTOPMOST ne garantissait PAS le dessus -> re-retour utilisateur,
+choix v1 a revisiter si le « devant TOUT » gene), la
 croix (X) redescend l'etat du ring (reouverture au 1er clic), --editors
 retire de daw.ps1 (a la demande = la norme), etat BOX memorise hors DOM
 (il survivait pas aux re-rendus + reset a la deconnexion moteur).
