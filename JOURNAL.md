@@ -1256,3 +1256,42 @@ Suite directe de la journee, pilotee par 4 retours utilisateur en rafale.
   specs 10/10, suite complete 53/53.
 - Verdicts CI du jour : 3eea6be, 4f059ec, 7126c65 VERTS ; 169850d (les
   3 chantiers) en sentinelle a la cloture.
+
+## 2026-08-26 (nuit) — D1 + D2 + A2 : la vague parallele continue
+
+« ok continue les chantiers et montre moi le resultat et teste ce que tu
+fais avec playwright au maximum ». Deux agents (D1 pistes, D2 devices,
+sequences sur les fichiers partages) + A2 moteur par moi, en parallele.
+
+- D1 REORDONNER LES PISTES (agent) : TrackDef.order additif fractionnaire
+  (la liste Automerge garde l ordre de creation, l identite survit - LE
+  point CRDT du design), orderedTracks source unique (render, session,
+  mixer + minimap), drag de la tete au seuil 5 px (clic simple intact),
+  reequilibrage sous 1e-9, undo complet. dnd-tracks.spec 4/4 dont
+  convergence 2 onglets.
+- D2 REORDONNER LES DEVICES (agent) : moveProcessor (remove+insert meme
+  def, compromis CRDT assume et documente), drag horizontal dans le rack,
+  ligne d insertion verticale. MOISSONS D INTEGRATION : (1) le drag etait
+  muet - ctx.selectedTrackId nul quand le rack affiche la 1re piste en
+  fallback -> la piste se retrouve PAR le device dans le doc ; (2) flake
+  de spec : le rack scrolle, le panneau 0 pouvait etre HORS viewport
+  (x=-95) -> scrollIntoViewIfNeeded avant boundingBox. 4/4.
+- A2 MOTEUR AUTOMATION (moi) : evaluateur pur miroir du TS (double
+  arithmetic), lecture/ecriture automerge-c des lanes, evaluation par
+  sous-bloc gain/pan/master (lane enabled > manuel), gtests 44/44 avec
+  PREUVES au bit (lane plate == statique, deterministe, disabled ==
+  manuel, roundtrip). E2E MOTEUR REEL automation-engine.spec : la lane
+  ecrite par la page pilote le NIVEAU mesure aux VU - Playwright au
+  maximum comme demande.
+- LE CRASH DU SOIR (0xC0000005, moteur live mort en ~5 s, gtests verts) :
+  PAS un bug de code - ABI PERIMEE du build incremental apres changement
+  de LAYOUT de structs partagees (AudioTrack/AudioGraph). ninja clean +
+  rebuild complet = vivant. LECON GRAVEE dans REPRISE : layout change =>
+  clean build obligatoire. Au passage : ne pas oublier create_test_doc
+  (cible hors build par defaut, emportee par le clean).
+- Lecons e2e moteur-spawne : purger le token file d un run precedent
+  (la page pechait un token perime -> 4001, retry unique rate) ;
+  attendre « WebSocket server listening » avant d ouvrir la page (le
+  client web ne re-essaie pas un ERR_CONNECTION_REFUSED initial - dette
+  produit signalee).
+- Suite e2e complete 62/62 ; tsc 0 ; cargo 9/9.

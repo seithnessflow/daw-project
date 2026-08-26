@@ -1,68 +1,70 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Reecrit le 2026-08-26 au soir (rack en bas + chantiers paralleles).
+*Reecrit le 2026-08-26 tard (vague parallele 2 : D1+D2+A2).
 VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
 
 ## Ou on en est (30 secondes)
 
-Grosse journee, 7 pushes, tout verifie :
+Journee record, ~10 pushes. Depuis la derniere reecriture :
 
-1. **Renommage partout** (piste/clip/scene, clic droit -> inline, undo).
-2. **Session F5+** : stop-all, stop filtre par scene, launch QUANTISE
-   (ancre/quantum, promotion au sample), verite moteur des slots (badge
-   queued). + FIX file de changes (getLastChange scalaire perdait des
-   mutations multi-gestes).
-3. **BOX** : fenetres de plugin TOPMOST devant Chrome, croix (X)
-   resynchronisee, --editors retire (a la demande), bouton visible.
-4. **RACK EN BAS facon Ableton** : panneau device pleine largeur sous
-   l'etabli, splitter hauteur, piano-roll large. (.panel-device)
-5. **D3 drag & drop** : instruments/effets/samples du navigateur se
-   GLISSENT sur les pistes / le vide (nouvelle piste) / les lanes.
-6. **A1 automation** : couche DOCUMENT complete (schema additif,
-   mutateurs journalises, automationValueAt pur). Moteur ignorant (A2).
-7. Les points 5 et 6 = premiers CHANTIERS PAR AGENTS PARALLELES
-   (partition stricte de fichiers, integration en serie) - ca marche,
-   tsc 0 du premier coup des deux cotes.
+1. **D1** : les PISTES se reordonnent au drag de la tete (order
+   fractionnaire additif - identite CRDT preservee, orderedTracks
+   source unique, convergence 2 onglets testee).
+2. **D2** : les DEVICES se reordonnent au drag horizontal dans le rack
+   (moveProcessor, compromis CRDT documente ; params survivent au move).
+3. **A2** : le MOTEUR evalue les enveloppes gain/pan/master (lane
+   enabled > manuel), evaluateur C++ miroir exact du TS, PREUVES au bit
+   en gtest, et e2e MOTEUR REEL : une lane ecrite par la page pilote
+   les VU (automation-engine.spec). Les lanes de device = A4.
+4. Tout teste Playwright au maximum (demande utilisateur) :
+   **e2e 62/62**, gtests 44/44, tsc 0, cargo 9/9.
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-CI VERTE sur 3eea6be, 4f059ec, 7126c65. **Le push 169850d (rack en bas +
-D3 + A1, 3 commits) etait EN SENTINELLE a la cloture — verifier son
-verdict AVANT de coder** (gh run list). Local : suite e2e complete
-**53/53**, tsc 0, gtests moteur 42/42, cargo 9/9.
+CI VERTE jusqu'a 169850d inclus (+ c3076fd docs). **Le push 93a8c6f
+(D1+D2+A2, 3 commits) etait EN SENTINELLE a la cloture — verifier son
+verdict AVANT de coder** (gh run list). NB : la CI teste Linux/GCC — le
+proto C++ automation y compile pour la premiere fois.
+
+## LECON GRAVEE DU JOUR (build moteur)
+
+**Changer le LAYOUT d'une struct partagee (AudioTrack, AudioGraph...)
+=> CLEAN BUILD OBLIGATOIRE** (`ninja clean` puis rebuild) : l'incremental
+a produit un moteur live qui mourait en ~5 s (0xC0000005, SANS sortie du
+crash handler) avec des gtests VERTS. Symptome = crash inexplicable dont
+les chemins sont vides -> soupconner l'ABI avant le code. Et le clean
+emporte `create_test_doc.exe` (cible hors build par defaut) : le
+reconstruire (`ninja create_test_doc` sous vcvars) sinon 2 specs e2e
+sechent.
 
 ## RESTE / prochaine tranche (a arbitrer avec l'utilisateur)
 
-- **Automation A2** (moteur : evaluation par sous-bloc, hash deterministe,
-  gtest exactitude vs automationValueAt) puis A3 (UI lane).
-- **DND D1** (reordonner les pistes - champ order fractionnaire, piege
-  CRDT documente dans DND-DESIGN.md), D2 (devices), D4 (clips/slots).
-- **P2P E4** (MIDI laptop -> Massive tour, 2-3 sessions) : toujours a
-  arbitrer, necessite les deux machines.
-- Au fil de l'eau : renommer depuis la tranche mixer ; verite des
-  fenetres BOX en telemetrie (apres la croix, l'UI croit « ouvert »
-  jusqu'au clic suivant) ; le PORTABLE doit pull+rebuild (ring/proto
-  session ont bouge : SessionState, quantize).
+- **A3** : l'UI des enveloppes (lane sous la piste, points a la souris) —
+  le moteur et le doc sont prets, il ne manque que le dessin.
+- **D4** : clips entre pistes + slots Session deplacables.
+- **P2P E4** (MIDI laptop -> Massive tour) : toujours en attente, deux
+  machines requises.
+- Au fil de l'eau : verite BOX en telemetrie ; retry connexion moteur
+  initiale ; renommer depuis le mixer.
 
 ## A surveiller (pieges connus)
 
-- **Aucun fichier temp/log de test dans `web/`** (vite -> EBUSY).
-- **Zombies plugin_host au rebuild** : Stop-Process -Force ; si un
-  survit (HasExited=True mais liste), wmic call terminate.
-- La suite e2e exige serveur NON-secure + 47821 libre ; la stack
-  utilisateur tourne en SECURE (token epingle) -> basculer puis
-  RESTAURER (rode 3x aujourd'hui).
-- Fenetres BOX = TOPMOST au-dessus de TOUT (choix v1) - si ca gene en
-  multi-apps, affiner.
-- Quantum session = loop_len de l'ancre (pas de tempo au schema).
+- Layout de struct moteur => clean build (ci-dessus).
+- Aucun fichier temp/log de test dans `web/` (vite -> EBUSY).
+- Zombies plugin_host : Stop-Process -Force, sinon wmic call terminate.
+- Suite e2e = serveur NON-secure + 47821 libre ; la stack utilisateur
+  est SECURE -> basculer puis RESTAURER (rode).
+- Specs moteur-spawne : purger le token file du port avant spawn +
+  attendre « WebSocket server listening » avant d'ouvrir la page.
+- Le rack scrolle : scrollIntoViewIfNeeded avant boundingBox en spec.
 
 ## Relancer
 
-`start-daw.cmd` OU `scripts\daw.ps1 -Secure` -> URL stable a bookmarker :
-`http://localhost:5173/#stoken=<token de ~/.daw-server-token>` (menu des
-projets ; studio dedans). Rebuild moteur : `engine\rebuild_msvc.bat`
-(zombies d'abord). Tests : `daw_engine_test.exe` (42/42) ; e2e : `cd web ;
-npm run test:e2e` (53 tests). La manip 5 min : GLISSER un instrument du
-navigateur sur une piste (le rack EN BAS montre le device), BOX ->
-fenetre devant, vue Session -> lancer 2 slots avec Q (file pointillee,
-promotion), stop all.
+`start-daw.cmd` OU `scripts\daw.ps1 -Secure` -> URL stable
+`http://localhost:5173/#stoken=<token de ~/.daw-server-token>`.
+Rebuild moteur : `engine\rebuild_msvc.bat` (zombies d'abord ; layout
+change = ninja clean avant). Tests : daw_engine_test 44/44 ; e2e 62.
+La manip 5 min : REORDONNER les pistes en tirant leur tete, reordonner
+les devices du rack en tirant leur barre de titre, glisser un instrument
+du navigateur sur une piste, BOX -> fenetre devant. L'automation
+s'entend deja au moteur (gain/pan) mais ne se dessine pas encore (A3).

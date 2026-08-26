@@ -2,9 +2,8 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-26 soir (rack en BAS facon Ableton ; D3 drag&drop navigateur ;
-A1 automation couche document ; BOX fenetres TOPMOST ; 3 chantiers dont
-2 par agents paralleles).*
+2026-08-26 nuit (D1 reordre pistes + D2 reordre devices + A2 moteur
+automation ; e2e 62/62 ; lecon clean-build ABI).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 
@@ -109,7 +108,22 @@ multi-mutations (dupliquer une scene, etc.).
 - **BOX / fenetres de plugin** (apres 2 retours utilisateur) : fenetre
   TOPMOST tant qu'ouverte (devant Chrome garanti), croix (X) resynchronise
   le ring, --editors retire de daw.ps1 (a la demande), etat memorise hors
-  DOM. Suite e2e **53/53**, tsc 0, gtests 42/42.
+  DOM.
+
+**Nuit du 2026-08-26 (vague 2 parallele)** :
+- **D1 pistes reordonnables** (drag de la tete ; TrackDef.order additif
+  fractionnaire, identite CRDT preservee ; orderedTracks source unique).
+- **D2 devices reordonnables** (drag horizontal du rack ; moveProcessor,
+  compromis CRDT documente ; la piste retrouvee PAR le device).
+- **A2 moteur automation** : gain/pan/master evalues par sous-bloc
+  (lane enabled > manuel ; mapping gain v*2, pan v*2-1) ; evaluateur
+  C++ miroir EXACT du TS ; gtests 44/44 (exactitude au bit) ; e2e
+  moteur reel automation-engine.spec (la lane pilote les VU). Les lanes
+  de DEVICE (processorId) attendent A4.
+- **LECON BUILD** : layout de struct partagee change => CLEAN build
+  (ninja clean) - l'incremental a produit un moteur live qui mourait en
+  5 s (0xC0000005) avec des gtests verts. Suite e2e **62/62**, tsc 0,
+  gtests 44/44, cargo 9/9.
 
 ## Criteres d'acceptation
 

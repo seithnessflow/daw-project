@@ -170,10 +170,16 @@ RESTE UI (petit, non bloquant) :
    hauteur, piano-roll large). 6. [x] D3 drag & drop navigateur -> pistes
    (DND-DESIGN tranche 1). 7. [x] BOX : fenetres TOPMOST devant Chrome,
    croix resynchronisee, --editors retire (a la demande).
-   RESTE DND : D1 (pistes, champ order fractionnaire), D2 (devices),
-   D4 (clips entre pistes + slots). Au fil de l'eau signale : renommer
-   depuis la tranche mixer ; verite des fenetres BOX en telemetrie
-   (apres croix, l'UI croit « ouvert » jusqu'au clic suivant).
+   8. [x] D1 pistes reordonnables (nuit, agent). 9. [x] D2 devices
+   reordonnables (nuit, agent). 10. [x] A2 moteur automation gain/pan/
+   master + e2e moteur reel (nuit).
+   RESTE DND : D4 (clips entre pistes + slots Session).
+   RESTE AUTOMATION : A3 (UI lane - dessiner les courbes), A4 (params
+   de device VST3 + cle de stem etendue), A5 (courbes/confort).
+   Au fil de l'eau signale : renommer depuis la tranche mixer ; verite
+   des fenetres BOX en telemetrie (apres croix, l'UI croit « ouvert »
+   jusqu'au clic suivant) ; le client moteur web ne re-essaie pas un
+   ERR_CONNECTION_REFUSED initial (il ne re-essaie que sur 4001).
 
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)
