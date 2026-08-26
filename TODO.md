@@ -145,6 +145,22 @@ RESTE UI (petit, non bloquant) :
    direction P2P engines (gros chantier archi — PROPOSER, pas construire).
 3. Le petit reste UI ci-dessus, au fil de l'eau.
 
+### Passe du 2026-08-26 (arbitrage utilisateur « les 4 dans l'ordre ») :
+1. [x] POLISH UI : renameTrack/renameClip/renameScene (schema ClipDef.name
+   additif, undo, clic droit -> inline) ; nom humain des clips (source
+   unique clipDisplayName, plus d'id brut) ; fix Ctrl+D (copie integrale).
+2. [x] SESSION F5+ : stop-all, stop filtre par scene (defaut pre-F5+
+   corrige), launch quantise (ancre/epoque/quantum, promotion thread audio,
+   gtest), verite moteur des slots (SessionState telemetrie, badge queued),
+   gestion scenes (renommer/dupliquer/supprimer + undo complet).
+   MOISSON : fix FILE de changes (getLastChange scalaire perdait des
+   mutations) ; fix flake Echap du menu contextuel (listeners immediats).
+3. [ ] AUTOMATION : **design ecrit, A ARBITRER** -> docs/AUTOMATION-DESIGN.md
+   (decoupage A1-A5 propose ; rien construit).
+4. [ ] P2P ENGINES : **proposition ecrite, A ARBITRER** ->
+   docs/P2P-ENGINES-DESIGN.md (E4 MIDI d'abord recommande, puis E1 doc p2p ;
+   4 decisions a trancher listees). Rien construit.
+
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)
 

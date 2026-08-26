@@ -32,6 +32,7 @@ import { SessionClock } from '../network/session_clock';
 import { Presence } from '../network/presence';
 import { renderPresence } from './presence_view';
 import { renderBrowser } from '../ui/browser';
+import { applySessionState } from '../ui/session';
 import { initParadigm } from './paradigm';
 import { initSplitters } from './splitters';
 import { initRackTabs } from './rack_tabs';
@@ -533,6 +534,12 @@ export async function init(): Promise<void> {
   };
   engineClient.onState = (state) => {
     life.setEngineState(state.pluginBlocksMissed);
+  };
+  // F5+ : verite des slots Session (l'etat optimiste local est reconcilie ;
+  // applySessionState ne re-rend que si quelque chose a change)
+  engineClient.onSessionState = (slots) => {
+    applySessionState(slots);
+    (window as any).__dawSessionSlots = slots;  // sonde de pilotage
   };
   // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
   // + device le lit a chaque ouverture

@@ -14,12 +14,14 @@ import {
   type EngineState,
   type AudioTap,
   type PluginCatalog,
+  type SessionState,
   type Error as ProtoError,
 } from '../proto/messages';
 
 // Re-export types for convenience
 export { TransportCommand_Action as TransportAction };
-export type { EngineState, Meters, TransportPosition, AudioTap, PluginCatalog };
+export type { EngineState, Meters, TransportPosition, AudioTap, PluginCatalog,
+  SessionState };
 
 // Decoded message types for the client
 export type DecodedMessage =
@@ -28,6 +30,7 @@ export type DecodedMessage =
   | { type: 'state'; data: EngineState }
   | { type: 'audioTap'; data: AudioTap }
   | { type: 'pluginCatalog'; data: PluginCatalog }
+  | { type: 'sessionState'; data: SessionState }
   | { type: 'error'; data: ProtoError };
 
 // Encode message types
@@ -36,7 +39,7 @@ export type EncodeMessage =
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
   | { type: 'tapControl'; data: { enabled: boolean } }
   | { type: 'editor'; data: { nodeId: string; open: boolean } }
-  | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean } };
+  | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean; quantize: boolean } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -79,6 +82,7 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
           sceneId: msg.data.sceneId,
           trackId: msg.data.trackId,
           stop: msg.data.stop,
+          quantize: msg.data.quantize,
         },
       };
       break;
@@ -138,6 +142,9 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
     }
     if (msg.pluginCatalog !== undefined) {
       return { type: 'pluginCatalog', data: msg.pluginCatalog };
+    }
+    if (msg.sessionState !== undefined) {
+      return { type: 'sessionState', data: msg.sessionState };
     }
     if (msg.error !== undefined) {
       return { type: 'error', data: msg.error };

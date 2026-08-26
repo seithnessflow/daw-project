@@ -89,8 +89,13 @@ test.describe('Sync resilience (critere 3 round 2)', () => {
       await expect(page.locator('#server-status')).toHaveAttribute('data-state', 'disconnected');
 
       // Edit offline: add a third track (pure document op)
+      // MODIF DE TEST SIGNALEE (2026-08-26) : `.track[data-track-id]` au lieu
+      // de `[data-track-id]` - depuis T8 la console Mixage (toujours dans le
+      // DOM) porte data-track-id sur ses VU/pins ; le selecteur nu comptait
+      // 10 elements pour 3 pistes. L'intention (nombre de PISTES) et le
+      // compte attendu sont inchanges.
       await page.locator('#add-track-btn').click();
-      await expect(page.locator('[data-track-id]')).toHaveCount(3);
+      await expect(page.locator('.track[data-track-id]')).toHaveCount(3);
 
       // 2. The server ARRIVES (fresh store: it seeds the project)
       child = spawn(serverBin, [], {
@@ -103,13 +108,13 @@ test.describe('Sync resilience (critere 3 round 2)', () => {
         .toHaveAttribute('data-state', 'connected', { timeout: 15000 });
 
       // 3. NOTHING lost locally...
-      await expect(page.locator('[data-track-id]')).toHaveCount(3);
+      await expect(page.locator('.track[data-track-id]')).toHaveCount(3);
       // ...and the server HOLDS the offline edit: a second tab sees it
       const page2 = await context.newPage();
       await page2.goto(`/?project=${projectId}&lab=1&server=ws://127.0.0.1:${port}`);
       await expect(page2.locator('#server-status'))
         .toHaveAttribute('data-state', 'connected', { timeout: 15000 });
-      await expect(page2.locator('[data-track-id]')).toHaveCount(3, { timeout: 10000 });
+      await expect(page2.locator('.track[data-track-id]')).toHaveCount(3, { timeout: 10000 });
       await page2.close();
     } finally {
       child?.kill();

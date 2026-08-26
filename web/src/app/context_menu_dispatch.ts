@@ -89,6 +89,33 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
     return items;
   }
 
+  // ---- SCENE (bouton de ligne du clip-launcher, F5+) ----
+  const sceneEl = closest(target, '.ss-scene[data-ss-scene-btn]');
+  if (sceneEl) {
+    const sceneId = sceneEl.dataset.ssSceneBtn!;
+    return [
+      { label: 'Renommer', onClick: () => {
+        const sc = (doc().scenes ?? []).find((s) => s.id === sceneId);
+        if (!sc) return;
+        startInlineRename(sceneEl, sc.name, (name) => {
+          project.renameScene(sceneId, name);
+          sendLastChange(); renderSession();
+        });
+      } },
+      { label: 'Dupliquer la scene', onClick: () => {
+        project.duplicateScene(sceneId);
+        sendLastChange(); renderSession(); renderTracks(true);
+      } },
+      { separator: true },
+      { label: 'Supprimer la scene (et ses slots)', danger: true, onClick: () => {
+        // le moteur peut jouer un slot de cette scene : on l'arrete d'abord
+        ctx.engineClient?.sessionLaunch(sceneId, '', true);
+        project.deleteScene(sceneId);
+        sendLastChange(); renderSession(); renderTracks(true);
+      } },
+    ];
+  }
+
   // ---- SLOT Session ----
   const slotEl = closest(target, '.ss-slot');
   if (slotEl) {

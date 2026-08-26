@@ -155,6 +155,20 @@ void AudioGraph::processTrack(
     // F5 : etat de launch de session (thread audio). Quand un slot est lance,
     // il PREND la piste : les clips de timeline se taisent et l'instrument joue
     // les notes BOUCLEES du slot au lieu de ses notes de timeline.
+    // F5+ : PROMOTION des slots en file - si la frontiere de quantum tombe
+    // dans ce bloc, le slot en file devient le slot lance ; le demarrage est
+    // cale au sample par le saut d'emission plus bas. Course tolerée avec un
+    // stop simultane du control thread : fenetre d'un bloc, echelle humaine.
+    const int64_t clock = session_clock_.load(std::memory_order_relaxed);
+    const int32_t queued = track.queued_slot.load(std::memory_order_acquire);
+    if (queued >= 0) {
+        const int64_t qs = track.queued_start.load(std::memory_order_relaxed);
+        if (qs < clock + static_cast<int64_t>(frame_count)) {
+            track.launch_clock.store(qs, std::memory_order_relaxed);
+            track.launched_slot.store(queued, std::memory_order_release);
+            track.queued_slot.store(-1, std::memory_order_release);
+        }
+    }
     const int32_t launched = track.launched_slot.load(std::memory_order_acquire);
     const bool session_active =
         launched >= 0 && launched < static_cast<int32_t>(track.session_slots.size()) &&
@@ -198,14 +212,24 @@ void AudioGraph::processTrack(
     }
     if (session_active) {
         const SessionSlot& slot = track.session_slots[launched];
-        const int64_t base = session_clock_.load(std::memory_order_relaxed) -
-                             track.launch_clock.load(std::memory_order_relaxed);
+        const int64_t lc = track.launch_clock.load(std::memory_order_relaxed);
         ProcessorNode* inst = track.instrument_node;
-        daw::host::emitSessionLoop(
-            slot.notes, slot.loop_len, base, frame_count,
-            [inst](bool on, uint8_t p, uint8_t v, uint32_t off) {
-                inst->emitMidi(on, p, v, off);
-            });
+        if (clock >= lc) {
+            daw::host::emitSessionLoop(
+                slot.notes, slot.loop_len, clock - lc, frame_count,
+                [inst](bool on, uint8_t p, uint8_t v, uint32_t off) {
+                    inst->emitMidi(on, p, v, off);
+                });
+        } else if (lc - clock < static_cast<int64_t>(frame_count)) {
+            // F5+ : slot promu qui demarre DANS ce bloc - emission decalee au
+            // sample exact de la frontiere de quantum (offset + skip).
+            const uint32_t skip = static_cast<uint32_t>(lc - clock);
+            daw::host::emitSessionLoop(
+                slot.notes, slot.loop_len, 0, frame_count - skip,
+                [inst, skip](bool on, uint8_t p, uint8_t v, uint32_t off) {
+                    inst->emitMidi(on, p, v, off + skip);
+                });
+        }
     }
 
     // Process through chain, en mesurant le pic APRES CHAQUE device (T3 :
@@ -358,15 +382,35 @@ ProcessorNode* AudioGraph::getNodeById(const std::string& id) noexcept {
 }
 
 bool AudioGraph::launchSlot(const std::string& track_id,
-                            const std::string& scene_id, bool stop) noexcept {
+                            const std::string& scene_id, bool stop,
+                            bool quantize) noexcept {
     // F5 : control thread (message launch). Le graphe est immuable une fois
     // actif ; on ne touche que les atomics de launch de la piste.
     AudioTrack* track = getTrackById(track_id);
     if (!track) return false;
     const int32_t prev = track->launched_slot.load(std::memory_order_relaxed);
+    const int32_t prev_q = track->queued_slot.load(std::memory_order_relaxed);
+    const bool was_engaged = prev >= 0 || prev_q >= 0;
+    // Le slot appartient-il a scene_id ? (scene vide = toutes)
+    const auto inScene = [&](int32_t idx) {
+        return scene_id.empty() ||
+               (idx >= 0 && idx < static_cast<int32_t>(track->session_slots.size()) &&
+                track->session_slots[idx].scene_id == scene_id);
+    };
     if (stop) {
+        // F5+ : stop FILTRE par scene (scene vide = stop inconditionnel).
+        // File d'abord, puis lance (l'ordre reduit la fenetre de course avec
+        // la promotion du thread audio - voir processTrack).
+        bool engaged_after = false;
+        if (prev_q >= 0) {
+            if (inScene(prev_q)) track->queued_slot.store(-1, std::memory_order_release);
+            else engaged_after = true;
+        }
         if (prev >= 0) {
-            track->launched_slot.store(-1, std::memory_order_release);
+            if (inScene(prev)) track->launched_slot.store(-1, std::memory_order_release);
+            else engaged_after = true;
+        }
+        if (was_engaged && !engaged_after) {
             launched_count_.fetch_sub(1, std::memory_order_relaxed);
         }
         return true;
@@ -379,13 +423,51 @@ bool AudioGraph::launchSlot(const std::string& track_id,
         }
     }
     if (idx < 0) return false;  // pas de slot pour cette scene sur cette piste
-    // launch_clock AVANT launched_slot (release) : le thread audio lit
-    // launched_slot (acquire) puis launch_clock -> voit un rebasage coherent.
-    track->launch_clock.store(session_clock_.load(std::memory_order_relaxed),
-                              std::memory_order_relaxed);
-    track->launched_slot.store(idx, std::memory_order_release);
-    if (prev < 0) launched_count_.fetch_add(1, std::memory_order_relaxed);
+    const int64_t now = session_clock_.load(std::memory_order_relaxed);
+    const bool anchor = launched_count_.load(std::memory_order_relaxed) == 0;
+    if (anchor) {
+        // F5+ : l'ancre part immediatement et POSE la grille (epoque +
+        // quantum = son loop_len). quantize sans reference n'a pas de sens.
+        session_epoch_.store(now, std::memory_order_relaxed);
+        session_quantum_.store(track->session_slots[idx].loop_len,
+                               std::memory_order_relaxed);
+    }
+    if (!anchor && quantize) {
+        // En FILE pour la prochaine frontiere ; le slot courant (s'il y en a
+        // un) continue jusqu'a la promotion par le thread audio.
+        const int64_t start = nextQuantumStart(
+            now, session_epoch_.load(std::memory_order_relaxed),
+            session_quantum_.load(std::memory_order_relaxed));
+        track->queued_start.store(start, std::memory_order_relaxed);
+        track->queued_slot.store(idx, std::memory_order_release);
+    } else {
+        // launch_clock AVANT launched_slot (release) : le thread audio lit
+        // launched_slot (acquire) puis launch_clock -> rebasage coherent.
+        track->queued_slot.store(-1, std::memory_order_relaxed);
+        track->launch_clock.store(now, std::memory_order_relaxed);
+        track->launched_slot.store(idx, std::memory_order_release);
+    }
+    if (!was_engaged) launched_count_.fetch_add(1, std::memory_order_relaxed);
     return true;
+}
+
+std::vector<std::tuple<std::string, std::string, bool>>
+AudioGraph::getSessionState() const noexcept {
+    // F5+ : verite des slots pour la telemetrie (control thread, atomics
+    // relaxed - une coherence de l'ordre du bloc suffit a l'UI).
+    std::vector<std::tuple<std::string, std::string, bool>> out;
+    for (const auto& track : tracks_) {
+        const int32_t launched = track.launched_slot.load(std::memory_order_relaxed);
+        const int32_t queued = track.queued_slot.load(std::memory_order_relaxed);
+        const auto scene = [&](int32_t idx) -> const std::string& {
+            static const std::string kEmpty;
+            return (idx >= 0 && idx < static_cast<int32_t>(track.session_slots.size()))
+                       ? track.session_slots[idx].scene_id : kEmpty;
+        };
+        if (launched >= 0) out.emplace_back(track.id, scene(launched), false);
+        if (queued >= 0) out.emplace_back(track.id, scene(queued), true);
+    }
+    return out;
 }
 
 std::vector<std::tuple<std::string, float, float>> AudioGraph::getMeters() const noexcept {

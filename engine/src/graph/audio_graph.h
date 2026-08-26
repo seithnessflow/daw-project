@@ -40,6 +40,20 @@ struct SessionSlot {
     std::vector<daw::host::ScheduledNote> notes;
 };
 
+/**
+ * F5+ : prochaine frontiere de quantum >= now, sur la grille posee par
+ * l'ancre (epoch + k*quantum). now == frontiere -> now (lancement immediat).
+ * Helper PUR (teste dans cli_integration_test sans graphe).
+ */
+[[nodiscard]] constexpr int64_t nextQuantumStart(int64_t now, int64_t epoch,
+                                                 int64_t quantum) noexcept {
+    if (quantum <= 0) return now;
+    const int64_t since = now - epoch;
+    if (since <= 0) return epoch;  // avant l'epoque : la grille commence la
+    const int64_t k = (since + quantum - 1) / quantum;  // ceil
+    return epoch + k * quantum;
+}
+
 struct AudioTrack {
     std::string id;
     std::string name;
@@ -66,6 +80,12 @@ struct AudioTrack {
     std::vector<SessionSlot> session_slots;
     std::atomic<int32_t> launched_slot{-1};
     std::atomic<int64_t> launch_clock{0};
+    // F5+ (launch quantise) : slot EN FILE, demarre a queued_start (une
+    // frontiere de quantum). Ecrit par le control thread ; PROMU launched par
+    // le thread audio quand l'horloge atteint queued_start. Le slot courant
+    // continue de jouer jusqu'a la promotion (comportement Ableton).
+    std::atomic<int32_t> queued_slot{-1};
+    std::atomic<int64_t> queued_start{0};
     ProcessorNode* instrument_node = nullptr;
     int32_t prev_launched = -1;
 
@@ -85,6 +105,8 @@ struct AudioTrack {
         , session_slots(std::move(other.session_slots))
         , launched_slot(other.launched_slot.load(std::memory_order_relaxed))
         , launch_clock(other.launch_clock.load(std::memory_order_relaxed))
+        , queued_slot(other.queued_slot.load(std::memory_order_relaxed))
+        , queued_start(other.queued_start.load(std::memory_order_relaxed))
         , instrument_node(other.instrument_node)
         , prev_launched(other.prev_launched) {}
 
@@ -102,6 +124,8 @@ struct AudioTrack {
             session_slots = std::move(other.session_slots);
             launched_slot.store(other.launched_slot.load(std::memory_order_relaxed), std::memory_order_relaxed);
             launch_clock.store(other.launch_clock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            queued_slot.store(other.queued_slot.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            queued_start.store(other.queued_start.load(std::memory_order_relaxed), std::memory_order_relaxed);
             instrument_node = other.instrument_node;
             prev_launched = other.prev_launched;
         }
@@ -216,12 +240,24 @@ public:
 
     /**
      * Lancer / arreter un slot de session (control thread, message launch).
-     * stop=true -> arrete le slot lance de la piste. Sinon lance le slot de la
-     * scene scene_id. Rebase sur l'horloge de session courante. Retourne false
-     * si la piste (ou le slot) est introuvable.
+     * stop=true -> arrete ; F5+ : scene_id VIDE arrete quel que soit le slot,
+     * scene_id donne n'arrete que si le slot lance/en file appartient a cette
+     * scene (avant, stop tuait les slots des AUTRES scenes). Sinon lance le
+     * slot de la scene scene_id : immediat si rien ne joue nulle part (le slot
+     * devient l'ANCRE : epoque = maintenant, quantum = son loop_len) ou si
+     * quantize=false ; sinon EN FILE pour la prochaine frontiere de quantum
+     * (promotion par le thread audio, le slot courant joue jusque-la).
+     * Retourne false si la piste (ou le slot) est introuvable.
      */
     bool launchSlot(const std::string& track_id, const std::string& scene_id,
-                    bool stop) noexcept;
+                    bool stop, bool quantize = false) noexcept;
+
+    /**
+     * F5+ : etat des slots pour la telemetrie (control thread). Un tuple par
+     * piste engagee : {track_id, scene_id, queued}.
+     */
+    [[nodiscard]] std::vector<std::tuple<std::string, std::string, bool>>
+    getSessionState() const noexcept;
 
     /**
      * Set the sample rate.
@@ -317,9 +353,16 @@ private:
     std::atomic<float> master_peak_left_{0.0f};
     std::atomic<float> master_peak_right_{0.0f};
 
-    // F5 : horloge de session libre + nombre de slots lances (pour anyLaunched).
+    // F5 : horloge de session libre + nombre de pistes ENGAGEES (slot lance OU
+    // en file) - anyLaunched doit couvrir les files (le callback doit tourner
+    // pour que la promotion arrive meme transport a l'arret).
     std::atomic<int64_t> session_clock_{0};
     std::atomic<int32_t> launched_count_{0};
+    // F5+ : epoque du quantum (horloge au lancement de l'ANCRE - le 1er slot
+    // parti quand rien ne jouait) et quantum (loop_len de l'ancre). Remis a
+    // zero implicitement : reposes au prochain lancement d'ancre.
+    std::atomic<int64_t> session_epoch_{0};
+    std::atomic<int64_t> session_quantum_{0};
 
     size_t num_tracks_ = 0;
     std::unique_ptr<std::atomic<float>[]> peak_left_;

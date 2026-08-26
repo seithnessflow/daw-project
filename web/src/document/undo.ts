@@ -16,7 +16,7 @@
  * Outside replay, any local op clears redo.
  */
 
-import type { ClipDef, TrackDef, ProcessorDef, NoteDef } from './schema';
+import type { ClipDef, TrackDef, ProcessorDef, NoteDef, SceneDef } from './schema';
 
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
@@ -42,7 +42,13 @@ export type InverseOp =
   | { type: 'removeProcessor'; trackId: string; processorId: string }
   // F7 : le toggle de note est SON PROPRE inverse (re-toggler la meme note
   // annule l'ajout/retrait) - on capture la note identique.
-  | { type: 'toggleNote'; trackId: string; clipId: string; note: NoteDef };
+  | { type: 'toggleNote'; trackId: string; clipId: string; note: NoteDef }
+  // F5+ gestion scenes : supprimer une scene emporte ses slots sur TOUTES les
+  // pistes - l'inverse restaure la scene ET chaque clip a sa piste.
+  | { type: 'renameScene'; sceneId: string; name: string }
+  | { type: 'deleteScene'; sceneId: string }
+  | { type: 'restoreScene'; scene: SceneDef; index: number;
+      clips: Array<{ trackId: string; clip: ClipDef }> };
 
 interface UndoGroup {
   ops: InverseOp[];
@@ -72,6 +78,9 @@ function targetKey(op: InverseOp): string {
     case 'removeProcessor': return `proc:${op.trackId}:${op.processorId}`;
     case 'toggleNote':
       return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:${op.note.startSample}`;
+    case 'renameScene': return `scenename:${op.sceneId}`;
+    case 'deleteScene': return `scene:${op.sceneId}`;
+    case 'restoreScene': return `scene:${op.scene.id}`;
   }
 }
 

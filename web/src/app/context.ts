@@ -99,10 +99,13 @@ export const els = {
   addTrackBtn: document.getElementById('add-track-btn') as HTMLButtonElement,
 };
 
-/** Push the last local change to the server (the one road out). */
+/** Push every pending local change to the server (the one road out).
+ *  F5+ fix : boucle - un geste peut empiler PLUSIEURS changes (dupliquer une
+ *  scene = addScene + N addClip) ; n'en envoyer qu'un perdait les autres. */
 export function sendLastChange(): void {
-  const change = ctx.project?.getLastChange();
-  if (change && ctx.serverClient) {
-    ctx.serverClient.sendChange(change);
+  if (!ctx.project) return;
+  let change: Uint8Array | null;
+  while ((change = ctx.project.getLastChange())) {
+    ctx.serverClient?.sendChange(change);
   }
 }

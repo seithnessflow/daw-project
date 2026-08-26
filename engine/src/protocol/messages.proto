@@ -48,10 +48,29 @@ message EditorControl {
 // F5 : Client -> Engine. Lancer / arreter un slot du clip-launcher (Session).
 // Les slots jouent en boucle sur l'horloge de session (independants du
 // transport d'arrangement). track_id vide = tous les pistes de la scene.
+// F5+ semantique du STOP : scene_id vide = arreter QUEL QUE SOIT le slot
+// (track_id vide en plus = STOP ALL) ; scene_id donne = n'arreter que les
+// slots DE CETTE SCENE (avant F5+, stop arretait tout - defaut corrige).
 message SessionLaunch {
     string scene_id = 1;   // la scene (ligne) du slot a lancer
     string track_id = 2;   // la piste (colonne) ; vide = toute la scene
     bool stop = 3;         // true = arreter (le slot de track_id, ou toute la scene)
+    // F5+ : lancer au prochain QUANTUM au lieu d'immediatement. Le quantum =
+    // loop_len du 1er slot lance (l'ancre, qui part immediatement et pose
+    // l'epoque). Ignore quand rien ne joue (le lancement est l'ancre).
+    bool quantize = 4;
+}
+
+// F5+ : Engine -> Client, avec la telemetrie. La VERITE des slots (l'UI
+// n'affiche plus un etat local optimiste) : un slot absent est arrete ;
+// queued = lance mais en attente de son quantum.
+message SessionState {
+    message Slot {
+        string track_id = 1;
+        string scene_id = 2;
+        bool queued = 3;   // true = en file (quantize), false = joue
+    }
+    repeated Slot slots = 1;
 }
 
 message TransportPosition {
@@ -145,5 +164,6 @@ message Message {
         Error error = 6;
         AudioTap audio_tap = 8;       // S8a
         PluginCatalog plugin_catalog = 9;  // 2.5-decouverte
+        SessionState session_state = 12;   // F5+ : verite des slots Session
     }
 }

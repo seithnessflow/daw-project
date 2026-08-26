@@ -97,6 +97,9 @@ export interface EditorControl {
  * F5 : Client -> Engine. Lancer / arreter un slot du clip-launcher (Session).
  * Les slots jouent en boucle sur l'horloge de session (independants du
  * transport d'arrangement). track_id vide = tous les pistes de la scene.
+ * F5+ semantique du STOP : scene_id vide = arreter QUEL QUE SOIT le slot
+ * (track_id vide en plus = STOP ALL) ; scene_id donne = n'arreter que les
+ * slots DE CETTE SCENE (avant F5+, stop arretait tout - defaut corrige).
  */
 export interface SessionLaunch {
   /** la scene (ligne) du slot a lancer */
@@ -105,6 +108,28 @@ export interface SessionLaunch {
   trackId: string;
   /** true = arreter (le slot de track_id, ou toute la scene) */
   stop: boolean;
+  /**
+   * F5+ : lancer au prochain QUANTUM au lieu d'immediatement. Le quantum =
+   * loop_len du 1er slot lance (l'ancre, qui part immediatement et pose
+   * l'epoque). Ignore quand rien ne joue (le lancement est l'ancre).
+   */
+  quantize: boolean;
+}
+
+/**
+ * F5+ : Engine -> Client, avec la telemetrie. La VERITE des slots (l'UI
+ * n'affiche plus un etat local optimiste) : un slot absent est arrete ;
+ * queued = lance mais en attente de son quantum.
+ */
+export interface SessionState {
+  slots: SessionState_Slot[];
+}
+
+export interface SessionState_Slot {
+  trackId: string;
+  sceneId: string;
+  /** true = en file (quantize), false = joue */
+  queued: boolean;
 }
 
 export interface TransportPosition {
@@ -262,7 +287,11 @@ export interface Message {
     | AudioTap
     | undefined;
   /** 2.5-decouverte */
-  pluginCatalog?: PluginCatalog | undefined;
+  pluginCatalog?:
+    | PluginCatalog
+    | undefined;
+  /** F5+ : verite des slots Session */
+  sessionState?: SessionState | undefined;
 }
 
 function createBaseTransportCommand(): TransportCommand {
@@ -636,7 +665,7 @@ export const EditorControl: MessageFns<EditorControl> = {
 };
 
 function createBaseSessionLaunch(): SessionLaunch {
-  return { sceneId: "", trackId: "", stop: false };
+  return { sceneId: "", trackId: "", stop: false, quantize: false };
 }
 
 export const SessionLaunch: MessageFns<SessionLaunch> = {
@@ -649,6 +678,9 @@ export const SessionLaunch: MessageFns<SessionLaunch> = {
     }
     if (message.stop !== false) {
       writer.uint32(24).bool(message.stop);
+    }
+    if (message.quantize !== false) {
+      writer.uint32(32).bool(message.quantize);
     }
     return writer;
   },
@@ -690,6 +722,14 @@ export const SessionLaunch: MessageFns<SessionLaunch> = {
             message.stop = reader.bool();
             continue;
           }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.quantize = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -715,6 +755,7 @@ export const SessionLaunch: MessageFns<SessionLaunch> = {
         ? globalThis.String(object.track_id)
         : "",
       stop: isSet(object.stop) ? globalThis.Boolean(object.stop) : false,
+      quantize: isSet(object.quantize) ? globalThis.Boolean(object.quantize) : false,
     };
   },
 
@@ -729,6 +770,9 @@ export const SessionLaunch: MessageFns<SessionLaunch> = {
     if (message.stop !== false) {
       obj.stop = message.stop;
     }
+    if (message.quantize !== false) {
+      obj.quantize = message.quantize;
+    }
     return obj;
   },
 
@@ -740,6 +784,185 @@ export const SessionLaunch: MessageFns<SessionLaunch> = {
     message.sceneId = object.sceneId ?? "";
     message.trackId = object.trackId ?? "";
     message.stop = object.stop ?? false;
+    message.quantize = object.quantize ?? false;
+    return message;
+  },
+};
+
+function createBaseSessionState(): SessionState {
+  return { slots: [] };
+}
+
+export const SessionState: MessageFns<SessionState> = {
+  encode(message: SessionState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.slots) {
+      SessionState_Slot.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SessionState {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSessionState();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.slots.push(SessionState_Slot.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SessionState {
+    return {
+      slots: globalThis.Array.isArray(object?.slots) ? object.slots.map((e: any) => SessionState_Slot.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: SessionState): unknown {
+    const obj: any = {};
+    if (message.slots?.length) {
+      obj.slots = message.slots.map((e) => SessionState_Slot.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SessionState>, I>>(base?: I): SessionState {
+    return SessionState.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SessionState>, I>>(object: I): SessionState {
+    const message = createBaseSessionState();
+    message.slots = object.slots?.map((e) => SessionState_Slot.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSessionState_Slot(): SessionState_Slot {
+  return { trackId: "", sceneId: "", queued: false };
+}
+
+export const SessionState_Slot: MessageFns<SessionState_Slot> = {
+  encode(message: SessionState_Slot, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.trackId !== "") {
+      writer.uint32(10).string(message.trackId);
+    }
+    if (message.sceneId !== "") {
+      writer.uint32(18).string(message.sceneId);
+    }
+    if (message.queued !== false) {
+      writer.uint32(24).bool(message.queued);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SessionState_Slot {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSessionState_Slot();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.trackId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.sceneId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.queued = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SessionState_Slot {
+    return {
+      trackId: isSet(object.trackId)
+        ? globalThis.String(object.trackId)
+        : isSet(object.track_id)
+        ? globalThis.String(object.track_id)
+        : "",
+      sceneId: isSet(object.sceneId)
+        ? globalThis.String(object.sceneId)
+        : isSet(object.scene_id)
+        ? globalThis.String(object.scene_id)
+        : "",
+      queued: isSet(object.queued) ? globalThis.Boolean(object.queued) : false,
+    };
+  },
+
+  toJSON(message: SessionState_Slot): unknown {
+    const obj: any = {};
+    if (message.trackId !== "") {
+      obj.trackId = message.trackId;
+    }
+    if (message.sceneId !== "") {
+      obj.sceneId = message.sceneId;
+    }
+    if (message.queued !== false) {
+      obj.queued = message.queued;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SessionState_Slot>, I>>(base?: I): SessionState_Slot {
+    return SessionState_Slot.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SessionState_Slot>, I>>(object: I): SessionState_Slot {
+    const message = createBaseSessionState_Slot();
+    message.trackId = object.trackId ?? "";
+    message.sceneId = object.sceneId ?? "";
+    message.queued = object.queued ?? false;
     return message;
   },
 };
@@ -1692,6 +1915,7 @@ function createBaseMessage(): Message {
     error: undefined,
     audioTap: undefined,
     pluginCatalog: undefined,
+    sessionState: undefined,
   };
 }
 
@@ -1729,6 +1953,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.pluginCatalog !== undefined) {
       PluginCatalog.encode(message.pluginCatalog, writer.uint32(74).fork()).join();
+    }
+    if (message.sessionState !== undefined) {
+      SessionState.encode(message.sessionState, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -1834,6 +2061,14 @@ export const Message: MessageFns<Message> = {
             message.pluginCatalog = PluginCatalog.decode(reader, reader.uint32());
             continue;
           }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.sessionState = SessionState.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1883,6 +2118,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.plugin_catalog)
         ? PluginCatalog.fromJSON(object.plugin_catalog)
         : undefined,
+      sessionState: isSet(object.sessionState)
+        ? SessionState.fromJSON(object.sessionState)
+        : isSet(object.session_state)
+        ? SessionState.fromJSON(object.session_state)
+        : undefined,
     };
   },
 
@@ -1920,6 +2160,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.pluginCatalog !== undefined) {
       obj.pluginCatalog = PluginCatalog.toJSON(message.pluginCatalog);
+    }
+    if (message.sessionState !== undefined) {
+      obj.sessionState = SessionState.toJSON(message.sessionState);
     }
     return obj;
   },
@@ -1959,6 +2202,9 @@ export const Message: MessageFns<Message> = {
       : undefined;
     message.pluginCatalog = (object.pluginCatalog !== undefined && object.pluginCatalog !== null)
       ? PluginCatalog.fromPartial(object.pluginCatalog)
+      : undefined;
+    message.sessionState = (object.sessionState !== undefined && object.sessionState !== null)
+      ? SessionState.fromPartial(object.sessionState)
       : undefined;
     return message;
   },

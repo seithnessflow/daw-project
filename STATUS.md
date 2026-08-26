@@ -2,7 +2,8 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-25 (finition UI F1-F7 : l'interface est finie ; ring v9).*
+2026-08-26 (renommage inline + Session F5+ : stop-all, launch quantise,
+gestion scenes, verite moteur des slots ; fix file de changes).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 
@@ -66,6 +67,30 @@ interdisait le produit).
 | Web TypeScript | ✅ | ✅ | Automerge reel, suite e2e 36/36 (specs moteur-reel : port 47821 LIBRE requis) ; sync transport L1a/b/c VERT DEUX MACHINES ; catalogue PluginCatalog (91 classes) + picker ; badge fraicheur 3 etats ; ear --vst3 + positions des clics, self-test 7/7. **REFONTE UI « etabli Magic Potion » (T1-T8) + FINITION F1-F7 (2026-08-25)** : etabli 3 colonnes (navigateur / arrangement / rack) avec splitters redimensionnables (largeurs localStorage) ; commutateur de paradigmes Arrangement/Session/Mixage (presentation LOCALE par onglet) ; console Mixage reelle (VU par piste + master, faders, pan, M/S) ; vue Session clip-launcher FONCTIONNELLE (launch live des slots, etat « en lecture ») ; navigateur Instruments/Effets/Samples (source unique des samples) ; rack en knobs rotatifs, bouton BOX (GUI plugin a la demande) ; undo des notes ; reduced-motion/focus |
 
 **Note:** Developpement 100% natif Windows (MSVC). GCC uniquement en CI.
+
+**Session F5+ (2026-08-26, moteur+web)** : launch QUANTISE (l'ancre - 1er
+slot parti quand rien ne joue - part immediatement et pose epoque + quantum
+= son loop_len ; les suivants attendent la frontiere, promotion par le
+thread audio au sample exact) ; STOP filtre par scene (avant : stop d'une
+scene tuait les slots des AUTRES scenes - defaut corrige) ; STOP ALL ;
+SessionState dans la telemetrie 30 Hz = VERITE des slots a l'UI (badge
+queued pointille, etat optimiste reconcilie). Gestion scenes : renommer
+(inline), dupliquer (slots+notes), supprimer (avec slots), undo complet.
+gtest testSessionQuantizedLaunch - moteur 42/42. Prouve bout-en-bout au
+pilotage (moteur reel --mute : ancre -> queued -> promotion -> stop all,
+traces/f5plus-*.png).
+
+**Renommage (2026-08-26, web)** : ClipDef.name additif (SCHEMA.md),
+renameTrack/renameClip/renameScene undo-journalises, clic droit ->
+Renommer (input inline), clipDisplayName = source unique du nom affiche
+(un clip MIDI n'affiche plus son id brut). Ctrl+D copiait 5 champs et
+perdait notes/fades - copie integrale desormais.
+
+**FIX SYNC (2026-08-26, important)** : Project.getLastChange etait un
+SCALAIRE - deux mutations avant un envoi = la 1re perdue pour les pairs
+(vu au pilotage : slots fantomes). Desormais une FILE (pendingChanges),
+sendLastChange draine tout. Meme classe de bug fermee pour tous les gestes
+multi-mutations (dupliquer une scene, etc.).
 
 ## Criteres d'acceptation
 

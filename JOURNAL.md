@@ -1172,3 +1172,51 @@ avec selection des projets ».
   compilent+lient sur son MSVC), gtests 41/41 (dont F5 session loop). Friction
   notee : PowerShell du portable a l'execution de scripts DESACTIVEE -> passer
   par cmd (npm.cmd) et pas les shims .ps1.
+
+## 2026-08-26 — Les 4 dans l'ordre : rename, Session F5+, deux designs
+
+Arbitrage utilisateur a la reprise : « les 4 dans l'ordre » (polish UI ->
+Session F5+ -> automation design -> P2P design).
+
+- RESTES DE VEILLE au sol : le tree portait des modifs non commitees
+  (trim du token serveur + test, var(--mono) x2) que REPRISE annoncait
+  poussees. Verifiees (cargo test 9/9), commitees separement.
+- RENOMMAGE : ClipDef.name additif ; renameTrack/renameClip/renameScene
+  undo-journalises ; clic droit -> Renommer = input INLINE (module
+  inline_rename, data-role suspendu pendant l'edition pour ne pas voler la
+  poignee de drag) ; clipDisplayName = source unique (3 jumeaux remplaces,
+  un clip MIDI affiche « MIDI », plus d'id brut). Fix dans le rayon :
+  Ctrl+D dupliquait 5 champs -> notes/fades/name perdus, copie integrale.
+- SESSION F5+ : semantique STOP reparee (stop d'une scene tuait les slots
+  des AUTRES scenes -> stop filtre par scene ; scene vide = stop
+  inconditionnel, les deux vides = STOP ALL). Launch QUANTISE : l'ancre
+  (1er slot quand rien ne joue) part immediatement et pose epoque+quantum
+  (son loop_len) ; les suivants sont mis EN FILE (queued_slot/queued_start)
+  et PROMUS par le thread audio a la frontiere, demarrage au sample exact
+  (emission decalee offset+skip). SessionState (proto additif, les 2
+  etages) dans la telemetrie 30 Hz : l'UI affiche la VERITE moteur
+  (reconciliation de l'etat optimiste, badge queued pointille). Gestion
+  scenes : renommer/dupliquer (slots+notes, un geste d'undo)/supprimer
+  (avec slots, restauration A SA PLACE). gtest testSessionQuantizedLaunch
+  (42/42) + spec ui-session-plus + pilotage moteur reel --mute (ancre ->
+  queued -> promotion -> stop all, traces/f5plus-*.png).
+- MOISSON DU PILOTAGE (le bug le plus important du jour) : les slots crees
+  par le pilote n'atteignaient JAMAIS le serveur. Cause : getLastChange
+  SCALAIRE - deux mutations avant un envoi = la premiere perdue pour les
+  pairs (le doc local, lui, les avait : bug silencieux). Fix racine :
+  FILE pendingChanges, sendLastChange draine tout. starter.ts contournait
+  deja (« getLastChange is scalar ») - la classe est fermee.
+- FLAKE ATTRAPE : Echap du menu contextuel perdu si presse avant le
+  setTimeout(0) d'attache des listeners -> keydown/resize/blur attaches
+  IMMEDIATEMENT, seul le clic exterieur reste differe. 4/4 repeats verts.
+- MODIF DE TEST SIGNALEE : sync-resilience comptait les pistes via
+  [data-track-id] nu - depuis T8 la console Mixage porte cet attribut sur
+  VU/pins (10 elements pour 3 pistes). Selecteur precise en
+  .track[data-track-id], intention et comptes inchanges. (Latent, pas vu
+  en CI : le spec s'y skippe sans binaire serveur debug.)
+- DESIGNS A ARBITRER (rien construit) : docs/AUTOMATION-DESIGN.md
+  (enveloppes : schema additif normalise 0..1, evaluation pure f(t) =
+  hash preserve, cle de stem etendue, decoupage A1-A5) et
+  docs/P2P-ENGINES-DESIGN.md (cible : serveur = signaling seul ; briques
+  S8/L1/store deja la ; recommandation E4 MIDI laptop->tour d'abord,
+  2-3 sessions, puis E1 doc sur DataChannel).

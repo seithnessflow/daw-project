@@ -3495,6 +3495,95 @@ static bool testSessionLoopSchedule() {
     return true;
 }
 
+// F5+ : launch quantise - la grille (nextQuantumStart, helper pur) puis la
+// machine a etats du graphe : ancre immediate, mise en file, stop FILTRE par
+// scene (le defaut pre-F5+ tuait les slots des autres scenes), promotion par
+// le thread audio a la frontiere, stop-all.
+static bool testSessionQuantizedLaunch() {
+    std::cout << "Test: Session quantized launch (F5+)... ";
+    using daw::graph::AudioGraph;
+    using daw::graph::AudioTrack;
+    using daw::graph::SessionSlot;
+    using daw::graph::nextQuantumStart;
+
+    // 1) la grille : frontiere suivante >= now, now-sur-frontiere = now
+    if (nextQuantumStart(0, 0, 100) != 0 ||
+        nextQuantumStart(1, 0, 100) != 100 ||
+        nextQuantumStart(100, 0, 100) != 100 ||
+        nextQuantumStart(101, 0, 100) != 200 ||
+        nextQuantumStart(250, 50, 100) != 250 ||   // epoque decalee
+        nextQuantumStart(251, 50, 100) != 350 ||
+        nextQuantumStart(42, 0, 0) != 42) {        // quantum 0 = immediat
+        std::cout << "FAIL (nextQuantumStart)\n"; return false;
+    }
+
+    // 2) machine a etats sur un graphe minimal : t1 porte s1 et s2, t2 porte s2
+    AudioGraph graph;
+    {
+        AudioTrack t1; t1.id = "t1";
+        t1.session_slots.push_back(SessionSlot{"s1", 48000, {}});
+        t1.session_slots.push_back(SessionSlot{"s2", 48000, {}});
+        graph.addTrack(std::move(t1));
+        AudioTrack t2; t2.id = "t2";
+        t2.session_slots.push_back(SessionSlot{"s2", 48000, {}});
+        graph.addTrack(std::move(t2));
+    }
+    graph.prepare(48000, 256);  // process() exige les buffers prepares
+    const auto state = [&]() { return graph.getSessionState(); };
+
+    // Ancre : rien ne joue -> lancement IMMEDIAT meme avec quantize
+    graph.setSessionClock(0);
+    if (!graph.launchSlot("t1", "s1", false, true)) {
+        std::cout << "FAIL (anchor launch)\n"; return false;
+    }
+    auto s = state();
+    if (s.size() != 1 || std::get<0>(s[0]) != "t1" || std::get<1>(s[0]) != "s1" ||
+        std::get<2>(s[0]) != false) {
+        std::cout << "FAIL (anchor state)\n"; return false;
+    }
+
+    // Quantize pendant que l'ancre joue -> EN FILE pour la frontiere 48000
+    graph.setSessionClock(1000);
+    if (!graph.launchSlot("t2", "s2", false, true)) {
+        std::cout << "FAIL (queued launch)\n"; return false;
+    }
+    s = state();
+    bool t2_queued = false;
+    for (const auto& [tid, sid, q] : s) {
+        if (tid == "t2" && sid == "s2" && q) t2_queued = true;
+    }
+    if (s.size() != 2 || !t2_queued) { std::cout << "FAIL (queued state)\n"; return false; }
+
+    // Stop de la scene s1 : t1 s'arrete, la FILE de t2 (scene s2) survit
+    graph.launchSlot("t1", "s1", true);
+    graph.launchSlot("t2", "s1", true);  // scene filtree : ne touche pas s2
+    s = state();
+    if (s.size() != 1 || std::get<0>(s[0]) != "t2" || !std::get<2>(s[0])) {
+        std::cout << "FAIL (scene-filtered stop)\n"; return false;
+    }
+    if (!graph.anyLaunched()) {  // la file compte (le callback doit tourner)
+        std::cout << "FAIL (queued counts as engaged)\n"; return false;
+    }
+
+    // Promotion : la frontiere 48000 tombe dans le bloc [47900, 48156)
+    std::vector<float> buf(256 * 2, 0.0f);
+    graph.setSessionClock(47900);
+    graph.process(buf.data(), 256, 0);
+    s = state();
+    if (s.size() != 1 || std::get<0>(s[0]) != "t2" || std::get<2>(s[0]) != false) {
+        std::cout << "FAIL (promotion at boundary)\n"; return false;
+    }
+
+    // STOP ALL (scene vide) -> plus rien
+    graph.launchSlot("t2", "", true);
+    if (!state().empty() || graph.anyLaunched()) {
+        std::cout << "FAIL (stop all)\n"; return false;
+    }
+
+    std::cout << "OK (grid, anchor, queue, scene-filtered stop, promotion, stop-all)\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -3545,6 +3634,7 @@ int main(int argc, char* argv[]) {
     run(testProcessorStateInDocument);
     run(testWebSocketAuth);
     run(testSessionLoopSchedule);  // F5
+    run(testSessionQuantizedLaunch);  // F5+
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);

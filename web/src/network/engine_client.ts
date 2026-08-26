@@ -53,6 +53,10 @@ export class EngineClient {
    *  (envoye une fois a l'auth). */
   onPluginCatalog: ((entries: Array<{ uid: string; name: string;
     vendor: string; subCategories: string }>) => void) | null = null;
+  /** F5+ : verite des slots Session (telemetrie 30 Hz) - liste vide =
+   *  tout arrete ; queued = lance, en attente de son quantum. */
+  onSessionState: ((slots: Array<{ trackId: string; sceneId: string;
+    queued: boolean }>) => void) | null = null;
 
   constructor(config: EngineConfig = {}) {
     this.address = config.address ?? '127.0.0.1';
@@ -194,9 +198,14 @@ export class EngineClient {
    * F5 : lancer / arreter un slot du clip-launcher (Session). trackId vide =
    * toute la scene. C'est un signal LOCAL (presentation/performance), pas le
    * document - les slots jouent sur l'horloge de session (libre).
+   * F5+ : stop avec sceneId vide = arreter quelle que soit la scene (les deux
+   * vides = STOP ALL) ; quantize = lancer a la prochaine frontiere de quantum
+   * (l'ancre - premier slot parti quand rien ne joue - part immediatement).
    */
-  sessionLaunch(sceneId: string, trackId: string, stop: boolean): void {
-    const message = encodeMessage({ type: 'sessionLaunch', data: { sceneId, trackId, stop } });
+  sessionLaunch(sceneId: string, trackId: string, stop: boolean,
+    quantize = false): void {
+    const message = encodeMessage({
+      type: 'sessionLaunch', data: { sceneId, trackId, stop, quantize } });
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(message);
     }
@@ -303,6 +312,9 @@ export class EngineClient {
         break;
       case 'pluginCatalog':
         this.onPluginCatalog?.(msg.data.entries);
+        break;
+      case 'sessionState':
+        this.onSessionState?.(msg.data.slots);
         break;
       case 'error':
         this.onError?.(msg.data.message);

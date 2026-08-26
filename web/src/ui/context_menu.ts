@@ -74,13 +74,15 @@ export function showContextMenu(x: number, y: number, items: MenuItem[]): void {
   menu.style.top = `${py}px`;
 
   current = menu;
-  // differe l'ecoute du clic exterieur au tick suivant (ne pas se fermer sur
-  // le pointerup du clic droit qui vient de l'ouvrir)
+  // Echap/resize/blur : IMMEDIAT (les differer perdait un Echap presse avant
+  // le tick suivant - flake attrape par ui-context-menu.spec). Seul le clic
+  // exterieur est differe (ne pas se fermer sur le pointerup du clic droit
+  // qui vient d'ouvrir le menu) ; scroll avec lui (le clic peut en produire).
+  document.addEventListener('keydown', onKey, true);
+  window.addEventListener('resize', closeContextMenu);
+  window.addEventListener('blur', closeContextMenu);
   setTimeout(() => {
     document.addEventListener('pointerdown', outside, true);
-    document.addEventListener('keydown', onKey, true);
-    window.addEventListener('resize', closeContextMenu);
-    window.addEventListener('blur', closeContextMenu);
     document.addEventListener('scroll', closeContextMenu, true);
   }, 0);
   // focus le 1er item actionnable (clavier)

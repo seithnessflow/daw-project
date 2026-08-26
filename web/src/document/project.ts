@@ -11,7 +11,7 @@
  */
 
 import * as Automerge from '@automerge/automerge';
-import { ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef } from './schema';
+import { ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef, SceneDef } from './schema';
 import { UndoJournal, type InverseOp } from './undo';
 import { seedBytes } from './seed';
 
@@ -32,7 +32,13 @@ function plain<T>(v: T): T {
 
 export class Project {
   private doc: Automerge.Doc<ProjectDef>;
-  private lastChange: Uint8Array | null = null;
+  // F5+ fix (2026-08-26) : FILE de modifications en attente, plus un scalaire.
+  // L'ancien lastChange unique PERDAIT toute mutation non envoyee des que la
+  // suivante arrivait (deux mutateurs + un seul sendLastChange = 1er change
+  // jamais sur le fil - vu en pilotage : slots de session fantomes). Chaque
+  // mutateur pousse ; getLastChange() draine UN change (les appelants
+  // bouclent, ou avalent volontairement - criterion3-push.spec).
+  private pendingChanges: Uint8Array[] = [];
   private journal = new UndoJournal();
 
   constructor() {
@@ -51,6 +57,7 @@ export class Project {
     }
     // V1.3: the journal referenced a document that no longer exists
     this.journal.clear();
+    this.pendingChanges.length = 0;  // changes d'un doc qui n'existe plus
   }
 
   /**
@@ -201,6 +208,9 @@ export class Project {
         case 'addProcessor': this.addProcessor(op.trackId, op.proc, op.index); break;
         case 'removeProcessor': this.removeProcessor(op.trackId, op.processorId); break;
         case 'toggleNote': this.toggleNote(op.trackId, op.clipId, op.note); break;
+        case 'renameScene': this.renameScene(op.sceneId, op.name); break;
+        case 'deleteScene': this.deleteScene(op.sceneId); break;
+        case 'restoreScene': this.restoreScene(op.scene, op.index, op.clips); break;
       }
       emit?.();
     }
@@ -219,7 +229,7 @@ export class Project {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.gain = Math.max(0, Math.min(2, gain));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -235,7 +245,7 @@ export class Project {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.pan = Math.max(-1, Math.min(1, pan));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -251,7 +261,7 @@ export class Project {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.name = next;
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -273,7 +283,7 @@ export class Project {
       if (next) c.name = next;
       else delete c.name;
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -285,16 +295,21 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       d.masterGain = Math.max(0, Math.min(2, gain));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
+  }
+
+  /** Empile le dernier change local dans la file d'envoi. */
+  private capturePending(): void {
+    const c = Automerge.getLastLocalChange(this.doc);
+    if (c) this.pendingChanges.push(c);
   }
 
   /**
-   * Get the last change for sending to the server.
+   * Draine UN change en attente (FIFO). Les envoyeurs bouclent jusqu'a null
+   * (sendLastChange) - un appel isole qui avale reste possible (test A3-4).
    */
   getLastChange(): Uint8Array | null {
-    const change = this.lastChange;
-    this.lastChange = null;
-    return change;
+    return this.pendingChanges.shift() ?? null;
   }
 
   /**
@@ -311,7 +326,7 @@ export class Project {
         ?.chain.find((x) => x.id === processorId);
       if (p) p.bypass = bypass;
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -339,7 +354,7 @@ export class Project {
         p.params.push({ key, value });
       }
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /** Inverse of a param CREATION (V1.3): splice the {key,value} entry out. */
@@ -357,7 +372,7 @@ export class Project {
       const i = p.params.findIndex((x) => x.key === key);
       if (i >= 0) p.params.splice(i, 1);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -375,7 +390,7 @@ export class Project {
         ?.clips.find((x) => x.id === clipId);
       if (c) c.startSample = Math.max(0, Math.round(startSample));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -403,7 +418,7 @@ export class Project {
       c.lengthSamples = Math.max(1024, Math.round(bounds.lengthSamples));
       c.offsetSamples = Math.max(0, Math.round(bounds.offsetSamples));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -429,7 +444,7 @@ export class Project {
       c.fadeInSamples = Math.max(0, Math.min(half, Math.round(fadeInSamples)));
       c.fadeOutSamples = Math.max(0, Math.min(half, Math.round(fadeOutSamples)));
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -447,7 +462,7 @@ export class Project {
       const i = track.clips.findIndex((c) => c.id === clipId);
       if (i >= 0) track.clips.splice(i, 1);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -462,7 +477,7 @@ export class Project {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.clips.push(clip);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -479,15 +494,101 @@ export class Project {
     return id;
   }
 
-  /** T7 Session : ajoute une scene (une LIGNE du clip-launcher) et rend son id. */
+  /** T7 Session : ajoute une scene (une LIGNE du clip-launcher) et rend son
+   *  id. F5+ : undo-journalisee (inverse = deleteScene). */
   addScene(name: string): string {
     const id = 'scene-' + Math.random().toString(36).slice(2, 8);
+    this.journal.capture({ type: 'deleteScene', sceneId: id });
     this.doc = Automerge.change(this.doc, (d) => {
       if (!d.scenes) d.scenes = [];
       (d.scenes as unknown[]).push({ id, name });
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
     return id;
+  }
+
+  /** F5+ : renomme une scene (meme moule que renameTrack). */
+  renameScene(sceneId: string, name: string): void {
+    const scene = (this.doc.scenes ?? []).find((s) => s.id === sceneId);
+    const next = name.trim().slice(0, 64);
+    if (!scene || !next || next === scene.name) return;
+    this.journal.capture({ type: 'renameScene', sceneId, name: scene.name });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const s = (d.scenes ?? []).find((x) => x.id === sceneId);
+      if (s) s.name = next;
+    });
+    this.capturePending();
+  }
+
+  /**
+   * F5+ : supprime une scene ET ses slots sur toutes les pistes (un slot
+   * orphelin serait invisible et injouable). Inverse = restoreScene, qui
+   * remet la scene et chaque clip a sa piste.
+   */
+  deleteScene(sceneId: string): void {
+    const scene = (this.doc.scenes ?? []).find((s) => s.id === sceneId);
+    if (!scene) return;
+    const clips: Array<{ trackId: string; clip: ClipDef }> = [];
+    for (const t of this.doc.tracks) {
+      for (const c of t.clips) {
+        if (c.sceneId === sceneId) clips.push({ trackId: t.id, clip: plain(c) as ClipDef });
+      }
+    }
+    const index = (this.doc.scenes ?? []).findIndex((s) => s.id === sceneId);
+    this.journal.capture({
+      type: 'restoreScene', scene: plain(scene) as SceneDef, index, clips });
+    this.doc = Automerge.change(this.doc, (d) => {
+      for (const t of d.tracks) {
+        for (let i = t.clips.length - 1; i >= 0; --i) {
+          if (t.clips[i].sceneId === sceneId) t.clips.splice(i, 1);
+        }
+      }
+      if (d.scenes) {
+        const i = d.scenes.findIndex((s) => s.id === sceneId);
+        if (i >= 0) d.scenes.splice(i, 1);
+      }
+    });
+    this.capturePending();
+  }
+
+  /** F5+ : inverse de deleteScene - restaure la scene A SA PLACE et ses slots. */
+  restoreScene(scene: SceneDef, index: number,
+    clips: Array<{ trackId: string; clip: ClipDef }>): void {
+    if ((this.doc.scenes ?? []).some((s) => s.id === scene.id)) return;
+    this.journal.capture({ type: 'deleteScene', sceneId: scene.id });
+    this.doc = Automerge.change(this.doc, (d) => {
+      if (!d.scenes) d.scenes = [];
+      const at = index >= 0 && index <= d.scenes.length ? index : d.scenes.length;
+      (d.scenes as unknown[]).splice(at, 0, { ...scene });
+      for (const { trackId, clip } of clips) {
+        const t = d.tracks.find((x) => x.id === trackId);
+        if (t && !t.clips.some((c) => c.id === clip.id)) t.clips.push({ ...clip });
+      }
+    });
+    this.capturePending();
+  }
+
+  /**
+   * F5+ : duplique une scene (slots et notes compris, nouveaux ids). UN seul
+   * geste d'undo (groupe). Rend l'id de la copie.
+   */
+  duplicateScene(sceneId: string): string | null {
+    const scene = (this.doc.scenes ?? []).find((s) => s.id === sceneId);
+    if (!scene) return null;
+    this.beginUndoGroup();
+    const newId = this.addScene(`${scene.name} (copie)`);
+    for (const t of this.doc.tracks) {
+      const slot = t.clips.find((c) => c.sceneId === sceneId);
+      if (slot) {
+        this.addClip(t.id, {
+          ...(plain(slot) as ClipDef),
+          id: 'clip-' + Math.random().toString(36).slice(2, 10),
+          sceneId: newId,
+        });
+      }
+    }
+    this.endUndoGroup();
+    return newId;
   }
 
   /** T7 Session : cree un SLOT (clip MIDI de session) sur une piste dans une
@@ -522,7 +623,7 @@ export class Project {
       if (i >= 0) c.notes.splice(i, 1);
       else c.notes.push(note);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -533,7 +634,7 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       d.tracks.push(track);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -549,7 +650,7 @@ export class Project {
       const i = d.tracks.findIndex((t) => t.id === trackId);
       if (i >= 0) d.tracks.splice(i, 1);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -571,7 +672,7 @@ export class Project {
         t.chain.push(proc);
       }
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**
@@ -592,7 +693,7 @@ export class Project {
       const i = t.chain.findIndex((p) => p.id === processorId);
       if (i >= 0) t.chain.splice(i, 1);
     });
-    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+    this.capturePending();
   }
 
   /**

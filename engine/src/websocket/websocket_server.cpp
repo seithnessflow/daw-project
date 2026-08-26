@@ -397,11 +397,11 @@ void WebSocketServer::handleSessionLaunch(const protocol::SessionLaunch& cmd) {
     if (cmd.track_id().empty()) {
         for (size_t i = 0; i < graph->getTrackCount(); ++i) {
             if (auto* t = graph->getTrack(i)) {
-                graph->launchSlot(t->id, cmd.scene_id(), cmd.stop());
+                graph->launchSlot(t->id, cmd.scene_id(), cmd.stop(), cmd.quantize());
             }
         }
     } else {
-        graph->launchSlot(cmd.track_id(), cmd.scene_id(), cmd.stop());
+        graph->launchSlot(cmd.track_id(), cmd.scene_id(), cmd.stop(), cmd.quantize());
     }
 }
 
@@ -456,10 +456,22 @@ void WebSocketServer::broadcastTelemetry() {
             plugin_child_restarts_->load(std::memory_order_relaxed));
     }
 
+    // F5+ : verite des slots Session (l'UI n'affiche plus un etat local
+    // optimiste). Toujours envoyee - une liste vide SIGNIFIE tout arrete.
+    protocol::Message session_msg;
+    auto* session = session_msg.mutable_session_state();
+    for (const auto& [track_id, scene_id, queued] : graph->getSessionState()) {
+        auto* slot = session->add_slots();
+        slot->set_track_id(track_id);
+        slot->set_scene_id(scene_id);
+        slot->set_queued(queued);
+    }
+
     // Broadcast all
     sendToAll(pos_msg);
     sendToAll(meters_msg);
     sendToAll(state_msg);
+    sendToAll(session_msg);
 }
 
 void WebSocketServer::sendToAll(const protocol::Message& msg) {
