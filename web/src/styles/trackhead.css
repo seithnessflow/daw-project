@@ -14,7 +14,7 @@
   min-width: 0;
 }
 .track-gain {
-  font-family: Consolas, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   color: var(--text-3);
   min-width: 46px;

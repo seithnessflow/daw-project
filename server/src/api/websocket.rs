@@ -79,7 +79,7 @@ async fn handle_socket(socket: WebSocket, project_id: String, state: Arc<AppStat
         {
             Ok(Some(Ok(Message::Text(t)))) => t
                 .strip_prefix("auth:")
-                .map(|got| crate::constant_time_eq(got.as_bytes(), expected.as_bytes()))
+                .map(|got| crate::constant_time_eq(got.trim().as_bytes(), expected.as_bytes()))
                 .unwrap_or(false),
             _ => false,
         };

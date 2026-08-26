@@ -30,8 +30,11 @@ async fn main() -> Result<()> {
     // AUDIT-5 F1: opt-in shared token. Set DAW_SERVER_TOKEN to require auth
     // (tunnel/exposed mode); unset (dev default) keeps the current no-auth
     // behaviour. An empty value is treated as unset.
+    // AUDIT-5 F1 robustness: trim - a token set via `set VAR=x && cmd` in
+    // cmd.exe keeps the space before && ("x "), which broke auth silently.
     let auth_token = std::env::var("DAW_SERVER_TOKEN")
         .ok()
+        .map(|t| t.trim().to_string())
         .filter(|t| !t.is_empty());
     if auth_token.is_some() {
         tracing::info!("Auth: shared token REQUIRED (DAW_SERVER_TOKEN set)");

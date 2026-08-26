@@ -34,7 +34,7 @@ fn bearer_ok(headers: &HeaderMap, expected: &Option<String>) -> bool {
             .get(header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
-            .map(|got| crate::constant_time_eq(got.as_bytes(), tok.as_bytes()))
+            .map(|got| crate::constant_time_eq(got.trim().as_bytes(), tok.as_bytes()))
             .unwrap_or(false),
     }
 }

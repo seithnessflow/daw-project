@@ -116,4 +116,23 @@ async fn token_required_refuses_bad_accepts_good() {
             got
         );
     }
+    // 4) Robustness: a TRAILING SPACE on the token (the cmd.exe
+    // `set VAR=x && cmd` pitfall) must still authenticate - the server
+    // trims what it receives.
+    {
+        let (mut ws, _) = connect_async(&url).await.expect("connect");
+        ws.send(Message::Text(format!("auth:{} ", TOKEN)))
+            .await
+            .expect("send");
+        let got = tokio::time::timeout(Duration::from_secs(7), ws.next())
+            .await
+            .expect("timeout")
+            .expect("stream ended")
+            .expect("ws error");
+        assert!(
+            matches!(got, Message::Binary(_)),
+            "expected the doc after a good token with a trailing space, got {:?}",
+            got
+        );
+    }
 }
