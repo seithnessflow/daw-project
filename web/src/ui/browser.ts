@@ -11,6 +11,11 @@
 
 import { ctx, sendLastChange } from '../app/context';
 import { renderTracks } from '../app/render';
+// D3 : le rail est la SOURCE des drags ; les cibles (pistes, zone vide) et
+// la pose vivent dans placement.ts. Cycle d'import placement<->browser
+// assume : chaque module n'appelle l'autre qu'a l'execution, jamais a l'eval.
+import { DND_MIME, installBrowserDnd, decorateSampleChips,
+         type BrowserDragPayload } from '../app/placement';
 
 type Cat = { uid: string; name: string; vendor: string; subCategories: string };
 const isInst = (e: Cat) =>
@@ -21,6 +26,7 @@ let tab: 'inst' | 'fx' | 'samples' = 'inst';
 export function renderBrowser(): void {
   const slot = document.getElementById('browser-slot');
   if (!slot) return;
+  installBrowserDnd();  // D3 : cibles de drop sur #tracks (idempotent)
   const cat = ((window as unknown as { __dawPlugins?: Cat[] }).__dawPlugins) ?? [];
   const inst = cat.filter(isInst).sort((a, b) => a.name.localeCompare(b.name));
   const fx = cat.filter((e) => e.subCategories.includes('Fx') && !isInst(e))
@@ -50,6 +56,9 @@ export function renderBrowser(): void {
   if (tab === 'samples') {
     if (ctx.library) {
       list.appendChild(ctx.library.element);
+      // D3 : vrai drag vers une lane EN PLUS du clic arme (qui reste tel
+      // quel) - decoration idempotente, la Library n'est pas modifiee.
+      decorateSampleChips(ctx.library.element);
     } else {
       const empty = document.createElement('div');
       empty.className = 'browser-empty';
@@ -83,6 +92,18 @@ export function renderBrowser(): void {
     vd.textContent = e.vendor;
     it.append(ic, nm, vd);
     it.title = `Ajouter ${e.name} a la piste selectionnee`;
+    // D3 : vrai drag vers une piste (drop = addProcessor sur CETTE piste)
+    // ou vers la zone vide (= nouvelle piste + device). Le clic simple
+    // ci-dessous garde son comportement (piste SELECTIONNEE).
+    it.draggable = true;
+    it.addEventListener('dragstart', (ev) => {
+      const payload: BrowserDragPayload = {
+        kind: tab === 'inst' ? 'instrument' : 'effect',
+        uid: e.uid, name: e.name,
+      };
+      ev.dataTransfer?.setData(DND_MIME, JSON.stringify(payload));
+      if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'copy';
+    });
     it.addEventListener('click', () => {
       if (!ctx.project || !ctx.selectedTrackId) return;
       ctx.project.addProcessor(ctx.selectedTrackId, {

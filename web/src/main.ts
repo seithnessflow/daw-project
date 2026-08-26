@@ -39,6 +39,7 @@ import './styles/starter.css';
 import './styles/help.css';
 import './styles/menu.css';
 import './styles/context-menu.css';
+import './styles/dnd.css';
 
 // Menu principal (2026-08-25) : sans ?project= dans l'URL, on affiche le
 // selecteur de projets (bookmark stable a la racine) plutot que de booter

@@ -1,0 +1,41 @@
+/* ---- D3 : drag & drop navigateur -> pistes (regle SPLITTER) ----------
+   Feedback OBLIGATOIRE pendant le dragover : la cible dit toujours ce que
+   le drop va faire (piste surlignee = "ajoute ICI" ; zone vide = lisere
+   "+ nouvelle piste"). Les classes sont posees/retirees par placement.ts. */
+
+/* Les sources : la main dit "ca se prend" */
+.browser-item[draggable="true"],
+.sample-chip[draggable="true"] {
+  cursor: grab;
+}
+.browser-item[draggable="true"]:active,
+.sample-chip[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Piste cible : surlignage potion (l'accent de selection du systeme v3) */
+#tracks .track.dnd-drop-track {
+  outline: 2px solid var(--potion);
+  outline-offset: -2px;
+  background: rgba(165, 139, 255, 0.07);
+}
+
+/* Zone vide : lisere pointille + promesse explicite du geste Ableton */
+#tracks.dnd-drop-new {
+  outline: 2px dashed var(--potion-dim);
+  outline-offset: -4px;
+}
+#tracks.dnd-drop-new::after {
+  content: '+ nouvelle piste';
+  position: absolute;
+  left: 274px;               /* juste apres la colonne des tetes (260px) */
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: var(--r);
+  border: 1px dashed var(--potion);
+  color: var(--potion);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 10px;
+  pointer-events: none;      /* jamais une cible : pur affichage */
+}
