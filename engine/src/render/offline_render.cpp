@@ -229,6 +229,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
 
     const auto& doc = document.getDocument();
     graph_ptr->setMasterGain(doc.master_gain);  // V1.2: same stage as live
+    graph_ptr->setMasterAutomation(doc.automation);  // A2: same stage as live
 
     for (const auto& track_def : doc.tracks) {
         graph::AudioTrack track;
@@ -236,6 +237,7 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
         track.name = track_def.name;
         track.gain = track_def.gain;
         track.pan = track_def.pan;  // F2 (pan==0 -> processTrack ne touche rien : hash inchange)
+        track.automation = track_def.automation;  // A2 (aucune lane -> hash inchange)
 
         // S7: THE INVARIANT's reading half - an unresolvable plugin
         // with a stem plays its rendered truth (decision shared with

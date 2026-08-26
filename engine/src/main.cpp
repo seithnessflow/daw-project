@@ -704,6 +704,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     auto graph = std::make_unique<daw::graph::AudioGraph>();
     graph->setSampleRate(sample_rate);
     graph->setMasterGain(project.master_gain);  // V1.2
+    graph->setMasterAutomation(project.automation);  // A2
 
     for (const auto& track_def : project.tracks) {
         daw::graph::AudioTrack track;
@@ -711,6 +712,7 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
         track.name = track_def.name;
         track.gain.store(track_def.gain, std::memory_order_relaxed);
         track.pan.store(track_def.pan, std::memory_order_relaxed);  // F2
+        track.automation = track_def.automation;  // A2 (immuable une fois actif)
 
         // S7: THE INVARIANT's reading half. Pre-fetch an unresolved
         // node's stem from the store (the asset road), then let the

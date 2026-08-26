@@ -29,6 +29,7 @@ AudioGraph::AudioGraph(AudioGraph&& other) noexcept
     , max_block_size_(other.max_block_size_)
     , track_buffer_(std::move(other.track_buffer_))
     , mix_buffer_(std::move(other.mix_buffer_))
+    , master_automation_(std::move(other.master_automation_))
     , master_gain_(other.master_gain_.load(std::memory_order_relaxed))
     , master_peak_left_(other.master_peak_left_.load(std::memory_order_relaxed))
     , master_peak_right_(other.master_peak_right_.load(std::memory_order_relaxed))
@@ -43,6 +44,7 @@ AudioGraph& AudioGraph::operator=(AudioGraph&& other) noexcept {
         max_block_size_ = other.max_block_size_;
         track_buffer_ = std::move(other.track_buffer_);
         mix_buffer_ = std::move(other.mix_buffer_);
+        master_automation_ = std::move(other.master_automation_);
         master_gain_.store(other.master_gain_.load(std::memory_order_relaxed),
                            std::memory_order_relaxed);
         master_peak_left_.store(other.master_peak_left_.load(std::memory_order_relaxed),
@@ -126,7 +128,11 @@ bool AudioGraph::process(
     // process(), so live/offline parity is free (no twin). Multiplication
     // is UNCONDITIONAL: x1.0 is bit-exact in IEEE754, the reference hash
     // is safe by construction.
-    const float master = master_gain_.load(std::memory_order_relaxed);
+    // A2 : lane master 'gain' enabled > masterGain manuel.
+    float master = master_gain_.load(std::memory_order_relaxed);
+    if (auto v = laneValueFor(master_automation_, "gain", position_samples)) {
+        master = mapGain(*v);
+    }
     float mpl = 0.0f;
     float mpr = 0.0f;
     for (uint32_t j = 0; j < frame_count; ++j) {
@@ -199,7 +205,13 @@ void AudioGraph::processTrack(
     }
 
     // Apply track gain (atomic load for thread-safe real-time updates)
-    const float gain_value = track.gain.load(std::memory_order_relaxed);
+    // A2 : une lane 'gain' enabled PRIME sur la valeur manuelle (design
+    // section 2). Evaluation au premier sample du sous-bloc (256 frames),
+    // f(position) pure -> parite live/offline et hash deterministe gratuits.
+    float gain_value = track.gain.load(std::memory_order_relaxed);
+    if (auto v = laneValueFor(track.automation, "gain", position_samples)) {
+        gain_value = mapGain(*v);
+    }
     for (uint32_t i = 0; i < frame_count * 2; ++i) {
         output[i] *= gain_value;
     }
@@ -265,7 +277,11 @@ void AudioGraph::processTrack(
     //   hash) ou le hard-pan a +3 dB (risque de clip) ET creerait une
     //   discontinuite de -3 dB en frolant le centre. gl,gr continus en 0.
     // pan -1 (G) .. 0 (centre) .. +1 (D). Le metering suit (post-pan).
-    const float pan_value = track.pan.load(std::memory_order_relaxed);
+    float pan_value = track.pan.load(std::memory_order_relaxed);
+    // A2 : lane 'pan' enabled > pan manuel (0..1 -> -1..+1)
+    if (auto v = laneValueFor(track.automation, "pan", position_samples)) {
+        pan_value = mapPan(*v);
+    }
     if (pan_value != 0.0f) {
         const float gl = pan_value <= 0.0f ? 1.0f : (1.0f - pan_value);
         const float gr = pan_value >= 0.0f ? 1.0f : (1.0f + pan_value);

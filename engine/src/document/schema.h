@@ -105,6 +105,27 @@ struct ClipDef {
 /**
  * Track definition.
  */
+/**
+ * A2 automation (AUTOMATION-DESIGN.md, ecrit par le web en A1) : une
+ * enveloppe temps -> valeur attachee a un parametre. v NORMALISE 0..1
+ * (mappe par le consommateur : gain 0..1 -> 0..2, pan 0..1 -> -1..+1),
+ * t en samples timeline, points TRIES par t (invariant d'ecriture web).
+ * A2 n'evalue que les cibles de PISTE/MASTER (processor_id vide, param
+ * gain|pan) - les params de device attendent la tranche A4.
+ */
+struct AutomationPointDef {
+    int64_t t = 0;
+    float v = 0.0f;
+};
+
+struct AutomationLaneDef {
+    std::string id;
+    std::string processor_id;  // vide = parametre de piste (ou master a la racine)
+    std::string param;         // "gain" | "pan" | cle native | id VST3 decimal
+    bool enabled = true;
+    std::vector<AutomationPointDef> points;
+};
+
 struct TrackDef {
     std::string id;
     std::string name;
@@ -115,6 +136,8 @@ struct TrackDef {
     float pan = 0.0f;
     std::vector<ClipDef> clips;
     std::vector<ProcessorDef> chain;
+    // A2 : lanes d'automation de la piste (additif - vide sur vieux docs).
+    std::vector<AutomationLaneDef> automation;
 };
 
 /**
@@ -125,6 +148,8 @@ struct ProjectDef {
     uint32_t sample_rate = 48000;
     float master_gain = 1.0f;  // V1.2: root masterGain, additive (1.0 when absent)
     std::vector<TrackDef> tracks;
+    // A2 : lanes d'automation du MASTER (racine, additif).
+    std::vector<AutomationLaneDef> automation;
 };
 
 /**

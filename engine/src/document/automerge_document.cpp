@@ -375,6 +375,169 @@ ProjectDef AutomergeDocument::getDocument() const {
     return def;
 }
 
+// A2 : lecture d'une liste "automation" (lanes) sous un parent (racine =
+// master, ou un objet piste). Additif : parent sans champ = liste vide.
+// t est ecrit int cote web (Math.round) mais on COERCE via double
+// (piege CRDT int/f64, AUDIT-5 A1) ; v est un f64 0..1.
+static void readAutomationLanes(AMdoc* doc, const AMobjId* parentId,
+                                std::vector<AutomationLaneDef>& out) {
+    AMbyteSpan strVal;
+    AMresult* r = AMmapGet(doc, parentId, AMstr("automation"), nullptr);
+    if (r && AMresultStatus(r) == AM_STATUS_OK &&
+        AMitemValType(AMresultItem(r)) == AM_VAL_TYPE_OBJ_TYPE) {
+        const AMobjId* lanesId = AMitemObjId(AMresultItem(r));
+        const size_t count = AMobjSize(doc, lanesId, nullptr);
+        for (size_t i = 0; i < count; ++i) {
+            AMresult* lr = AMlistGet(doc, lanesId, i, nullptr);
+            if (lr && AMresultStatus(lr) == AM_STATUS_OK &&
+                AMitemValType(AMresultItem(lr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                const AMobjId* laneObj = AMitemObjId(AMresultItem(lr));
+                AutomationLaneDef lane;
+
+                AMresult* fr = AMmapGet(doc, laneObj, AMstr("id"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToStr(AMresultItem(fr), &strVal)) {
+                    lane.id = std::string(
+                        reinterpret_cast<const char*>(strVal.src), strVal.count);
+                }
+                if (fr) AMresultFree(fr);
+
+                fr = AMmapGet(doc, laneObj, AMstr("enabled"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK) {
+                    bool b = true;
+                    if (AMitemToBool(AMresultItem(fr), &b)) lane.enabled = b;
+                }
+                if (fr) AMresultFree(fr);
+
+                // target = map {processorId?, param} (processorId ABSENT =
+                // parametre de piste/master, jamais null - SCHEMA.md)
+                fr = AMmapGet(doc, laneObj, AMstr("target"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemValType(AMresultItem(fr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                    const AMobjId* tgtObj = AMitemObjId(AMresultItem(fr));
+                    AMresult* tr = AMmapGet(doc, tgtObj, AMstr("param"), nullptr);
+                    if (tr && AMresultStatus(tr) == AM_STATUS_OK &&
+                        AMitemToStr(AMresultItem(tr), &strVal)) {
+                        lane.param = std::string(
+                            reinterpret_cast<const char*>(strVal.src), strVal.count);
+                    }
+                    if (tr) AMresultFree(tr);
+                    tr = AMmapGet(doc, tgtObj, AMstr("processorId"), nullptr);
+                    if (tr && AMresultStatus(tr) == AM_STATUS_OK &&
+                        AMitemToStr(AMresultItem(tr), &strVal)) {
+                        lane.processor_id = std::string(
+                            reinterpret_cast<const char*>(strVal.src), strVal.count);
+                    }
+                    if (tr) AMresultFree(tr);
+                }
+                if (fr) AMresultFree(fr);
+
+                fr = AMmapGet(doc, laneObj, AMstr("points"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemValType(AMresultItem(fr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                    const AMobjId* ptsId = AMitemObjId(AMresultItem(fr));
+                    const size_t pcount = AMobjSize(doc, ptsId, nullptr);
+                    for (size_t pi = 0; pi < pcount; ++pi) {
+                        AMresult* pr = AMlistGet(doc, ptsId, pi, nullptr);
+                        if (pr && AMresultStatus(pr) == AM_STATUS_OK &&
+                            AMitemValType(AMresultItem(pr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                            const AMobjId* ptObj = AMitemObjId(AMresultItem(pr));
+                            AutomationPointDef pt;
+                            double f64 = 0.0;
+                            AMresult* vr = AMmapGet(doc, ptObj, AMstr("t"), nullptr);
+                            if (vr && AMresultStatus(vr) == AM_STATUS_OK &&
+                                itemToDouble(AMresultItem(vr), &f64)) {
+                                pt.t = static_cast<int64_t>(f64);
+                            }
+                            if (vr) AMresultFree(vr);
+                            vr = AMmapGet(doc, ptObj, AMstr("v"), nullptr);
+                            if (vr && AMresultStatus(vr) == AM_STATUS_OK &&
+                                itemToDouble(AMresultItem(vr), &f64)) {
+                                pt.v = static_cast<float>(f64);
+                            }
+                            if (vr) AMresultFree(vr);
+                            lane.points.push_back(pt);
+                        }
+                        if (pr) AMresultFree(pr);
+                    }
+                }
+                if (fr) AMresultFree(fr);
+
+                out.push_back(std::move(lane));
+            }
+            if (lr) AMresultFree(lr);
+        }
+    }
+    if (r) AMresultFree(r);
+}
+
+// A2 : ecriture symetrique (utilisee par addTrack - les gtests et les
+// round-trips passent par la ; en production seul le WEB ecrit des lanes).
+static void writeAutomationLanes(AMdoc* doc, const AMobjId* parentId,
+                                 const std::vector<AutomationLaneDef>& lanes,
+                                 std::vector<AMresult*>& results_to_free) {
+    if (lanes.empty()) return;  // additif : pas de champ sur les docs sans lanes
+    AMresult* r = AMmapPutObject(doc, parentId, AMstr("automation"), AM_OBJ_TYPE_LIST);
+    if (!r || AMresultStatus(r) != AM_STATUS_OK) {
+        if (r) AMresultFree(r);
+        return;
+    }
+    const AMobjId* lanesId = AMitemObjId(AMresultItem(r));
+    results_to_free.push_back(r);
+    for (size_t i = 0; i < lanes.size(); ++i) {
+        const auto& lane = lanes[i];
+        AMresult* lr = AMlistPutObject(doc, lanesId, i, true, AM_OBJ_TYPE_MAP);
+        if (!lr || AMresultStatus(lr) != AM_STATUS_OK) {
+            if (lr) AMresultFree(lr);
+            continue;
+        }
+        const AMobjId* laneObj = AMitemObjId(AMresultItem(lr));
+        results_to_free.push_back(lr);
+        AMresult* fr;
+        fr = AMmapPutStr(doc, laneObj, AMstr("id"), AMstr(lane.id.c_str()));
+        if (fr) results_to_free.push_back(fr);
+        fr = AMmapPutBool(doc, laneObj, AMstr("enabled"), lane.enabled);
+        if (fr) results_to_free.push_back(fr);
+        fr = AMmapPutObject(doc, laneObj, AMstr("target"), AM_OBJ_TYPE_MAP);
+        if (fr && AMresultStatus(fr) == AM_STATUS_OK) {
+            const AMobjId* tgtObj = AMitemObjId(AMresultItem(fr));
+            results_to_free.push_back(fr);
+            AMresult* tr = AMmapPutStr(doc, tgtObj, AMstr("param"),
+                                       AMstr(lane.param.c_str()));
+            if (tr) results_to_free.push_back(tr);
+            if (!lane.processor_id.empty()) {  // absent, jamais null (SCHEMA.md)
+                tr = AMmapPutStr(doc, tgtObj, AMstr("processorId"),
+                                 AMstr(lane.processor_id.c_str()));
+                if (tr) results_to_free.push_back(tr);
+            }
+        } else if (fr) {
+            results_to_free.push_back(fr);
+        }
+        fr = AMmapPutObject(doc, laneObj, AMstr("points"), AM_OBJ_TYPE_LIST);
+        if (fr && AMresultStatus(fr) == AM_STATUS_OK) {
+            const AMobjId* ptsId = AMitemObjId(AMresultItem(fr));
+            results_to_free.push_back(fr);
+            for (size_t pi = 0; pi < lane.points.size(); ++pi) {
+                AMresult* pr = AMlistPutObject(doc, ptsId, pi, true, AM_OBJ_TYPE_MAP);
+                if (pr && AMresultStatus(pr) == AM_STATUS_OK) {
+                    const AMobjId* ptObj = AMitemObjId(AMresultItem(pr));
+                    results_to_free.push_back(pr);
+                    AMresult* vr;
+                    vr = AMmapPutInt(doc, ptObj, AMstr("t"), lane.points[pi].t);
+                    if (vr) results_to_free.push_back(vr);
+                    vr = AMmapPutF64(doc, ptObj, AMstr("v"),
+                                     static_cast<double>(lane.points[pi].v));
+                    if (vr) results_to_free.push_back(vr);
+                } else if (pr) {
+                    results_to_free.push_back(pr);
+                }
+            }
+        } else if (fr) {
+            results_to_free.push_back(fr);
+        }
+    }
+}
+
 bool AutomergeDocument::readDocument(ProjectDef& out) const {
     if (!doc_) {
         return false;
@@ -417,6 +580,9 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
         }
     }
     if (result) AMresultFree(result);
+
+    // A2 : lanes d'automation du MASTER (racine, additif)
+    readAutomationLanes(doc_, AM_ROOT, out.automation);
 
     // Read tracks array
     result = AMmapGet(doc_, AM_ROOT, AMstr("tracks"), nullptr);
@@ -748,6 +914,9 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                             }
                         }
                         if (r) AMresultFree(r);
+
+                        // A2 : lanes d'automation de la piste (additif)
+                        readAutomationLanes(doc_, trackId, track.automation);
                     }
                 }
                 if (trackResult) AMresultFree(trackResult);
@@ -1280,6 +1449,9 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
             if (kr) results_to_free.push_back(kr);
         }
     }
+
+    // A2 : lanes d'automation de la piste (additif - rien si vide)
+    writeAutomationLanes(doc_, trackObjId, track.automation, results_to_free);
 
     // Commit
     r = AMcommit(doc_, AMstr("Add track"), nullptr);

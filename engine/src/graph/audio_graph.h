@@ -13,6 +13,7 @@
 #include "processor_node.h"
 #include "clip_player.h"
 #include "gain_node.h"
+#include "automation.h"             // A2 : enveloppes (evaluation pure)
 #include "../host/midi_schedule.h"  // F5 : ScheduledNote pour les slots Session
 
 #include <atomic>
@@ -77,6 +78,11 @@ struct AudioTrack {
     // possedant vers la chaine ; l'objet node est heap (unique_ptr), son adresse
     // survit au move de la piste. prev_launched : etat vu par le thread audio
     // au bloc precedent (detection de transition -> all-notes-off).
+    // A2 : lanes d'automation de la piste (copiees du document en
+    // buildGraph, IMMUABLES une fois le graphe actif - le thread audio les
+    // lit sans verrou, une edition = rebuild comme tout le reste du doc).
+    std::vector<daw::document::AutomationLaneDef> automation;
+
     std::vector<SessionSlot> session_slots;
     std::atomic<int32_t> launched_slot{-1};
     std::atomic<int64_t> launch_clock{0};
@@ -102,6 +108,7 @@ struct AudioTrack {
         , chain(std::move(other.chain))
         , solo(other.solo.load(std::memory_order_relaxed))
         , mute(other.mute.load(std::memory_order_relaxed))
+        , automation(std::move(other.automation))
         , session_slots(std::move(other.session_slots))
         , launched_slot(other.launched_slot.load(std::memory_order_relaxed))
         , launch_clock(other.launch_clock.load(std::memory_order_relaxed))
@@ -121,6 +128,7 @@ struct AudioTrack {
             chain = std::move(other.chain);
             solo.store(other.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);
             mute.store(other.mute.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            automation = std::move(other.automation);
             session_slots = std::move(other.session_slots);
             launched_slot.store(other.launched_slot.load(std::memory_order_relaxed), std::memory_order_relaxed);
             launch_clock.store(other.launch_clock.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -228,6 +236,15 @@ public:
      */
     void setSessionClock(int64_t clock) noexcept {
         session_clock_.store(clock, std::memory_order_relaxed);
+    }
+
+    /**
+     * A2 : lanes d'automation du MASTER (racine du doc). A poser AVANT
+     * l'activation (buildGraph) - immuables ensuite, lues par le thread
+     * audio dans process() (application du master gain).
+     */
+    void setMasterAutomation(std::vector<daw::document::AutomationLaneDef> lanes) {
+        master_automation_ = std::move(lanes);
     }
 
     /**
@@ -348,6 +365,9 @@ private:
     // Using std::atomic<float> with memory_order_relaxed for both operations.
     // Relaxed ordering is sufficient: no synchronization needed, we just want
     // a recent-ish value for visual metering. No barriers, no cost.
+    // A2 : automation du master (immuable une fois actif)
+    std::vector<daw::document::AutomationLaneDef> master_automation_;
+
     // V1.2: master stage (atomics - sacred-thread rules)
     std::atomic<float> master_gain_{1.0f};
     std::atomic<float> master_peak_left_{0.0f};

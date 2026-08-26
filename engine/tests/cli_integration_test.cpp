@@ -3495,6 +3495,187 @@ static bool testSessionLoopSchedule() {
     return true;
 }
 
+// A2 : l'evaluateur d'enveloppe PUR - miroir exact de automationValueAt
+// (web/src/document/automation.ts). Les cas assertes ICI sont les memes que
+// la spec web : toute divergence entre les deux etages casse le contrat.
+static bool testAutomationEvaluator() {
+    std::cout << "Test: automation evaluator (A2, miroir TS)... ";
+    using daw::document::AutomationLaneDef;
+    using daw::graph::automationValueAt;
+    using daw::graph::laneValueFor;
+    using daw::graph::mapGain;
+    using daw::graph::mapPan;
+
+    AutomationLaneDef lane;
+    lane.param = "gain";
+    lane.enabled = true;
+    lane.points = {{1000, 0.0f}, {2000, 1.0f}, {3000, 0.5f}};
+
+    // clamp aux extremites, lineaire au milieu
+    if (automationValueAt(lane, 0) != 0.0f ||        // avant le 1er point
+        automationValueAt(lane, 1000) != 0.0f ||
+        automationValueAt(lane, 1500) != 0.5f ||     // milieu exact
+        automationValueAt(lane, 2000) != 1.0f ||
+        automationValueAt(lane, 2500) != 0.75f ||    // descente
+        automationValueAt(lane, 3000) != 0.5f ||
+        automationValueAt(lane, 99999) != 0.5f) {    // apres le dernier
+        std::cout << "FAIL (interpolation/clamp)\n";
+        return false;
+    }
+    // disabled / vide -> nullopt (le manuel reprend, jamais 0)
+    lane.enabled = false;
+    if (automationValueAt(lane, 1500).has_value()) {
+        std::cout << "FAIL (disabled)\n"; return false;
+    }
+    lane.enabled = true;
+    AutomationLaneDef empty;
+    empty.param = "gain"; empty.enabled = true;
+    if (automationValueAt(empty, 0).has_value()) {
+        std::cout << "FAIL (empty)\n"; return false;
+    }
+    // points confondus en t (possible apres merge de pairs) : a t exact le
+    // SECOND gagne (le segment [dup2,dup3] l'emporte), pas de division par 0
+    AutomationLaneDef dup;
+    dup.param = "gain"; dup.enabled = true;
+    dup.points = {{100, 0.2f}, {500, 0.8f}, {500, 0.4f}, {900, 0.6f}};
+    const auto atDup = automationValueAt(dup, 500);
+    const auto after = automationValueAt(dup, 700);  // milieu de [500,900]
+    if (!atDup || *atDup != 0.4f || !after || *after != 0.5f) {
+        std::cout << "FAIL (duplicate t)\n"; return false;
+    }
+    // laneValueFor : filtre param + processor_id (device = A4, ignore)
+    AutomationLaneDef dev;
+    dev.param = "gain"; dev.enabled = true; dev.processor_id = "p1";
+    dev.points = {{0, 0.9f}};
+    std::vector<AutomationLaneDef> lanes = {dev, lane};
+    const auto v = laneValueFor(lanes, "gain", 1500);
+    if (!v || *v != 0.5f) { std::cout << "FAIL (laneValueFor filtre)\n"; return false; }
+    if (laneValueFor(lanes, "pan", 0).has_value()) {
+        std::cout << "FAIL (laneValueFor param)\n"; return false;
+    }
+    // mappings v normalise -> unites moteur
+    if (mapGain(0.5f) != 1.0f || mapGain(0.25f) != 0.5f ||
+        mapPan(0.5f) != 0.0f || mapPan(0.0f) != -1.0f || mapPan(1.0f) != 1.0f) {
+        std::cout << "FAIL (mapping)\n"; return false;
+    }
+    std::cout << "OK (clamp, lineaire, disabled, points confondus, filtre, mapping)\n";
+    return true;
+}
+
+// A2 : PREUVE D'EXACTITUDE au rendu - une lane plate a v DOIT rendre les
+// memes octets que le gain statique mapGain(v) ; disabled -> le manuel
+// reprend ; deux rendus -> deterministe. Et le ROUNDTRIP document des lanes
+// (ecriture addTrack -> lecture getDocument) est garde au passage.
+static bool testAutomationRender() {
+    std::cout << "Test: automation render exactness (A2)... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-automation-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    // Asset constant dyadique (16000/32768) : chaque op float est exacte
+    std::vector<int16_t> in(4096 * 2, 16000);
+    if (!writeWav16((dir / "autohash.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: cannot write asset\n";
+        return false;
+    }
+
+    const auto makeDoc = [&](float manual_gain,
+                             bool with_lane, bool lane_enabled,
+                             daw::document::AutomergeDocument& doc) {
+        if (!doc.create(48000)) return false;
+        daw::document::TrackDef track;
+        track.id = "t1";
+        track.name = "auto";
+        track.gain = manual_gain;
+        daw::document::ClipDef c;
+        c.id = "c1";
+        c.asset_hash = "autohash";
+        c.start_sample = 0;
+        c.length_samples = 2048;
+        track.clips.push_back(c);
+        if (with_lane) {
+            daw::document::AutomationLaneDef lane;
+            lane.id = "lane-1";
+            lane.param = "gain";
+            lane.enabled = lane_enabled;
+            // plate a 0.25 -> mapGain = 0.5 (dyadique : exactitude au bit)
+            lane.points = {{0, 0.25f}, {2048, 0.25f}};
+            track.automation.push_back(lane);
+        }
+        return doc.addTrack(track);
+    };
+
+    daw::render::OfflineRenderer renderer;
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+
+    // A = lane plate 0.25 enabled, gain manuel VOLONTAIREMENT faux (1.7)
+    daw::document::AutomergeDocument docA;
+    if (!makeDoc(1.7f, true, true, docA)) { std::cout << "FAILED: docA\n"; return false; }
+    // Roundtrip : la lane revient du document (garde la lecture C-API)
+    {
+        const auto rt = docA.getDocument();
+        if (rt.tracks.size() != 1 || rt.tracks[0].automation.size() != 1) {
+            std::cout << "FAILED: lane roundtrip (absente)\n"; return false;
+        }
+        const auto& l = rt.tracks[0].automation[0];
+        if (l.id != "lane-1" || l.param != "gain" || !l.enabled ||
+            !l.processor_id.empty() || l.points.size() != 2 ||
+            l.points[0].t != 0 || l.points[0].v != 0.25f ||
+            l.points[1].t != 2048 || l.points[1].v != 0.25f) {
+            std::cout << "FAILED: lane roundtrip (champs)\n"; return false;
+        }
+    }
+    const std::string outA1 = (dir / "a1.wav").string();
+    const std::string outA2 = (dir / "a2.wav").string();
+    if (!renderer.render(docA, outA1, dir.string(), config).success ||
+        !renderer.render(docA, outA2, dir.string(), config).success) {
+        std::cout << "FAILED: render A\n"; return false;
+    }
+
+    // B = gain statique 0.5 (= mapGain(0.25)), pas de lane
+    daw::document::AutomergeDocument docB;
+    if (!makeDoc(0.5f, false, false, docB)) { std::cout << "FAILED: docB\n"; return false; }
+    const std::string outB = (dir / "b.wav").string();
+    if (!renderer.render(docB, outB, dir.string(), config).success) {
+        std::cout << "FAILED: render B\n"; return false;
+    }
+
+    // C = lane DISABLED + gain manuel 0.5 : le manuel reprend, doit == B
+    daw::document::AutomergeDocument docC;
+    if (!makeDoc(0.5f, true, false, docC)) { std::cout << "FAILED: docC\n"; return false; }
+    const std::string outC = (dir / "c.wav").string();
+    if (!renderer.render(docC, outC, dir.string(), config).success) {
+        std::cout << "FAILED: render C\n"; return false;
+    }
+
+    const auto bytesOf = [](const std::string& p) {
+        std::ifstream f(p, std::ios::binary);
+        return std::vector<char>((std::istreambuf_iterator<char>(f)),
+                                 std::istreambuf_iterator<char>());
+    };
+    const auto a1 = bytesOf(outA1);
+    const auto a2 = bytesOf(outA2);
+    const auto b = bytesOf(outB);
+    const auto c = bytesOf(outC);
+    if (a1.empty() || a1 != a2) {
+        std::cout << "FAILED: rendu non deterministe avec lane\n"; return false;
+    }
+    if (a1 != b) {
+        std::cout << "FAILED: lane plate 0.25 != gain statique 0.5 (exactitude)\n";
+        return false;
+    }
+    if (c != b) {
+        std::cout << "FAILED: lane disabled ne rend pas le manuel\n"; return false;
+    }
+
+    std::cout << "OK (deterministe, plate==statique au bit, disabled==manuel, roundtrip)\n";
+    return true;
+}
+
 // F5+ : launch quantise - la grille (nextQuantumStart, helper pur) puis la
 // machine a etats du graphe : ancre immediate, mise en file, stop FILTRE par
 // scene (le defaut pre-F5+ tuait les slots des autres scenes), promotion par
@@ -3635,6 +3816,8 @@ int main(int argc, char* argv[]) {
     run(testWebSocketAuth);
     run(testSessionLoopSchedule);  // F5
     run(testSessionQuantizedLaunch);  // F5+
+    run(testAutomationEvaluator);  // A2
+    run(testAutomationRender);     // A2
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);
