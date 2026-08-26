@@ -4,6 +4,9 @@
  * 6px edges - snapped to the zoom-refined grid AND neighbor edges,
  * Alt = free. Coalescing: at most one document write per animation
  * frame during a gesture, a final one on release (the fader's road).
+ * D4: the title-bar drag is BI-DIMENSIONAL - X keeps the historic
+ * horizontal behavior, Y targets another track's lane (drop = the
+ * moveClipToTrack mutator, Escape cancels).
  */
 
 import { TIMELINE } from '../ui/track';
@@ -40,15 +43,41 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   }
 
   const startX = e.clientX;
+  const startY = e.clientY;
   const origSec = clip.startSample / sr;
   let moved = false;
   let pendingSec = origSec;
   let writeRaf = 0;
+  // D4 : piste cible d'un drag VERTICAL (null = on reste sur sa piste).
+  // L'axe X garde tout le comportement existant (snap, ecritures rAF sur
+  // la piste d'ORIGINE) ; l'axe Y ne fait que viser une autre lane - la
+  // mutation de piste n'a lieu qu'au DROP (moveClipToTrack).
+  let dropTrackId: string | null = null;
   e.preventDefault();
+
+  // D4 : la lane sous le pointeur par GEOMETRIE (elementsFromPoint verrait
+  // le clip qui suit la souris ; les rects des lanes ne mentent pas).
+  const laneTrackAt = (clientY: number): HTMLElement | null => {
+    for (const el of document.querySelectorAll<HTMLElement>(
+      '#tracks .track[data-track-id]')) {
+      const lane = el.querySelector('.track-lane');
+      if (!lane) continue;
+      const r = lane.getBoundingClientRect();
+      if (clientY >= r.top && clientY < r.bottom) return el;
+    }
+    return null;
+  };
+  const clearDropHighlight = (): void => {
+    document.querySelectorAll('#tracks .track.dnd-drop-track')
+      .forEach((el) => el.classList.remove('dnd-drop-track'));
+  };
 
   const onMove = (ev: PointerEvent) => {
     const dx = ev.clientX - startX;
-    if (!moved && Math.abs(dx) < 3) return;    // click, not yet a drag
+    const dy = ev.clientY - startY;
+    // D4 : le seuil arme aussi sur Y (un drag purement vertical vers une
+    // autre piste doit s'armer) - un clic sans mouvement reste un clic.
+    if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
     if (!moved) ctx.project!.beginUndoGroup(); // V1.3: one gesture = one undo
     moved = true;
     clipEl.classList.add('dragging');
@@ -64,6 +93,16 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
     }
     clipEl.style.left = `${sec * TIMELINE.pps}px`;
     pendingSec = sec;
+    // D4 : surligner la piste cible quand le pointeur survole la lane
+    // d'une AUTRE piste (classe existante .dnd-drop-track, dnd.css).
+    const targetEl = laneTrackAt(ev.clientY);
+    const targetId = targetEl?.getAttribute('data-track-id') ?? null;
+    const next = targetId && targetId !== trackId ? targetId : null;
+    if (next !== dropTrackId) {
+      clearDropHighlight();
+      dropTrackId = next;
+      if (next && targetEl) targetEl.classList.add('dnd-drop-track');
+    }
     if (!writeRaf) {
       writeRaf = requestAnimationFrame(() => {
         writeRaf = 0;
@@ -75,12 +114,24 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   const onUp = () => {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('keydown', onKey, true);
     if (writeRaf) cancelAnimationFrame(writeRaf);
     clipEl.classList.remove('dragging');
+    clearDropHighlight();
     if (moved) {
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
-      ctx.project!.setClipStart(trackId, clipId, pendingSec * sr);
+      if (dropTrackId) {
+        // D4 : drop sur une AUTRE piste - delete+recreate meme id (le
+        // compromis d'identite assume, mutateur unique moveClipToTrack),
+        // position = le MEME snap que l'horizontal (pendingSec). Son
+        // endUndoGroup interne clot le groupe du geste ; le notre plus
+        // bas est alors un no-op inoffensif.
+        ctx.project!.moveClipToTrack(trackId, clipId, dropTrackId, pendingSec * sr);
+      } else {
+        // Sur sa propre piste : comportement existant inchange.
+        ctx.project!.setClipStart(trackId, clipId, pendingSec * sr);
+      }
       ctx.project!.endUndoGroup();  // V1.3
       sendLastChange();
       renderTracks(true);
@@ -93,8 +144,38 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       renderTracks(true);
     }
   };
+  const onKey = (kev: KeyboardEvent) => {
+    if (kev.key !== 'Escape') return;
+    // Echap annule (idiome D1/D2) - MAIS ici le doc a deja recu des
+    // ecritures coalescees pendant le drag : on REMET la position
+    // d'origine puis on ferme le groupe. L'entree d'undo restante est un
+    // aller-retour inerte (le journal n'a pas d'abort - assume, commente).
+    kev.preventDefault();
+    kev.stopPropagation();
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('keydown', onKey, true);
+    if (writeRaf) { cancelAnimationFrame(writeRaf); writeRaf = 0; }
+    clipEl.classList.remove('dragging');
+    clearDropHighlight();
+    dropTrackId = null;
+    if (moved) {
+      clipEl.style.left = `${origSec * TIMELINE.pps}px`;
+      ctx.project!.setClipStart(trackId, clipId, origSec * sr);
+      ctx.project!.endUndoGroup();
+      sendLastChange();
+      // Le relachement qui suit un drag ANNULE ne doit pas devenir un
+      // clic surprise (meme idiome que track_reorder).
+      window.addEventListener('pointerup', () => {
+        ctx.justDragged = true;
+        setTimeout(() => { ctx.justDragged = false; }, 0);
+      }, { once: true });
+      renderTracks(true);
+    }
+  };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
+  window.addEventListener('keydown', onKey, true);
 }
 
 /**

@@ -130,6 +130,12 @@ export class EngineClient {
 
         this.ws.onerror = (event) => {
           console.error('Engine WebSocket error:', event);
+          // Ceinture : un ECHEC INITIAL (ERR_CONNECTION_REFUSED pendant un
+          // (re)demarrage moteur) planifie aussi le re-essai. En pratique
+          // les navigateurs font suivre onerror d'un onclose qui planifie
+          // deja - mais si un chemin ne le fait pas, la page restait morte
+          // a vie. La garde anti-doublon rend l'appel idempotent.
+          this.scheduleReconnect();
           reject(new Error('WebSocket connection failed'));
         };
 

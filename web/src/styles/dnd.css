@@ -99,6 +99,28 @@ body.device-reorder-active {
   pointer-events: none;        /* jamais une cible : pur affichage */
 }
 
+/* ---- D4 : clips entre pistes + slots Session -------------------------
+   Drag VERTICAL d'un clip : la piste cible reutilise .dnd-drop-track (la
+   classe D3 plus haut - meme promesse visuelle, meme accent potion).
+   Slots Session : le slot tire est semi-opaque (langage D1/D2), la
+   cellule cible VIDE s'illumine - une cellule pleine n'est jamais
+   surlignee (le drop y serait un no-op : pas de promesse mensongere). */
+
+#session-slot .ss-slot.slot-reorder-source {
+  opacity: 0.55;
+  outline: 1px dashed var(--potion-dim);
+  outline-offset: -1px;
+}
+body.slot-reorder-active {
+  user-select: none;
+  cursor: grabbing;
+}
+#session-slot .ss-slot.dnd-drop-cell {
+  outline: 2px solid var(--potion);
+  outline-offset: -2px;
+  background: rgba(165, 139, 255, 0.12);
+}
+
 /* ---- Vague gestes complets (2026-08-27) : le RACK est une cible ------- */
 /* Deposer un instrument/effet dans la Device View (geste Ableton) : le
    panneau s illumine pendant le survol. */

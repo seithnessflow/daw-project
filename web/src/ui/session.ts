@@ -11,6 +11,7 @@ import { ctx, sendLastChange } from '../app/context';
 import { renderTracks } from '../app/render';
 import { trackHue } from './track';
 import { orderedTracks } from '../document/schema';
+import { initSlotReorder } from '../app/slot_reorder';
 
 // F5 : etat "en lecture" des slots - optimiste local, RECONCILIE par la
 // verite moteur (telemetrie SessionState, F5+) quand un moteur est la.
@@ -79,6 +80,9 @@ function stopAll(): void {
 export function renderSession(): void {
   const slot = document.getElementById('session-slot');
   if (!slot || !ctx.project) return;
+  // D4 : la delegation du drag de slots se pose UNE fois (garde
+  // idempotente dans le module) - meme moule que track/device_reorder.
+  initSlotReorder();
   const doc = ctx.project.getDocument();
   // D1 : les colonnes suivent l'ordre d'AFFICHAGE (source unique)
   const tracks = orderedTracks(doc);

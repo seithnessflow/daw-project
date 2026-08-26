@@ -243,6 +243,8 @@ export class Project {
           this.setClipFades(op.trackId, op.clipId, op.fadeInSamples, op.fadeOutSamples); break;
         case 'addClip': this.addClip(op.trackId, op.clip); break;
         case 'deleteClip': this.deleteClip(op.trackId, op.clipId); break;
+        case 'setClipScene':
+          this.setClipScene(op.trackId, op.clipId, op.sceneId); break;
         case 'addTrack': this.addTrack(op.track); break;
         case 'deleteTrack': this.deleteTrack(op.trackId); break;
         case 'addProcessor': this.addProcessor(op.trackId, op.proc, op.index); break;
@@ -571,6 +573,41 @@ export class Project {
   }
 
   /**
+   * D4 (DND-DESIGN.md) : deplace un clip vers une AUTRE piste (drag
+   * vertical). COMPROMIS D'IDENTITE ASSUME (grave dans DND-DESIGN) :
+   * changer un clip de piste = SUPPRIMER + RECREER (meme id, tous champs
+   * copies). Un clip n'a pas d'edits concurrents fins hors notes - et les
+   * notes voyagent DANS la copie. Pas de nouveaux InverseOp : les captures
+   * de deleteClip (re-add complet sur la piste d'origine) et addClip
+   * (re-delete sur la cible) suffisent, groupees en UN geste - l'undo
+   * remet le clip, tous champs, sur la piste d'origine.
+   *
+   * NOTE groupe : si un groupe est DEJA ouvert (drag de clip : le geste a
+   * commence par des setClipStart coalesces), beginUndoGroup est un no-op
+   * imbrique et le endUndoGroup ci-dessous FERME ce groupe exterieur - le
+   * journal ne compte pas les imbrications. Voulu : le move est toujours
+   * la DERNIERE mutation du geste (les appelants qui combinent avec
+   * setClipScene le placent en dernier, voir slot_reorder.ts).
+   */
+  moveClipToTrack(fromTrackId: string, clipId: string, toTrackId: string,
+    startSample?: number): void {
+    const clip = this.doc.tracks.find((t) => t.id === fromTrackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return;                                        // source partie
+    if (!this.doc.tracks.some((t) => t.id === toTrackId)) return;  // cible partie
+    const dest = Math.max(0, Math.round(startSample ?? clip.startSample));
+    if (fromTrackId === toTrackId && dest === clip.startSample) return;  // no-op
+    // Copie plain AVANT toute mutation (jamais un proxy Automerge reinsere
+    // dans le meme doc - meme doctrine que moveProcessor).
+    const copy = plain(clip) as ClipDef;
+    copy.startSample = dest;
+    this.beginUndoGroup();
+    this.deleteClip(fromTrackId, clipId);
+    this.addClip(toTrackId, copy);
+    this.endUndoGroup();
+  }
+
+  /**
    * v8 MIDI : cree un clip MIDI (pas d'asset, notes editables au piano-roll)
    * et rend son id. Un clip a assetHash vide + notes = clip MIDI ; l'instrument
    * en tete de chaine de la piste le joue.
@@ -691,6 +728,27 @@ export class Project {
     };
     this.addClip(trackId, clip);
     return id;
+  }
+
+  /**
+   * D4 : change la SCENE d'un slot Session (drag de slot dans la grille).
+   * Ecrit UNIQUEMENT le champ sceneId (LWW par champ - l'identite du clip
+   * survit, contrairement au changement de piste). Reserve aux clips qui
+   * SONT deja des slots (sceneId present) : transformer un clip timeline
+   * en slot est un autre geste, pas celui-ci. Inverse = l'ancien sceneId.
+   */
+  setClipScene(trackId: string, clipId: string, sceneId: string): void {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip || !clip.sceneId || clip.sceneId === sceneId) return;
+    this.journal.capture({
+      type: 'setClipScene', trackId, clipId, sceneId: clip.sceneId });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const c = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId);
+      if (c) c.sceneId = sceneId;
+    });
+    this.capturePending();
   }
 
   /**

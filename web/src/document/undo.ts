@@ -41,6 +41,9 @@ export type InverseOp =
       fadeInSamples: number; fadeOutSamples: number }
   | { type: 'addClip'; trackId: string; clip: ClipDef }
   | { type: 'deleteClip'; trackId: string; clipId: string }
+  // D4 : changer la scene d'un slot Session ecrit le seul champ sceneId
+  // (identite du clip preservee) - l'inverse porte l'ancien sceneId.
+  | { type: 'setClipScene'; trackId: string; clipId: string; sceneId: string }
   | { type: 'addTrack'; track: TrackDef }
   | { type: 'deleteTrack'; trackId: string }
   // V1.5: index restores the chain ORDER (a chain is a pipeline - putting
@@ -101,6 +104,7 @@ function targetKey(op: InverseOp): string {
     case 'setClipFades': return `clipfades:${op.trackId}:${op.clipId}`;
     case 'addClip': return `clip:${op.trackId}:${op.clip.id}`;
     case 'deleteClip': return `clip:${op.trackId}:${op.clipId}`;
+    case 'setClipScene': return `clipscene:${op.trackId}:${op.clipId}`;
     case 'addTrack': return `track:${op.track.id}`;
     case 'deleteTrack': return `track:${op.trackId}`;
     case 'addProcessor': return `proc:${op.trackId}:${op.proc.id}`;
