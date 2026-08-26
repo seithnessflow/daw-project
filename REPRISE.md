@@ -1,70 +1,69 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Reecrit le 2026-08-26 tard (vague parallele 2 : D1+D2+A2).
-VOLATILE : etat dans STATUS.md, file dans TODO.md, recit dans JOURNAL.md.*
+*Reecrit le 2026-08-27 (audio repare + preuve par etage + chantiers
+entames soldes). VOLATILE : etat STATUS.md, file TODO.md, recit JOURNAL.md.*
 
 ## Ou on en est (30 secondes)
 
-Journee record, ~10 pushes. Depuis la derniere reecriture :
+**LES CHANTIERS ENTAMES SONT SOLDES.** Depuis la derniere reecriture :
 
-1. **D1** : les PISTES se reordonnent au drag de la tete (order
-   fractionnaire additif - identite CRDT preservee, orderedTracks
-   source unique, convergence 2 onglets testee).
-2. **D2** : les DEVICES se reordonnent au drag horizontal dans le rack
-   (moveProcessor, compromis CRDT documente ; params survivent au move).
-3. **A2** : le MOTEUR evalue les enveloppes gain/pan/master (lane
-   enabled > manuel), evaluateur C++ miroir exact du TS, PREUVES au bit
-   en gtest, et e2e MOTEUR REEL : une lane ecrite par la page pilote
-   les VU (automation-engine.spec). Les lanes de device = A4.
-4. Tout teste Playwright au maximum (demande utilisateur) :
-   **e2e 62/62**, gtests 44/44, tsc 0, cargo 9/9.
+1. **Audio de studio repare** (retour « j'ai pas l'audio comme il faut ») :
+   4 faders etaient a gain=0 dans le doc (pistes muettes) -> 0 dB ;
+   master a -2 dB (le mix cretait au-dela de -1 dBFS) ; porte ear VERTE.
+2. **PREUVE AUDIO PAR ETAGE** (idee utilisateur) : peak/rms/hash entre
+   chaque maillon de chaque piste. `npm run ear -- --project studio
+   --probe` imprime la table. gtest 45/45, deterministe, exact au bit.
+3. **Gestes complets vague 1** : drop d'un plugin SUR le rack (a la
+   position), clic droit navigateur, dblclick barre = fenetre plugin.
+   + menu « + device » en FIXED (il etait tronque par le panneau bas).
+4. **A3 enveloppes** : bouton A par piste, lane sous la piste, courbe
+   SVG, dblclick/drag/clic-droit, ON/off - et le moteur (A2) JOUE ce
+   qu'on dessine. **DND COMPLET** : D4 clips entre pistes (drag
+   bi-dimensionnel, X historique intact) + slots Session deplacables.
+5. Ceinture reconnexion moteur (echec initial re-essaie aussi).
+
+Suite e2e **70/70**, moteur **45/45**, cargo 9/9, tsc 0.
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-CI VERTE jusqu'a 169850d inclus (+ c3076fd docs). **Le push 93a8c6f
-(D1+D2+A2, 3 commits) etait EN SENTINELLE a la cloture — verifier son
-verdict AVANT de coder** (gh run list). NB : la CI teste Linux/GCC — le
-proto C++ automation y compile pour la premiere fois.
+CI VERTE verifiee jusqu'a 93a8c6f. Pushes du 27 : 002a4b5 (preuve),
+232beb7 (gestes), fca5b6b (A3+D4) - **verdicts CI a verifier en premier**
+(gh run list ; le commit REPRISE part apres, son verdict aussi).
 
-## LECON GRAVEE DU JOUR (build moteur)
+## RESTE / prochaine tranche
 
-**Changer le LAYOUT d'une struct partagee (AudioTrack, AudioGraph...)
-=> CLEAN BUILD OBLIGATOIRE** (`ninja clean` puis rebuild) : l'incremental
-a produit un moteur live qui mourait en ~5 s (0xC0000005, SANS sortie du
-crash handler) avec des gtests VERTS. Symptome = crash inexplicable dont
-les chemins sont vides -> soupconner l'ABI avant le code. Et le clean
-emporte `create_test_doc.exe` (cible hors build par defaut) : le
-reconstruire (`ninja create_test_doc` sous vcvars) sinon 2 specs e2e
-sechent.
-
-## RESTE / prochaine tranche (a arbitrer avec l'utilisateur)
-
-- **A3** : l'UI des enveloppes (lane sous la piste, points a la souris) —
-  le moteur et le doc sont prets, il ne manque que le dessin.
-- **D4** : clips entre pistes + slots Session deplacables.
-- **P2P E4** (MIDI laptop -> Massive tour) : toujours en attente, deux
-  machines requises.
-- Au fil de l'eau : verite BOX en telemetrie ; retry connexion moteur
-  initiale ; renommer depuis le mixer.
+**L'utilisateur a annonce : « on commencera un gros chantier ».
+Candidats prets a arbitrer :**
+- **P2P E4** (docs/P2P-ENGINES-DESIGN.md) : MIDI laptop -> Massive tour,
+  2-3 sessions, DEUX MACHINES requises - la demo differenciateur.
+- **Effets natifs 4.2/4.3** (EQ 3 bandes + compresseur, puis Drive/Delay).
+- **Vague 3 MIDI + instruments** (le test Massive complet).
+- **AUDIT-5 a ratifier** (rapport docs/AUDIT-5.md, quick wins < 1h).
+Tranches minces restantes : A4 (automation des params VST3 + cle de
+stem), A5 (courbes/confort) ; preuve par etage DANS l'UI (colonne hash
+a cote des VU du rack).
 
 ## A surveiller (pieges connus)
 
-- Layout de struct moteur => clean build (ci-dessus).
-- Aucun fichier temp/log de test dans `web/` (vite -> EBUSY).
+- Layout de struct moteur change => CLEAN build (ninja clean) ; le clean
+  emporte create_test_doc (le rebuilder : ninja create_test_doc).
+- Aucun fichier temp/log de test dans web/ (vite -> EBUSY).
 - Zombies plugin_host : Stop-Process -Force, sinon wmic call terminate.
-- Suite e2e = serveur NON-secure + 47821 libre ; la stack utilisateur
-  est SECURE -> basculer puis RESTAURER (rode).
-- Specs moteur-spawne : purger le token file du port avant spawn +
-  attendre « WebSocket server listening » avant d'ouvrir la page.
-- Le rack scrolle : scrollIntoViewIfNeeded avant boundingBox en spec.
+- Suite e2e = serveur NON-secure + 47821 libre ; stack utilisateur
+  SECURE -> basculer puis RESTAURER (rode).
+- Specs a geste : DESARMER le kit apres la pose ; viser le CENTRE des
+  poignees (10 px) ; scrollIntoViewIfNeeded avant boundingBox (le rack
+  scrolle) ; specs moteur-spawne : purger le token file + attendre
+  « WebSocket server listening ».
+- endUndoGroup ne compte pas les imbrications (le end interne clot le
+  groupe) - contrainte notee dans moveClipToTrack/slot_reorder.
 
 ## Relancer
 
 `start-daw.cmd` OU `scripts\daw.ps1 -Secure` -> URL stable
 `http://localhost:5173/#stoken=<token de ~/.daw-server-token>`.
-Rebuild moteur : `engine\rebuild_msvc.bat` (zombies d'abord ; layout
-change = ninja clean avant). Tests : daw_engine_test 44/44 ; e2e 62.
-La manip 5 min : REORDONNER les pistes en tirant leur tete, reordonner
-les devices du rack en tirant leur barre de titre, glisser un instrument
-du navigateur sur une piste, BOX -> fenetre devant. L'automation
-s'entend deja au moteur (gain/pan) mais ne se dessine pas encore (A3).
+Moteur : rebuild_msvc.bat (zombies d'abord) ; tests 45/45 ; e2e 70.
+La manip 5 min : bouton **A** d'une piste -> double-cliquer 3 points
+dans la lane -> PLAY : le fondu dessine S'ENTEND. Glisser un clip sur
+une AUTRE piste. Glisser un plugin du navigateur DANS le rack. La table
+de verite : `npm run ear -- --project studio --probe`.

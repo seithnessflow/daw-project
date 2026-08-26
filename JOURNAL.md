@@ -1295,3 +1295,33 @@ sequences sur les fichiers partages) + A2 moteur par moi, en parallele.
   client web ne re-essaie pas un ERR_CONNECTION_REFUSED initial - dette
   produit signalee).
 - Suite e2e complete 62/62 ; tsc 0 ; cargo 9/9.
+
+## 2026-08-27 — Audio repare + preuve par etage + fin des chantiers entames
+
+- AUDIO « pas comme il faut » (retour utilisateur) : traque par MESURE
+  (ear), cause = 4 faders a gain=0 dans le document (Track 2/snare/bass/
+  chord muettes) + mix cretant a -0.76 dBFS une fois remontes -> gains a
+  0 dB, master a -2 dB, porte ear VERTE (-2.56 dBFS). En chemin : garde
+  B5 muette sur les hash vides (clips MIDI legitimes).
+- PREUVE PAR ETAGE (idee utilisateur, construite dans la foulee) :
+  peak/rms/hash FNV-1a du flux float ENTRE chaque maillon (clips -> gain
+  -> chaque plugin -> pan -> master), offline only (probe nul en live),
+  --probe au render + table ear --probe. gtest 45/45 (deterministe,
+  -6.02 dB exact au gain, pan neutre). La table de studio se lit comme
+  un recit (Dexed genere du silence, Krush +8 dB de crete...).
+- GESTES vague 1 valides/pousses (rack-cible, clic droit navigateur,
+  dblclick=fenetre) + CASSE trouvee : le menu + device etait tronque par
+  le panneau bas et scrollait le rack hors champ -> menu en fixed.
+- A3 ENVELOPPES (moi) : bouton A, lane sous la piste (rangee SOEUR de
+  .track - dans la .track flex elle partait hors ecran), courbe SVG
+  clampee, dblclick/drag/clic droit, ON/off. Le moteur A2 joue ce qu on
+  dessine. automation-ui.spec 2/2.
+- D4 CLIPS ENTRE PISTES + SLOTS (agent) : moveClipToTrack (delete+
+  recreate meme id, compromis assume), drag bi-dimensionnel (X historique
+  intact, Y vise par geometrie), slots deplacables entre cellules.
+  Lecons de spec : desarmer le kit (clip fantome au mouse.up), viser le
+  CENTRE d une poignee de 10 px. dnd-clips 3/3.
+- Ceinture engine_client : scheduleReconnect aussi sur l echec initial.
+- SUITE COMPLETE 70/70 ; moteur 45/45 ; tsc 0. LES CHANTIERS ENTAMES
+  SONT SOLDES (DND D1-D4 complet, automation A1-A3 ; restent A4/A5
+  minces). Prochain arbitrage : LE gros chantier.
