@@ -62,9 +62,12 @@
       </div>
     </div>
 
-    <!-- Refonte T5 : espace de travail 3 colonnes. Les slots gardent leurs
-         id (le JS les remplit par id, jamais par position) - on ne fait que
-         les RE-PARENTER dans des colonnes. -->
+    <!-- Refonte T5 : les slots gardent leurs id (le JS les remplit par id,
+         jamais par position) - on ne fait que les RE-PARENTER.
+         2026-08-26 (demande utilisateur « le rack est mieux en bas a la
+         Ableton ») : le rack quitte la colonne de droite pour un PANNEAU DU
+         BAS pleine largeur (Device View), frere de .workspace dans le body
+         - la workspace n'a plus que 2 colonnes. -->
     <div class="workspace">
       <div class="col col-browser">
         <div id="browser-slot"></div>
@@ -81,18 +84,18 @@
         <div id="session-slot"></div>
         <div id="mixer-slot"></div>
       </div>
-      <div class="col-split" data-split="rack" role="separator"
-           aria-orientation="vertical" tabindex="0"
-           title="Glisser pour redimensionner (double-clic : defaut)"></div>
-      <div class="col col-rack" data-rack-tab="rack">
-        <div class="rack-tabs" role="tablist" aria-label="Panneau droit">
-          <button class="rack-tab" data-role="rack-tab" data-tab="rack"
-                  role="tab" aria-selected="true">Rack</button>
-          <button class="rack-tab" data-role="rack-tab" data-tab="piano"
-                  role="tab" aria-selected="false">Piano-roll</button>
-        </div>
-        <div class="device-view-slot" id="device-view-slot"></div>
+    </div>
+    <div class="col-split" data-split="device" role="separator"
+         aria-orientation="horizontal" tabindex="0"
+         title="Glisser pour redimensionner (double-clic : defaut)"></div>
+    <div class="panel-device" data-rack-tab="rack">
+      <div class="rack-tabs" role="tablist" aria-label="Panneau du bas">
+        <button class="rack-tab" data-role="rack-tab" data-tab="rack"
+                role="tab" aria-selected="true">Rack</button>
+        <button class="rack-tab" data-role="rack-tab" data-tab="piano"
+                role="tab" aria-selected="false">Piano-roll</button>
       </div>
+      <div class="device-view-slot" id="device-view-slot"></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

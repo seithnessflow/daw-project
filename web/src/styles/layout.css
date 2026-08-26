@@ -1,12 +1,12 @@
-/* ---- Espace de travail 3 colonnes (Refonte T5) -----------------
-   browser | arrangement | rack. Le body reste flex-column (topbar +
-   workspace) ; la workspace est la grille qui remplit le reste. */
+/* ---- Espace de travail (Refonte T5, re-plie 2026-08-26) --------
+   browser | arrangement en haut ; le RACK est un PANNEAU DU BAS pleine
+   largeur facon Ableton (Device View), frere de .workspace dans le body
+   (flex-column : topbar / workspace / splitter / panel-device). */
 .workspace {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns:
-    var(--col-browser, 208px) 6px minmax(0, 1fr) 6px var(--col-rack, 340px);
+  grid-template-columns: var(--col-browser, 208px) 6px minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
   border-radius: var(--r);
@@ -36,6 +36,13 @@
   position: absolute;
   inset: 0 -3px;  /* zone de saisie elargie sans deplacer le trait */
 }
+/* le splitter HORIZONTAL du panneau bas (frere de .workspace dans le body
+   flex-column : hauteur fixe 6px, saisie elargie VERTICALEMENT) */
+.col-split[data-split="device"] {
+  cursor: row-resize;
+  flex: 0 0 6px;
+}
+.col-split[data-split="device"]::after { inset: -3px 0; }
 .col-split:hover,
 .col-split.dragging,
 .col-split:focus-visible {
@@ -53,11 +60,22 @@
 .col-arrange .tracks { border-radius: 0; box-shadow: none; }
 .col-arrange #add-track-btn { margin: 6px 8px; flex: 0 0 auto; }
 
-/* droite : rack device / piano-roll en ONGLETS (F7). La tete d'onglets coiffe,
-   #device-view-slot scrolle en dessous ; render.ts rend les DEUX, le CSS
-   n'en montre qu'un selon data-rack-tab. */
-.col-rack { background: var(--surface); overflow: hidden; }
-.col-rack .device-view-slot { margin: 0; flex: 1; min-height: 0; overflow-y: auto; }
+/* bas : rack device / piano-roll en ONGLETS (F7), panneau pleine largeur
+   facon Ableton (2026-08-26). La tete d'onglets coiffe, #device-view-slot
+   remplit en dessous (la chaine .device-chain defile deja en X) ;
+   render.ts rend les DEUX, le CSS n'en montre qu'un selon data-rack-tab. */
+.panel-device {
+  flex: 0 0 var(--row-device, 260px);
+  height: var(--row-device, 260px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  overflow: hidden;
+  border-radius: var(--r);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.panel-device .device-view-slot { margin: 0; flex: 1; min-height: 0; overflow: auto; }
 .rack-tabs {
   display: flex;
   gap: 2px;
@@ -80,8 +98,8 @@
   box-shadow: inset 0 0 0 1px var(--hair), inset 0 2px 0 var(--copper);
 }
 /* visibilite selon l'onglet actif */
-.col-rack[data-rack-tab="rack"] .piano-roll-slot { display: none; }
-.col-rack[data-rack-tab="piano"] #device-view { display: none; }
+.panel-device[data-rack-tab="rack"] .piano-roll-slot { display: none; }
+.panel-device[data-rack-tab="piano"] #device-view { display: none; }
 
 /* les slots vides (starter/overview absents) ne prennent pas de place */
 #starter-slot:empty, #overview-slot:empty, #library-slot:empty { display: none; }

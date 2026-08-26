@@ -8,7 +8,10 @@
     var(--surface);
   box-shadow: 0 -1px 0 var(--hair-strong);
   padding: 7px 14px 10px;
-  min-height: 116px;
+  /* 2026-08-26 (panneau bas Ableton) : remplir la hauteur du panneau -
+     l'ancien min-height 116px datait de la colonne etroite */
+  min-height: 100%;
+  box-sizing: border-box;
 }
 .device-view-title {
   font-size: 9px;

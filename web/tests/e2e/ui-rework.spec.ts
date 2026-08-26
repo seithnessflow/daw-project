@@ -42,10 +42,13 @@ test.describe('Refonte UI : commutateur de paradigmes (T6)', () => {
   });
 });
 
+// MODIF DE TEST SIGNALEE (2026-08-26, rack en bas facon Ableton) : la
+// colonne .col-rack est devenue le panneau du bas .panel-device - meme
+// mecanique d'onglets, autre hote. Intention et assertions inchangees.
 test.describe('Refonte UI : onglets Rack / Piano-roll (F7)', () => {
   test('bascule Rack<->Piano + persistance localStorage', async ({ page }) => {
     await open(page, `ui-racktab-${Date.now()}`);
-    const col = page.locator('.col-rack');
+    const col = page.locator('.panel-device');
     await expect(col).toHaveAttribute('data-rack-tab', 'rack');
 
     await page.locator('[data-role="rack-tab"][data-tab="piano"]').click();
@@ -54,7 +57,7 @@ test.describe('Refonte UI : onglets Rack / Piano-roll (F7)', () => {
 
     await page.reload();
     await waitForServerConnection(page);
-    await expect(page.locator('.col-rack')).toHaveAttribute('data-rack-tab', 'piano');
+    await expect(page.locator('.panel-device')).toHaveAttribute('data-rack-tab', 'piano');
   });
 });
 
@@ -63,10 +66,15 @@ test.describe('Refonte UI : splitters de colonnes (F7)', () => {
     const id = `ui-split-${Date.now()}`;
     await open(page, id);
 
+    // MODIF DE TEST SIGNALEE (2026-08-26, rack en bas) : la var CSS vit
+    // desormais sur le BODY (le panneau bas n'est pas dans .workspace) et
+    // il y a 2 splitters (browser vertical + device horizontal) - l'ancien
+    // splitter 'rack' a disparu avec la colonne droite.
     const readW = () => page.evaluate(() =>
-      getComputedStyle(document.querySelector('.workspace')!).getPropertyValue('--col-browser').trim());
+      getComputedStyle(document.body).getPropertyValue('--col-browser').trim());
+    const readH = () => page.evaluate(() =>
+      getComputedStyle(document.body).getPropertyValue('--row-device').trim());
 
-    // deux splitters presents
     await expect(page.locator('.col-split')).toHaveCount(2);
     const before = await readW();
 
@@ -82,6 +90,16 @@ test.describe('Refonte UI : splitters de colonnes (F7)', () => {
     expect(parseInt(after)).toBeGreaterThan(parseInt(before));
     const stored = await page.evaluate(() => localStorage.getItem('daw-col-widths'));
     expect(stored).toContain('browser');
+
+    // le splitter HORIZONTAL du panneau bas : glisser vers le HAUT l'agrandit
+    const beforeH = await readH();
+    const hs = page.locator('.col-split[data-split="device"]');
+    const hbox = (await hs.boundingBox())!;
+    await page.mouse.move(hbox.x + hbox.width / 2, hbox.y + hbox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hbox.x + hbox.width / 2, hbox.y - 60, { steps: 6 });
+    await page.mouse.up();
+    expect(parseInt(await readH())).toBeGreaterThan(parseInt(beforeH));
 
     // survit au reload (presentation locale)
     await page.reload();
