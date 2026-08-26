@@ -17,6 +17,7 @@
  */
 
 import type { TrackDef, ProcessorDef } from '../document/schema';
+import { clipDisplayName } from '../document/schema';
 import { clampSamples, cssId } from '../document/sanitize';
 import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
 
@@ -164,8 +165,8 @@ export function createTrackUI(
     nameStrip.className = 'clip-name';
     nameStrip.dataset.role = 'clip-handle';  // ONLY the title bar drags
     nameStrip.style.background = `hsl(${hue} var(--sat) 26%)`;
-    // Human name, not the generated id: 'clip-kick-1787...' -> 'kick'
-    nameStrip.textContent = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+    // Human name, never the raw id (source unique : clipDisplayName)
+    nameStrip.textContent = clipDisplayName(clip);
     clipEl.title = clip.assetHash;
     clipEl.appendChild(nameStrip);
     const wave = document.createElement('canvas');

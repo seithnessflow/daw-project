@@ -21,6 +21,8 @@ import type { ClipDef, TrackDef, ProcessorDef, NoteDef } from './schema';
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
   | { type: 'setTrackPan'; trackId: string; pan: number }
+  | { type: 'renameTrack'; trackId: string; name: string }
+  | { type: 'renameClip'; trackId: string; clipId: string; name: string }
   | { type: 'setMasterGain'; gain: number }
   | { type: 'setProcessorBypass'; trackId: string; processorId: string; bypass: boolean }
   | { type: 'setProcessorParam'; trackId: string; processorId: string; key: string; value: number }
@@ -53,6 +55,8 @@ function targetKey(op: InverseOp): string {
   switch (op.type) {
     case 'setTrackGain': return `gain:${op.trackId}`;
     case 'setTrackPan': return `pan:${op.trackId}`;
+    case 'renameTrack': return `trackname:${op.trackId}`;
+    case 'renameClip': return `clipname:${op.trackId}:${op.clipId}`;
     case 'setMasterGain': return 'master';
     case 'setProcessorBypass': return `byp:${op.trackId}:${op.processorId}`;
     case 'setProcessorParam':

@@ -7,6 +7,7 @@
  */
 
 import { TIMELINE } from '../ui/track';
+import { clipDisplayName } from '../document/schema';
 import { Library, type Kit } from '../ui/library';
 import { decodeDurationSec } from '../ui/waveform';
 import { SERVER_HTTP, assetAuthHeaders } from './context';
@@ -55,6 +56,7 @@ export async function handleFileDrop(
   const clipId = `clip-${stem}-${Date.now()}`;
   ctx.project.addClip(trackId, {
     id: clipId,
+    name: stem,
     assetHash: hash,
     startSample: Math.round(sec * sr),
     lengthSamples: Math.max(1024, Math.round(durationSec * sr)),
@@ -78,7 +80,7 @@ export function refreshPalette(): void {
   const byHash = new Map<string, { name: string; seconds: number }>();
   for (const t of doc.tracks) {
     for (const c of t.clips) {
-      const name = c.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+      const name = clipDisplayName(c);
       const prev = byHash.get(c.assetHash);
       const seconds = c.lengthSamples / sr;
       if (!prev || seconds > prev.seconds) {

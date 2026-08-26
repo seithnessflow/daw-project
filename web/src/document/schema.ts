@@ -17,6 +17,9 @@ export interface NoteDef {
 
 export interface ClipDef {
   id: string;
+  /** Nom d'affichage (additif 2026-08-26, renommable au clic droit). Absent :
+   *  les consommateurs derivent un nom de l'id via clipDisplayName(). */
+  name?: string;
   assetHash: string;
   startSample: number;
   lengthSamples: number;
@@ -93,6 +96,24 @@ export interface ProjectDef {
   /** T7 : scenes du clip-launcher (absent = pas de vue Session). */
   scenes?: SceneDef[];
   [key: string]: unknown;  // Index signature for Automerge compatibility
+}
+
+/**
+ * Nom d'affichage d'un clip - SOURCE UNIQUE (remplace 3 derivations jumelles
+ * track.ts/wiring.ts/placement.ts). `name` prime ; sinon on derive de l'id :
+ * 'clip-kick-1787...' -> 'kick'. Un id purement aleatoire (addMidiClip /
+ * addSessionClip : 'clip-' + 8 base36) n'a aucun sens humain -> 'MIDI' ou
+ * 'clip', jamais l'id brut.
+ */
+export function clipDisplayName(
+  clip: Pick<ClipDef, 'id' | 'name' | 'notes'>): string {
+  const named = clip.name?.trim();
+  if (named) return named;
+  const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+  if (clip.id === `clip-${stem}` && /^[a-z0-9]{6,12}$/.test(stem)) {
+    return clip.notes ? 'MIDI' : 'clip';
+  }
+  return stem || 'clip';
 }
 
 /**

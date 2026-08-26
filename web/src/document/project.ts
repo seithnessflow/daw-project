@@ -181,6 +181,8 @@ export class Project {
       switch (op.type) {
         case 'setTrackGain': this.setTrackGain(op.trackId, op.gain); break;
         case 'setTrackPan': this.setTrackPan(op.trackId, op.pan); break;
+        case 'renameTrack': this.renameTrack(op.trackId, op.name); break;
+        case 'renameClip': this.renameClip(op.trackId, op.clipId, op.name); break;
         case 'setMasterGain': this.setMasterGain(op.gain); break;
         case 'setProcessorBypass':
           this.setProcessorBypass(op.trackId, op.processorId, op.bypass); break;
@@ -232,6 +234,44 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.pan = Math.max(-1, Math.min(1, pan));
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * Renomme une piste (clic droit 2026-08-26). Nom vide apres trim = no-op
+   * (TrackDef.name est requis) ; borne a 64 chars.
+   */
+  renameTrack(trackId: string, name: string): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    const next = name.trim().slice(0, 64);
+    if (!track || !next || next === track.name) return;
+    this.journal.capture({ type: 'renameTrack', trackId, name: track.name });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (t) t.name = next;
+    });
+    this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
+  }
+
+  /**
+   * Renomme un clip (champ additif ClipDef.name). Nom vide = RETIRE le champ
+   * (l'affichage retombe sur le nom derive) - c'est aussi l'inverse d'un
+   * premier nommage, capture en name:''.
+   */
+  renameClip(trackId: string, clipId: string, name: string): void {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+    const next = name.trim().slice(0, 64);
+    if (next === (clip.name ?? '')) return;
+    this.journal.capture({ type: 'renameClip', trackId, clipId, name: clip.name ?? '' });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const c = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId);
+      if (!c) return;
+      if (next) c.name = next;
+      else delete c.name;
     });
     this.lastChange = Automerge.getLastLocalChange(this.doc) ?? null;
   }

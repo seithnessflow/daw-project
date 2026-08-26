@@ -10,7 +10,9 @@
 import { ctx, sendLastChange } from './context';
 import { renderTracks } from './render';
 import { showContextMenu, type MenuItem } from '../ui/context_menu';
+import { startInlineRename } from '../ui/inline_rename';
 import { renderSession } from '../ui/session';
+import { clipDisplayName } from '../document/schema';
 import * as life from '../ui/life';
 
 function closest(el: EventTarget | null, sel: string): HTMLElement | null {
@@ -31,6 +33,16 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
     const trackId = trackEl?.getAttribute('data-track-id');
     if (!trackId) return null;
     return [
+      { label: 'Renommer', onClick: () => {
+        const c = doc().tracks.find((x) => x.id === trackId)
+          ?.clips.find((x) => x.id === clipId);
+        const strip = clipEl.querySelector<HTMLElement>('.clip-name');
+        if (!c || !strip) return;
+        startInlineRename(strip, clipDisplayName(c), (name) => {
+          project.renameClip(trackId, clipId, name);
+          sendLastChange(); renderTracks(true);
+        });
+      } },
       { label: 'Dupliquer', onClick: () => {
         const t = doc().tracks.find((x) => x.id === trackId);
         const c = t?.clips.find((x) => x.id === clipId);
@@ -129,6 +141,16 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
       if (ctx.engineClient) life.applyMonitorShade(ctx.engineClient.monitorSnapshot());
     };
     return [
+      { label: 'Renommer', onClick: () => {
+        const t = doc().tracks.find((x) => x.id === trackId);
+        const nameEl = trackEl.querySelector<HTMLElement>('.track-name');
+        if (!t || !nameEl) return;
+        startInlineRename(nameEl, t.name, (name) => {
+          project.renameTrack(trackId, name);
+          sendLastChange(); renderTracks(true);
+        });
+      } },
+      { separator: true },
       { label: m.mute ? 'Reactiver (unmute)' : 'Muter', onClick: () => setMon('mute', !m.mute) },
       { label: m.solo ? 'Enlever le solo' : 'Solo', onClick: () => setMon('solo', !m.solo) },
       { separator: true },

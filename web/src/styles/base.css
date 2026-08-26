@@ -136,3 +136,17 @@ input:focus-visible,
   }
 }
 
+
+/* Renommage inline (clic droit "Renommer") : l'input epouse son hote
+   (bandeau de clip, nom de piste) sans changer la geometrie. */
+.inline-rename {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  padding: 0 3px;
+  outline: none;
+}

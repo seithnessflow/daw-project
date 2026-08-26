@@ -45,6 +45,7 @@
       "clips": [
         {
           "id": "string (UUID)",
+          "name": "string (optional, display name)",
           "assetHash": "string (SHA-256 hex)",
           "startSample": "int64",
           "lengthSamples": "int64",
@@ -92,6 +93,7 @@
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | `string` | Yes | UUID v4. Immutable after creation. |
+| `name` | `string` | No | 2026-08-26, additive. Display name (right-click rename). Absent = the UI derives a name from the id (`clipDisplayName`, web/src/document/schema.ts). The engine ignores it. |
 | `assetHash` | `string` | Yes | SHA-256 (64 hex chars) of the source file CONTENTS - real since 2.3a (2026-08-22, FIPS-vector tested). The hash is the asset's NAME KEY: assets resolve as `<assetHash>.wav` and existing documents keep their historical keys (16-char FNV names from before the swap stay valid as names; new documents always produce SHA-256). |
 | `startSample` | `int64` | Yes | Position on timeline where clip begins. |
 | `lengthSamples` | `int64` | Yes | Duration of the clip in samples. |

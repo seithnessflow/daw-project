@@ -755,14 +755,14 @@ export async function init(): Promise<void> {
         const grid = snapStep() * sr;
         const start =
           Math.ceil((clip.startSample + clip.lengthSamples) / grid) * grid;
-        const name = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
-        const copyId = `clip-${name}-${Date.now()}`;
+        const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+        const copyId = `clip-${stem}-${Date.now()}`;
+        // Copie INTEGRALE (fix 2026-08-26 : l'objet a 5 champs perdait
+        // notes/fades/name du clip duplique), plain() car proxy Automerge
         ctx.project.addClip(track.id, {
+          ...(JSON.parse(JSON.stringify(clip)) as typeof clip),
           id: copyId,
-          assetHash: clip.assetHash,
           startSample: Math.round(start),
-          lengthSamples: clip.lengthSamples,
-          offsetSamples: clip.offsetSamples,
         });
         sendLastChange();
         ctx.selectedClipId = copyId;
