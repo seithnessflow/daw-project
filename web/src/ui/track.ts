@@ -21,6 +21,22 @@ import { clipDisplayName } from '../document/schema';
 import { clampSamples, cssId } from '../document/sanitize';
 import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
 
+// ---- Fenetres de plugin ouvertes (bouton BOX) ---------------------------
+// SOURCE DE VERITE locale de l'etat des fenetres GUI (procId). Survit aux
+// re-rendus ; remise a zero quand le moteur part (ses enfants - et leurs
+// fenetres - meurent avec lui).
+const openEditors = new Set<string>();
+export function isEditorOpen(procId: string): boolean {
+  return openEditors.has(procId);
+}
+export function markEditorOpen(procId: string, open: boolean): void {
+  if (open) openEditors.add(procId);
+  else openEditors.delete(procId);
+}
+export function resetOpenEditors(): void {
+  openEditors.clear();
+}
+
 /** Timeline scale, shared by tracks, ruler and playhead. */
 export const TIMELINE = {
   pps: 20,          // pixels per second
@@ -745,18 +761,21 @@ function createDevicePanel(
   title.appendChild(name);
 
   // Editor button (vst3 only): toggle the plugin's native GUI window on
-  // demand (per node). The web tracks the intended state locally; the
-  // engine opens/closes the child's EditorWindow on the message.
+  // demand (per node). L'etat vit dans openEditors (module) - PAS dans le
+  // DOM : avant, chaque renderTracks reconstruisait le bouton a 'false'
+  // alors que la fenetre restait ouverte, et le clic suivant renvoyait
+  // « open » au lieu de fermer (bouton menteur, casse 2026-08-26).
   if (proc.type === 'vst3') {
     const ed = document.createElement('button');
     ed.className = 'device-editor';
     ed.dataset.role = 'editor';
     ed.dataset.procId = proc.id;
-    ed.setAttribute('aria-pressed', 'false');
-    ed.textContent = '⊞';  // squared plus - "open window"
+    ed.setAttribute('aria-pressed', isEditorOpen(proc.id) ? 'true' : 'false');
+    ed.textContent = '⊞ BOX';  // la fenetre du plugin, a la demande (F1)
     ed.title = 'Ouvrir / fermer la fenetre du plugin';
     ed.addEventListener('click', () => {
-      const open = ed.getAttribute('aria-pressed') !== 'true';
+      const open = !isEditorOpen(proc.id);
+      markEditorOpen(proc.id, open);
       ed.setAttribute('aria-pressed', open ? 'true' : 'false');
       panel.dispatchEvent(new CustomEvent('editor-toggle', {
         detail: { procId: proc.id, open }, bubbles: true,

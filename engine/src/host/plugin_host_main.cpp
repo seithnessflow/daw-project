@@ -289,6 +289,9 @@ struct EditorWindow {
     Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
     bool controller_is_component = false;  // effet mono-classe : pas de terminate dedie
     GuiParamSink handler;
+    // 2026-08-26 : pointeur vers ring->editor_open - la croix (X) y ecrit 0
+    // pour que l'etat desire suive la realite (voir WM_CLOSE).
+    std::atomic<uint32_t>* want_flag = nullptr;
 
     static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         auto* self = reinterpret_cast<EditorWindow*>(
@@ -296,6 +299,12 @@ struct EditorWindow {
         switch (msg) {
             case WM_CLOSE:
                 ShowWindow(h, SW_HIDE);  // v1 : cacher, jamais detruire le plugin
+                // 2026-08-26 : la croix (X) REDESCEND l'etat desire du ring -
+                // sinon il reste a 1 et le prochain BOX « ouvrir » est un
+                // non-evenement (transition 1->1) : bouton mort en apparence.
+                if (self && self->want_flag) {
+                    self->want_flag->store(0u, std::memory_order_release);
+                }
                 return 0;
             case WM_SIZE:
                 if (self && self->view &&
@@ -388,6 +397,16 @@ struct EditorWindow {
         // reste redimensionnable a la main (WM_SIZE -> onSize).
         ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
+        // 2026-08-26 : AMENER AU PREMIER PLAN. Un process d'arriere-plan n'a
+        // pas le droit de voler le focus (SetForegroundWindow peut echouer,
+        // tant pis) mais l'aller-retour TOPMOST garantit le dessus de la
+        // pile Z - sans lui la fenetre naissait DERRIERE le navigateur et
+        // l'utilisateur concluait que BOX ne faisait rien (retour du jour).
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SetForegroundWindow(hwnd);
         std::cerr << "plugin_host: editor window open (" << title << ")" << std::endl;
         return true;
     }
@@ -777,6 +796,7 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     // sert l'audio avec ou sans fenetre.
 #ifdef _WIN32
     EditorWindow editor_win;
+    editor_win.want_flag = &ring->editor_open;  // la croix (X) redescend l'etat
     std::string editor_title = module_path;
     {
         const auto slash = editor_title.find_last_of("/\\");

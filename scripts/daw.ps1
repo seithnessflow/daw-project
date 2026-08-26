@@ -96,7 +96,10 @@ $muteArg = if ($Mute) { " --mute" } else { "" }
 # L1c: --start-stopped = le moteur ne SONNE que sur commande (bouton/Espace)
 # 2.5-decouverte : le dossier VST3 standard est scanne (cache a cote du
 # binaire) - le menu + device propose tous les plugins de la machine
-$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped --editors$muteArg " +
+# 2026-08-26 : --editors RETIRE - il ouvrait TOUTES les fenetres de plugin au
+# spawn (verrue v1), en desaccord avec le bouton BOX (etat web « ferme »").
+# Les fenetres s'ouvrent A LA DEMANDE (BOX / clic droit), ring v9.
+$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped$muteArg " +
               "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\again.vst3 " +
               "--vst3-dir `"C:\Program Files\Common Files\VST3`""
 $engineProc = Start-Process -FilePath $engineExe -ArgumentList $engineArgs `

@@ -8,6 +8,7 @@
  */
 
 import { ctx, sendLastChange } from './context';
+import { isEditorOpen, markEditorOpen } from '../ui/track';
 import { renderTracks } from './render';
 import { showContextMenu, type MenuItem } from '../ui/context_menu';
 import { startInlineRename } from '../ui/inline_rename';
@@ -72,10 +73,13 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
     const isVst3 = proc?.type === 'vst3';
     const items: MenuItem[] = [];
     if (isVst3) {
-      const ed = devEl.querySelector('[data-role="editor"]');
-      const open = ed?.getAttribute('aria-pressed') !== 'true';
+      // meme source de verite que le bouton BOX (l'attribut DOM mentait
+      // apres un re-rendu - casse 2026-08-26)
+      const open = !isEditorOpen(procId);
       items.push({ label: open ? 'Ouvrir la fenetre du plugin' : 'Fermer la fenetre', onClick: () => {
-        ed?.setAttribute('aria-pressed', open ? 'true' : 'false');
+        markEditorOpen(procId, open);
+        devEl.querySelector('[data-role="editor"]')
+          ?.setAttribute('aria-pressed', open ? 'true' : 'false');
         ctx.engineClient?.setEditor(procId, open);
       } });
     }

@@ -246,13 +246,19 @@
 /* Same lamp grammar as .device-toggle: OPEN window = lit potion, closed
    = neutral. aria-pressed='true' means the editor window is open. */
 .device-editor {
-  font-size: 11px;
+  /* 2026-08-26 : bouton VISIBLE (l'ancien glyphe transparent etait
+     introuvable - retour utilisateur « il faut un bouton ») */
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   line-height: 1;
-  padding: 1px 5px;
+  padding: 3px 7px;
   border-radius: var(--r);
-  background: transparent;
-  color: var(--text-3);
-  box-shadow: inset 0 0 0 1px transparent;
+  background: var(--surface);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--hair-strong);
+  white-space: nowrap;
 }
 .device-editor:hover {
   color: var(--text);

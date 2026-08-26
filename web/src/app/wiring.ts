@@ -9,7 +9,7 @@ import { Project } from '../document/project';
 import { ServerClient } from '../network/server_client';
 import { EngineClient } from '../network/engine_client';
 import { TIMELINE, formatGain, setPluginCatalog, noteStemFreshness,
-         refreshStemBadges } from '../ui/track';
+         refreshStemBadges, resetOpenEditors } from '../ui/track';
 import * as life from '../ui/life';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
@@ -231,6 +231,10 @@ export async function init(): Promise<void> {
     els.playBtn.disabled = true;
     els.stopBtn.disabled = true;
     els.loopBtn.disabled = true;
+    // les fenetres de plugin meurent avec le moteur : le bouton BOX ne doit
+    // pas pretendre qu'elles sont encore ouvertes
+    resetOpenEditors();
+    renderTracks(true);
     console.log('Disconnected from engine');
   };
 
