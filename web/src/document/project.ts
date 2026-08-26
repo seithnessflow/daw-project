@@ -11,7 +11,10 @@
  */
 
 import * as Automerge from '@automerge/automerge';
-import { ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef, SceneDef } from './schema';
+import {
+  ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef, SceneDef,
+  AutomationLaneDef,
+} from './schema';
 import { UndoJournal, type InverseOp } from './undo';
 import { seedBytes } from './seed';
 
@@ -28,6 +31,41 @@ function seedDoc(): Automerge.Doc<ProjectDef> {
 /** Automerge proxies -> plain JS (deep), for captured snapshots. */
 function plain<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
+}
+
+/**
+ * A1 automation : les lanes vivent a DEUX endroits (piste ou master,
+ * AUTOMATION-DESIGN.md section 1) - un seul jeu de mutateurs avec
+ * trackId null = master. Ces deux helpers factorisent l'adressage et
+ * marchent aussi bien sur le doc lu que sur le draft d'un change.
+ */
+function lanesIn(d: ProjectDef, trackId: string | null): AutomationLaneDef[] | undefined {
+  return trackId === null
+    ? d.automation
+    : d.tracks.find((t) => t.id === trackId)?.automation;
+}
+
+/** Variante creatrice (draft de change) : cree le tableau additif si
+ *  absent ; null si la piste ciblee n'existe plus (no-op silencieux). */
+function ensureLanes(d: ProjectDef, trackId: string | null): AutomationLaneDef[] | null {
+  if (trackId === null) {
+    if (!d.automation) d.automation = [];
+    return d.automation;
+  }
+  const t = d.tracks.find((x) => x.id === trackId);
+  if (!t) return null;
+  if (!t.automation) t.automation = [];
+  return t.automation;
+}
+
+/** t en SAMPLES timeline : entier >= 0 (invariant SCHEMA.md 1). */
+function clampT(t: number): number {
+  return Math.max(0, Math.round(t));
+}
+
+/** v NORMALISE 0..1 - le document ne porte jamais d'unite (design A1). */
+function clampV(v: number): number {
+  return Math.max(0, Math.min(1, v));
 }
 
 export class Project {
@@ -211,6 +249,18 @@ export class Project {
         case 'renameScene': this.renameScene(op.sceneId, op.name); break;
         case 'deleteScene': this.deleteScene(op.sceneId); break;
         case 'restoreScene': this.restoreScene(op.scene, op.index, op.clips); break;
+        case 'deleteAutomationLane':
+          this.deleteAutomationLane(op.trackId, op.laneId); break;
+        case 'restoreAutomationLane':
+          this.restoreAutomationLane(op.trackId, op.lane, op.index); break;
+        case 'setAutomationLaneEnabled':
+          this.setAutomationLaneEnabled(op.trackId, op.laneId, op.enabled); break;
+        case 'addAutomationPoint':
+          this.addAutomationPoint(op.trackId, op.laneId, op.t, op.v); break;
+        case 'moveAutomationPoint':
+          this.moveAutomationPoint(op.trackId, op.laneId, op.index, op.t, op.v); break;
+        case 'deleteAutomationPoint':
+          this.deleteAutomationPoint(op.trackId, op.laneId, op.index); break;
       }
       emit?.();
     }
@@ -692,6 +742,162 @@ export class Project {
       if (!t) return;
       const i = t.chain.findIndex((p) => p.id === processorId);
       if (i >= 0) t.chain.splice(i, 1);
+    });
+    this.capturePending();
+  }
+
+  // ---- A1 automation (AUTOMATION-DESIGN.md section 1) ---------------------
+  // trackId null = lanes du MASTER (ProjectDef.automation). Le moteur
+  // ignore tout ceci jusqu'a la tranche A2 - couche document seulement.
+
+  /**
+   * Cree une lane d'automation (vide, enabled) et rend son id ('' si la
+   * piste ciblee n'existe plus - le no-op silencieux du moule). Inverse =
+   * deleteAutomationLane : l'id est tire AVANT le change, comme addScene.
+   */
+  addAutomationLane(trackId: string | null,
+    target: { processorId?: string; param: string }): string {
+    if (trackId !== null && !this.doc.tracks.some((t) => t.id === trackId)) return '';
+    const id = 'lane-' + Math.random().toString(36).slice(2, 10);
+    this.journal.capture({ type: 'deleteAutomationLane', trackId, laneId: id });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const lanes = ensureLanes(d, trackId);
+      if (!lanes) return;
+      // Automerge rejette undefined : processorId absent s'OMET, jamais nul
+      const tgt: AutomationLaneDef['target'] = { param: target.param };
+      if (target.processorId !== undefined) tgt.processorId = target.processorId;
+      (lanes as unknown[]).push({ id, target: tgt, points: [], enabled: true });
+    });
+    this.capturePending();
+    return id;
+  }
+
+  /**
+   * Supprime une lane. Inverse = restoreAutomationLane avec la lane
+   * ENTIERE (points compris) et son index - meme doctrine que
+   * deleteTrack/removeProcessor : l'inverse restaure tout, a sa place.
+   */
+  deleteAutomationLane(trackId: string | null, laneId: string): void {
+    const lanes = lanesIn(this.doc, trackId);
+    const index = lanes ? lanes.findIndex((l) => l.id === laneId) : -1;
+    if (!lanes || index < 0) return;
+    this.journal.capture({
+      type: 'restoreAutomationLane', trackId,
+      lane: plain(lanes[index]) as AutomationLaneDef, index,
+    });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const ls = lanesIn(d, trackId);
+      if (!ls) return;
+      const i = ls.findIndex((l) => l.id === laneId);
+      if (i >= 0) ls.splice(i, 1);
+    });
+    this.capturePending();
+  }
+
+  /** Inverse de deleteAutomationLane - restaure la lane A SA PLACE. */
+  restoreAutomationLane(trackId: string | null,
+    lane: AutomationLaneDef, index: number): void {
+    if (trackId !== null && !this.doc.tracks.some((t) => t.id === trackId)) return;
+    if (lanesIn(this.doc, trackId)?.some((l) => l.id === lane.id)) return;
+    this.journal.capture({ type: 'deleteAutomationLane', trackId, laneId: lane.id });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const ls = ensureLanes(d, trackId);
+      if (!ls) return;
+      const at = index >= 0 && index <= ls.length ? index : ls.length;
+      (ls as unknown[]).splice(at, 0, {
+        ...lane,
+        target: { ...lane.target },
+        points: lane.points.map((p) => ({ ...p })),
+      });
+    });
+    this.capturePending();
+  }
+
+  /** Bypass de lane (enabled=false : l'etat manuel reprend). Meme moule
+   *  que setProcessorBypass. */
+  setAutomationLaneEnabled(trackId: string | null,
+    laneId: string, enabled: boolean): void {
+    const lane = lanesIn(this.doc, trackId)?.find((l) => l.id === laneId);
+    if (!lane) return;
+    this.journal.capture({
+      type: 'setAutomationLaneEnabled', trackId, laneId, enabled: lane.enabled });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const l = lanesIn(d, trackId)?.find((x) => x.id === laneId);
+      if (l) l.enabled = enabled;
+    });
+    this.capturePending();
+  }
+
+  /**
+   * Ajoute un point (t rond+clamp >= 0, v clamp 0..1). L'insertion est a
+   * l'INDEX TRIE (apres les points de meme t) - le tri par t est un
+   * invariant d'ECRITURE, jamais repare a la lecture (automationValueAt
+   * et le futur moteur A2 le presument). Inverse = deleteAutomationPoint
+   * a l'index d'insertion.
+   */
+  addAutomationPoint(trackId: string | null, laneId: string,
+    t: number, v: number): void {
+    const lane = lanesIn(this.doc, trackId)?.find((l) => l.id === laneId);
+    if (!lane) return;
+    const pt = clampT(t);
+    const pv = clampV(v);
+    const at = lane.points.filter((p) => p.t <= pt).length;
+    this.journal.capture({ type: 'deleteAutomationPoint', trackId, laneId, index: at });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const l = lanesIn(d, trackId)?.find((x) => x.id === laneId);
+      if (!l) return;
+      (l.points as unknown[]).splice(at, 0, { t: pt, v: pv });
+    });
+    this.capturePending();
+  }
+
+  /**
+   * Deplace un point (drag). Tant que t ne traverse pas un voisin, on
+   * REECRIT ce point en place - il garde son identite Automerge et deux
+   * pairs qui draguent des points differents mergent en LWW par champ
+   * (decision design). S'il traverse, splice out + splice in a l'index
+   * trie ; l'inverse vise alors le NOUVEL index (la ou le point EST
+   * maintenant), avec les anciennes valeurs.
+   */
+  moveAutomationPoint(trackId: string | null, laneId: string,
+    index: number, t: number, v: number): void {
+    const lane = lanesIn(this.doc, trackId)?.find((l) => l.id === laneId);
+    if (!lane || index < 0 || index >= lane.points.length) return;
+    const old = lane.points[index];
+    const pt = clampT(t);
+    const pv = clampV(v);
+    // Index final = position triee parmi les AUTRES points (comme si le
+    // point etait retire puis reinsere apres ses egaux en t).
+    const newIndex = lane.points
+      .filter((p, i) => i !== index && p.t <= pt).length;
+    this.journal.capture({
+      type: 'moveAutomationPoint', trackId, laneId,
+      index: newIndex, t: old.t, v: old.v,
+    });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const l = lanesIn(d, trackId)?.find((x) => x.id === laneId);
+      if (!l || index >= l.points.length) return;
+      if (newIndex === index) {
+        l.points[index].t = pt;
+        l.points[index].v = pv;
+      } else {
+        l.points.splice(index, 1);
+        (l.points as unknown[]).splice(newIndex, 0, { t: pt, v: pv });
+      }
+    });
+    this.capturePending();
+  }
+
+  /** Supprime un point. Inverse = addAutomationPoint (t,v) - la
+   *  reinsertion triee retrouve sa place, un point n'a pas d'id. */
+  deleteAutomationPoint(trackId: string | null, laneId: string, index: number): void {
+    const lane = lanesIn(this.doc, trackId)?.find((l) => l.id === laneId);
+    if (!lane || index < 0 || index >= lane.points.length) return;
+    const p = lane.points[index];
+    this.journal.capture({ type: 'addAutomationPoint', trackId, laneId, t: p.t, v: p.v });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const l = lanesIn(d, trackId)?.find((x) => x.id === laneId);
+      if (l && index < l.points.length) l.points.splice(index, 1);
     });
     this.capturePending();
   }

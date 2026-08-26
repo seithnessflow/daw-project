@@ -68,6 +68,30 @@ export interface ProcessorDef {
   stemLatencySamples?: number;
 }
 
+/**
+ * A1 automation (AUTOMATION-DESIGN.md section 1) : une ENVELOPPE =
+ * une courbe temps -> valeur attachee a un parametre. v est NORMALISE
+ * 0..1 partout (mappe par le consommateur - les unites ne se gravent
+ * pas dans le document), t en SAMPLES timeline (int, >= 0 - invariant
+ * SCHEMA.md 1). Points = liste Automerge d'objets {t,v} TRIEE par t a
+ * l'ecriture : deux pairs qui editent des points differents mergent
+ * naturellement. Interpolation lineaire v1 (un champ shape additif
+ * par point viendra plus tard sans invalider le format).
+ */
+export interface AutomationLaneDef {
+  id: string;
+  target: {
+    /** Absent = parametre de PISTE (gain/pan) - ou de MASTER quand la
+     *  lane vit sur ProjectDef.automation. */
+    processorId?: string;
+    /** 'gain' | 'pan' | cle native ('drive') | id VST3 decimal ('0'). */
+    param: string;
+  };
+  points: { t: number; v: number }[];
+  /** Bypass de la lane (l'etat manuel reprend quand false). */
+  enabled: boolean;
+}
+
 export interface TrackDef {
   id: string;
   name: string;
@@ -77,6 +101,9 @@ export interface TrackDef {
   pan?: number;
   clips: ClipDef[];
   chain: ProcessorDef[];
+  /** A1 : lanes d'automation de la piste. ADDITIF - absent = rien.
+   *  Le moteur les ignore jusqu'a la tranche A2. */
+  automation?: AutomationLaneDef[];
 }
 
 /** T7 (Session) : une scene = une LIGNE du clip-launcher (un groupe de
@@ -95,6 +122,9 @@ export interface ProjectDef {
   tracks: TrackDef[];
   /** T7 : scenes du clip-launcher (absent = pas de vue Session). */
   scenes?: SceneDef[];
+  /** A1 : lanes d'automation du MASTER (target sans processorId = les
+   *  parametres racine, ex 'gain' -> masterGain). ADDITIF - absent = rien. */
+  automation?: AutomationLaneDef[];
   [key: string]: unknown;  // Index signature for Automerge compatibility
 }
 

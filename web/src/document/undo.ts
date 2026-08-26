@@ -16,7 +16,9 @@
  * Outside replay, any local op clears redo.
  */
 
-import type { ClipDef, TrackDef, ProcessorDef, NoteDef, SceneDef } from './schema';
+import type {
+  ClipDef, TrackDef, ProcessorDef, NoteDef, SceneDef, AutomationLaneDef,
+} from './schema';
 
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
@@ -48,7 +50,21 @@ export type InverseOp =
   | { type: 'renameScene'; sceneId: string; name: string }
   | { type: 'deleteScene'; sceneId: string }
   | { type: 'restoreScene'; scene: SceneDef; index: number;
-      clips: Array<{ trackId: string; clip: ClipDef }> };
+      clips: Array<{ trackId: string; clip: ClipDef }> }
+  // A1 automation : trackId null = lanes du MASTER (ProjectDef.automation).
+  // deleteLane capture la lane ENTIERE + son index (une lane est une liste
+  // ordonnee a l'ecran - la remettre a la fin n'est pas la remettre).
+  | { type: 'deleteAutomationLane'; trackId: string | null; laneId: string }
+  | { type: 'restoreAutomationLane'; trackId: string | null;
+      lane: AutomationLaneDef; index: number }
+  | { type: 'setAutomationLaneEnabled'; trackId: string | null;
+      laneId: string; enabled: boolean }
+  | { type: 'addAutomationPoint'; trackId: string | null; laneId: string;
+      t: number; v: number }
+  | { type: 'moveAutomationPoint'; trackId: string | null; laneId: string;
+      index: number; t: number; v: number }
+  | { type: 'deleteAutomationPoint'; trackId: string | null; laneId: string;
+      index: number };
 
 interface UndoGroup {
   ops: InverseOp[];
@@ -81,6 +97,28 @@ function targetKey(op: InverseOp): string {
     case 'renameScene': return `scenename:${op.sceneId}`;
     case 'deleteScene': return `scene:${op.sceneId}`;
     case 'restoreScene': return `scene:${op.scene.id}`;
+    // A1 automation - CHOIX DE CLES :
+    // - lane (delete/restore partagent la cle) : scope + laneId, comme
+    //   scene/track - l'identite est l'id, stable.
+    // - POINT : un point n'a PAS d'id, et son INDEX n'est pas stable (le
+    //   tri par t le deplace quand il traverse un voisin). La cle stable
+    //   d'un drag est lane + identite du point de DEPART du geste : on
+    //   cle sur les (t,v) PRE-MUTATION portes par l'inverse. Consequence
+    //   voulue : dans un groupe, chaque micro-pas d'un drag garde son
+    //   inverse (les (t,v) changent a chaque pas) et l'undo DEROULE le
+    //   geste pas a pas - deduper sur un index mouvant laisserait un
+    //   inverse perime des que le point croise un voisin.
+    case 'deleteAutomationLane':
+      return `alane:${op.trackId ?? 'master'}:${op.laneId}`;
+    case 'restoreAutomationLane':
+      return `alane:${op.trackId ?? 'master'}:${op.lane.id}`;
+    case 'setAutomationLaneEnabled':
+      return `alaneon:${op.trackId ?? 'master'}:${op.laneId}`;
+    case 'addAutomationPoint':
+    case 'moveAutomationPoint':
+      return `apoint:${op.trackId ?? 'master'}:${op.laneId}:${op.t}:${op.v}`;
+    case 'deleteAutomationPoint':
+      return `apoint-i:${op.trackId ?? 'master'}:${op.laneId}:${op.index}`;
   }
 }
 

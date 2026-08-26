@@ -77,6 +77,7 @@
 | `sampleRate` | `uint32` | Yes | Project sample rate in Hz. Fixed at 48000 for slice 1. |
 | `masterGain` | `float` | No (V1.2, additive) | Root master gain, linear 0.0-2.0. ABSENT on older documents = 1.0 (every consumer defaults it). Applied as the last stage of the mix, identically live and offline. |
 | `tracks` | `array<Track>` | Yes | Ordered list of tracks. May be empty. |
+| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | MASTER automation lanes (targets without `processorId` address root params, e.g. `"gain"` -> masterGain). Absent = none. The engine ignores this field until slice A2 (docs/AUTOMATION-DESIGN.md). |
 
 ### Track
 
@@ -87,6 +88,7 @@
 | `gain` | `float` | Yes | Linear gain multiplier. Range: 0.0 to 2.0. Default: 1.0. |
 | `clips` | `array<Clip>` | Yes | Clips on this track, ordered by `startSample`. |
 | `chain` | `array<Processor>` | Yes | Processing chain, applied in order. |
+| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | This track's automation lanes. Absent = none. The engine ignores this field until slice A2. |
 
 ### Clip
 
@@ -110,6 +112,22 @@
 | `uid` | `string` | vst3 only | 32-hex VST3 class id. The document NEVER carries module paths - uid -> module resolution is host-side (`--vst3-module`). |
 | `bypass` | `bool` | Yes (default false) | 2.4d: bypass is DOCUMENT state, driven from the tab. Live vst3: dry time-aligned (latency kept, pipeline warm). Offline / zero-latency nodes: identity. |
 | `params` | `list<{key, value}>` | Yes | Parameter pairs as a LIST of `{key: string, value: float}` maps (list-of-pairs, not a map: iterable by index across every consumer). |
+
+### AutomationLane
+
+A1 (2026-08-26, additive - docs/AUTOMATION-DESIGN.md section 1). An
+envelope: a time -> value curve attached to one parameter. Lives on a
+track (`Track.automation`) or on the master (root `automation`). The
+engine IGNORES these fields until slice A2; the web tier writes and
+converges them today.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | `lane-` + 8 base36 chars. Immutable after creation. |
+| `target.processorId` | `string` | No | Chain node the lane drives. ABSENT (key omitted, never null) = a TRACK param (gain/pan) - or a root param when the lane lives on the master list. |
+| `target.param` | `string` | Yes | `"gain"` \| `"pan"` \| a native param key (e.g. `"drive"`) \| a VST3 param id as a decimal string (e.g. `"0"`). |
+| `points` | `array<{t, v}>` | Yes | `t`: `int64` timeline samples, >= 0 (invariant 1). `v`: `float` NORMALIZED 0.0-1.0 - the consumer maps to units, the document never carries any. SORTED by `t` at write time (readers assume it). Linear interpolation between points, held flat outside the extremes; a per-point `shape` field will arrive later, additively. |
+| `enabled` | `bool` | Yes | `false` = lane bypassed, the manual state takes over. An enabled lane WINS over the manual value (design section 2). |
 
 ## Processor Types
 
