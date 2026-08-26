@@ -99,6 +99,13 @@ export interface TrackDef {
   /** F2 : pan -1 (gauche) .. 0 (centre) .. +1 (droite). ADDITIF - absent sur
    *  les anciens projets (le moteur retombe sur 0 centre). */
   pan?: number;
+  /** D1 (DND-DESIGN.md) : ordre d'AFFICHAGE, fractionnaire. ADDITIF - absent
+   *  sur les vieux docs (les consommateurs retombent sur l'index de liste).
+   *  La LISTE Automerge garde l'ordre de CREATION et ne bouge JAMAIS :
+   *  reordonner = ecrire ce champ (LWW par champ), jamais delete+insert -
+   *  l'identite de l'objet survit et les edits concurrents d'un pair
+   *  (gain, pan...) ne sont pas perdus pendant un deplacement. */
+  order?: number;
   clips: ClipDef[];
   chain: ProcessorDef[];
   /** A1 : lanes d'automation de la piste. ADDITIF - absent = rien.
@@ -144,6 +151,22 @@ export function clipDisplayName(
     return clip.notes ? 'MIDI' : 'clip';
   }
   return stem || 'clip';
+}
+
+/**
+ * D1 : les pistes dans l'ordre d'AFFICHAGE - SOURCE UNIQUE du tri.
+ * Cle = (order ?? index dans la liste), croissant ; en cas d'egalite,
+ * l'ordre de la liste Automerge (= ordre de creation) tranche - tri
+ * STABLE et deterministe sur tous les pairs. Une vieille piste sans
+ * `order` garde donc sa place historique tant que personne ne la bouge.
+ * Tout consommateur qui presente les pistes (arrangement, session,
+ * mixer) passe par ici ; doc.tracks reste l'ordre de creation.
+ */
+export function orderedTracks(doc: ProjectDef): TrackDef[] {
+  return doc.tracks
+    .map((t, i) => ({ t, key: t.order ?? i, i }))
+    .sort((a, b) => (a.key - b.key) || (a.i - b.i))
+    .map((x) => x.t);
 }
 
 /**

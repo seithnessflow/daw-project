@@ -26,6 +26,9 @@ import { renderPianoRoll } from '../ui/piano_roll';
 import { renderSession } from '../ui/session';
 import { renderMixer } from '../ui/mixer';
 import { cssId } from '../document/sanitize';
+import { orderedTracks } from '../document/schema';
+import { initTrackReorder } from './track_reorder';
+import { initDeviceReorder } from './device_reorder';
 
 /**
  * V1.6: remote fade changes settle IN PLACE (the same-structure path
@@ -54,11 +57,19 @@ function updateClipFadesUI(track: { id: string; clips: Array<{
 
 export function renderTracks(force = false): void {
   if (!ctx.project) return;
+  // D1 : la delegation du reordonnement de pistes se pose UNE fois
+  // (garde idempotente dans le module) - wiring.ts reste intouche.
+  initTrackReorder();
+  // D2 : idem pour le reordonnement des devices du rack.
+  initDeviceReorder();
   const doc = ctx.project.getDocument();
+  // D1 : l'ordre d'AFFICHAGE (order fractionnaire, source unique
+  // orderedTracks) - doc.tracks garde l'ordre de creation.
+  const shown = orderedTracks(doc);
 
   if (ctx.selectedTrackId === null ||
       !doc.tracks.some((t) => t.id === ctx.selectedTrackId)) {
-    ctx.selectedTrackId = doc.tracks[0]?.id ?? null;
+    ctx.selectedTrackId = shown[0]?.id ?? null;
   }
   const selectedTrack =
     doc.tracks.find((t) => t.id === ctx.selectedTrackId) ?? null;
@@ -79,19 +90,29 @@ export function renderTracks(force = false): void {
   els.masterDb.textContent = formatGain(masterGain);
 
   const existingEls = Array.from(els.tracks.querySelectorAll('[data-track-id]'));
-  const deviceCount = els.deviceViewSlot.querySelectorAll('.device').length;
+  // D2 : position-a-position par data-proc-id (pas un simple comptage) -
+  // un reordre DISTANT de la chaine garde le meme nombre de devices et
+  // doit quand meme casser sameStructure pour que le rack se replace
+  // (jumeau exact du diff d'ordre des pistes ci-dessous).
+  const deviceEls = Array.from(els.deviceViewSlot.querySelectorAll('.device'));
+  const chainNow = selectedTrack?.chain ?? [];
+  // D1 : la comparaison position-a-position se fait contre l'ordre
+  // d'AFFICHAGE (shown) - un reordre distant change l'id attendu a une
+  // position et casse sameStructure, donc declenche le rebuild qui
+  // replace les pistes. Meme diff incremental qu'avant sinon.
   const sameStructure =
     !force &&
-    existingEls.length === doc.tracks.length &&
-    doc.tracks.every(
+    existingEls.length === shown.length &&
+    shown.every(
       (t, i) =>
         existingEls[i].getAttribute('data-track-id') === t.id &&
         existingEls[i].querySelectorAll('.clip').length === t.clips.length
     ) &&
-    deviceCount === (selectedTrack?.chain.length ?? 0);
+    deviceEls.length === chainNow.length &&
+    chainNow.every((p, i) => deviceEls[i].getAttribute('data-proc-id') === p.id);
 
   if (sameStructure) {
-    for (const track of doc.tracks) {
+    for (const track of shown) {
       updateTrackGainUI(track.id, track.gain);
       updateClipFadesUI(track, doc.sampleRate || 48000);
     }
@@ -114,7 +135,7 @@ export function renderTracks(force = false): void {
 
   els.tracks.appendChild(createRulerUI(laneSeconds));
 
-  for (const track of doc.tracks) {
+  for (const track of shown) {
     const element = createTrackUI(
       track, sr, laneSeconds, track.id === ctx.selectedTrackId,
       (gain) => {

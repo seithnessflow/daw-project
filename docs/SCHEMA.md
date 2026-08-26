@@ -77,7 +77,7 @@
 | `sampleRate` | `uint32` | Yes | Project sample rate in Hz. Fixed at 48000 for slice 1. |
 | `masterGain` | `float` | No (V1.2, additive) | Root master gain, linear 0.0-2.0. ABSENT on older documents = 1.0 (every consumer defaults it). Applied as the last stage of the mix, identically live and offline. |
 | `tracks` | `array<Track>` | Yes | Ordered list of tracks. May be empty. |
-| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | MASTER automation lanes (targets without `processorId` address root params, e.g. `"gain"` -> masterGain). Absent = none. The engine ignores this field until slice A2 (docs/AUTOMATION-DESIGN.md). |
+| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | MASTER automation lanes (targets without `processorId` address root params, e.g. `"gain"` -> masterGain). Absent = none. A2 (same day): the engine EVALUATES `gain` lanes here (enabled lane WINS over `masterGain`, mapping v*2). |
 
 ### Track
 
@@ -88,7 +88,8 @@
 | `gain` | `float` | Yes | Linear gain multiplier. Range: 0.0 to 2.0. Default: 1.0. |
 | `clips` | `array<Clip>` | Yes | Clips on this track, ordered by `startSample`. |
 | `chain` | `array<Processor>` | Yes | Processing chain, applied in order. |
-| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | This track's automation lanes. Absent = none. The engine ignores this field until slice A2. |
+| `order` | `float` | No (D1 2026-08-26, additive) | DISPLAY order (fractional indexing: dropping between neighbors writes their midpoint). The Automerge list keeps CREATION order - objects never move in the list, so concurrent edits keep their identity (docs/DND-DESIGN.md). Consumers sort via `orderedTracks` (web/src/document/schema.ts); absent = the list index. The engine ignores it (mixing is order-independent). |
+| `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | This track's automation lanes. Absent = none. A2 (same day): the engine EVALUATES track-param lanes (`processorId` absent, param `gain`/`pan`; enabled lane WINS over the manual value; mapping gain v*2, pan v*2-1; per-256-frame-block evaluation, engine/src/graph/automation.h mirrors web automationValueAt). Device-param lanes (`processorId` set) stay ignored until A4. |
 
 ### Clip
 
@@ -118,7 +119,8 @@
 A1 (2026-08-26, additive - docs/AUTOMATION-DESIGN.md section 1). An
 envelope: a time -> value curve attached to one parameter. Lives on a
 track (`Track.automation`) or on the master (root `automation`). The
-engine IGNORES these fields until slice A2; the web tier writes and
+engine EVALUATES track/master gain-pan lanes since A2 (device-param
+lanes wait for A4); the web tier writes and
 converges them today.
 
 | Field | Type | Required | Description |

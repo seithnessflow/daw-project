@@ -10,6 +10,7 @@
  */
 
 import type { ProjectDef } from '../document/schema';
+import { orderedTracks } from '../document/schema';
 import { trackHue } from './track';
 
 export interface OverviewCallbacks {
@@ -100,10 +101,13 @@ export class Overview {
     ctx.fillRect(0, 0, w, h);
 
     // Tracks as thin rows, clips as colored blocks
+    // D1 : la minimap suit l'ordre d'AFFICHAGE (orderedTracks), comme
+    // l'arrangement - sinon un reordre desynchronise les deux vues.
     const sr = doc.sampleRate || 48000;
-    const rows = Math.max(1, doc.tracks.length);
+    const shown = orderedTracks(doc);
+    const rows = Math.max(1, shown.length);
     const rowH = Math.max(2, Math.min(6, (h - 4) / rows));
-    doc.tracks.forEach((t, i) => {
+    shown.forEach((t, i) => {
       const y = 2 + i * rowH;
       if (y + rowH > h - 2) return;  // beyond the strip: elided
       const hue = trackHue(t.id);

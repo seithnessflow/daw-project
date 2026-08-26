@@ -226,6 +226,8 @@ export class Project {
       switch (op.type) {
         case 'setTrackGain': this.setTrackGain(op.trackId, op.gain); break;
         case 'setTrackPan': this.setTrackPan(op.trackId, op.pan); break;
+        case 'setTrackOrder': this.setTrackOrder(op.trackId, op.order); break;
+        case 'clearTrackOrder': this.clearTrackOrder(op.trackId); break;
         case 'renameTrack': this.renameTrack(op.trackId, op.name); break;
         case 'renameClip': this.renameClip(op.trackId, op.clipId, op.name); break;
         case 'setMasterGain': this.setMasterGain(op.gain); break;
@@ -245,6 +247,8 @@ export class Project {
         case 'deleteTrack': this.deleteTrack(op.trackId); break;
         case 'addProcessor': this.addProcessor(op.trackId, op.proc, op.index); break;
         case 'removeProcessor': this.removeProcessor(op.trackId, op.processorId); break;
+        case 'moveProcessor':
+          this.moveProcessor(op.trackId, op.processorId, op.toIndex); break;
         case 'toggleNote': this.toggleNote(op.trackId, op.clipId, op.note); break;
         case 'renameScene': this.renameScene(op.sceneId, op.name); break;
         case 'deleteScene': this.deleteScene(op.sceneId); break;
@@ -294,6 +298,42 @@ export class Project {
     this.doc = Automerge.change(this.doc, (d) => {
       const t = d.tracks.find((x) => x.id === trackId);
       if (t) t.pan = Math.max(-1, Math.min(1, pan));
+    });
+    this.capturePending();
+  }
+
+  /**
+   * D1 : ecrit l'ordre d'AFFICHAGE fractionnaire d'une piste (voir
+   * orderedTracks dans schema.ts - la liste Automerge ne bouge jamais).
+   * Inverse : l'ancien order si present ; s'il etait ABSENT, l'inverse
+   * doit RETIRER le champ (type dedie clearTrackOrder, meme doctrine que
+   * removeProcessorParam pour une creation de param) - sinon l'undo
+   * laisserait un order fantome qui fige la piste hors de sa place
+   * historique (index de liste).
+   */
+  setTrackOrder(trackId: string, order: number): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    if (!track || !Number.isFinite(order)) return;
+    if (track.order === order) return;  // no-op: pas d'entree d'undo
+    this.journal.capture(track.order === undefined
+      ? { type: 'clearTrackOrder', trackId }
+      : { type: 'setTrackOrder', trackId, order: track.order });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (t) t.order = order;
+    });
+    this.capturePending();
+  }
+
+  /** D1 : inverse d'un PREMIER setTrackOrder - retire le champ additif
+   *  (la piste retombe sur son index de liste, voir orderedTracks). */
+  clearTrackOrder(trackId: string): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    if (!track || track.order === undefined) return;
+    this.journal.capture({ type: 'setTrackOrder', trackId, order: track.order });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (t && t.order !== undefined) delete t.order;
     });
     this.capturePending();
   }
@@ -742,6 +782,47 @@ export class Project {
       if (!t) return;
       const i = t.chain.findIndex((p) => p.id === processorId);
       if (i >= 0) t.chain.splice(i, 1);
+    });
+    this.capturePending();
+  }
+
+  /**
+   * D2 (DND-DESIGN.md) : deplace un device dans la chaine de sa piste.
+   * `toIndex` = l'index FINAL vise dans la chaine (position apres le
+   * retrait, la ou le device DOIT se retrouver) - symetrique : l'inverse
+   * est moveProcessor vers l'index d'origine.
+   *
+   * COMPROMIS CRDT ASSUME (decision DND-DESIGN.md) : l'ordre de la
+   * chaine EST le sens (pipeline audio, le moteur lit l'ordre du
+   * tableau) - pas de champ order fractionnaire ici (ce serait un
+   * changement de contrat sur 3 etages). v1 = remove + insert d'une
+   * COPIE plain() de la MEME def dans UN SEUL Automerge.change (le
+   * moule exact de l'undo de removeProcessor). Consequence : l'objet
+   * reinsere est un NOUVEL objet Automerge - un pair qui tournait un
+   * knob de CE device pendant la fenetre du move perd cet edit (son
+   * change vise l'objet supprime). Un device se deplace rarement
+   * pendant qu'un pair le regle ; le champ order viendra si la
+   * collaboration s'y cogne.
+   */
+  moveProcessor(trackId: string, processorId: string, toIndex: number): void {
+    const track = this.doc.tracks.find((t) => t.id === trackId);
+    const from = track ? track.chain.findIndex((p) => p.id === processorId) : -1;
+    if (!track || from < 0) return;  // cible partie (peut-etre remote) : no-op
+    const to = Math.max(0, Math.min(track.chain.length - 1, Math.round(toIndex)));
+    if (to === from) return;  // meme place : pas d'entree d'undo
+    // Copie AVANT le change (jamais de proxy Automerge reinsere dans le
+    // meme doc) - params, name, uid, state : tout survit au move.
+    const copy = plain(track.chain[from]) as ProcessorDef;
+    this.journal.capture({ type: 'moveProcessor', trackId, processorId, toIndex: from });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const t = d.tracks.find((x) => x.id === trackId);
+      if (!t) return;
+      const i = t.chain.findIndex((p) => p.id === processorId);
+      if (i < 0) return;
+      t.chain.splice(i, 1);
+      // re-clamp dans le draft : la chaine a UN element de moins
+      const at = Math.max(0, Math.min(t.chain.length, to));
+      t.chain.splice(at, 0, copy);
     });
     this.capturePending();
   }

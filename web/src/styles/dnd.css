@@ -39,3 +39,62 @@
   font-size: 10px;
   pointer-events: none;      /* jamais une cible : pur affichage */
 }
+
+/* ---- D1 : reordonner les pistes par drag de la tete ------------------
+   La piste tiree se signale (opacite + lisere potion) ; la LIGNE
+   d'insertion (element fixe, cree par track_reorder.ts) montre entre
+   quelles pistes le drop tombera. Elle est CACHEE quand le drop serait
+   sans effet (slot adjacent a la source) : jamais de promesse mensongere.
+   Pendant le geste, user-select coupe sur body pour que le mouvement ne
+   surligne pas les noms de pistes. */
+
+#tracks .track.track-reorder-source {
+  opacity: 0.55;
+  outline: 1px dashed var(--potion-dim);
+  outline-offset: -1px;
+}
+#tracks .track.track-reorder-source .track-head {
+  cursor: grabbing;
+}
+body.track-reorder-active {
+  user-select: none;
+  cursor: grabbing;
+}
+.track-reorder-line {
+  position: fixed;             /* immune au scroll interne de #tracks */
+  height: 2px;
+  background: var(--potion);
+  box-shadow: 0 0 6px var(--potion);
+  z-index: 1000;
+  pointer-events: none;        /* jamais une cible : pur affichage */
+}
+
+/* ---- D2 : reordonner les devices du rack par drag de la barre de titre
+   Meme langage visuel que D1, tourne de 90 degres : le panneau tire est
+   semi-opaque (lisere potion), la LIGNE d'insertion est VERTICALE entre
+   les panneaux de .device-chain (element fixe, cree par
+   device_reorder.ts) et CACHEE quand le drop serait sans effet (slot
+   adjacent a la source) : jamais de promesse mensongere. Pendant le
+   geste, user-select coupe sur body pour que le mouvement ne surligne
+   pas les noms de devices. */
+
+#device-view .device.device-reorder-source {
+  opacity: 0.55;
+  outline: 1px dashed var(--potion-dim);
+  outline-offset: -1px;
+}
+#device-view .device.device-reorder-source .device-title {
+  cursor: grabbing;
+}
+body.device-reorder-active {
+  user-select: none;
+  cursor: grabbing;
+}
+.device-reorder-line {
+  position: fixed;             /* immune au scroll horizontal du rack */
+  width: 2px;
+  background: var(--potion);
+  box-shadow: 0 0 6px var(--potion);
+  z-index: 1000;
+  pointer-events: none;        /* jamais une cible : pur affichage */
+}

@@ -9,6 +9,7 @@
 import { ctx, sendLastChange, els } from './../app/context';
 import { renderTracks } from './../app/render';
 import { trackHue, formatGain } from './track';
+import { orderedTracks } from '../document/schema';
 
 const fmtPan = (p: number): string =>
   p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`;
@@ -93,7 +94,8 @@ export function renderMixer(): void {
   const console_ = document.createElement('div');
   console_.className = 'mx-console';
 
-  for (const t of doc.tracks) {
+  // D1 : les tranches suivent l'ordre d'AFFICHAGE (source unique)
+  for (const t of orderedTracks(doc)) {
     const m = (mon as Record<string, { mute?: boolean; solo?: boolean }>)[t.id] ?? {};
     console_.appendChild(strip(
       t.id, t.name, trackHue(t.id), t.gain,

@@ -23,6 +23,11 @@ import type {
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
   | { type: 'setTrackPan'; trackId: string; pan: number }
+  // D1 : ordre d'affichage fractionnaire. clearTrackOrder = inverse d'un
+  // PREMIER setTrackOrder (le champ etait ABSENT - l'inverse le retire,
+  // meme doctrine que removeProcessorParam pour un param cree).
+  | { type: 'setTrackOrder'; trackId: string; order: number }
+  | { type: 'clearTrackOrder'; trackId: string }
   | { type: 'renameTrack'; trackId: string; name: string }
   | { type: 'renameClip'; trackId: string; clipId: string; name: string }
   | { type: 'setMasterGain'; gain: number }
@@ -42,6 +47,10 @@ export type InverseOp =
   // a device back at the end is not putting it back)
   | { type: 'addProcessor'; trackId: string; proc: ProcessorDef; index: number }
   | { type: 'removeProcessor'; trackId: string; processorId: string }
+  // D2 : deplacer un device dans la chaine. L'inverse d'un move est le
+  // move RETOUR (toIndex = l'index d'origine) - jamais un remove+add
+  // journalise separement : un seul geste, une seule entree.
+  | { type: 'moveProcessor'; trackId: string; processorId: string; toIndex: number }
   // F7 : le toggle de note est SON PROPRE inverse (re-toggler la meme note
   // annule l'ajout/retrait) - on capture la note identique.
   | { type: 'toggleNote'; trackId: string; clipId: string; note: NoteDef }
@@ -77,6 +86,10 @@ function targetKey(op: InverseOp): string {
   switch (op.type) {
     case 'setTrackGain': return `gain:${op.trackId}`;
     case 'setTrackPan': return `pan:${op.trackId}`;
+    // D1 : set et clear partagent la cle - dans un groupe (reequilibrage),
+    // seule la PREMIERE capture par piste survit : la valeur pre-geste.
+    case 'setTrackOrder':
+    case 'clearTrackOrder': return `order:${op.trackId}`;
     case 'renameTrack': return `trackname:${op.trackId}`;
     case 'renameClip': return `clipname:${op.trackId}:${op.clipId}`;
     case 'setMasterGain': return 'master';
@@ -92,6 +105,10 @@ function targetKey(op: InverseOp): string {
     case 'deleteTrack': return `track:${op.trackId}`;
     case 'addProcessor': return `proc:${op.trackId}:${op.proc.id}`;
     case 'removeProcessor': return `proc:${op.trackId}:${op.processorId}`;
+    // D2 : cle PROPRE au move (pas `proc:` - un move dans le meme groupe
+    // qu'un add/remove du meme device ne doit pas etre dedupe avec eux :
+    // ce ne sont pas des inverses interchangeables).
+    case 'moveProcessor': return `procmove:${op.trackId}:${op.processorId}`;
     case 'toggleNote':
       return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:${op.note.startSample}`;
     case 'renameScene': return `scenename:${op.sceneId}`;

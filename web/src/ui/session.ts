@@ -10,6 +10,7 @@
 import { ctx, sendLastChange } from '../app/context';
 import { renderTracks } from '../app/render';
 import { trackHue } from './track';
+import { orderedTracks } from '../document/schema';
 
 // F5 : etat "en lecture" des slots - optimiste local, RECONCILIE par la
 // verite moteur (telemetrie SessionState, F5+) quand un moteur est la.
@@ -79,7 +80,8 @@ export function renderSession(): void {
   const slot = document.getElementById('session-slot');
   if (!slot || !ctx.project) return;
   const doc = ctx.project.getDocument();
-  const tracks = doc.tracks;
+  // D1 : les colonnes suivent l'ordre d'AFFICHAGE (source unique)
+  const tracks = orderedTracks(doc);
   const scenes = (doc.scenes as { id: string; name: string }[] | undefined) ?? [];
 
   slot.replaceChildren();
