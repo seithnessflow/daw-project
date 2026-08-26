@@ -804,6 +804,21 @@ function createDevicePanel(
     ed.textContent = '⊞ BOX';  // la fenetre du plugin, a la demande (F1)
     ed.title = 'Ouvrir / fermer la fenetre du plugin';
     ed.addEventListener('click', () => {
+      // REFUS VISIBLE (2026-08-27, 4e « BOX n'ouvre pas » utilisateur -
+      // a chaque fois l'onglet n'etait PAS connecte au moteur et le clic
+      // partait dans le vide en silence) : moteur absent = le bouton
+      // FLASHE rouge et la pastille engine clignote, aucun etat ne ment.
+      if (!ctx.engineClient?.isConnected()) {
+        ed.classList.remove('refused');
+        void ed.offsetWidth;  // relancer l'animation
+        ed.classList.add('refused');
+        ed.title = 'MOTEUR NON CONNECTE - la pastille engine est rouge. '
+          + 'Relancer start-daw.cmd ou recharger la page (F5).';
+        document.getElementById('engine-status')?.classList.add('attention');
+        setTimeout(() => document.getElementById('engine-status')
+          ?.classList.remove('attention'), 2000);
+        return;
+      }
       const open = !isEditorOpen(proc.id);
       markEditorOpen(proc.id, open);
       ed.setAttribute('aria-pressed', open ? 'true' : 'false');

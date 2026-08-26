@@ -99,14 +99,21 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
     const items: MenuItem[] = [];
     if (isVst3) {
       // meme source de verite que le bouton BOX (l'attribut DOM mentait
-      // apres un re-rendu - casse 2026-08-26)
+      // apres un re-rendu - casse 2026-08-26). Moteur absent : entree
+      // DESACTIVEE qui le DIT (refus visible, jamais un clic dans le vide).
+      const engineUp = ctx.engineClient?.isConnected() ?? false;
       const open = !isEditorOpen(procId);
-      items.push({ label: open ? 'Ouvrir la fenetre du plugin' : 'Fermer la fenetre', onClick: () => {
-        markEditorOpen(procId, open);
-        devEl.querySelector('[data-role="editor"]')
-          ?.setAttribute('aria-pressed', open ? 'true' : 'false');
-        ctx.engineClient?.setEditor(procId, open);
-      } });
+      items.push({
+        label: !engineUp
+          ? 'Fenetre du plugin (moteur non connecte)'
+          : open ? 'Ouvrir la fenetre du plugin' : 'Fermer la fenetre',
+        disabled: !engineUp,
+        onClick: () => {
+          markEditorOpen(procId, open);
+          devEl.querySelector('[data-role="editor"]')
+            ?.setAttribute('aria-pressed', open ? 'true' : 'false');
+          ctx.engineClient?.setEditor(procId, open);
+        } });
     }
     items.push({ label: bypassed ? 'Reactiver (bypass off)' : 'Bypass', onClick: () => {
       project.setProcessorBypass(trackId, procId, !bypassed); sendLastChange(); renderTracks(true);

@@ -150,3 +150,11 @@ input:focus-visible,
   padding: 0 3px;
   outline: none;
 }
+
+/* La pastille engine reclame l attention (action moteur refusee) */
+.status-dot.attention {
+  animation: dot-attention 0.5s ease-in-out 4;
+}
+@keyframes dot-attention {
+  50% { transform: scale(1.8); box-shadow: 0 0 10px #ff5c5c; background: #ff5c5c; }
+}
