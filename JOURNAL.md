@@ -1220,3 +1220,39 @@ Session F5+ -> automation design -> P2P design).
   docs/P2P-ENGINES-DESIGN.md (cible : serveur = signaling seul ; briques
   S8/L1/store deja la ; recommandation E4 MIDI laptop->tour d'abord,
   2-3 sessions, puis E1 doc sur DataChannel).
+
+## 2026-08-26 (soir) — BOX devant, rack en bas, premiers chantiers paralleles
+
+Suite directe de la journee, pilotee par 4 retours utilisateur en rafale.
+
+- BOX (2 allers-retours) : « n ouvre pas le plugin » -> diagnostic pilote,
+  les fenetres s ouvraient DERRIERE Chrome et --editors (daw.ps1) ouvrait
+  tout au spawn en desaccord avec le bouton. Fixes : etat hors DOM +
+  reset a la deconnexion moteur, croix (X) ecrit 0 dans le ring
+  (reouverture 1er clic), --editors retire, bouton visible « BOX ».
+  Puis « doivent s ouvrir devant chrome » : l aller-retour
+  TOPMOST->NOTOPMOST ne garantissait rien depuis un process d arriere-plan
+  -> TOPMOST permanent tant qu ouverte (modele Ableton), verifie
+  WS_EX_TOPMOST pose. Choix v1 note (devant TOUT, a revisiter).
+- URL STABLE donnee et ouverte (bookmark) ; onglet perime = cause du
+  2e « n ouvre pas » (fixes deja en place, F5 suffisait).
+- RACK EN BAS (« mieux en bas a la ableton », plan approuve) : le panneau
+  device quitte la colonne droite pour un panneau bas pleine largeur,
+  frere de .workspace (topbar/workspace/splitter horizontal/panel-device).
+  La chaine de devices etait deja horizontale - le gros du chantier etait
+  la genealogie du layout (exploration dediee), splitters generalises aux
+  2 axes (meme cle localStorage etendue), rack_tabs re-hote. Piano-roll
+  pleine largeur = gain net. Modif ui-rework.spec SIGNALEE (geometrie).
+- PREMIERS CHANTIERS PAR AGENTS PARALLELES (« tu peux lancer plusieurs
+  chantiers en parallele ») : partition STRICTE des fichiers, agents
+  interdits de stack/commit, integration+verification en serie par moi.
+  D3 drag&drop navigateur->pistes (payload MIME custom + type marqueur
+  sample, coexistence avec le drop de fichiers, un groupe d undo par drag,
+  chips Library decorees par contrat sans toucher le module) et
+  A1 automation couche document (schema additif piste+master, 6 mutateurs
+  au moule, move de point sans traversee = reecriture EN PLACE pour
+  garder l identite Automerge, automationValueAt pur = futur contrat
+  d exactitude du moteur). Les DEUX livres tsc 0 du premier coup, leurs
+  specs 10/10, suite complete 53/53.
+- Verdicts CI du jour : 3eea6be, 4f059ec, 7126c65 VERTS ; 169850d (les
+  3 chantiers) en sentinelle a la cloture.

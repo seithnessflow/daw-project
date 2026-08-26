@@ -155,11 +155,25 @@ RESTE UI (petit, non bloquant) :
    gestion scenes (renommer/dupliquer/supprimer + undo complet).
    MOISSON : fix FILE de changes (getLastChange scalaire perdait des
    mutations) ; fix flake Echap du menu contextuel (listeners immediats).
-3. [ ] AUTOMATION : **design ecrit, A ARBITRER** -> docs/AUTOMATION-DESIGN.md
-   (decoupage A1-A5 propose ; rien construit).
+3. [~] AUTOMATION : design ecrit (docs/AUTOMATION-DESIGN.md) ; **A1 FAIT
+   le soir meme** (couche document : schema additif, 6 mutateurs
+   journalises, automationValueAt pur, automation-doc.spec — chantier
+   agent parallele, integre/verifie). RESTE : A2 moteur (hash + gtest
+   exactitude), A3 UI lane, A4 VST3+stems, A5 courbes.
 4. [ ] P2P ENGINES : **proposition ecrite, A ARBITRER** ->
    docs/P2P-ENGINES-DESIGN.md (E4 MIDI d'abord recommande, puis E1 doc p2p ;
    4 decisions a trancher listees). Rien construit.
+
+### Passe du 2026-08-26 SOIR (arbitrages « rack en bas » + « chantiers
+### paralleles », plan approuve) :
+5. [x] RACK EN BAS facon Ableton (panneau pleine largeur, splitter
+   hauteur, piano-roll large). 6. [x] D3 drag & drop navigateur -> pistes
+   (DND-DESIGN tranche 1). 7. [x] BOX : fenetres TOPMOST devant Chrome,
+   croix resynchronisee, --editors retire (a la demande).
+   RESTE DND : D1 (pistes, champ order fractionnaire), D2 (devices),
+   D4 (clips entre pistes + slots). Au fil de l'eau signale : renommer
+   depuis la tranche mixer ; verite des fenetres BOX en telemetrie
+   (apres croix, l'UI croit « ouvert » jusqu'au clic suivant).
 
 ## LE PROGRAMME (arbitrage utilisateur 2026-08-23, plan approuve —
 ## AMENDE le gel d'ADR-019 : l'entrelacement est ratifie)

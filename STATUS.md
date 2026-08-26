@@ -2,8 +2,9 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-26 (renommage inline + Session F5+ : stop-all, launch quantise,
-gestion scenes, verite moteur des slots ; fix file de changes).*
+2026-08-26 soir (rack en BAS facon Ableton ; D3 drag&drop navigateur ;
+A1 automation couche document ; BOX fenetres TOPMOST ; 3 chantiers dont
+2 par agents paralleles).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 
@@ -91,6 +92,24 @@ SCALAIRE - deux mutations avant un envoi = la 1re perdue pour les pairs
 (vu au pilotage : slots fantomes). Desormais une FILE (pendingChanges),
 sendLastChange draine tout. Meme classe de bug fermee pour tous les gestes
 multi-mutations (dupliquer une scene, etc.).
+
+**Soir du 2026-08-26 (3 chantiers, 2 par agents paralleles)** :
+- **RACK EN BAS** (demande utilisateur) : panneau device pleine largeur
+  sous l'etabli (frere de .workspace), splitter horizontal (hauteur
+  persistee), onglets Rack/Piano-roll conserves, piano-roll pleine
+  largeur. .col-rack -> .panel-device (modif ui-rework.spec signalee).
+- **D3 DRAG & DROP** : instruments/effets/samples du navigateur se
+  glissent sur les pistes (device ajoute + piste selectionnee), sur le
+  vide (nouvelle piste + device), samples poses a la position du drop.
+  Feedback dragover. dnd-browser.spec.
+- **A1 AUTOMATION (document seul)** : AutomationLaneDef additif
+  (piste + master), 6 mutateurs undo-journalises, automationValueAt pur
+  (contrat d'exactitude pour le moteur A2). SCHEMA.md documente.
+  automation-doc.spec. Le moteur IGNORE ces champs jusqu'a A2.
+- **BOX / fenetres de plugin** (apres 2 retours utilisateur) : fenetre
+  TOPMOST tant qu'ouverte (devant Chrome garanti), croix (X) resynchronise
+  le ring, --editors retire de daw.ps1 (a la demande), etat memorise hors
+  DOM. Suite e2e **53/53**, tsc 0, gtests 42/42.
 
 ## Criteres d'acceptation
 
