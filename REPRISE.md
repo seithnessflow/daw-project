@@ -26,9 +26,14 @@ Suite e2e **70/70**, moteur **45/45**, cargo 9/9, tsc 0.
 
 ## Point de synchro (A LIRE EN PREMIER)
 
-CI VERTE verifiee jusqu'a 93a8c6f. Pushes du 27 : 002a4b5 (preuve),
-232beb7 (gestes), fca5b6b (A3+D4) - **verdicts CI a verifier en premier**
-(gh run list ; le commit REPRISE part apres, son verdict aussi).
+**CI VERTE VERIFIEE sur tout le 27** : 002a4b5 (preuve par etage),
+232beb7 (gestes), fca5b6b (A3+D4), edddf27 (docs), 385facf (fix specs
+BOX). Seul 92dd535 fut ROUGE (le refus-visible de BOX cassait 2 specs
+qui testaient l'envoi sans moteur - modif de test signalee, corrige et
+vert dans 385facf). Ajout tardif : BOX refuse VISIBLEMENT (flash rouge +
+pastille) quand le moteur est deconnecte - fin des clics dans le vide
+(4 retours utilisateur avaient cette meme cause). Ce commit REPRISE
+part apres 385facf (meme code, docs seuls) - verdict attendu vert.
 
 ## RESTE / prochaine tranche
 
