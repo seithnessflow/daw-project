@@ -25,6 +25,7 @@ import { renderPresence } from './presence_view';
 import { renderPianoRoll } from '../ui/piano_roll';
 import { renderSession } from '../ui/session';
 import { renderMixer } from '../ui/mixer';
+import { renderAutomationLanes } from '../ui/automation_lane';
 import { cssId } from '../document/sanitize';
 import { orderedTracks } from '../document/schema';
 import { initTrackReorder } from './track_reorder';
@@ -254,4 +255,6 @@ export function renderTracks(force = false): void {
   // T7/T8 : la grille Session et la console Mixage suivent le doc. Cheap si cachees.
   renderSession();
   renderMixer();
+  // A3 : les lanes d'automation decorent les .track frais (no-op si fermees)
+  renderAutomationLanes();
 }

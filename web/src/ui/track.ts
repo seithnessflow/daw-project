@@ -18,6 +18,7 @@
 
 import type { TrackDef, ProcessorDef } from '../document/schema';
 import { clipDisplayName } from '../document/schema';
+import { toggleAutomationLane, isAutomationOpen } from './automation_lane';
 import { clampSamples, cssId } from '../document/sanitize';
 import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
 
@@ -110,6 +111,21 @@ export function createTrackUI(
       const on = btn.getAttribute('aria-pressed') !== 'true';
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       onMonitorToggle?.(kind, on);
+    });
+    monitor.appendChild(btn);
+  }
+  // A3 : le bouton A ouvre/ferme la LANE D'AUTOMATION de la piste (module
+  // ui/automation_lane - presentation locale, le doc porte les enveloppes)
+  {
+    const btn = document.createElement('button');
+    btn.className = 'monitor-btn monitor-auto';
+    btn.dataset.role = 'automation';
+    btn.textContent = 'A';
+    btn.title = 'Enveloppes d\'automation (volume / pan)';
+    btn.setAttribute('aria-pressed', isAutomationOpen(track.id) ? 'true' : 'false');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleAutomationLane(track.id);
     });
     monitor.appendChild(btn);
   }
