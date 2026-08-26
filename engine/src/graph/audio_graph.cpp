@@ -30,6 +30,7 @@ AudioGraph::AudioGraph(AudioGraph&& other) noexcept
     , track_buffer_(std::move(other.track_buffer_))
     , mix_buffer_(std::move(other.mix_buffer_))
     , master_automation_(std::move(other.master_automation_))
+    , probe_(other.probe_)
     , master_gain_(other.master_gain_.load(std::memory_order_relaxed))
     , master_peak_left_(other.master_peak_left_.load(std::memory_order_relaxed))
     , master_peak_right_(other.master_peak_right_.load(std::memory_order_relaxed))
@@ -45,6 +46,7 @@ AudioGraph& AudioGraph::operator=(AudioGraph&& other) noexcept {
         track_buffer_ = std::move(other.track_buffer_);
         mix_buffer_ = std::move(other.mix_buffer_);
         master_automation_ = std::move(other.master_automation_);
+        probe_ = other.probe_;
         master_gain_.store(other.master_gain_.load(std::memory_order_relaxed),
                            std::memory_order_relaxed);
         master_peak_left_.store(other.master_peak_left_.load(std::memory_order_relaxed),
@@ -133,6 +135,8 @@ bool AudioGraph::process(
     if (auto v = laneValueFor(master_automation_, "gain", position_samples)) {
         master = mapGain(*v);
     }
+    // Preuve par etage : le MIX avant master (la somme des pistes)
+    if (probe_) probe_->feed("__master__", "mix", output, frame_count);
     float mpl = 0.0f;
     float mpr = 0.0f;
     for (uint32_t j = 0; j < frame_count; ++j) {
@@ -147,6 +151,8 @@ bool AudioGraph::process(
     }
     master_peak_left_.store(mpl, std::memory_order_relaxed);
     master_peak_right_.store(mpr, std::memory_order_relaxed);
+    // Preuve par etage : la SORTIE finale (post-masterGain)
+    if (probe_) probe_->feed("__master__", "master", output, frame_count);
 
     return true;
 }
@@ -204,6 +210,9 @@ void AudioGraph::processTrack(
         }
     }
 
+    // Preuve par etage (offline) : le signal APRES le mix des clips
+    if (probe_) probe_->feed(track.id, "clips", output, frame_count);
+
     // Apply track gain (atomic load for thread-safe real-time updates)
     // A2 : une lane 'gain' enabled PRIME sur la valeur manuelle (design
     // section 2). Evaluation au premier sample du sous-bloc (256 frames),
@@ -215,6 +224,7 @@ void AudioGraph::processTrack(
     for (uint32_t i = 0; i < frame_count * 2; ++i) {
         output[i] *= gain_value;
     }
+    if (probe_) probe_->feed(track.id, "gain", output, frame_count);
 
     // F5 : notes de session bouclees vers l'instrument, AVANT la chaine (le
     // node draine son ring en process()). Le flag suppress coupe ses notes de
@@ -263,6 +273,9 @@ void AudioGraph::processTrack(
             node_peak_left_[gi].store(npl, std::memory_order_relaxed);
             node_peak_right_[gi].store(npr, std::memory_order_relaxed);
         }
+        // Preuve par etage : le signal APRES CE node (l'id du document -
+        // le meme chez tous les pairs, donc les hash sont comparables)
+        if (probe_) probe_->feed(track.id, processor->getId(), output, frame_count);
         ++node_j;
     }
 
@@ -290,6 +303,7 @@ void AudioGraph::processTrack(
             output[i * 2 + 1] *= gr;
         }
     }
+    if (probe_) probe_->feed(track.id, "pan", output, frame_count);
 
     // Calculate peaks for metering
     float peak_l = 0.0f;

@@ -3676,6 +3676,84 @@ static bool testAutomationRender() {
     return true;
 }
 
+// Preuve par etage (2026-08-27) : le probe DIT ou l'audio change - gain 0.5
+// => l'etage gain doit mesurer EXACTEMENT -6.02 dB sous l'etage clips, et
+// deux rendus doivent produire le MEME JSON (hash d'etage deterministes).
+static bool testStageProbe() {
+    std::cout << "Test: stage probe (preuve par etage)... ";
+
+    const fs::path dir = fs::temp_directory_path() / "daw-probe-test";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    std::vector<int16_t> in(4096 * 2, 16000);  // constante dyadique
+    if (!writeWav16((dir / "probehash.wav").string(), 2, 48000, in)) {
+        std::cout << "FAILED: asset\n"; return false;
+    }
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) { std::cout << "FAILED: doc\n"; return false; }
+    daw::document::TrackDef track;
+    track.id = "t1";
+    track.name = "probe";
+    track.gain = 0.5f;
+    daw::document::ClipDef c;
+    c.id = "c1"; c.asset_hash = "probehash";
+    c.start_sample = 0; c.length_samples = 2048;
+    track.clips.push_back(c);
+    if (!doc.addTrack(track)) { std::cout << "FAILED: addTrack\n"; return false; }
+
+    daw::render::OfflineRenderer renderer;
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.bit_depth = 16;
+    config.probe_path = (dir / "p1.json").string();
+    if (!renderer.render(doc, (dir / "o1.wav").string(), dir.string(), config).success) {
+        std::cout << "FAILED: render 1\n"; return false;
+    }
+    config.probe_path = (dir / "p2.json").string();
+    if (!renderer.render(doc, (dir / "o2.wav").string(), dir.string(), config).success) {
+        std::cout << "FAILED: render 2\n"; return false;
+    }
+    const auto slurp = [](const fs::path& p) {
+        std::ifstream f(p, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(f)),
+                           std::istreambuf_iterator<char>());
+    };
+    const std::string j1 = slurp(dir / "p1.json");
+    const std::string j2 = slurp(dir / "p2.json");
+    if (j1.empty() || j1 != j2) {
+        std::cout << "FAILED: probe non deterministe entre 2 rendus\n"; return false;
+    }
+    // Extraction fruste mais exacte : rms de l'etage clips et de l'etage gain
+    const auto rmsOf = [&](const std::string& stage) -> double {
+        const std::string needle = "\"stage\":\"" + stage + "\"";
+        const size_t at = j1.find(needle);
+        if (at == std::string::npos) return 999.0;
+        const size_t r = j1.find("\"rms_dbfs\":", at);
+        return std::stod(j1.substr(r + 11));
+    };
+    const double clips_rms = rmsOf("clips");
+    const double gain_rms = rmsOf("gain");
+    const double pan_rms = rmsOf("pan");
+    // gain 0.5 = -6.0206 dB exactement (le signal constant rend le rms pur)
+    const double drop = clips_rms - gain_rms;
+    if (clips_rms > 0.0 || std::fabs(drop - 6.02) > 0.02) {
+        std::cout << "FAILED: chute de gain " << drop << " dB (attendu 6.02)\n";
+        return false;
+    }
+    // pan 0 : etage pan == etage gain (centre neutre, aucun octet change)
+    if (std::fabs(pan_rms - gain_rms) > 1e-9) {
+        std::cout << "FAILED: pan neutre a change le signal\n"; return false;
+    }
+    // le master doit etre present (piste __master__)
+    if (j1.find("\"track\":\"__master__\"") == std::string::npos) {
+        std::cout << "FAILED: etage master absent\n"; return false;
+    }
+    std::cout << "OK (deterministe, -6.02 dB au gain, pan neutre, master)\n";
+    return true;
+}
+
 // F5+ : launch quantise - la grille (nextQuantumStart, helper pur) puis la
 // machine a etats du graphe : ancre immediate, mise en file, stop FILTRE par
 // scene (le defaut pre-F5+ tuait les slots des autres scenes), promotion par
@@ -3818,6 +3896,7 @@ int main(int argc, char* argv[]) {
     run(testSessionQuantizedLaunch);  // F5+
     run(testAutomationEvaluator);  // A2
     run(testAutomationRender);     // A2
+    run(testStageProbe);           // preuve par etage
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);

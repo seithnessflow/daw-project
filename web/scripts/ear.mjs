@@ -20,6 +20,9 @@
 //   --out <name>          output WAV name, ear/<name>.wav (default
 //                         'current') - lets several variants coexist for
 //                         A/B comparison with ear:analyze
+//   --probe               PREUVE PAR ETAGE : peak/rms/hash du signal entre
+//                         chaque maillon (clips -> gain -> plugins -> pan ->
+//                         master), table imprimee + JSON ear/<out>-probe.json
 //
 // Examples:
 //   npm run ear -- --solo "Track 1"                 # the AGain track alone
@@ -170,9 +173,16 @@ mkdirSync(stageDir, { recursive: true });
 }
 
 // ---- Render (offline, silent by nature) -----------------------------------
+// --probe : la PREUVE PAR ETAGE (2026-08-27) - peak/rms/hash du signal entre
+// chaque maillon de chaque piste (clips -> gain -> chaque plugin -> pan ->
+// master). C'est l'outil qui repond a "l'audio n'est pas comme il faut" par
+// des NOMBRES etage par etage, au lieu d'une heure de soupcons.
+const wantProbe = args.includes('--probe');
+const probeJson = join(earDir, `${outName}-probe.json`);
 const render = spawnSync(
   engineExe,
   ['--doc', docCopy, '--render', outWav, '--assets', stageDir,
+   ...(wantProbe ? ['--probe', probeJson] : []),
    '--vst3-module', `${againUid}=${againModule}`,
    ...extraModules.flatMap((m) => ['--vst3-module', m])],
   { cwd: join(root, 'engine', 'build-msvc'), encoding: 'utf8', timeout: 120000 },
@@ -194,6 +204,30 @@ if (render.status !== 0) {
       console.error('render| ' + line.trim());
     }
   }
+}
+
+// ---- Preuve par etage : table lisible --------------------------------------
+if (wantProbe && existsSync(probeJson)) {
+  const stages = JSON.parse(readFileSync(probeJson, 'utf8'));
+  const doc = Automerge.load(readFileSync(docCopy));
+  const nodeName = new Map();
+  for (const t of doc.tracks) for (const p of t.chain ?? []) {
+    nodeName.set(p.id, p.name ?? p.type);
+  }
+  const trackName = new Map(doc.tracks.map((t) => [t.id, t.name || t.id]));
+  console.error('\n=== PREUVE PAR ETAGE (peak dBFS / rms dBFS / hash) ===');
+  let current = null;
+  for (const s of stages) {
+    const tn = s.track === '__master__' ? 'MASTER' : (trackName.get(s.track) ?? s.track);
+    if (tn !== current) { console.error(`-- ${tn}`); current = tn; }
+    const label = nodeName.get(s.stage) ?? s.stage;
+    const silent = s.peak_dbfs <= -119.9 ? '  << SILENCE' : '';
+    console.error(
+      `   ${label.padEnd(22)} peak ${String(s.peak_dbfs).padStart(7)}  ` +
+      `rms ${String(s.rms_dbfs).padStart(7)}  ${s.hash.slice(0, 12)}${silent}`);
+  }
+  console.error('(hash identique entre 2 rendus = memes octets a cet etage ;');
+  console.error(' un hash qui change DIT quel maillon a change l\'audio)\n');
 }
 
 // ---- Gate -----------------------------------------------------------------

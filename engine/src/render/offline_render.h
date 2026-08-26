@@ -33,6 +33,9 @@ struct RenderConfig {
     uint32_t block_size = 512;    // Processing block size
     int64_t start_sample = 0;     // Start position
     int64_t end_sample = -1;      // End position (-1 = end of project)
+    // Preuve audio par etage (2026-08-27) : chemin d'un JSON a ecrire
+    // (peak/rms/hash par etage de chaque piste). Vide = pas de sonde.
+    std::string probe_path;
 };
 
 /**

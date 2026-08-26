@@ -75,6 +75,8 @@ void printUsage(const char* program) {
               << "  --editors          Open each VST3 plugin's native GUI window (windowed hosting v1)\n"
               << "  --vst3-dir <dir>   Scan a VST3 folder (repeatable; cached, crash-isolated enumeration)\n"
               << "  --render <file>    Render to WAV file\n"
+              << "  --probe <file>     With --render: write per-stage audio proof JSON\n"
+              << "                     (peak/rms/hash between every chain node of every track)\n"
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
               << "  --mute             Use null audio backend (silent playback for testing)\n"
@@ -132,6 +134,7 @@ struct Options {
     std::vector<std::string> allow_origins;  // Extra allowed Origins for the WS server
     std::vector<std::string> solo_tracks;
     std::vector<std::string> mute_tracks;
+    std::string probe_path;  // preuve audio par etage (--render seulement)
 };
 
 bool parseArgs(int argc, char* argv[], Options& opts) {
@@ -189,6 +192,12 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.vst3_dirs.push_back(argv[i]);
+        } else if (arg == "--probe") {
+            if (++i >= argc) {
+                std::cerr << "Error: --probe requires a file path\n";
+                return false;
+            }
+            opts.probe_path = argv[i];
         } else if (arg == "--mute") {
             opts.mute = true;
         } else if (arg == "--ws-port") {
@@ -893,6 +902,7 @@ int doRender(const daw::document::AutomergeDocument& doc, const Options& opts) {
     daw::render::RenderConfig config;
     config.sample_rate = opts.sample_rate;
     config.bit_depth = opts.bit_depth;
+    config.probe_path = opts.probe_path;  // preuve audio par etage
 
     daw::render::OfflineRenderer renderer;
     if (!opts.vst3_modules.empty()) {

@@ -14,6 +14,7 @@
 #include "clip_player.h"
 #include "gain_node.h"
 #include "automation.h"             // A2 : enveloppes (evaluation pure)
+#include "stage_probe.h"            // preuve audio par etage (offline)
 #include "../host/midi_schedule.h"  // F5 : ScheduledNote pour les slots Session
 
 #include <atomic>
@@ -248,6 +249,13 @@ public:
     }
 
     /**
+     * Preuve audio par etage (2026-08-27) : OFFLINE UNIQUEMENT - nul en
+     * live (un if par etage dans processTrack, zero cout RT). Installee
+     * par offline_render quand --probe est demande.
+     */
+    void setStageProbe(StageProbe* probe) noexcept { probe_ = probe; }
+
+    /**
      * Y a-t-il au moins un slot lance ? Le callback l'utilise pour traiter le
      * graphe MEME a l'arret (sinon les slots ne sonneraient qu'en lecture).
      */
@@ -367,6 +375,9 @@ private:
     // a recent-ish value for visual metering. No barriers, no cost.
     // A2 : automation du master (immuable une fois actif)
     std::vector<daw::document::AutomationLaneDef> master_automation_;
+
+    // Preuve par etage : nul en live, pose par offline_render (--probe)
+    StageProbe* probe_ = nullptr;
 
     // V1.2: master stage (atomics - sacred-thread rules)
     std::atomic<float> master_gain_{1.0f};

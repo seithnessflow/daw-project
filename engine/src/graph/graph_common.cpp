@@ -33,6 +33,13 @@ ClipPlayer makeClipPlayer(const document::ClipDef& clip_def,
     info.fade_out_samples = fade_out < half ? fade_out : half;
     player.setClip(info);
 
+    // Un hash VIDE est LEGITIME : clip MIDI (v8) / slot Session - ses notes
+    // vont a l'instrument, il n'a pas d'asset. Sans ce cas, la garde B5
+    // hurlait "unsafe hash" sur chaque clip MIDI (7 warnings par build de
+    // graphe sur studio, 2026-08-27) : du bruit qui masquait les vrais.
+    if (clip_def.asset_hash.empty()) {
+        return player;  // clip sans audio, silencieux par nature
+    }
     // AUDIT-5 B5: a document-supplied hash must never become a path escape.
     if (!daw::util::isPathComponentSafe(clip_def.asset_hash)) {
         std::cerr << "WARNING: unsafe asset hash rejected (path traversal?): "

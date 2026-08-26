@@ -68,6 +68,12 @@ RenderResult OfflineRenderer::render(
     // the render loop below must never feed process() more than that.
     graph->prepare(config.sample_rate, audio::INTERNAL_BLOCK_SIZE);
 
+    // Preuve audio par etage (2026-08-27) : installee AVANT le pre-roll ?
+    // NON - apres (voir plus bas) : le pre-roll rejoue un segment pour
+    // chauffer l'etat des plugins, ses octets ne font pas partie du rendu
+    // et pollueraient les hash d'etage.
+    graph::StageProbe probe;
+
     // Calculate render range
     int64_t start = config.start_sample;
     int64_t end = config.end_sample;
@@ -133,6 +139,12 @@ RenderResult OfflineRenderer::render(
         warm += warm_frames;
     }
 
+    // Preuve par etage : posee APRES le pre-roll (ses octets jetes ne font
+    // pas partie du rendu et pollueraient les hash), retiree avant retour.
+    if (!config.probe_path.empty()) {
+        graph->setStageProbe(&probe);
+    }
+
     int64_t position = start;
     while (position < end) {
         // Calculate block size for this iteration
@@ -195,6 +207,19 @@ RenderResult OfflineRenderer::render(
             result.error = "Plugin bridge failed during render (node " +
                            node->getId() + ")";
             return result;
+        }
+    }
+
+    // Preuve par etage : ecrire le JSON (echec = rendu QUAND MEME reussi,
+    // mais on le dit - la preuve manquante ne doit pas passer inapercue)
+    graph->setStageProbe(nullptr);
+    if (!config.probe_path.empty()) {
+        std::ofstream pf(config.probe_path, std::ios::binary);
+        if (pf) {
+            pf << probe.toJson();
+            std::cout << "Stage probe written: " << config.probe_path << "\n";
+        } else {
+            std::cerr << "WARNING: stage probe NOT written (" << config.probe_path << ")\n";
         }
     }
 
