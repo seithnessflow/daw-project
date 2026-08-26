@@ -111,8 +111,11 @@ test.describe('Gestes complets : rack-cible, clic droit navigateur, dblclick', (
         bypass: false, params: [] });
       (window as any).__dawFlush?.();
     }, trackId);
+    // MODIF SIGNALEE (2026-08-27) : simuler l'etat connecte - BOX refuse
+    // visiblement sans moteur (voir ui-rack.spec, meme justification).
     await page.evaluate(() => {
       const eng = (window as any).__dawEngine;
+      eng.isConnected = () => true;
       (window as any).__edCalls = [];
       const orig = eng.setEditor?.bind(eng);
       eng.setEditor = (id: string, open: boolean) => {

@@ -64,9 +64,14 @@ test.describe('Rack : bouton BOX = fenetre GUI a la demande (F1 web)', () => {
   test('un vst3 a un bouton editeur ; le clic appelle engineClient.setEditor(procId, open)', async ({ page }) => {
     await open(page, `ui-editor-${Date.now()}`);
 
-    // espionne setEditor
+    // MODIF DE TEST SIGNALEE (2026-08-27) : BOX refuse desormais VISIBLEMENT
+    // le clic quand le moteur est deconnecte (une action montre tous ses
+    // effets - fin des clics dans le vide). Pour tester le CHEMIN d'envoi
+    // en lab (sans moteur), on simule l'etat connecte ; le refus a son
+    // pilote dedie (traces/box-refus.png).
     await page.evaluate(() => {
       const eng = (window as any).__dawEngine;
+      eng.isConnected = () => true;
       (window as any).__edCalls = [];
       const orig = eng.setEditor.bind(eng);
       eng.setEditor = (idArg: string, open: boolean) => { (window as any).__edCalls.push([idArg, open]); orig(idArg, open); };
