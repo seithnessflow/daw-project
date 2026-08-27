@@ -22,9 +22,16 @@ jamais d'auto-switch) — prouve sur la VRAIE stack (essai-claude joue,
 puis moteur rendu a studio). + Le transport REFUSE le desaccord ;
 snap de pose = grille du zoom ; + clip MIDI revele le piano-roll ;
 composition-utilisateur complete (essai-claude : beat kit + basse
-Dexed, export traces/essai-claude-mixdown.wav, ear verte). Moisson
-restante au TODO 7 (pose avalee sur position occupee, kit de
-demarrage). Verdict CI a verifier : af0bd8e (+ 95be372 compo).
+Dexed, export traces/essai-claude-mixdown.wav, ear verte).
+ET (suite 9) : IMPORT UNIVERSEL (drop mp3/flac/ogg -> decode
+navigateur au taux du projet -> WAV 16 bits au store, moteur intact,
+prouve au vrai mp3) ; POSE EN COUCHE (clic arme sur position occupee
+= pose, chevauchement=somme) + ANTI-FLAM (meme sample meme pas =
+refus visible) ; cellules piano-roll adressables (data-pitch/step).
+Suite e2e 83/83. CI VERTE sur TOUS les pushes du jour jusqu'a
+af0bd8e inclus ; dernier verdict a verifier : 6c3526a (import).
+Moisson restante : kit de demarrage hors ?lab=1 (concept), GR meter
+(avec 4.2), et les chantiers AUDIT-6 (multi-selection, tempo...).
 
 ## POINT DE SYNCHRO (A LIRE EN PREMIER)
 
