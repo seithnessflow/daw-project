@@ -14,11 +14,10 @@ attend sa RATIFICATION.
 
 ## POINT DE SYNCHRO (A LIRE EN PREMIER)
 
-**Verdict CI attendu sur le push du 2026-08-27 soir** (3 commits :
-4789a2a export mixdown, cd49674 pre-ecoute, + docs/cloture) : verifier
-`gh run list` — code touche (moteur+web+proto), la CI DOIT tourner.
-Piege connu : un push DOCS SEULS ne produit AUCUN run (paths-ignore
-'**.md' — c'est ecrit dans ci.yml, pas un rouge).
+**Verdict CI attendu sur bf2c8bb (gardes d'onglet)** : verifier
+`gh run list`. Le push precedent (export+pre-ecoute) est deja VERT
+(run 33070584737). Piege connu : un push DOCS SEULS ne produit AUCUN
+run (paths-ignore '**.md' — ecrit dans ci.yml, pas un rouge).
 
 ## CE QUE LA SESSION A LIVRE (2026-08-27)
 
@@ -35,8 +34,18 @@ Piege connu : un push DOCS SEULS ne produit AUCUN run (paths-ignore
 3. **PRE-ECOUTE SAMPLES** (cd49674) : ▶ par chip (ui/preview.ts,
    WebAudio, -3 dB, un seul a la fois, n'arme pas le chip, refus
    visible si store muet).
-4. Preuves : e2e **74/74** (dont export-mixdown 2/2 moteur reel avec
-   AGain rendu, sample-preview 2/2), gtests 45/45, tsc 0.
+4. **GARDES D'ONGLET** (bf2c8bb, sur 2 incidents utilisateur du soir) :
+   - garde de VERSION : /api/version (identite du processus vite),
+     l'onglet poll 10 s et se RECHARGE seul si la stack a ete relancee
+     sous lui (« vieille version du site » fermee) ;
+   - garde de PROJET : badge topbar + project_id du moteur dans
+     EngineState (champ 7) ; desaccord = bandeau rouge + bouton
+     rejoindre + export REFUSE (l'incident « onglet vide, export qui
+     sonne » etait CE desaccord : onglet ≠ projet du moteur).
+5. Preuves finales : e2e **76/76** (export-mixdown 2/2, sample-preview
+   2/2, tab-guards 2/2), gtests 45/45, tsc 0. **CI VERTE verifiee** sur
+   le push export+pre-ecoute (run 33070584737) ; verdict du push
+   gardes (bf2c8bb) = premier point de synchro ci-dessus.
 
 ## LA DECISION OUVERTE (inchangee)
 
@@ -79,4 +88,8 @@ GR meter (avec 4.2), dr_flac/dr_mp3 a l'import.
   se TELECHARGE (studio-mixdown.wav — l'ecouter dans le lecteur) ;
   2) rail gauche onglet **Samples** : le **▶** d'un chip JOUE le
   sample (re-clic = stop), sans l'armer ;
-  3) moteur coupe -> le clic WAV↓ FLASHE rouge et dit pourquoi.
+  3) moteur coupe -> le clic WAV↓ FLASHE rouge et dit pourquoi ;
+  4) GARDES : le badge cuivre a cote du titre dit LE projet de
+  l'onglet ; ouvrir un VIEUX onglet -> il se recharge seul en <= 10 s ;
+  un onglet sur un autre projet que le moteur -> bandeau rouge +
+  bouton « Ouvrir <projet> ».
