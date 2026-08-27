@@ -42,10 +42,58 @@ function laneOf(trackId: string): HTMLElement | null {
     `[data-track-id="${trackId}"] .track-lane`) as HTMLElement | null;
 }
 
+/**
+ * IMPORT UNIVERSEL (AUDIT-6 QW, 2026-08-27) : re-encode un AudioBuffer en
+ * WAV PCM 16 bits. Le STORE reste du WAV canonique (le moteur ne change
+ * pas) ; le decodage navigateur (mp3/flac/ogg/m4a) + l'OfflineAudioContext
+ * au taux du PROJET donnent le resampling gratuitement. 16 bits assume
+ * (documente) : les sources compressees sont deja lossy ; un FLAC 24 bits
+ * perd 8 bits a l'import - dette datee si ca gene.
+ */
+export function encodeWav16(buf: AudioBuffer): ArrayBuffer {
+  const ch = Math.min(2, buf.numberOfChannels);
+  const frames = buf.length;
+  const out = new ArrayBuffer(44 + frames * ch * 2);
+  const v = new DataView(out);
+  const w4 = (o: number, s: string) => {
+    for (let i = 0; i < 4; i++) v.setUint8(o + i, s.charCodeAt(i));
+  };
+  w4(0, 'RIFF'); v.setUint32(4, 36 + frames * ch * 2, true); w4(8, 'WAVE');
+  w4(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);                       // PCM
+  v.setUint16(22, ch, true);
+  v.setUint32(24, buf.sampleRate, true);
+  v.setUint32(28, buf.sampleRate * ch * 2, true); // byte rate
+  v.setUint16(32, ch * 2, true);                  // block align
+  v.setUint16(34, 16, true);                      // bits
+  w4(36, 'data'); v.setUint32(40, frames * ch * 2, true);
+  const chans = [] as Float32Array[];
+  for (let c = 0; c < ch; c++) chans.push(buf.getChannelData(c));
+  let o = 44;
+  for (let i = 0; i < frames; i++) {
+    for (let c = 0; c < ch; c++) {
+      const s = Math.max(-1, Math.min(1, chans[c][i]));
+      v.setInt16(o, Math.round(s * 32767), true);
+      o += 2;
+    }
+  }
+  return out;
+}
+
+/** Decode n'importe quel format navigateur AU TAUX DONNE -> WAV 16 bits. */
+export async function transcodeToProjectWav(
+  input: ArrayBuffer, sampleRate: number): Promise<ArrayBuffer> {
+  // OfflineAudioContext : decodeAudioData RESAMPLE vers le taux du
+  // contexte (spec WebAudio) - le 44.1k arrive a 48k sans rien faire.
+  const oc = new OfflineAudioContext(2, 2, sampleRate);
+  const buf = await oc.decodeAudioData(input);
+  return encodeWav16(buf);
+}
+
 export async function handleFileDrop(
   file: File, trackId: string, laneX: number): Promise<void> {
   if (!ctx.project) return;
-  // Garde de kind : un WAV ne se pose pas sur une piste MIDI
+  // Garde de kind : un fichier audio ne se pose pas sur une piste MIDI
   const tdef = ctx.project.getDocument().tracks.find((t) => t.id === trackId);
   if (tdef && !trackAcceptsAudio(tdef)) {
     const lane = laneOf(trackId);
@@ -53,13 +101,26 @@ export async function handleFileDrop(
       'Piste MIDI : un fichier audio ne se pose pas ici');
     return;
   }
-  const bytes = await file.arrayBuffer();
+  let bytes = await file.arrayBuffer();
   const head = new Uint8Array(bytes.slice(0, 12));
   const ascii = (o: number, n: number) =>
     String.fromCharCode(...head.slice(o, o + n));
   if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WAVE') {
-    console.error(`drop refused: ${file.name} is not a WAV (compressed formats are backlog)`);
-    return;
+    // Pas un WAV : IMPORT UNIVERSEL - le navigateur decode (mp3/flac/
+    // ogg/m4a), on re-encode en WAV canonique au taux du projet. Un
+    // fichier indechiffrable = refus VISIBLE, jamais un silence.
+    try {
+      const rate = ctx.project.getDocument().sampleRate || 48000;
+      bytes = await transcodeToProjectWav(bytes, rate);
+      console.log(`import: ${file.name} transcode en WAV ${rate} Hz `
+        + `(${bytes.byteLength} octets)`);
+    } catch {
+      const lane = laneOf(trackId);
+      if (lane) flashLaneRefusal(lane,
+        `« ${file.name} » n'est pas un fichier audio lisible`);
+      console.error(`drop refused: ${file.name} undecodable`);
+      return;
+    }
   }
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const hash = Array.from(new Uint8Array(digest))
@@ -291,11 +352,20 @@ async function placeSampleFromDrop(
   const dropStep = snapStep();  // la grille du zoom, comme les drags
   const seconds = Math.max(0,
     Math.round((laneX / TIMELINE.pps) / dropStep) * dropStep);
+  const dropStart = Math.round(seconds * sr);
+  // Anti-doublon meme-sample (le meme garde que le clic arme)
+  if (tdef?.clips.some((c) => !c.sceneId && c.assetHash === sample.hash &&
+      c.startSample === dropStart)) {
+    const lane = laneOf(trackId);
+    if (lane) flashLaneRefusal(lane,
+      `« ${sample.name} » est deja pose exactement ici`);
+    return;
+  }
   const placedId = `clip-${sample.name}-${Date.now()}`;
   ctx.project.addClip(trackId, {
     id: placedId,
     assetHash: sample.hash,
-    startSample: Math.round(seconds * sr),
+    startSample: dropStart,
     lengthSamples: Math.round(sample.seconds * sr),
     offsetSamples: 0,
   });

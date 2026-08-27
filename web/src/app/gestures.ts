@@ -136,6 +136,12 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       sendLastChange();
       renderTracks(true);
     } else {
+      // Un sample ARME change le sens du clic : POSER EN COUCHE
+      // (chevauchement=somme, le modele moteur) au lieu de selectionner -
+      // avant, le clic sur une position occupee etait AVALE en silence
+      // (2 snares perdues en composant, 2026-08-27). On laisse l'event
+      // 'click' buller vers le placeur de wiring (pas de justDragged).
+      if (ctx.library?.getArmed()) return;
       // A plain click on the title bar: select the clip (and its track)
       ctx.selectedClipId = clipId;
       ctx.selectedTrackId = trackId;

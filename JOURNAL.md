@@ -1519,3 +1519,22 @@ navigation « Ouvrir » remplacee par le switch, geste devenu
 secondaire), gtests 45/45. Piege paye : un serveur ZOMBIE d'une spec
 ecoutait sur 3000 et refusait tout - tuer/relancer avant d'accuser le
 code (2 faux rouges).
+
+**2026-08-27 (suite 9 - import universel + pose en couche) :** trois
+livraisons de la moisson de composition :
+- IMPORT UNIVERSEL : un fichier non-WAV droppe est DECODE PAR LE
+  NAVIGATEUR (mp3/flac/ogg/m4a) dans un OfflineAudioContext AU TAUX DU
+  PROJET (resampling gratuit - le 44.1k arrive a 48k pile) puis
+  re-encode en WAV PCM 16 bits canonique vers le store : le moteur ne
+  change PAS. 16 bits assume (sources lossy ; FLAC 24 bits perd 8 bits
+  a l'import - dette datee si ca gene). Indechiffrable = refus VISIBLE.
+  Preuve au VRAI mp3 (voix systeme Windows Aria.mp3, test conditionnel
+  skip en CI Linux) : transcode, pose, bonne duree.
+- POSE EN COUCHE : un sample ARME clique sur une position occupee POSE
+  (chevauchement=somme, le modele moteur) au lieu d'etre avale - le
+  clic bulle du geste clip vers le placeur quand un sample est arme.
+  ANTI-FLAM : le MEME sample exactement au MEME pas = refus visible
+  (le doublon +6 dB muet de la compo).
+- Outillage : cellules du piano-roll adressables par data-pitch/step.
+e2e import-formats 3/3 du premier coup ; sonde __dawTranscode exposee
+(idiome __daw*).

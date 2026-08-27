@@ -140,7 +140,6 @@
          Ctrl+E au marqueur ; aide mise a jour. e2e clip-split 2/2
          (geometrie exacte, fades repartis, undo, refus MIDI).
    - [ ] GR METER du compresseur (avec la session 4.2 EQ3+comp).
-   - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
    MOISSON DE LA SESSION DE COMPOSITION (2026-08-27, « compose comme un
    utilisateur ») - a arbitrer :
    - [x] LE MOTEUR SUIT LE PROJET DE L'ONGLET - FAIT 2026-08-27 nuit
@@ -150,11 +149,18 @@
          reconnexion, adoption premiere-connexion) ; bouton PRIMAIRE du
          bandeau « Jouer <projet> ici », jamais d'auto-switch. Verite =
          EngineState.project_id. tab-guards 2/2, gtests 45/45.
-   - [ ] POSE SUR POSITION OCCUPEE : le clic arme sur un clip existant
-         est AVALE en silence (2 snares perdues en composant) ; et le
-         snap peut EMPILER un doublon au meme sample (flam +6 dB muet).
-         Se decide AVEC le concept chevauchement=somme/remplace
-         (AUDIT-6). Minimum : refus visible OU pose superposee assumee.
+   - [x] POSE SUR POSITION OCCUPEE - FAIT 2026-08-27 nuit : le clic
+         arme POSE EN COUCHE (chevauchement=somme, le modele moteur
+         actuel - le concept somme/remplace au DRAG reste ouvert
+         AUDIT-6) ; anti-flam : le meme sample exactement au meme pas
+         est refuse visiblement. e2e import-formats.
+   - [x] dr_flac/dr_mp3 a l'import -> RESOLU MIEUX 2026-08-27 nuit,
+         SANS toucher le moteur : IMPORT UNIVERSEL navigateur (un drop
+         mp3/flac/ogg est decode par OfflineAudioContext AU TAUX DU
+         PROJET puis re-encode WAV PCM 16 bits vers le store - WAV
+         canonique conserve, resampling gratuit). 16 bits assume
+         (FLAC 24 bits perd 8 bits - dette datee). Indechiffrable =
+         refus visible. Preuve au vrai mp3 systeme (conditionnel CI).
    - [x] SNAP DE POSE - FAIT 2026-08-27 nuit : clic arme, drop sample,
          drop WAV et marqueur suivent snapStep() du zoom.
    - [x] + clip MIDI REVELE le piano-roll - FAIT 2026-08-27 nuit

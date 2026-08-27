@@ -53,6 +53,10 @@ export function renderPianoRoll(
         + (s % 4 === 0 ? ' pr-beat' : '');
       const start = s * stepLen;
       if (has(p, start)) cell.classList.add('pr-on');
+      // Outillage de pilotage (compo 2026-08-27) : adresser une cellule
+      // par donnees, pas par geometrie - le meme contrat que les specs.
+      cell.dataset.pitch = String(p);
+      cell.dataset.step = String(s);
       cell.setAttribute('aria-label', `${NAMES[p % 12]}${Math.floor(p / 12) - 1} pas ${s + 1}`);
       cell.addEventListener('click', () => {
         const note: NoteDef = {

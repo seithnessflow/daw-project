@@ -38,7 +38,8 @@ import { initSplitters } from './splitters';
 import { initRackTabs } from './rack_tabs';
 import { initContextMenu } from './context_menu_dispatch';
 import { TransportSync } from '../network/transport_sync';
-import { handleFileDrop, flashLaneRefusal } from './placement';
+import { handleFileDrop, flashLaneRefusal,
+         transcodeToProjectWav } from './placement';
 import { trackAcceptsAudio } from '../document/schema';
 import { renderTracks } from './render';
 import { wireExport } from './export';
@@ -598,7 +599,12 @@ export async function init(): Promise<void> {
     }
   }
 
-  // ---- Drag & drop a WAV on a lane ---------------------------------------
+  // Sonde de pilotage (idiome __daw*) : l'encodeur/transcodeur d'import
+  // testable en page (roundtrip WAV, decodage mp3 reel).
+  (window as any).__dawTranscode = transcodeToProjectWav;
+
+  // ---- Drag & drop d'un fichier AUDIO sur un couloir (wav direct ;
+  // mp3/flac/ogg transcodes par le navigateur au taux du projet) --------
   els.tracks.addEventListener('dragover', (e) => {
     const lane = (e.target as HTMLElement).closest('.track-lane') as HTMLElement | null;
     if (!lane) return;
@@ -689,11 +695,22 @@ export async function init(): Promise<void> {
       const x = e.clientX - lane.getBoundingClientRect().left;
       const step = snapStep();
       const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / step) * step);
+      const startSample = Math.round(seconds * sr);
+      // ANTI-DOUBLON (compo 2026-08-27) : le snap peut ramener deux clics
+      // sur LE MEME sample - deux exemplaires superposes = flam +6 dB
+      // muet. Le meme sample au meme endroit : refus visible.
+      if (tdef?.clips.some((c) => !c.sceneId && c.assetHash === armed.hash &&
+          c.startSample === startSample)) {
+        flashLaneRefusal(lane,
+          `« ${armed.name} » est deja pose exactement ici (meme sample, `
+          + 'meme pas de grille) - viser un autre pas ou zoomer');
+        return;
+      }
       const placedId = `clip-${armed.name}-${Date.now()}`;
       ctx.project.addClip(id, {
         id: placedId,
         assetHash: armed.hash,
-        startSample: Math.round(seconds * sr),
+        startSample,
         lengthSamples: Math.round(armed.seconds * sr),
         offsetSamples: 0,
       });
