@@ -33,8 +33,11 @@ export interface TimeSignatureEvent {
 export interface NoteDef {
   pitch: number;         // 0..127
   velocity: number;      // 0..127
-  startSample: number;   // relatif au debut du clip (domaine absolu)
-  lengthSamples: number;
+  /** Relatif au debut du clip (domaine absolu). T3 : OPTIONNEL - une
+   *  note MUSICALE porte startTick/lengthTick a la place (exclusivite
+   *  de domaine) ; lire via geometry.noteStartSamples, jamais en direct. */
+  startSample?: number;
+  lengthSamples?: number;
   /** v2 : position musicale relative au debut du clip (PPQ 960). */
   startTick?: number;
   lengthTick?: number;
@@ -46,8 +49,13 @@ export interface ClipDef {
    *  les consommateurs derivent un nom de l'id via clipDisplayName(). */
   name?: string;
   assetHash: string;
-  startSample: number;
-  lengthSamples: number;
+  /** T3 : OPTIONNEL - un clip MUSICAL porte startTick a la place
+   *  (exclusivite de domaine, garde sanitize). TOUT consommateur de
+   *  geometrie passe par geometry.clipStartSamples, jamais en direct. */
+  startSample?: number;
+  /** Toujours present sur un clip audio (le contenu ne s'etire pas) ;
+   *  un clip MIDI musical peut porter lengthTick a la place. */
+  lengthSamples?: number;
   offsetSamples: number;
   /** V1.6: explicit fades, ADDITIVE (absent = 0). 0 = engine default,
    *  an implicit 4 ms anti-click ramp. */

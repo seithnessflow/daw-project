@@ -11,6 +11,7 @@
 
 import type { Project } from '../document/project';
 import type { ClipDef, NoteDef } from '../document/schema';
+import { isMusicalClip } from '../document/schema';
 
 const STEPS = 16;                 // subdivisions temporelles du clip
 const LOW = 48;                   // do3
@@ -31,10 +32,17 @@ export function renderPianoRoll(
 ): void {
   container.replaceChildren();
   container.className = 'piano-roll';
-  const stepLen = Math.max(1, Math.floor(clip.lengthSamples / STEPS));
+  // T3 : un clip MUSICAL edite en TICKS (clip d'1 mesure : 3840/16 =
+  // 240 ticks = la double-croche), un clip absolu en samples - le
+  // domaine du clip parent gouverne ses notes (jamais un mix).
+  const musical = isMusicalClip(clip) && typeof clip.lengthTick === 'number';
+  const stepLen = musical
+    ? Math.max(1, Math.floor(clip.lengthTick! / STEPS))
+    : Math.max(1, Math.floor((clip.lengthSamples ?? 0) / STEPS));
   const notes = clip.notes ?? [];
   const has = (pitch: number, start: number) =>
-    notes.some((n) => n.pitch === pitch && n.startSample === start);
+    notes.some((n) => n.pitch === pitch &&
+      (musical ? n.startTick === start : n.startSample === start));
 
   const grid = document.createElement('div');
   grid.className = 'pr-grid';
@@ -59,9 +67,9 @@ export function renderPianoRoll(
       cell.dataset.step = String(s);
       cell.setAttribute('aria-label', `${NAMES[p % 12]}${Math.floor(p / 12) - 1} pas ${s + 1}`);
       cell.addEventListener('click', () => {
-        const note: NoteDef = {
-          pitch: p, velocity: 100, startSample: start, lengthSamples: stepLen,
-        };
+        const note: NoteDef = musical
+          ? { pitch: p, velocity: 100, startTick: start, lengthTick: stepLen }
+          : { pitch: p, velocity: 100, startSample: start, lengthSamples: stepLen };
         project.toggleNote(trackId, clip.id, note);
         onChange();
       });

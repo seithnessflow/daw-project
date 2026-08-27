@@ -11,6 +11,7 @@
 
 import type { ProjectDef } from '../document/schema';
 import { orderedTracks } from '../document/schema';
+import { clipStartSamples, clipLengthSamples } from '../document/geometry';
 import { trackHue } from './track';
 
 export interface OverviewCallbacks {
@@ -113,8 +114,8 @@ export class Overview {
       const hue = trackHue(t.id);
       ctx.fillStyle = `hsl(${hue}, 45%, 48%)`;
       for (const c of t.clips) {
-        const x = (c.startSample / sr) * sx;
-        const cw = Math.max(1, (c.lengthSamples / sr) * sx);
+        const x = (clipStartSamples(c, doc) / sr) * sx;
+        const cw = Math.max(1, (clipLengthSamples(c, doc) / sr) * sx);
         ctx.fillRect(x, y, cw, rowH - 1);
       }
     });

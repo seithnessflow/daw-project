@@ -7,6 +7,9 @@
  */
 
 import { TIMELINE } from '../ui/track';
+import { clipEndSamples, sampleToTick, tickToSample }
+  from '../document/geometry';
+import type { ProjectDef } from '../document/schema';
 import { ctx, els, ZOOM_MIN, ZOOM_MAX } from './context';
 import { renderTracks } from './render';
 
@@ -20,7 +23,7 @@ export function contentSeconds(): number {
     const sr = doc.sampleRate || 48000;
     for (const t of doc.tracks) {
       for (const c of t.clips) {
-        end = Math.max(end, (c.startSample + c.lengthSamples) / sr);
+        end = Math.max(end, clipEndSamples(c, doc) / sr);
       }
     }
   }
@@ -58,6 +61,33 @@ export function snapStep(): number {
   if (pps >= 40) return 0.125;
   if (pps >= 10) return 0.25;
   return 0.5;
+}
+
+/**
+ * T3 : le pas de grille MUSICAL (ticks, PPQ 960) par zoom - le miroir
+ * exact des paliers de snapStep : a 120 BPM les deux grilles
+ * COINCIDENT (120 ticks = 0,0625 s), aux autres tempos la grille
+ * musicale gouverne les objets musicaux.
+ */
+export function snapTickStep(): number {
+  const pps = TIMELINE.pps;
+  if (pps >= 80) return 120;   // double-croche/2
+  if (pps >= 40) return 240;   // double-croche
+  if (pps >= 10) return 480;   // croche
+  return 960;                  // noire
+}
+
+/**
+ * T3 : snap MUSICAL d'une cible de geste (secondes -> tick le plus
+ * proche sur la grille snapTickStep -> secondes). Pour les clips
+ * musicaux uniquement - l'absolu garde la grille en secondes.
+ */
+export function snapSecMusical(doc: ProjectDef, sec: number): number {
+  const sr = doc.sampleRate || 48000;
+  const step = snapTickStep();
+  const tick = Math.max(0,
+    Math.round(sampleToTick(doc, sec * sr) / step) * step);
+  return tickToSample(doc, tick) / sr;
 }
 
 /**

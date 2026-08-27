@@ -1664,3 +1664,38 @@ standalone create_musical_doc.cpp attendra T5 (elle nait avec
 EXPECTED_HASH_MUSICAL) — sa substance est deja un gtest.
 Prochain : T3 (surface web — tempo topbar, grille musicale, mutateurs
 dual-aware, piano-roll en ticks, rituel du compositeur a 100 BPM).
+
+**2026-08-27 (suite 15 - T3 : le temps musical a une surface) :**
+la geometrie web passe par UN point de branche : document/geometry.ts
+(clipStartSamples/clipLengthSamples/noteStartSamples, memoises par
+VERSION de document via WeakMap - Automerge produit un objet neuf par
+change), 13 consommateurs convertis (track, overview, navigation,
+render, gestures, dispatch, wiring, placement, automation_lane,
+piano_roll, project, undo, sanitize) ; startSample devient OPTIONNEL
+dans le type (le moment prevu en T1) et tsc a pointe chaque site
+restant. Mutateurs DUAL-AWARE : setClipTiming = LE vehicule (photo des
+cinq champs temporels presents ; restaurer = poser les presents ET
+retirer les absents - l'undo d'un « Rendre musical » retire startTick
+et remet startSample), setClipStart/Bounds/move/duplicate branchent
+par domaine, la scission refuse le musical (couture d'un demi-tick -
+dette datee). Champ TEMPO en topbar (l'input parle BPM, le document
+milli-BPM entier, undo, ensureV2 lazy - un projet jamais touche reste
+v1, verifie en spec). Un clip MIDI frais NAIT musical (startTick,
+notes en ticks au piano-roll, 240 = la double-croche d'une mesure) ;
+badge ♪ + bascule Rendre musical / Rendre absolu au clic droit
+(undoable, clips audio seuls - le MIDI absolu = conversion de masse,
+dette datee). Grille : snapTickStep (120/240/480/960 par zoom, miroir
+des paliers secondes - a 120 BPM les grilles COINCIDENT), snap musical
+dans les deux gestes, regle en MESURES sur un doc v2. tempo.spec.ts :
+registre + v2 lazy + exclusivite de domaine + deplacement au ratio
+pixel 1,25 (100->80) + LWW deux onglets + bascule undoable. Une seule
+retombee de spec (ui-rename voyait « MIDI♪ ») corrigee par le DESIGN
+(badge hors du strip de nom), pas par la spec. RITUEL DU COMPOSITEUR
+a 100 BPM (hors coincidence 120), tout par l'UI : beat absolu pose,
+piste MIDI musicale + 4 notes en ticks, drag du clip snappe
+MUSICALEMENT a tick 3840 = mesure 2 a 2,400 s PILE, conversion d'un
+kick en musical, tempo 100->90 : le musical glisse du ratio 1,111
+exact et l'absolu ne bouge pas d'un pixel, export offline x2 =
+hash stable (e1d19415a6e48728). Suite 99/99, tsc 0.
+Prochain : T5 (EXPECTED_HASH_MUSICAL jumeau gtest+ci.yml ; T4 Link
+Etage 2 reste explicitement differe).

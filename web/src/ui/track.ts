@@ -16,8 +16,11 @@
  *   [data-role="param"][data-param-key], data-state on pills.
  */
 
-import type { TrackDef, ProcessorDef } from '../document/schema';
+import type { TrackDef, ProcessorDef, ProjectDef } from '../document/schema';
 import { clipDisplayName } from '../document/schema';
+import { clipStartSamples, clipLengthSamples, tickToSample }
+  from '../document/geometry';
+import { isMusicalClip } from '../document/schema';
 import { toggleAutomationLane, isAutomationOpen } from './automation_lane';
 import { clampSamples, cssId } from '../document/sanitize';
 import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
@@ -55,6 +58,7 @@ export function trackHue(trackId: string): number {
 
 export function createTrackUI(
   track: TrackDef,
+  doc: ProjectDef,  // T3 : la geometrie passe par clipStartSamples (tempo)
   sampleRate: number,
   laneSeconds: number,
   selected: boolean,
@@ -200,8 +204,9 @@ export function createTrackUI(
     clipEl.dataset.clipId = clip.id;
     // Clamp document-derived spans (M5): a hostile lengthSamples must
     // not become a giant DOM node that freezes a peer.
-    const startS = clampSamples(clip.startSample);
-    const lenS = clampSamples(clip.lengthSamples);
+    // T3 : LE point de branche geometrie (clip musical = ticks resolus)
+    const startS = clampSamples(clipStartSamples(clip, doc));
+    const lenS = clampSamples(clipLengthSamples(clip, doc));
     clipEl.style.left = `${(startS / sampleRate) * TIMELINE.pps}px`;
     clipEl.style.width = `${Math.max(2, (lenS / sampleRate) * TIMELINE.pps)}px`;
     clipEl.style.background = `hsl(${hue} var(--sat) 34%)`;
@@ -212,6 +217,19 @@ export function createTrackUI(
     nameStrip.style.background = `hsl(${hue} var(--sat) 26%)`;
     // Human name, never the raw id (source unique : clipDisplayName)
     nameStrip.textContent = clipDisplayName(clip);
+    // T3 : badge de DOMAINE - un clip musical suit le tempo (une action
+    // a deux verites possibles doit MONTRER laquelle gouverne). Le
+    // badge vit HORS de .clip-name (le nom reste le nom - la spec
+    // rename et l'inline-rename lisent le texte du strip).
+    const musical = isMusicalClip(clip);
+    clipEl.dataset.domain = musical ? 'musical' : 'absolu';
+    if (musical) {
+      const badge = document.createElement('span');
+      badge.className = 'clip-domain-badge';
+      badge.textContent = '♪';  // noire : suit le tempo
+      badge.title = 'Clip musical : suit le tempo du projet';
+      clipEl.appendChild(badge);
+    }
     clipEl.title = clip.assetHash;
     clipEl.appendChild(nameStrip);
     const wave = document.createElement('canvas');
@@ -262,7 +280,8 @@ export function createTrackUI(
  * in app/loop_region.ts, delegated so they survive rebuilds), the lower
  * band is the seek strip - the ONLY place a click seeks.
  */
-export function createRulerUI(laneSeconds: number): HTMLElement {
+export function createRulerUI(laneSeconds: number,
+  doc?: ProjectDef): HTMLElement {
   const row = document.createElement('div');
   row.className = 'ruler-row';
   const spacer = document.createElement('div');
@@ -291,12 +310,40 @@ export function createRulerUI(laneSeconds: number): HTMLElement {
   const seekBand = document.createElement('div');
   seekBand.className = 'ruler-seek';
   seekBand.dataset.role = 'seek';
-  for (let s = 0; s <= laneSeconds; s += 1) {
-    const tick = document.createElement('div');
-    tick.className = 'ruler-tick';
-    tick.style.left = `${s * TIMELINE.pps}px`;
-    if (s % 5 === 0) tick.textContent = `${s}s`;
-    seekBand.appendChild(tick);
+  // T3 : regle en MESURES.battements sur un document v2 (le noyau
+  // place chaque mesure - la grille suit le tempo) ; secondes sinon.
+  if (doc && (doc.schemaVersion ?? 1) >= 2) {
+    const sr = doc.sampleRate || 48000;
+    const endSample = laneSeconds * sr;
+    const showBeats = TIMELINE.pps >= 40;
+    for (let bar = 0; ; bar++) {
+      const barSample = tickToSample(doc, bar * 3840);
+      if (barSample > endSample) break;
+      const tick = document.createElement('div');
+      tick.className = 'ruler-tick ruler-bar';
+      tick.style.left = `${(barSample / sr) * TIMELINE.pps}px`;
+      tick.textContent = `${bar + 1}`;
+      seekBand.appendChild(tick);
+      if (showBeats) {
+        for (let beat = 1; beat < 4; beat++) {
+          const bs = tickToSample(doc, bar * 3840 + beat * 960);
+          if (bs > endSample) break;
+          const bt = document.createElement('div');
+          bt.className = 'ruler-tick ruler-beat';
+          bt.style.left = `${(bs / sr) * TIMELINE.pps}px`;
+          seekBand.appendChild(bt);
+        }
+      }
+      if (bar > 4096) break;  // garde (tempo hostile)
+    }
+  } else {
+    for (let s = 0; s <= laneSeconds; s += 1) {
+      const tick = document.createElement('div');
+      tick.className = 'ruler-tick';
+      tick.style.left = `${s * TIMELINE.pps}px`;
+      if (s % 5 === 0) tick.textContent = `${s}s`;
+      seekBand.appendChild(tick);
+    }
   }
   ruler.appendChild(seekBand);
   row.appendChild(ruler);

@@ -46,6 +46,14 @@
       <div class="position">
         <span id="position">00:00.000</span>
       </div>
+      <!-- T3 tempo : LE registre du projet (milli-BPM entier dans le
+           document ; l'input parle en BPM decimal). Undoable. -->
+      <div class="tempo-box" title="Tempo du projet (BPM, 20..999)">
+        <input type="number" id="tempo-input" data-role="tempo"
+               min="20" max="999" step="0.5" value="120"
+               aria-label="Tempo (BPM)">
+        <span class="tempo-unit">BPM</span>
+      </div>
       <span id="life-status" aria-hidden="true"></span>
       <div class="touch-modes" title="prototypes de toucher (phase 3)">
         <button data-role="touch-mode" data-mode="a" aria-pressed="false"

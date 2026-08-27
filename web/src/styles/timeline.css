@@ -302,3 +302,21 @@ body.compact-tracks .clip-name {
   flex-basis: 11px;
 }
 
+
+/* ---- T3 tempo : regle musicale (v2) + badge de domaine ------------ */
+.ruler-bar {
+  font-weight: 600;
+  color: var(--copper, #e6a552);
+}
+.ruler-beat {
+  opacity: 0.35;
+}
+.clip-domain-badge {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 9px;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 2;
+}

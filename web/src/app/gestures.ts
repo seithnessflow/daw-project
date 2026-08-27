@@ -10,8 +10,11 @@
  */
 
 import { TIMELINE } from '../ui/track';
+import { clipStartSamples, clipLengthSamples, clipEndSamples }
+  from '../document/geometry';
 import { ctx, sendLastChange } from './context';
-import { snapStep } from './navigation';
+import { snapStep, snapSecMusical } from './navigation';
+import { isMusicalClip } from '../document/schema';
 import { renderTracks } from './render';
 import { cssId } from '../document/sanitize';
 
@@ -36,15 +39,16 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
   if (!track || !clip) return;
 
   // Neighbor edges (start/end of every OTHER clip on this track)
+  // T3 : geometrie via LE point de branche (clips musicaux inclus)
   const edges: number[] = [];
   for (const c of track.clips) {
     if (c.id === clipId) continue;
-    edges.push(c.startSample / sr, (c.startSample + c.lengthSamples) / sr);
+    edges.push(clipStartSamples(c, doc) / sr, clipEndSamples(c, doc) / sr);
   }
 
   const startX = e.clientX;
   const startY = e.clientY;
-  const origSec = clip.startSample / sr;
+  const origSec = clipStartSamples(clip, doc) / sr;
   let moved = false;
   let pendingSec = origSec;
   let writeRaf = 0;
@@ -83,8 +87,12 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
     clipEl.classList.add('dragging');
     let sec = Math.max(0, origSec + dx / TIMELINE.pps);
     if (!ev.altKey) {
+      // T3 : un clip MUSICAL snappe sur la grille en TICKS (a 120 BPM
+      // les deux grilles coincident) ; l'absolu garde les secondes.
       const step = snapStep();
-      let snapped = Math.round(sec / step) * step;
+      let snapped = isMusicalClip(clip)
+        ? snapSecMusical(doc, sec)
+        : Math.round(sec / step) * step;
       // Neighbor edges win within 8 px
       for (const edge of edges) {
         if (Math.abs(sec - edge) * TIMELINE.pps < 8) { snapped = edge; break; }
@@ -204,7 +212,7 @@ export function beginFadeDrag(e: PointerEvent, handleEl: HTMLElement): void {
     ?.clips.find((c) => c.id === clipId);
   if (!clip) return;
 
-  const half = Math.floor(clip.lengthSamples / 2);
+  const half = Math.floor(clipLengthSamples(clip, doc) / 2);
   const origIn = clip.fadeInSamples ?? 0;
   const origOut = clip.fadeOutSamples ?? 0;
   let pendingIn = origIn;
@@ -281,13 +289,13 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
   const edges: number[] = [];
   for (const c of track.clips) {
     if (c.id === clipId) continue;
-    edges.push(c.startSample / sr, (c.startSample + c.lengthSamples) / sr);
+    edges.push(clipStartSamples(c, doc) / sr, clipEndSamples(c, doc) / sr);
   }
 
   const startX = e.clientX;
   const orig = {
-    start: clip.startSample / sr,
-    length: clip.lengthSamples / sr,
+    start: clipStartSamples(clip, doc) / sr,
+    length: clipLengthSamples(clip, doc) / sr,
     offset: clip.offsetSamples / sr,
   };
   const MIN_LEN = 1024 / sr;
@@ -300,7 +308,10 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
   const snapSec = (sec: number, alt: boolean): number => {
     if (alt) return sec;
     const step = snapStep();
-    let snapped = Math.round(sec / step) * step;
+    // T3 : grille musicale pour les clips musicaux (voir drag)
+    let snapped = isMusicalClip(clip)
+      ? snapSecMusical(doc, sec)
+      : Math.round(sec / step) * step;
     for (const edge of edges) {
       if (Math.abs(sec - edge) * TIMELINE.pps < 8) { snapped = edge; break; }
     }

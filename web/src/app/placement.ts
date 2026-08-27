@@ -495,7 +495,7 @@ export function refreshPalette(): void {
     for (const c of t.clips) {
       const name = clipDisplayName(c);
       const prev = byHash.get(c.assetHash);
-      const seconds = c.lengthSamples / sr;
+      const seconds = (c.lengthSamples ?? 0) / sr;
       if (!prev || seconds > prev.seconds) {
         byHash.set(c.assetHash, { name: prev?.name ?? name, seconds });
       }

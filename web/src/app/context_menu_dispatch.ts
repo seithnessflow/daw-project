@@ -9,10 +9,12 @@
 
 import { ctx, sendLastChange } from './context';
 import { isEditorOpen, markEditorOpen, TIMELINE } from '../ui/track';
-import { snapStep } from './navigation';
+import { snapStep, snapTickStep } from './navigation';
 import { showRackTab } from './rack_tabs';
 import { addDeviceToTrack } from './placement';
-import { orderedTracks, trackAcceptsMidi } from '../document/schema';
+import { orderedTracks, trackAcceptsMidi, isMusicalClip } from '../document/schema';
+import { clipStartSamples, clipEndSamples, clipLengthSamples, sampleToTick }
+  from '../document/geometry';
 import { renderTracks } from './render';
 import { showContextMenu, type MenuItem } from '../ui/context_menu';
 import { startInlineRename } from '../ui/inline_rename';
@@ -39,12 +41,15 @@ function splitTargetSample(clipEl: HTMLElement, clipId: string,
   if (!c || !c.assetHash) return null;  // MIDI = assetHash vide (schema)
   const lane = clipEl.closest('.track-lane');
   if (!lane) return null;
-  const sr = project.getDocument().sampleRate || 48000;
+  const docNow = project.getDocument();
+  const sr = docNow.sampleRate || 48000;
   const sec = (clickX - lane.getBoundingClientRect().left) / TIMELINE.pps;
   const step = snapStep();
   const at = Math.round((Math.round(sec / step) * step) * sr);
-  const left = at - c.startSample;
-  const right = c.startSample + c.lengthSamples - at;
+  // T3 : geometrie via LE point de branche (le mutateur refuse de
+  // toute facon les clips musicaux - couture d'un demi-tick)
+  const left = at - clipStartSamples(c, docNow);
+  const right = clipEndSamples(c, docNow) - at;
   return (left >= 1024 && right >= 1024) ? at : null;
 }
 
@@ -96,14 +101,23 @@ function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | nu
         });
       } },
       { label: 'Dupliquer', onClick: () => {
-        const t = doc().tracks.find((x) => x.id === trackId);
+        const d = doc();
+        const t = d.tracks.find((x) => x.id === trackId);
         const c = t?.clips.find((x) => x.id === clipId);
         if (!c) return;
-        project.addClip(trackId, {
-          ...c,
+        // T3 dual-aware : un clip musical se duplique en TICKS (colle
+        // a sa fin musicale) ; l'absolu garde le collage en samples.
+        const copy = {
+          ...(JSON.parse(JSON.stringify(c)) as typeof c),
           id: `clip-${Math.random().toString(36).slice(2, 10)}`,
-          startSample: c.startSample + c.lengthSamples,
-        } as never);
+        };
+        if (isMusicalClip(c)) {
+          copy.startTick = c.startTick! + (c.lengthTick ??
+            Math.max(1, sampleToTick(d, clipEndSamples(c, d)) - c.startTick!));
+        } else {
+          copy.startSample = (c.startSample ?? 0) + (c.lengthSamples ?? 0);
+        }
+        project.addClip(trackId, copy as never);
         sendLastChange(); renderTracks(true);
       } },
       // SCISSION (AUDIT-6) : a la position du clic droit, snappee a la
@@ -118,6 +132,45 @@ function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | nu
             sendLastChange(); renderTracks(true);
           } }]
         : []),
+      // T3 tempo : bascule de DOMAINE, clips AUDIO seuls (la conversion
+      // d'un MIDI absolu = conversion de masse des notes, dette datee).
+      // Undoable (setClipTiming restaure la photo d'avant).
+      ...((): MenuItem[] => {
+        const c = doc().tracks.find((x) => x.id === trackId)
+          ?.clips.find((x) => x.id === clipId);
+        if (!c || !c.assetHash) return [];
+        if (!isMusicalClip(c)) {
+          return [{ label: 'Rendre musical (snappe a la grille)',
+            onClick: () => {
+              const d = doc();
+              const cc = d.tracks.find((x) => x.id === trackId)
+                ?.clips.find((x) => x.id === clipId);
+              if (!cc || isMusicalClip(cc)) return;
+              const step = snapTickStep();
+              const tick = Math.max(0, Math.round(
+                sampleToTick(d, cc.startSample ?? 0) / step) * step);
+              project.setClipTiming(trackId, clipId, {
+                startTick: tick,
+                lengthSamples: cc.lengthSamples ?? 0,
+                offsetSamples: cc.offsetSamples,
+              });
+              sendLastChange(); renderTracks(true);
+            } }];
+        }
+        return [{ label: 'Rendre absolu (fige au tempo actuel)',
+          onClick: () => {
+            const d = doc();
+            const cc = d.tracks.find((x) => x.id === trackId)
+              ?.clips.find((x) => x.id === clipId);
+            if (!cc || !isMusicalClip(cc)) return;
+            project.setClipTiming(trackId, clipId, {
+              startSample: clipStartSamples(cc, d),
+              lengthSamples: clipLengthSamples(cc, d),
+              offsetSamples: cc.offsetSamples,
+            });
+            sendLastChange(); renderTracks(true);
+          } }];
+      })(),
       { separator: true },
       { label: 'Supprimer', danger: true, onClick: () => {
         project.deleteClip(trackId, clipId); sendLastChange(); renderTracks(true);

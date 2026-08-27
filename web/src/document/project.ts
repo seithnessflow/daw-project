@@ -13,10 +13,29 @@
 import * as Automerge from '@automerge/automerge';
 import {
   ProjectDef, TrackDef, ClipDef, ProcessorDef, NoteDef, SceneDef,
-  AutomationLaneDef,
+  AutomationLaneDef, isMusicalClip, ensureV2,
 } from './schema';
-import { UndoJournal, type InverseOp } from './undo';
+import { clipStartSamples, sampleToTick } from './geometry';
+import { clampMilliBpm } from './tempo';
+import { clampTick } from './sanitize';
+import { UndoJournal, type InverseOp, type ClipTiming } from './undo';
 import { seedBytes } from './seed';
+
+/** T3 : la photo des champs temporels PRESENTS d'un clip (le vehicule
+ *  de capture/restore dual-domaine - regle des jumeaux, une seule
+ *  definition pour tous les mutateurs). */
+function timingOf(clip: ClipDef): ClipTiming {
+  const t: ClipTiming = {};
+  if (typeof clip.startSample === 'number') t.startSample = clip.startSample;
+  if (typeof clip.lengthSamples === 'number') t.lengthSamples = clip.lengthSamples;
+  if (typeof clip.offsetSamples === 'number') t.offsetSamples = clip.offsetSamples;
+  if (typeof clip.startTick === 'number') t.startTick = clip.startTick;
+  if (typeof clip.lengthTick === 'number') t.lengthTick = clip.lengthTick;
+  return t;
+}
+
+const TIMING_FIELDS = ['startSample', 'lengthSamples', 'offsetSamples',
+  'startTick', 'lengthTick'] as const;
 
 /**
  * A4-3: every placeholder is the SAME seed document (vendored bytes,
@@ -231,6 +250,7 @@ export class Project {
         case 'renameTrack': this.renameTrack(op.trackId, op.name); break;
         case 'renameClip': this.renameClip(op.trackId, op.clipId, op.name); break;
         case 'setMasterGain': this.setMasterGain(op.gain); break;
+        case 'setTempo': this.setTempoMilliBpm(op.milliBpm); break;
         case 'setProcessorBypass':
           this.setProcessorBypass(op.trackId, op.processorId, op.bypass); break;
         case 'setProcessorParam':
@@ -239,6 +259,7 @@ export class Project {
           this.removeProcessorParam(op.trackId, op.processorId, op.key); break;
         case 'setClipStart': this.setClipStart(op.trackId, op.clipId, op.startSample); break;
         case 'setClipBounds': this.setClipBounds(op.trackId, op.clipId, op.bounds); break;
+        case 'setClipTiming': this.setClipTiming(op.trackId, op.clipId, op.timing); break;
         case 'setClipFades':
           this.setClipFades(op.trackId, op.clipId, op.fadeInSamples, op.fadeOutSamples); break;
         case 'addClip': this.addClip(op.trackId, op.clip); break;
@@ -390,6 +411,25 @@ export class Project {
     this.capturePending();
   }
 
+  /**
+   * T3 tempo : le registre du projet en milli-BPM entier (LWW par
+   * champ, clampe 20000..999000). Premier ecrit musical du document ->
+   * bump v2 lazy (ensureV2). Undoable (l'inverse restaure l'ancien
+   * registre ; l'absent d'origine equivaut a 120000 explicite).
+   */
+  setTempoMilliBpm(milliBpm: number): void {
+    const prev = typeof this.doc.tempoMilliBpm === 'number'
+      ? this.doc.tempoMilliBpm : 120000;
+    const next = clampMilliBpm(milliBpm);
+    if (next === prev && typeof this.doc.tempoMilliBpm === 'number') return;
+    this.journal.capture({ type: 'setTempo', milliBpm: prev });
+    this.doc = Automerge.change(this.doc, (d) => {
+      ensureV2(d);
+      d.tempoMilliBpm = next;
+    });
+    this.capturePending();
+  }
+
   /** Empile le dernier change local dans la file d'envoi. */
   private capturePending(): void {
     const c = Automerge.getLastLocalChange(this.doc);
@@ -475,12 +515,52 @@ export class Project {
     const clip = this.doc.tracks.find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return;
+    // T3 dual-aware : un clip MUSICAL se deplace en TICKS (pipeline
+    // geste px -> sec -> sample -> tick ; tickAtSample ne convertit que
+    // la CIBLE du geste, jamais une verite existante).
+    if (isMusicalClip(clip)) {
+      const timing = timingOf(clip);
+      timing.startTick = clampTick(sampleToTick(this.doc, startSample));
+      this.setClipTiming(trackId, clipId, timing);
+      return;
+    }
     this.journal.capture({
-      type: 'setClipStart', trackId, clipId, startSample: clip.startSample });
+      type: 'setClipStart', trackId, clipId,
+      startSample: clip.startSample ?? 0 });
     this.doc = Automerge.change(this.doc, (d) => {
       const c = d.tracks.find((t) => t.id === trackId)
         ?.clips.find((x) => x.id === clipId);
       if (c) c.startSample = Math.max(0, Math.round(startSample));
+    });
+    this.capturePending();
+  }
+
+  /**
+   * T3 : LE mutateur de timing dual-domaine. timing = la photo COMPLETE
+   * visee (champs presents poses, champs absents RETIRES parmi les
+   * cinq) - c'est aussi le vehicule d'undo (setClipTiming inverse).
+   * Ecrire un champ tick bump le document en v2 (lazy, ensureV2).
+   */
+  setClipTiming(trackId: string, clipId: string, timing: ClipTiming): void {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+    this.journal.capture({
+      type: 'setClipTiming', trackId, clipId, timing: timingOf(clip) });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const c = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId);
+      if (!c) return;
+      if (typeof timing.startTick === 'number' ||
+          typeof timing.lengthTick === 'number') {
+        ensureV2(d);
+      }
+      const rec = c as unknown as Record<string, number | undefined>;
+      for (const k of TIMING_FIELDS) {
+        const v = timing[k];
+        if (typeof v === 'number') rec[k] = Math.max(0, Math.round(v));
+        else if (typeof rec[k] === 'number') delete rec[k];
+      }
     });
     this.capturePending();
   }
@@ -494,11 +574,29 @@ export class Project {
     const clip = this.doc.tracks.find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return;
+    // T3 dual-aware : trim d'un clip musical -> position en ticks ; la
+    // duree suit son domaine (lengthTick si present = MIDI musical,
+    // sinon lengthSamples = audio musical, contenu jamais etire).
+    if (isMusicalClip(clip)) {
+      const timing = timingOf(clip);
+      const startTick = clampTick(sampleToTick(this.doc, bounds.startSample));
+      if (typeof clip.lengthTick === 'number') {
+        const endTick = clampTick(sampleToTick(
+          this.doc, bounds.startSample + bounds.lengthSamples));
+        timing.lengthTick = Math.max(1, endTick - startTick);
+      } else {
+        timing.lengthSamples = Math.max(1024, Math.round(bounds.lengthSamples));
+      }
+      timing.startTick = startTick;
+      timing.offsetSamples = Math.max(0, Math.round(bounds.offsetSamples));
+      this.setClipTiming(trackId, clipId, timing);
+      return;
+    }
     this.journal.capture({
       type: 'setClipBounds', trackId, clipId,
       bounds: {
-        startSample: clip.startSample,
-        lengthSamples: clip.lengthSamples,
+        startSample: clip.startSample ?? 0,
+        lengthSamples: clip.lengthSamples ?? 0,
         offsetSamples: clip.offsetSamples,
       },
     });
@@ -532,7 +630,7 @@ export class Project {
       const c = d.tracks.find((t) => t.id === trackId)
         ?.clips.find((x) => x.id === clipId);
       if (!c) return;
-      const half = Math.floor(c.lengthSamples / 2);
+      const half = Math.floor((c.lengthSamples ?? 0) / 2);
       c.fadeInSamples = Math.max(0, Math.min(half, Math.round(fadeInSamples)));
       c.fadeOutSamples = Math.max(0, Math.min(half, Math.round(fadeOutSamples)));
     });
@@ -567,7 +665,9 @@ export class Project {
     this.journal.capture({ type: 'deleteClip', trackId, clipId: clip.id });
     this.doc = Automerge.change(this.doc, (d) => {
       const t = d.tracks.find((x) => x.id === trackId);
-      if (t) t.clips.push(clip);
+      if (!t) return;
+      if (isMusicalClip(clip)) ensureV2(d);  // T3 : bump lazy
+      t.clips.push(clip);
     });
     this.capturePending();
   }
@@ -589,9 +689,15 @@ export class Project {
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return null;
     if (!clip.assetHash) return null;  // MIDI (assetHash vide) : refuse
+    // T3 : scission d'un clip MUSICAL refusee (dette datee, avec la
+    // scission MIDI) - couper au sample entre deux ticks creerait une
+    // couture d'un demi-tick a la reconversion. Rendre absolu d'abord.
+    if (isMusicalClip(clip)) return null;
     const at = Math.round(atSample);
-    const left = at - clip.startSample;
-    const right = clip.startSample + clip.lengthSamples - at;
+    const startS = clip.startSample ?? 0;
+    const lenS = clip.lengthSamples ?? 0;
+    const left = at - startS;
+    const right = startS + lenS - at;
     if (left < 1024 || right < 1024) return null;
     const rightId = `clip-${Math.random().toString(36).slice(2, 10)}`;
     const fadeIn = clip.fadeInSamples ?? 0;
@@ -608,7 +714,7 @@ export class Project {
     if (fadeOut) rightClip.fadeOutSamples = fadeOut;
     this.beginUndoGroup();
     this.setClipBounds(trackId, clipId, {
-      startSample: clip.startSample,
+      startSample: startS,
       lengthSamples: left,
       offsetSamples: clip.offsetSamples,
     });
@@ -644,12 +750,16 @@ export class Project {
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return;                                        // source partie
     if (!this.doc.tracks.some((t) => t.id === toTrackId)) return;  // cible partie
-    const dest = Math.max(0, Math.round(startSample ?? clip.startSample));
-    if (fromTrackId === toTrackId && dest === clip.startSample) return;  // no-op
+    const curStart = clipStartSamples(clip, this.doc);
+    const dest = Math.max(0, Math.round(startSample ?? curStart));
+    if (fromTrackId === toTrackId && dest === curStart) return;  // no-op
     // Copie plain AVANT toute mutation (jamais un proxy Automerge reinsere
     // dans le meme doc - meme doctrine que moveProcessor).
     const copy = plain(clip) as ClipDef;
-    copy.startSample = dest;
+    // T3 dual-aware : un clip musical demenage en ticks (la cible du
+    // geste passe par le pipeline sample -> tick), jamais en samples.
+    if (isMusicalClip(clip)) copy.startTick = clampTick(sampleToTick(this.doc, dest));
+    else copy.startSample = dest;
     this.beginUndoGroup();
     this.deleteClip(fromTrackId, clipId);
     this.addClip(toTrackId, copy);
@@ -663,8 +773,14 @@ export class Project {
    */
   addMidiClip(trackId: string, startSample: number, lengthSamples: number): string {
     const id = 'clip-' + Math.random().toString(36).slice(2, 10);
+    // T3 : un clip MIDI FRAIS nait MUSICAL (ticks) - la cible en
+    // samples de l'appelant passe par le pipeline sample -> tick.
+    // Il suit desormais le tempo ; l'existant absolu ne bouge pas.
+    const startTick = clampTick(sampleToTick(this.doc, startSample));
+    const endTick = clampTick(sampleToTick(this.doc, startSample + lengthSamples));
     const clip: ClipDef = {
-      id, assetHash: '', startSample, lengthSamples, offsetSamples: 0, notes: [],
+      id, assetHash: '', offsetSamples: 0, notes: [],
+      startTick, lengthTick: Math.max(960, endTick - startTick),
     };
     this.addClip(trackId, clip);
     return id;
@@ -815,10 +931,17 @@ export class Project {
         ?.clips.find((x) => x.id === clipId);
       if (!c) return;
       if (!c.notes) c.notes = [];
-      const i = c.notes.findIndex(
-        (n) => n.pitch === note.pitch && n.startSample === note.startSample);
+      // T3 : l'identite d'une note suit son domaine (tick pour une
+      // note musicale, sample pour une absolue - jamais un mix)
+      const i = c.notes.findIndex((n) => n.pitch === note.pitch &&
+        (typeof note.startTick === 'number'
+          ? n.startTick === note.startTick
+          : n.startSample === note.startSample));
       if (i >= 0) c.notes.splice(i, 1);
-      else c.notes.push(note);
+      else {
+        if (typeof note.startTick === 'number') ensureV2(d);
+        c.notes.push(note);
+      }
     });
     this.capturePending();
   }

@@ -16,6 +16,8 @@ import {
   formatGain,
   TIMELINE,
 } from '../ui/track';
+import { clipEndSamples } from '../document/geometry';
+import { refreshTempoField } from './tempo_field';
 import * as life from '../ui/life';
 import { fillWaveforms } from '../ui/waveform';
 import { ctx, els, sendLastChange } from './context';
@@ -66,6 +68,7 @@ export function renderTracks(force = false): void {
   // D2 : idem pour le reordonnement des devices du rack.
   initDeviceReorder();
   const doc = ctx.project.getDocument();
+  refreshTempoField();  // T3 : le registre suit le document (LWW)
   // D1 : l'ordre d'AFFICHAGE (order fractionnaire, source unique
   // orderedTracks) - doc.tracks garde l'ordre de creation.
   const shown = orderedTracks(doc);
@@ -131,16 +134,16 @@ export function renderTracks(force = false): void {
   let endSec = 30;
   for (const t of doc.tracks) {
     for (const c of t.clips) {
-      endSec = Math.max(endSec, (c.startSample + c.lengthSamples) / sr);
+      endSec = Math.max(endSec, clipEndSamples(c, doc) / sr);
     }
   }
   const laneSeconds = Math.ceil(endSec) + 5;
 
-  els.tracks.appendChild(createRulerUI(laneSeconds));
+  els.tracks.appendChild(createRulerUI(laneSeconds, doc));
 
   for (const track of shown) {
     const element = createTrackUI(
-      track, sr, laneSeconds, track.id === ctx.selectedTrackId,
+      track, doc, sr, laneSeconds, track.id === ctx.selectedTrackId,
       (gain) => {
         ctx.project!.setTrackGain(track.id, gain);
         sendLastChange();

@@ -20,6 +20,17 @@ import type {
   ClipDef, TrackDef, ProcessorDef, NoteDef, SceneDef, AutomationLaneDef,
 } from './schema';
 
+/** T3 : la photo EXACTE des champs temporels d'un clip - seuls les
+ *  champs PRESENTS sur le clip figurent (absent = a retirer au restore).
+ *  C'est le vehicule unique de capture/restore dual-domaine. */
+export interface ClipTiming {
+  startSample?: number;
+  lengthSamples?: number;
+  offsetSamples?: number;
+  startTick?: number;
+  lengthTick?: number;
+}
+
 export type InverseOp =
   | { type: 'setTrackGain'; trackId: string; gain: number }
   | { type: 'setTrackPan'; trackId: string; pan: number }
@@ -31,12 +42,20 @@ export type InverseOp =
   | { type: 'renameTrack'; trackId: string; name: string }
   | { type: 'renameClip'; trackId: string; clipId: string; name: string }
   | { type: 'setMasterGain'; gain: number }
+  // T3 tempo : registre milli-BPM (l'absent d'origine = 120000 explicite)
+  | { type: 'setTempo'; milliBpm: number }
   | { type: 'setProcessorBypass'; trackId: string; processorId: string; bypass: boolean }
   | { type: 'setProcessorParam'; trackId: string; processorId: string; key: string; value: number }
   | { type: 'removeProcessorParam'; trackId: string; processorId: string; key: string }
   | { type: 'setClipStart'; trackId: string; clipId: string; startSample: number }
   | { type: 'setClipBounds'; trackId: string; clipId: string;
       bounds: { startSample: number; lengthSamples: number; offsetSamples: number } }
+  // T3 tempo : LA capture dual-aware (regle des jumeaux). timing = la
+  // photo EXACTE des cinq champs temporels du clip (presents seulement) ;
+  // restaurer = poser les presents ET RETIRER les absents - l'undo d'un
+  // « Rendre musical » retire startTick et remet startSample.
+  | { type: 'setClipTiming'; trackId: string; clipId: string;
+      timing: ClipTiming }
   | { type: 'setClipFades'; trackId: string; clipId: string;
       fadeInSamples: number; fadeOutSamples: number }
   | { type: 'addClip'; trackId: string; clip: ClipDef }
@@ -96,11 +115,15 @@ function targetKey(op: InverseOp): string {
     case 'renameTrack': return `trackname:${op.trackId}`;
     case 'renameClip': return `clipname:${op.trackId}:${op.clipId}`;
     case 'setMasterGain': return 'master';
+    case 'setTempo': return 'tempo';
     case 'setProcessorBypass': return `byp:${op.trackId}:${op.processorId}`;
     case 'setProcessorParam':
     case 'removeProcessorParam': return `param:${op.trackId}:${op.processorId}:${op.key}`;
     case 'setClipStart': return `clipstart:${op.trackId}:${op.clipId}`;
     case 'setClipBounds': return `clipbounds:${op.trackId}:${op.clipId}`;
+    // T3 : MEME cle que start/bounds - dans un geste, la premiere photo
+    // du timing (quel que soit le domaine) est celle qui compte.
+    case 'setClipTiming': return `clipstart:${op.trackId}:${op.clipId}`;
     case 'setClipFades': return `clipfades:${op.trackId}:${op.clipId}`;
     case 'addClip': return `clip:${op.trackId}:${op.clip.id}`;
     case 'deleteClip': return `clip:${op.trackId}:${op.clipId}`;
@@ -114,7 +137,10 @@ function targetKey(op: InverseOp): string {
     // ce ne sont pas des inverses interchangeables).
     case 'moveProcessor': return `procmove:${op.trackId}:${op.processorId}`;
     case 'toggleNote':
-      return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:${op.note.startSample}`;
+      // T3 : une note musicale s'identifie par son tick (l'absolu par
+      // son sample) - les deux domaines ne se melangent jamais.
+      return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:` +
+        `${op.note.startTick ?? op.note.startSample}`;
     case 'renameScene': return `scenename:${op.sceneId}`;
     case 'deleteScene': return `scene:${op.sceneId}`;
     case 'restoreScene': return `scene:${op.scene.id}`;

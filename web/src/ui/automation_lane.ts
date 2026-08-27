@@ -25,7 +25,8 @@ import { renderTracks } from '../app/render';
 import { showContextMenu } from './context_menu';
 import { TIMELINE } from './track';
 import { cssId } from '../document/sanitize';
-import type { AutomationLaneDef, TrackDef } from '../document/schema';
+import type { AutomationLaneDef, TrackDef, ProjectDef } from '../document/schema';
+import { clipEndSamples } from '../document/geometry';
 
 const LANE_H = 56;
 const PAD = 6;
@@ -92,11 +93,12 @@ export function renderAutomationLanes(): void {
     if (!track) { existing?.remove(); continue; }
 
     existing?.remove();  // reconstruire (les points ont pu bouger/merger)
-    trackEl.insertAdjacentElement('afterend', buildRow(track, param, sr));
+    trackEl.insertAdjacentElement('afterend', buildRow(track, doc, param, sr));
   }
 }
 
-function buildRow(track: TrackDef, param: 'gain' | 'pan', sr: number): HTMLElement {
+function buildRow(track: TrackDef, doc: ProjectDef,
+  param: 'gain' | 'pan', sr: number): HTMLElement {
   const row = document.createElement('div');
   row.className = 'automation-row';
   row.dataset.autoTrack = track.id;
@@ -140,7 +142,8 @@ function buildRow(track: TrackDef, param: 'gain' | 'pan', sr: number): HTMLEleme
 
   // ---- La courbe (SVG, meme echelle que la timeline) --------------------
   const laneWidth = Math.max(600, xOf(
-    Math.max(48000 * 12, ...track.clips.map((c) => c.startSample + c.lengthSamples)), sr));
+    Math.max(48000 * 12,
+      ...track.clips.map((c) => clipEndSamples(c, doc))), sr));
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.classList.add('automation-svg');
   svg.setAttribute('width', String(laneWidth));

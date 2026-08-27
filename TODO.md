@@ -759,10 +759,20 @@ Ordre grave (la confiance avant le sucre, arbitrage confirme) :
          fixe, quantum 4/4-3/4), hash 56729beb61993cd7 INCHANGE,
          e2e 97/97. Fixture standalone create_musical_doc.cpp
          REPORTEE a T5 (elle nait avec EXPECTED_HASH_MUSICAL).
-       - [ ] T3 : surface web (champ tempo topbar + ensureV2, grille
-         musicale snapTickStep, regle mesures.battements, mutateurs
-         dual-aware, piano-roll en ticks, badge + « Rendre musical »,
-         rituel du compositeur A 100 BPM).
+       - [x] T3 (2026-08-27) : surface web COMPLETE - geometry.ts = LE
+         point de branche (clipStartSamples memoise par version de
+         doc, 13 consommateurs convertis, startSample OPTIONNEL dans
+         le type), champ tempo topbar (milli-BPM entier, undo,
+         ensureV2), snapTickStep + snap musical des gestes, regle en
+         mesures (v2), mutateurs dual-aware via setClipTiming (photo
+         des 5 champs temporels, restore = poser + retirer), clip
+         MIDI frais NAIT musical, piano-roll en ticks (240 =
+         double-croche), badge ♪ + « Rendre musical / Rendre absolu »
+         undoables, scission refusee sur musical (couture demi-tick,
+         dette datee). PREUVE : tempo.spec 2/2, suite 99/99, tsc 0,
+         RITUEL DU COMPOSITEUR A 100 BPM vert (drag snappe tick 3840
+         = mesure 2 a 2,400 s pile, ratio 100->90 = 1,111 exact,
+         absolu fixe, export x2 hash stable e1d19415a6e48728).
        - [ ] T4 : Link Etage 2 — DIFFERE explicitement (session dediee).
        - [ ] T5 : re-ancrage determinisme (EXPECTED_HASH_MUSICAL jumeau
          gtest+ci.yml MEME commit ; specs v2 adaptees = signalees).

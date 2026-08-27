@@ -19,6 +19,9 @@ import {
   ctx, els, sendLastChange,
   SERVER_URL, SERVER_TOKEN, ENGINE_PORT, PROJECT_ID, LAB_MODE,
 } from './context';
+import { isMusicalClip } from '../document/schema';
+import { clipEndSamples, sampleToTick } from '../document/geometry';
+import { clampTick } from '../document/sanitize';
 import {
   setZoom, fitAll, snapStep, contentSeconds,
   updateInsertMarker, refreshOverview, updateFollowUI,
@@ -46,6 +49,7 @@ import { wireExport } from './export';
 import { wireVersionGuard } from './version_guard';
 import { wireProjectGuard } from './project_guard';
 import { wireLoopRegion, reassertLoopRegion } from './loop_region';
+import { wireTempoField } from './tempo_field';
 import { wireTrackMenu } from './track_menu';
 
 declare global {
@@ -582,6 +586,7 @@ export async function init(): Promise<void> {
   wireProjectGuard();
   // Boucle utilisateur (AUDIT-6 QW) : drag sur la bande cycle de la regle
   wireLoopRegion();
+  wireTempoField();  // T3 tempo
   // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
   // + device le lit a chaque ouverture
   engineClient.onPluginCatalog = (entries) => {
@@ -827,17 +832,22 @@ export async function init(): Promise<void> {
       const clip = track?.clips.find((c) => c.id === ctx.selectedClipId);
       if (track && clip) {
         const grid = snapStep() * sr;
-        const start =
-          Math.ceil((clip.startSample + clip.lengthSamples) / grid) * grid;
+        const start = Math.ceil(clipEndSamples(clip, doc) / grid) * grid;
         const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
         const copyId = `clip-${stem}-${Date.now()}`;
         // Copie INTEGRALE (fix 2026-08-26 : l'objet a 5 champs perdait
         // notes/fades/name du clip duplique), plain() car proxy Automerge
-        ctx.project.addClip(track.id, {
+        // T3 dual-aware : le musical se colle en ticks, l'absolu en samples
+        const dupCopy = {
           ...(JSON.parse(JSON.stringify(clip)) as typeof clip),
           id: copyId,
-          startSample: Math.round(start),
-        });
+        };
+        if (isMusicalClip(clip)) {
+          dupCopy.startTick = clampTick(sampleToTick(doc, start));
+        } else {
+          dupCopy.startSample = Math.round(start);
+        }
+        ctx.project.addClip(track.id, dupCopy);
         sendLastChange();
         ctx.selectedClipId = copyId;
         renderTracks(true);
