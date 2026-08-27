@@ -1372,3 +1372,24 @@ devienne un daw ») et autorise plusieurs etapes. Livre :
 - Reste des quick wins en file (TODO 7) : boucle utilisateur (session
   dediee, layout AudioCommandMessage => clean build), GR meter (avec
   4.2), dr_flac/dr_mp3.
+
+**2026-08-27 (suite 2 - gardes d'onglet, sur incidents utilisateur) :**
+« rien dans l'arrangement et pourtant l'export m'a sorti un sample » :
+diagnostic par le DOCUMENT (dump studio.am : 6 pistes, 22 clips
+timeline PLEINS) - l'export disait vrai, l'ONGLET mentait (projet
+different de celui du moteur ; 5e occurrence de la classe
+« verifier SON onglet d'abord »). Puis « ca m'arrive trop souvent
+d'ouvrir un onglet qui est une vieille version du site » + « unifier et
+mettre a jour les onglets en permanence ». Livre (bf2c8bb) :
+- GARDE DE VERSION : /api/version = identite du processus vite ;
+  l'onglet poll (10 s) et se RECHARGE seul si la stack a ete relancee
+  sous lui. Silence sur erreur reseau (jamais de reload sur un doute).
+- GARDE DE PROJET : badge topbar (l'onglet dit ce qu'il montre) ;
+  project_id du moteur dans EngineState (champ 7 additif) ; desaccord =
+  bandeau rouge + bouton rejoindre (hash conserve) + export REFUSE.
+- Preuves : tab-guards 2/2 (moteur reel sur un autre projet), suite
+  76/76, gtests 45/45, tsc 0. CI VERTE sur le push precedent
+  (33070584737 - export+pre-ecoute valides en CI aussi).
+- Extension Chrome non connectee pendant l'incident (pas pu piloter
+  les onglets directement) - a reconnecter pour les prochains
+  diagnostics d'onglet.
