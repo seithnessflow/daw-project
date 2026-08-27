@@ -65,6 +65,22 @@ void audioCallback(
     // Process any pending commands from control thread
     processCommands(*ctx);
 
+    // A6 (mesure) : la forme reelle des callbacks (relaxed, lock-free)
+    if (ctx->cb_total_count) {
+        ctx->cb_total_count->fetch_add(1, std::memory_order_relaxed);
+        if (frame_count % INTERNAL_BLOCK_SIZE != 0) {
+            ctx->cb_partial_count->fetch_add(1, std::memory_order_relaxed);
+        }
+        uint32_t prev = ctx->cb_min_frames->load(std::memory_order_relaxed);
+        while (frame_count < prev && !ctx->cb_min_frames
+            ->compare_exchange_weak(prev, frame_count,
+                                    std::memory_order_relaxed)) {}
+        prev = ctx->cb_max_frames->load(std::memory_order_relaxed);
+        while (frame_count > prev && !ctx->cb_max_frames
+            ->compare_exchange_weak(prev, frame_count,
+                                    std::memory_order_relaxed)) {}
+    }
+
     // Raw pointer load: lock-free by static_assert. The pointed-to graph
     // cannot be freed while this callback runs (generation-gated retirement
     // on the control side).

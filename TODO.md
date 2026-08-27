@@ -1013,12 +1013,28 @@ pilote depuis un onglet. Sous-etapes de soutien, dans l'ordre :
          en vue) : la file est GENERIQUE — evenements {type, id, value}
          (type: param aujourd'hui, note-on/off demain) — pour que les
          notes de l'instrument s'y branchent sans re-bump de layout.
-      3. [ ] A3-2+A3-3 CONTRAT DE PERIODE (une session) : depth clampee
+      3. [~] A3-2+A3-3 CONTRAT DE PERIODE (une session) : depth clampee
          en silence a 2 (TODO promettait « buffer 1024 -> 4 blocs » —
          phrase fausse, famille des 47 runs) + bloc partiel (periode non
          multiple de 256) = bypass permanent. Remede : kRingSlots=8,
          clamp BRUYANT ou refus de demarrer, verification de periode a
          l'initialisation. La regle sort de la prose, entre dans le code.
+         ENTAME PAR LE LOT A6 (2026-08-27, piste A du plan tempo) :
+         MESURE sur le vrai device = miniaudio (noFixedSizedCallback
+         par defaut) livre des callbacks FIXES quand on demande un
+         multiple de 256 — partage 256 ET 512 : partials=0/201,
+         exclusif fixe par definition. Donc PAS d'accumulateur (piste
+         B) tant que le contrat tient ; il est desormais SURVEILLE :
+         compteurs cb_min/max/partial dans le callback (lock-free),
+         ligne callback-shape au demarrage + WARNING bruyant si un
+         partiel parait (la ou le bypass etait silencieux). Depth
+         corrigee : ceil(period/256) clampee a kRingSlots-2 (l'ancien
+         max(1, n/256) sous-provisionnait 374 -> 1). RESTE ici :
+         kRingSlots=8 (bump layout), refus de demarrer hors contrat,
+         A4-5 seq par slot. DETTE DATEE : le wrap de BOUCLE cree un
+         chunk partiel par tour (chunk clamp a loop_end) -> queue <=
+         255 frames en dry via plugins a chaque tour de boucle ;
+         declencheur mesurable = plugin + region utilisateur + oreille.
          ELARGIE PAR AUDIT-4 (2026-08-23) : la meme session absorbe
          A4-5 (seq PAR SLOT de sortie — un bloc saute par l'enfant fait
          rejouer un slot perime, ni dry ni compte) et grave l'invariant

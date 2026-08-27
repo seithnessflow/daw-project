@@ -1713,3 +1713,20 @@ ui-rename, avait ete corrigee par le design). gtests 51/51.
 LOT T : T1+T2+T3+T5 SOLDES en une session ; T4 (Link Etage 2) reste
 explicitement differe. Prochain : verdict CI GCC sur le hash musical
 (premier passage cross-compilateur), puis leve du gel.
+
+**2026-08-27 (suite 17 - Lot A6 : le contrat de periode mesure, piste
+A confirmee) :** la question du plan (une periode non multiple de 256
+bypasse les plugins - proxy_node:13) est MESUREE au lieu d'etre
+contournee : compteurs lock-free dans le callback (min/max frame_count,
+partiels), ligne `callback-shape` au demarrage. VERDICT sur le vrai
+device : en demandant un multiple de 256, miniaudio (mode fixe par
+defaut) livre des callbacks EXACTS - partage 256 : partials=0/201 a
+periode 256 ; partage 512 : 0/201 ; l'exclusif est fixe par
+definition (spike s2). PISTE A SUFFIT : pas d'accumulateur, le contrat
+est desormais SURVEILLE (WARNING bruyant si un partiel parait - le
+bypass silencieux a maintenant une voix). Correctif au passage : la
+profondeur proxy = ceil(period/256) clampee a kRingSlots-2 aux DEUX
+sites de build (l'ancien max(1, n/256) donnait 1 pour 374). Dette
+datee consignee (TODO tranche 2 item 3) : le wrap de boucle cree
+encore un chunk partiel par tour. gtests 51/51, hash absolu et musical
+INCHANGES.

@@ -1000,8 +1000,14 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     auto project = doc.getDocument();
     daw::document::resolveMusicalTime(project);
 
-    const uint32_t proxy_depth =
-        (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize);
+    // A6 : ceil, pas une division tronquee (periode 374 -> 2 blocs par
+    // callback, l'ancien max(1, 374/256)=1 sous-provisionnait le ring).
+    // Plafond reel du layout : kRingSlots-2 (le depasser = kLayoutVersion
+    // v10 + clean build - signale, jamais silencieux).
+    const uint32_t proxy_depth = (std::min)(
+        daw::host::kRingSlots - 2,
+        (device.getBufferSize() + daw::host::kRingBlockSize - 1) /
+            daw::host::kRingBlockSize);
     std::shared_ptr<daw::graph::AudioGraph> graph =
         buildGraph(project, device.getSampleRate(), opts.assets_dir,
                    asset_cache, plugin_registry, opts, proxy_depth);
@@ -1444,7 +1450,10 @@ int doPlayWithServer(const Options& opts) {
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
                 plugin_registry, opts,
-                (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize));
+                // A6 : ceil borne a kRingSlots-2 (jumeau du build initial)
+                (std::min)(daw::host::kRingSlots - 2,
+                    (device.getBufferSize() + daw::host::kRingBlockSize - 1) /
+                        daw::host::kRingBlockSize));
             if (graph) {
                 if (opts.debug_rebuild_delay_ms > 0) {
                     // Test hook: simulate an expensive (plugin) build
@@ -1729,6 +1738,31 @@ int doPlayWithServer(const Options& opts) {
                 ws_server.broadcastTelemetry();
             }
             last_telemetry = now;
+        }
+
+        // A6 (mesure, une fois) : la FORME reelle des callbacks apres
+        // ~200 callbacks - c'est la ligne que la matrice A6 lit. Un
+        // partiel (non multiple de 256) = bypass plugin sur sa queue.
+        static bool cb_shape_logged = false;
+        if (!cb_shape_logged) {
+            const auto shape = device.callbackShape();
+            if (shape.total >= 200) {
+                cb_shape_logged = true;
+                std::cerr << "callback-shape: min=" << shape.min_frames
+                          << " max=" << shape.max_frames
+                          << " partials=" << shape.partial
+                          << "/" << shape.total << "\n";
+                if (shape.partial > 0) {
+                    // A6 : un partiel = queue en bypass plugin
+                    // (proxy_node:13). Mesure 2026-08-27 : zero partiel
+                    // en 256/512 partage et en exclusif - si cette
+                    // ligne parait, le device sort du contrat et la
+                    // piste B (accumulateur) redevient necessaire.
+                    std::cerr << "WARNING: callbacks partiels detectes - "
+                              << "les plugins bypassent ces queues "
+                              << "(A6 piste B requise)\n";
+                }
+            }
         }
 
         // Poll telemetry for CLI display (reduced frequency to avoid buffer issues)

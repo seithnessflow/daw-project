@@ -151,6 +151,11 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     callback_context_.transport = &transport_;
     callback_context_.buffer_underrun_count = &buffer_underrun_count_;
     callback_context_.sample_rate = config.sample_rate;
+    // A6 (mesure) : forme des callbacks
+    callback_context_.cb_min_frames = &cb_min_frames_;
+    callback_context_.cb_max_frames = &cb_max_frames_;
+    callback_context_.cb_partial_count = &cb_partial_count_;
+    callback_context_.cb_total_count = &cb_total_count_;
 
     device_config.pUserData = &callback_context_;
 

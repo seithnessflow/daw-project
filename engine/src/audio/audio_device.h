@@ -124,6 +124,21 @@ public:
      *  demande - miniaudio retombe en partage en silence). */
     bool isExclusive() const { return actual_exclusive_; }
 
+    /** A6 (mesure) : la forme reelle des callbacks depuis le start -
+     *  {min, max, partiels (non multiples de 256), total}. */
+    struct CallbackShape {
+        uint32_t min_frames;
+        uint32_t max_frames;
+        uint64_t partial;
+        uint64_t total;
+    };
+    CallbackShape callbackShape() const {
+        return { cb_min_frames_.load(std::memory_order_relaxed),
+                 cb_max_frames_.load(std::memory_order_relaxed),
+                 cb_partial_count_.load(std::memory_order_relaxed),
+                 cb_total_count_.load(std::memory_order_relaxed) };
+    }
+
     /**
      * Get the device name.
      */
@@ -230,6 +245,11 @@ private:
 
     // Telemetry counters
     std::atomic<uint64_t> buffer_underrun_count_{0};
+    // A6 (mesure) : forme des callbacks (min/max frame_count, partiels)
+    std::atomic<uint32_t> cb_min_frames_{0xFFFFFFFFu};
+    std::atomic<uint32_t> cb_max_frames_{0};
+    std::atomic<uint64_t> cb_partial_count_{0};
+    std::atomic<uint64_t> cb_total_count_{0};
 
     // Callback context (passed to audio thread)
     AudioCallbackContext callback_context_;

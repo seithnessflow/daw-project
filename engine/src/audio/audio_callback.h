@@ -133,6 +133,15 @@ struct AudioCallbackContext {
     // la position d'arrangement). Touchee UNIQUEMENT par le thread audio (pas
     // d'atomic : un seul ecrivain/lecteur, le callback lui-meme).
     int64_t session_clock = 0;
+
+    // A6 (piste A, mesure) : la FORME reelle des callbacks du driver -
+    // min/max de frame_count et compte des callbacks NON multiples de
+    // 256 (chaque queue partielle bypasse les plugins, proxy_node:13).
+    // Ecrits par le callback (relaxed), lus par le control thread.
+    std::atomic<uint32_t>* cb_min_frames = nullptr;
+    std::atomic<uint32_t>* cb_max_frames = nullptr;
+    std::atomic<uint64_t>* cb_partial_count = nullptr;
+    std::atomic<uint64_t>* cb_total_count = nullptr;
 };
 
 /**
