@@ -32,6 +32,40 @@ export type JamRole = 'idle' | 'broadcasting' | 'listening';
 export class JamChannel {
   private server: ServerClient;
   private peers = new Map<string, RTCPeerConnection>();
+
+  /**
+   * SPIKE LATENCE s2 : acces lecture aux stats WebRTC par pair -
+   * jitterBufferDelay/jitterBufferEmittedCount (dwell moyen du NetEq,
+   * LE terme dominant jamais mesure) et totalPlayoutDelay. Sonde de
+   * mesure, aucun effet sur le chemin audio.
+   */
+  async rtcStats(): Promise<Record<string, Record<string, unknown>>> {
+    const out: Record<string, Record<string, unknown>> = {};
+    for (const [id, pc] of this.peers) {
+      const picked: Record<string, unknown> = {};
+      try {
+        const stats = await pc.getStats();
+        stats.forEach((s: Record<string, unknown>) => {
+          if (s.type === 'inbound-rtp' && s.kind === 'audio') {
+            picked.jitterBufferDelay = s.jitterBufferDelay;
+            picked.jitterBufferEmittedCount = s.jitterBufferEmittedCount;
+            picked.totalSamplesReceived = s.totalSamplesReceived;
+            picked.packetsLost = s.packetsLost;
+            picked.jitter = s.jitter;
+          }
+          if (s.type === 'media-playout') {
+            picked.totalPlayoutDelay = s.totalPlayoutDelay;
+            picked.totalSamplesCount = s.totalSamplesCount;
+          }
+          if (s.type === 'candidate-pair' && s.state === 'succeeded') {
+            picked.currentRoundTripTime = s.currentRoundTripTime;
+          }
+        });
+      } catch { /* pc fermee : ignorer */ }
+      out[id] = picked;
+    }
+    return out;
+  }
   private channels = new Map<string, RTCDataChannel>();
   private pingTimer: number | null = null;
 

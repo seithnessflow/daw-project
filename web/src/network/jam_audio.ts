@@ -57,6 +57,31 @@ export class JamAudio {
     }
   }
 
+  /**
+   * SPIKE LATENCE s2 : stats du worklet (le hook 'stats?' existait dans
+   * tap-player-worklet.js sans aucun consommateur). Renvoie
+   * {underruns, queued} - queued * 256 / 48000 = le dwell du FIFO
+   * broadcaster, un etage du tableau de latence.
+   */
+  workletStats(timeoutMs = 1000): Promise<{ underruns: number;
+    queued: number } | null> {
+    const node = this.node;
+    if (!node) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const to = window.setTimeout(() => resolve(null), timeoutMs);
+      const onMsg = (ev: MessageEvent) => {
+        if (ev.data && typeof ev.data.queued === 'number') {
+          window.clearTimeout(to);
+          node.port.removeEventListener('message', onMsg);
+          resolve(ev.data as { underruns: number; queued: number });
+        }
+      };
+      node.port.addEventListener('message', onMsg);
+      node.port.start();
+      node.port.postMessage('stats?');
+    });
+  }
+
   /** Listener: play a remote stream (autoplay-policy aware). */
   playRemote(stream: MediaStream): void {
     if (!this.remoteEl) {

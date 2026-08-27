@@ -1581,3 +1581,31 @@ Arbitrage propose A RATIFIER (docs/REVUE-EXTERNE-2026-08-27.md) :
 spike budget-latence -> migration TEMPO seule et gelee -> Vague 3
 avec l entree live dedans (E4 en fruit mur) + la performance au
 regime de preuve. Le choix binaire « Massive vs Vague 3 » est retire.
+
+**2026-08-27 (suite 12 - SPIKE LATENCE sessions 1+2, plan ratifie) :**
+le plan complet (spike -> perf -> TEMPO additive-dual ratifie « solution
+la plus elegante ») est approuve. Le spike a tout livre en une soiree :
+- MESURES DEVICE : plancher WASAPI partage = periode 374 (~23 ms, et
+  374 non-multiple de 256 => A6 prerequis basse latence) ; EXCLUSIF
+  (--exclusive, readback obligatoire - miniaudio retombe en silence) :
+  periodes HONOREES, 256 = 16 ms et 0 underrun sous charge 28 threads,
+  128 = 8 ms (exige A6). La sortie locale se joue desormais a 16 ms.
+- DEUX MALADIES SYSTEME trouvees en mesurant : (1) resolution timer
+  Windows 15,625 ms - le tick 1 ms dormait 15,6 ms -> timeBeginPeriod(1)
+  (pratique DAW standard) : pump 15,6 -> 10,1 ms median ; (2) le flux
+  jam broadcaster etait HACHE depuis S8 (238-950 underruns worklet/10 s,
+  FIFO demarrant a vide sous rafales) -> PRE-BUFFER d'amorcage 4 blocs
+  (~21 ms) : ZERO underrun. Sondes produit : workletStats() (le hook
+  stats? enfin consomme), rtcStats() (NetEq/playout par pair).
+- PIPELINE JAM MESURE (une machine) : pump ~5 ms + FIFO ~27 ms + Opus
+  ~20 ms + NetEq 21-32 ms ; playout listener ~42 ms ; TOTAL ~75 ms hors
+  reseau. Correctif de verite : le « ~40 ms P2P S8 » etait le RTT/2 du
+  DataChannel, pas une mesure audio.
+- VERDICT (docs/SPIKE-LATENCE.md) : jeu direct sur moteur distant =
+  EXCLU (75 ms de plancher logiciel) ; la forme jouable du test
+  Massive = clavier->MIDI LAN->rendu tour 16 ms->T8V dans la piece
+  (~18-20 ms) ; WAN = ecoute ~80-120 ms, jam quantise apres tempo.
+- Piege paye : mesure headless throttlee (16 ms d'event loop) - le
+  piege etait GRAVE dans CLAUDE.md, re-verifie en headed avant de
+  conclure ; la vraie cause etait la resolution timer, pas la page.
+Prochain : reliquat LAN 2 machines (court), puis Lot P, puis LOT T.

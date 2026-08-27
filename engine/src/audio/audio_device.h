@@ -32,6 +32,9 @@ struct AudioDeviceConfig {
     uint32_t buffer_size_frames = 512;  // Latency tradeoff
     std::string device_name;            // Empty = default device
     bool use_null_backend = false;      // For silent testing
+    // SPIKE LATENCE s2 : WASAPI exclusif opt-in (le readback share= de
+    // la ligne audio-negotiation fait foi, miniaudio retombe en silence)
+    bool exclusive_mode = false;
 };
 
 /**

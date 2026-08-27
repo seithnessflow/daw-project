@@ -48,6 +48,14 @@
 #include <atomic>
 #include <vector>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <timeapi.h>  // timeBeginPeriod (lib winmm)
+#pragma comment(lib, "winmm.lib")
+#endif
+
 namespace fs = std::filesystem;
 
 // Global flag for signal handling
@@ -126,6 +134,7 @@ struct Options {
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
     uint32_t buffer_size_frames = 512;  // SPIKE LATENCE : enfin reglable
+    bool exclusive_mode = false;        // SPIKE s2 : WASAPI exclusif opt-in
     uint16_t ws_port = 47821;    // Changed default to 47821
     uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
     std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
@@ -202,6 +211,10 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.probe_path = argv[i];
         } else if (arg == "--mute") {
             opts.mute = true;
+        } else if (arg == "--exclusive") {
+            // SPIKE LATENCE s2 : WASAPI exclusif (readback dans la ligne
+            // audio-negotiation - la demande peut retomber en partage)
+            opts.exclusive_mode = true;
         } else if (arg == "--buffer-size") {
             // SPIKE LATENCE : taille de buffer demandee au device (frames).
             // La negociation reelle est logguee (audio-negotiation:) - la
@@ -957,6 +970,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     daw::audio::AudioDeviceConfig config;
     config.sample_rate = opts.sample_rate;
     config.buffer_size_frames = opts.buffer_size_frames;
+    config.exclusive_mode = opts.exclusive_mode;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
@@ -1131,6 +1145,7 @@ int doPlayWithServer(const Options& opts) {
     daw::audio::AudioDeviceConfig config;
     config.sample_rate = opts.sample_rate;
     config.buffer_size_frames = opts.buffer_size_frames;
+    config.exclusive_mode = opts.exclusive_mode;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
@@ -1711,7 +1726,13 @@ int doPlayWithServer(const Options& opts) {
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // SPIKE LATENCE s2 : tick 1 ms (etait 10 ms - ce que les
+        // commentaires de tap_ring/pumpTap croyaient deja). Mesure : a
+        // 10 ms le pump livrait des rafales de 3 blocs toutes les
+        // ~15,6 ms et le worklet broadcaster tombait a sec (238-950
+        // underruns/10 s = flux hache a la source). Le tick 1 ms lisse
+        // la route du jam ; le cout CPU des polls est negligeable ici.
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
     std::cout << "\n\nStopping...\n";
@@ -1743,6 +1764,15 @@ int main(int argc, char* argv[]) {
     // Last-words logging FIRST: three silent 0xc0000409 deaths in one
     // night taught us the CRT fail-fast path leaves no trace otherwise
     daw::util::installCrashHandler();
+
+#ifdef _WIN32
+    // SPIKE LATENCE s2 : la resolution du timer Windows est 15,625 ms
+    // par defaut - un sleep_for(1ms) dormait 15,6 ms (MESURE : le pump
+    // du tap livrait des rafales de 3 blocs toutes les 15,6 ms quel que
+    // soit le tick demande). timeBeginPeriod(1) = la pratique standard
+    // des DAW Windows ; rendu a la sortie du process par l'OS.
+    timeBeginPeriod(1);
+#endif
 
     Options opts;
     if (!parseArgs(argc, argv, opts)) {

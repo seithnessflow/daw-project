@@ -133,6 +133,15 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     device_config.sampleRate = config.sample_rate;
     device_config.periodSizeInFrames = config.buffer_size_frames;
     device_config.dataCallback = miniaudioCallback;
+    // SPIKE LATENCE s2 : mode exclusif OPT-IN. miniaudio RETOMBE en
+    // partage EN SILENCE si l'exclusif echoue - la verite est le
+    // READBACK (device_->playback.shareMode) loggue plus bas, jamais
+    // la demande. L'exclusif force le format natif du device (le
+    // sample rate peut changer - actual_sample_rate_ fait foi).
+    if (config.exclusive_mode) {
+        device_config.playback.shareMode = ma_share_mode_exclusive;
+        device_config.performanceProfile = ma_performance_profile_low_latency;
+    }
 
     // Set up callback context
     callback_context_.command_buffer = &command_buffer_;
@@ -164,6 +173,14 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
               << " actual-period=" << actual_buffer_size_
               << " periods=" << device_->playback.internalPeriods
               << " rate=" << actual_sample_rate_
+              << " share="
+              << (device_->playback.shareMode == ma_share_mode_exclusive
+                      ? "EXCLUSIVE" : "shared")
+              << (config.exclusive_mode &&
+                  device_->playback.shareMode != ma_share_mode_exclusive
+                      ? " (exclusif DEMANDE mais retombe - fallback miniaudio)"
+                      : "")
+              << " format=" << ma_get_format_name(device_->playback.internalFormat)
               << " -> device-latency~"
               << (1000.0 * actual_buffer_size_ *
                   device_->playback.internalPeriods / actual_sample_rate_)
