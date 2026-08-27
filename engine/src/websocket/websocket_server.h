@@ -179,8 +179,19 @@ public:
         project_id_ = std::move(project_id);
     }
 
+    /**
+     * LE MOTEUR SUIT L'ONGLET : le proprietaire (main) fournit la bascule
+     * de projet. Appele sur le THREAD RESEAU - le handler ne fait que
+     * POSER la cible (atomique/flag), la bascule reelle vit dans la
+     * boucle de controle (elle possede ServerClient et le builder).
+     */
+    void setSwitchProjectHandler(std::function<void(const std::string&)> h) {
+        switch_project_handler_ = std::move(h);
+    }
+
 private:
     std::function<void(uint32_t)> render_request_handler_;
+    std::function<void(const std::string&)> switch_project_handler_;
     std::string project_id_;
     std::string catalog_frame_;
     // Message handlers

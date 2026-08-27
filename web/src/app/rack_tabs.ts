@@ -18,6 +18,16 @@ function apply(tab: string): void {
   try { localStorage.setItem(KEY, tab); } catch { /* private mode: ignore */ }
 }
 
+/**
+ * Montre un onglet du panneau (session de composition 2026-08-27 :
+ * « + clip MIDI » creait le clip dans un editeur INVISIBLE quand le Rack
+ * etait actif - une action montre TOUS ses effets, donc elle revele
+ * l'editeur qu'elle vient de remplir).
+ */
+export function showRackTab(tab: 'rack' | 'piano'): void {
+  apply(tab);
+}
+
 export function initRackTabs(): void {
   let saved: string | null = null;
   try { saved = localStorage.getItem(KEY); } catch { /* ignore */ }

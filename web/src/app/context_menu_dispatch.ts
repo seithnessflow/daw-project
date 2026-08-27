@@ -10,6 +10,7 @@
 import { ctx, sendLastChange } from './context';
 import { isEditorOpen, markEditorOpen, TIMELINE } from '../ui/track';
 import { snapStep } from './navigation';
+import { showRackTab } from './rack_tabs';
 import { addDeviceToTrack } from './placement';
 import { orderedTracks, trackAcceptsMidi } from '../document/schema';
 import { renderTracks } from './render';
@@ -260,7 +261,9 @@ function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | nu
         ? [{ label: '+ clip MIDI', onClick: () => {
             project.addMidiClip(trackId, 0, 96000);
             ctx.selectedTrackId = trackId;
-            sendLastChange(); renderTracks(true); } },
+            sendLastChange(); renderTracks(true);
+            // Montrer l'editeur qu'on vient de remplir (regle des effets)
+            showRackTab('piano'); } },
            { separator: true } as MenuItem]
         : []),
       { label: 'Supprimer la piste', danger: true, onClick: () => {

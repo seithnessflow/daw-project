@@ -1177,11 +1177,13 @@ int doPlayWithServer(const Options& opts) {
     // Session 3 (fraicheur, arbitrage b) : cadence du signal sf
     auto next_freshness = std::chrono::steady_clock::now();
 
-    // Connect to sync server
+    // Connect to sync server. current_project peut CHANGER en cours de vie
+    // (le moteur suit l'onglet) - c'est lui la verite, pas opts.project_id.
+    std::string current_project = opts.project_id;
     daw::network::ServerClient server_client;
     daw::network::ServerConfig server_config;
     server_config.url = opts.server_url;
-    server_config.project_id = opts.project_id;
+    server_config.project_id = current_project;
 
     // Handle initial document. NETWORK THREAD: document work only, no
     // graph construction here (R1) - bump the version, the builder follows.
@@ -1253,7 +1255,7 @@ int doPlayWithServer(const Options& opts) {
                                      opts.allow_origins.begin(), opts.allow_origins.end());
     wirePluginTelemetry(ws_server, plugin_registry);
     ws_server.setTapRing(&tap_ring);  // S8a
-    ws_server.setProjectId(opts.project_id);  // garde de projet (onglet)
+    ws_server.setProjectId(current_project);  // garde de projet (onglet)
 
     // Export mixdown (AUDIT-6 QW1) : demande navigateur -> instantane du
     // document sous verrou (ICI, thread reseau WS) -> rendu sur le thread
@@ -1316,6 +1318,28 @@ int doPlayWithServer(const Options& opts) {
         ws_server.sendRenderState(daw::protocol::RenderState::STARTED, "", "");
     });
 
+    // LE MOTEUR SUIT L'ONGLET (2026-08-27) : le thread reseau POSE la
+    // cible, la boucle de controle EXECUTE la bascule (elle possede
+    // ServerClient, le document et le builder - jamais de bascule sur
+    // un thread etranger).
+    std::mutex switch_mutex;
+    std::string switch_target;
+    std::atomic<bool> switch_pending{false};
+    ws_server.setSwitchProjectHandler([&](const std::string& id) {
+        // Le meme contrat d'id que le serveur : [A-Za-z0-9_-]{1,64}
+        if (id.empty() || id.size() > 64) return;
+        for (const char c : id) {
+            const bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9') || c == '_' || c == '-';
+            if (!ok) return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(switch_mutex);
+            switch_target = id;
+        }
+        switch_pending.store(true, std::memory_order_release);
+    });
+
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
     const auto telemetry_interval = std::chrono::milliseconds(1000 / ws_config.telemetry_hz);
@@ -1323,6 +1347,46 @@ int doPlayWithServer(const Options& opts) {
     // Main loop
     while (g_running) {
         auto now = std::chrono::steady_clock::now();
+
+        // ---- Bascule de projet (le moteur suit l'onglet) --------------
+        if (switch_pending.exchange(false, std::memory_order_acq_rel)) {
+            std::string target;
+            {
+                std::lock_guard<std::mutex> lock(switch_mutex);
+                target = switch_target;
+            }
+            if (!target.empty() && target != current_project) {
+                std::cout << "Project switch: " << current_project
+                          << " -> " << target << "\n";
+                // Arret propre : transport stoppe + position 0 (par le
+                // command ring - le callback reste seul ecrivain), region
+                // de boucle utilisateur effacee (elle appartenait a
+                // l'ancien projet). Les slots Session meurent avec
+                // l'ancien graphe au rebuild.
+                device.getTransport().stop();
+                daw::audio::AudioCommandMessage seek0{};
+                seek0.command = daw::audio::AudioCommand::Seek;
+                seek0.seek_position = 0;
+                device.sendCommand(seek0);
+                device.getTransport().clearUserLoop();
+                // Document NEUF + reconnexion : le premier doc du nouveau
+                // projet est ADOPTE (isLoaded false), doc_version bouge,
+                // le builder reconstruit - le chemin premiere-connexion
+                // existant, reutilise tel quel.
+                server_client.disconnect();
+                {
+                    std::lock_guard<std::mutex> lock(doc_mutex);
+                    doc = daw::document::AutomergeDocument{};
+                }
+                state_capture_due = {};
+                current_project = target;
+                server_config.project_id = target;
+                ws_server.setProjectId(target);
+                if (!server_client.connect(server_config)) {
+                    std::cerr << "Project switch: reconnect FAILED (server down?)\n";
+                }
+            }
+        }
 
         // ---- Graph builder (R1). Runs here, never on the network thread.
         // Last state wins: one rebuild toward the newest document version;

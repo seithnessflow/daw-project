@@ -683,10 +683,12 @@ export async function init(): Promise<void> {
           + '(creer une piste AUDIO avec le bouton + du coin)');
         return;
       }
-      // Place the armed sample, snapped to a 0.25 s grid
+      // Place the armed sample, snapped to LA grille du zoom (le 0.25
+      // fixe interdisait les contretemps fins - compo 2026-08-27)
       const sr = ctx.project.getDocument().sampleRate || 48000;
       const x = e.clientX - lane.getBoundingClientRect().left;
-      const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+      const step = snapStep();
+      const seconds = Math.max(0, Math.round((x / TIMELINE.pps) / step) * step);
       const placedId = `clip-${armed.name}-${Date.now()}`;
       ctx.project.addClip(id, {
         id: placedId,
@@ -706,8 +708,9 @@ export async function init(): Promise<void> {
     ctx.selectedClipId = null;
     if (lane) {
       const x = e.clientX - lane.getBoundingClientRect().left;
+      const mStep = snapStep();  // le marqueur suit la meme grille
       ctx.insertMarkerSec =
-        Math.max(0, Math.round((x / TIMELINE.pps) / 0.25) * 0.25);
+        Math.max(0, Math.round((x / TIMELINE.pps) / mStep) * mStep);
       updateInsertMarker();
       ctx.followPaused = true;   // editing intent: stop chasing
       updateFollowUI();

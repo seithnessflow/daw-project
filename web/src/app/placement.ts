@@ -16,6 +16,7 @@ import { ctx, els, sendLastChange, LAB_MODE } from './context';
 import { renderTracks } from './render';
 import { renderBrowser } from '../ui/browser';
 import { markLanded } from './gestures';
+import { snapStep } from './navigation';
 
 /**
  * A dropped file becomes a project asset + a clip: verify it is a WAV,
@@ -78,7 +79,10 @@ export async function handleFileDrop(
     return;
   }
   const sr = ctx.project.getDocument().sampleRate || 48000;
-  const sec = Math.max(0, Math.round((laneX / TIMELINE.pps) / 0.25) * 0.25);
+  // Snap de pose = LA grille du zoom (session de composition 2026-08-27 :
+  // le 0.25 fixe interdisait les contretemps fins que la grille dessinait)
+  const step = snapStep();
+  const sec = Math.max(0, Math.round((laneX / TIMELINE.pps) / step) * step);
   const stem = file.name.replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 24) || 'audio';
   const clipId = `clip-${stem}-${Date.now()}`;
@@ -264,7 +268,7 @@ function rackInsertIndex(clientX: number): number {
 
 /**
  * Drop d'un sample : pose le clip a la position x du drop (meme pose que
- * le clic arme de wiring.ts - snap 0.25 s, longueur = duree du sample).
+ * le clic arme de wiring.ts - snap = grille du zoom, longueur = duree du sample).
  * Async car la resolution nom->hash peut charger le kit lab ; addClip
  * no-op proprement si la piste a disparu entre-temps.
  */
@@ -284,7 +288,9 @@ async function placeSampleFromDrop(
     return;
   }
   const sr = ctx.project.getDocument().sampleRate || 48000;
-  const seconds = Math.max(0, Math.round((laneX / TIMELINE.pps) / 0.25) * 0.25);
+  const dropStep = snapStep();  // la grille du zoom, comme les drags
+  const seconds = Math.max(0,
+    Math.round((laneX / TIMELINE.pps) / dropStep) * dropStep);
   const placedId = `clip-${sample.name}-${Date.now()}`;
   ctx.project.addClip(trackId, {
     id: placedId,

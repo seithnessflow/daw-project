@@ -143,24 +143,25 @@
    - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
    MOISSON DE LA SESSION DE COMPOSITION (2026-08-27, « compose comme un
    utilisateur ») - a arbitrer :
-   - [ ] LE MOTEUR SUIT LE PROJET DE L'ONGLET (proposition, mecanisme) :
-         aujourd'hui le moteur est fige sur --project du boot ; un
-         NOUVEAU projet cree au menu n'est jamais joue (PLAY/export
-         refusent desormais visiblement, mais le flux « composer sur un
-         projet neuf » exige un redemarrage de stack). Design pressenti :
-         message WS « switch-project » -> ServerClient se reconnecte sur
-         l'autre id, doc remplace, graph rebuild ; verifier sessions/
-         stems/undo. UNE session bornee.
+   - [x] LE MOTEUR SUIT LE PROJET DE L'ONGLET - FAIT 2026-08-27 nuit
+         (ratification « le moteur est lock sur studio ») : proto
+         SwitchProject (15), cible posee par le thread reseau, bascule
+         par la boucle de controle (stop+seek0, clearUserLoop, doc neuf,
+         reconnexion, adoption premiere-connexion) ; bouton PRIMAIRE du
+         bandeau « Jouer <projet> ici », jamais d'auto-switch. Verite =
+         EngineState.project_id. tab-guards 2/2, gtests 45/45.
    - [ ] POSE SUR POSITION OCCUPEE : le clic arme sur un clip existant
          est AVALE en silence (2 snares perdues en composant) ; et le
          snap peut EMPILER un doublon au meme sample (flam +6 dB muet).
          Se decide AVEC le concept chevauchement=somme/remplace
          (AUDIT-6). Minimum : refus visible OU pose superposee assumee.
-   - [ ] SNAP DE POSE fige a 0.25 s (contretemps fins impossibles au
-         clic arme) - suivre snapStep() du zoom comme les drags.
-   - [ ] DECOUVRABILITE : + clip MIDI cache sous l'onglet Piano-roll ;
-         projet vierge sans matiere (exposer le kit de demarrage hors
-         ?lab=1 ?) ; data-attrs sur les cellules du piano-roll.
+   - [x] SNAP DE POSE - FAIT 2026-08-27 nuit : clic arme, drop sample,
+         drop WAV et marqueur suivent snapStep() du zoom.
+   - [x] + clip MIDI REVELE le piano-roll - FAIT 2026-08-27 nuit
+         (rack et menu contextuel basculent l'onglet).
+   - [ ] DECOUVRABILITE restante : projet vierge sans matiere (exposer
+         le kit de demarrage hors ?lab=1 ?) ; data-attrs sur les
+         cellules du piano-roll (outillage).
    - [x] PISTES TYPEES audio/MIDI - FAIT 2026-08-27 nuit (demande
          utilisateur « il faut des track midi et des tracks audio... un
          bouton dans le coin en haut a gauche ») : TrackDef.kind ADDITIF

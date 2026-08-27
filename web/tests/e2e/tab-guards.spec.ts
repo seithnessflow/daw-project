@@ -130,14 +130,32 @@ test('badge projet affiche ; moteur sur un AUTRE projet -> bandeau + export refu
     expect(await page.evaluate(() =>
       (window as any).__dawEngine.isPlaying())).toBe(false);
 
-    // Le bouton du bandeau rejoint le projet du moteur -> bandeau eteint
-    await banner.locator('button').click();
-    await page.waitForURL(`**project=${engineProject}**`, { timeout: 10000 });
-    await waitForServerConnection(page);
-    await page.waitForFunction(
-      () => (window as any).__dawEngine?.isConnected?.() ?? false,
-      null, { timeout: 15000 });
-    await expect(page.locator('#project-banner')).toBeHidden({ timeout: 10000 });
+    // MODIF SIGNALEE (le moteur suit l'onglet, 2026-08-27) : l'action
+    // PRIMAIRE du bandeau devient « Jouer <projet> ici » - le moteur
+    // BASCULE sur le projet de l'onglet (l'ancienne fin testait la
+    // navigation « Ouvrir », geste trivial encore present en secondaire).
+    await banner.locator('[data-role="engine-follow"]').click();
+    // La verite arrive par la telemetrie : project_id du moteur = l'onglet
+    expect(
+      await waitUntil(async () => (await page.evaluate(() =>
+        (window as any).__dawEngine.engineProjectId())) === tabProject,
+        15000),
+      'le moteur n a pas suivi l onglet (project_id)'
+    ).toBe(true);
+    await expect(page.locator('#project-banner')).toBeHidden({ timeout: 5000 });
+    expect(countInFile(logPath, 'Project switch:'),
+      'le log moteur ne trace pas la bascule').toBeGreaterThan(0);
+
+    // Et maintenant PLAY marche ICI (le refus est parti avec le desaccord)
+    await page.locator('#play-btn').click();
+    expect(
+      await waitUntil(async () => {
+        const t = await page.locator('#position').textContent() ?? '';
+        return t !== '' && t !== '00:00.000';
+      }, 10000),
+      'la lecture n a pas demarre apres la bascule'
+    ).toBe(true);
+    await page.locator('#stop-btn').click();
 
     expect(engine.exitCode, 'engine died during the test').toBeNull();
   } finally {

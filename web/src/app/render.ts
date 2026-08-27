@@ -28,6 +28,7 @@ import { renderMixer } from '../ui/mixer';
 import { renderAutomationLanes } from '../ui/automation_lane';
 import { cssId } from '../document/sanitize';
 import { trackAcceptsMidi } from '../document/schema';
+import { showRackTab } from './rack_tabs';
 import { orderedTracks } from '../document/schema';
 import { initTrackReorder } from './track_reorder';
 import { initDeviceReorder } from './device_reorder';
@@ -230,6 +231,7 @@ export function renderTracks(force = false): void {
       ctx.project!.addMidiClip(selectedTrack.id, 0, 96000);  // 2 s @48k
       sendLastChange();
       renderTracks(true);
+      showRackTab('piano');  // montrer l'editeur qu'on vient de remplir
     });
     head.appendChild(addBtn);
     slot.appendChild(head);

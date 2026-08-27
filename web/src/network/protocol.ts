@@ -43,7 +43,8 @@ export type EncodeMessage =
   | { type: 'tapControl'; data: { enabled: boolean } }
   | { type: 'editor'; data: { nodeId: string; open: boolean } }
   | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean; quantize: boolean } }
-  | { type: 'renderRequest'; data: { bitDepth: number } };
+  | { type: 'renderRequest'; data: { bitDepth: number } }
+  | { type: 'switchProject'; data: { projectId: string } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -97,6 +98,11 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
     case 'renderRequest':
       protoMessage = {
         renderRequest: { bitDepth: msg.data.bitDepth },
+      };
+      break;
+    case 'switchProject':
+      protoMessage = {
+        switchProject: { projectId: msg.data.projectId },
       };
       break;
   }

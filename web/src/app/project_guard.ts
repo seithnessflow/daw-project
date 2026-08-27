@@ -39,15 +39,27 @@ export function wireProjectGuard(): void {
     banner.replaceChildren();
     const txt = document.createElement('span');
     txt.textContent = `Le moteur joue « ${enginePid} » — cet onglet montre `
-      + `« ${PROJECT_ID} ». L'export et l'ecoute suivent le MOTEUR.`;
+      + `« ${PROJECT_ID} ».`;
+    // ACTION PRIMAIRE (le moteur suit l'onglet, 2026-08-27) : ramener le
+    // moteur ICI. Le bandeau s'eteint tout seul quand la telemetrie dit
+    // que ca matche ; en attendant, le bouton annonce la bascule.
+    const claim = document.createElement('button');
+    claim.dataset.role = 'engine-follow';
+    claim.textContent = `Jouer « ${PROJECT_ID} » ici`;
+    claim.addEventListener('click', () => {
+      claim.disabled = true;
+      claim.textContent = 'bascule du moteur…';
+      ctx.engineClient?.switchProject(PROJECT_ID);
+    });
     const go = document.createElement('button');
+    go.className = 'secondary';
     go.textContent = `Ouvrir « ${enginePid} »`;
     go.addEventListener('click', () => {
       const url = new URL(window.location.href);
       url.searchParams.set('project', enginePid);  // hash #stoken conserve
       window.location.href = url.toString();
     });
-    banner.append(txt, go);
+    banner.append(txt, claim, go);
     banner.hidden = false;
   }, POLL_MS);
 }

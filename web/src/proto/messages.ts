@@ -279,6 +279,21 @@ export function renderState_StatusToJSON(object: RenderState_Status): string {
   }
 }
 
+/**
+ * LE MOTEUR SUIT L'ONGLET (2026-08-27, ratification utilisateur : « le
+ * moteur est lock sur studio ») : le client demande au moteur de BASCULER
+ * sur un autre projet du meme serveur. Le moteur : stop transport,
+ * document neuf, reconnexion ServerClient sur le nouvel id, graphe
+ * reconstruit a l'adoption. La verite de l'etat reste EngineState.
+ * project_id (la garde d'onglet s'eteint d'elle-meme quand ca matche).
+ * Geste EXPLICITE (bouton du bandeau) - jamais un auto-switch silencieux
+ * (deux onglets sur deux projets se voleraient le moteur sans le dire).
+ */
+export interface SwitchProject {
+  /** [A-Za-z0-9_-]{1,64}, valide par le moteur */
+  projectId: string;
+}
+
 /** 2.5-decouverte: one scanned plugin class (Audio Module Class only) */
 export interface PluginEntry {
   /** 32-hex VST3 class id */
@@ -367,6 +382,10 @@ export interface Message {
   /** export mixdown (AUDIT-6 QW1) */
   renderRequest?:
     | RenderRequest
+    | undefined;
+  /** le moteur suit l'onglet */
+  switchProject?:
+    | SwitchProject
     | undefined;
   /** Engine -> Client */
   position?: TransportPosition | undefined;
@@ -2055,6 +2074,79 @@ export const RenderState: MessageFns<RenderState> = {
   },
 };
 
+function createBaseSwitchProject(): SwitchProject {
+  return { projectId: "" };
+}
+
+export const SwitchProject: MessageFns<SwitchProject> = {
+  encode(message: SwitchProject, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.projectId !== "") {
+      writer.uint32(10).string(message.projectId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SwitchProject {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSwitchProject();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.projectId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SwitchProject {
+    return {
+      projectId: isSet(object.projectId)
+        ? globalThis.String(object.projectId)
+        : isSet(object.project_id)
+        ? globalThis.String(object.project_id)
+        : "",
+    };
+  },
+
+  toJSON(message: SwitchProject): unknown {
+    const obj: any = {};
+    if (message.projectId !== "") {
+      obj.projectId = message.projectId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SwitchProject>, I>>(base?: I): SwitchProject {
+    return SwitchProject.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SwitchProject>, I>>(object: I): SwitchProject {
+    const message = createBaseSwitchProject();
+    message.projectId = object.projectId ?? "";
+    return message;
+  },
+};
+
 function createBasePluginEntry(): PluginEntry {
   return { uid: "", name: "", vendor: "", subCategories: "" };
 }
@@ -2354,6 +2446,7 @@ function createBaseMessage(): Message {
     editor: undefined,
     sessionLaunch: undefined,
     renderRequest: undefined,
+    switchProject: undefined,
     position: undefined,
     meters: undefined,
     engineState: undefined,
@@ -2384,6 +2477,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.renderRequest !== undefined) {
       RenderRequest.encode(message.renderRequest, writer.uint32(106).fork()).join();
+    }
+    if (message.switchProject !== undefined) {
+      SwitchProject.encode(message.switchProject, writer.uint32(122).fork()).join();
     }
     if (message.position !== undefined) {
       TransportPosition.encode(message.position, writer.uint32(26).fork()).join();
@@ -2471,6 +2567,14 @@ export const Message: MessageFns<Message> = {
             }
 
             message.renderRequest = RenderRequest.decode(reader, reader.uint32());
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.switchProject = SwitchProject.decode(reader, reader.uint32());
             continue;
           }
           case 3: {
@@ -2573,6 +2677,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.render_request)
         ? RenderRequest.fromJSON(object.render_request)
         : undefined,
+      switchProject: isSet(object.switchProject)
+        ? SwitchProject.fromJSON(object.switchProject)
+        : isSet(object.switch_project)
+        ? SwitchProject.fromJSON(object.switch_project)
+        : undefined,
       position: isSet(object.position) ? TransportPosition.fromJSON(object.position) : undefined,
       meters: isSet(object.meters) ? Meters.fromJSON(object.meters) : undefined,
       engineState: isSet(object.engineState)
@@ -2624,6 +2733,9 @@ export const Message: MessageFns<Message> = {
     if (message.renderRequest !== undefined) {
       obj.renderRequest = RenderRequest.toJSON(message.renderRequest);
     }
+    if (message.switchProject !== undefined) {
+      obj.switchProject = SwitchProject.toJSON(message.switchProject);
+    }
     if (message.position !== undefined) {
       obj.position = TransportPosition.toJSON(message.position);
     }
@@ -2673,6 +2785,9 @@ export const Message: MessageFns<Message> = {
       : undefined;
     message.renderRequest = (object.renderRequest !== undefined && object.renderRequest !== null)
       ? RenderRequest.fromPartial(object.renderRequest)
+      : undefined;
+    message.switchProject = (object.switchProject !== undefined && object.switchProject !== null)
+      ? SwitchProject.fromPartial(object.switchProject)
       : undefined;
     message.position = (object.position !== undefined && object.position !== null)
       ? TransportPosition.fromPartial(object.position)

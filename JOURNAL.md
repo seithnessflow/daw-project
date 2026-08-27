@@ -1495,3 +1495,27 @@ ecoute). MOISSON (la directive avait raison, le harnais ne voyait rien) :
   notes ; Start-Process coupe les arguments a l espace (quoter) ;
   lancer une spec contre la stack SECURE = seed-again pend (bascule
   d abord, la procedure existait).
+
+**2026-08-27 (suite 8 - LE MOTEUR SUIT L'ONGLET, ratification « le
+moteur est lock sur studio ») :** la bascule de projet est LIVREE.
+Proto SwitchProject (champ 15) ; le thread reseau POSE la cible
+(validee [A-Za-z0-9_-]{1,64}), la boucle de controle EXECUTE : stop
+transport + seek 0 (command ring), clearUserLoop, ServerClient
+disconnect/reconnect sur le nouvel id, document NEUF (move-assign) ->
+le premier doc est ADOPTE par le chemin premiere-connexion existant,
+le builder reconstruit. La verite reste EngineState.project_id : le
+bandeau s'eteint tout seul. UI : l'action PRIMAIRE du bandeau devient
+« Jouer <projet> ici » (bouton engine-follow), « Ouvrir <autre> »
+passe en secondaire. JAMAIS d'auto-switch (deux onglets sur deux
+projets se voleraient le moteur en silence).
++ 2 ameliorations de la moisson de composition : le SNAP DE POSE
+(clic arme, drop sample, drop WAV, marqueur) suit desormais
+snapStep() du zoom (le 0.25 fixe interdisait les contretemps que la
+grille dessinait) ; « + clip MIDI » (rack et menu) REVELE l'onglet
+Piano-roll qu'il vient de remplir (regle des effets annonces).
+Preuves : tab-guards 2/2 (bandeau -> Jouer ici -> project_id matche ->
+bandeau eteint -> PLAY avance ; modif de spec SIGNALEE : la fin
+navigation « Ouvrir » remplacee par le switch, geste devenu
+secondaire), gtests 45/45. Piege paye : un serveur ZOMBIE d'une spec
+ecoutait sur 3000 et refusait tout - tuer/relancer avant d'accuser le
+code (2 faux rouges).

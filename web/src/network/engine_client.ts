@@ -226,6 +226,17 @@ export class EngineClient {
   }
 
   /**
+   * LE MOTEUR SUIT L'ONGLET : demande au moteur de basculer sur un autre
+   * projet du meme serveur. La verite arrive par EngineState.project_id
+   * (la garde d'onglet s'eteint quand ca matche). Geste explicite
+   * (bouton du bandeau) - jamais auto.
+   */
+  switchProject(projectId: string): void {
+    this.sendBinary(encodeMessage({
+      type: 'switchProject', data: { projectId } }));
+  }
+
+  /**
    * Export mixdown : demande au moteur de rendre le document courant
    * (offline, thread ouvrier moteur) et de publier le WAV au store.
    * La reponse arrive par onRenderState. bitDepth 0 = defaut moteur (24).

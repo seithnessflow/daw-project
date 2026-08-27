@@ -258,6 +258,15 @@ void WebSocketServer::handleMessage(
                 case protocol::Message::kSessionLaunch:
                     handleSessionLaunch(message.session_launch());
                     break;
+                case protocol::Message::kSwitchProject:
+                    // Le moteur suit l'onglet : deleguer au proprietaire
+                    // (pose de cible seulement - la bascule vit dans la
+                    // boucle de controle). Mode fichier : ignore.
+                    if (switch_project_handler_) {
+                        switch_project_handler_(
+                            message.switch_project().project_id());
+                    }
+                    break;
                 case protocol::Message::kRenderRequest:
                     // Export mixdown : deleguer au proprietaire (ExportJob
                     // sur thread ouvrier). Pas de handler (mode fichier) =
