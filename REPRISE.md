@@ -1,95 +1,83 @@
 # REPRISE.md — point de reprise au demarrage
 
-*Reecrit le 2026-08-27 soir (cloture session AUDIT-6 + quick wins).
-Digest operationnel ; les proprietaires restent STATUS.md (etat),
-TODO.md (file), JOURNAL.md (recit date).*
+*Reecrit le 2026-08-27 nuit (cloture de la journee AUDIT-6 : rapport +
+5 livraisons). Les proprietaires restent STATUS.md (etat), TODO.md
+(file), JOURNAL.md (recit date).*
 
 ## L'ETAT EN UNE PHRASE
 
-Le DAW exporte et s'ecoute : un morceau SORT enfin par l'UI (bouton
-WAV↓ -> rendu offline moteur -> telechargement) et les samples se
-PRE-ECOUTENT au navigateur (▶ par chip) — e2e 74/74, gtests 45/45,
-tsc 0 ; et docs/AUDIT-6.md (parite vs Ableton/Cubase, ~35 constats)
-attend sa RATIFICATION.
+La journee « faut que ca devienne un DAW » : AUDIT-6 (parite vs
+Ableton/Cubase, a RATIFIER) + CINQ livraisons verifiees — export
+mixdown UI, pre-ecoute des samples, gardes d'onglet (version+projet),
+BOUCLE UTILISATEUR (drag sur la regle), SCISSION de clip (clic droit /
+Ctrl+E) — suite e2e 79/79, gtests 45/45, tsc 0, CI verte sur les deux
+premiers pushes.
 
 ## POINT DE SYNCHRO (A LIRE EN PREMIER)
 
-**Verdict CI attendu sur bf2c8bb (gardes d'onglet)** : verifier
-`gh run list`. Le push precedent (export+pre-ecoute) est deja VERT
-(run 33070584737). Piege connu : un push DOCS SEULS ne produit AUCUN
-run (paths-ignore '**.md' — ecrit dans ci.yml, pas un rouge).
+**Verdicts CI attendus sur b813998 (boucle) et 5bc6319 (scission)** :
+`gh run list` — deux pushes code, deux runs. Deja VERTS : export+
+pre-ecoute (33070584737) et gardes d'onglet (33072113838). Piege :
+un push docs-seuls ne produit AUCUN run (paths-ignore, ecrit dans
+ci.yml).
 
-## CE QUE LA SESSION A LIVRE (2026-08-27)
+## CE QUE LA JOURNEE A LIVRE (2026-08-27, dans l'ordre)
 
-1. **docs/AUDIT-6.md** — audit de parite conceptuelle vs Ableton/
-   Cubase (3 lectures paralleles exhaustives, ~35 constats etiquetes
-   [DESIGNE]/[REFUSE]/[SOUS-PESE]/[NOUVEAU], arbitrage propose).
-   Titre : rien n'entre (record/MIDI-in absents), rien ne sort
-   (export UI absent — corrige le jour meme), temps musical inexistant.
-   Consigne en TODO 7. A RATIFIER (l'arbitrage en fin de rapport).
-2. **EXPORT MIXDOWN UI** (4789a2a) : bouton WAV↓ en topbar ->
-   RenderRequest/RenderState (proto 13/14) -> render/export_job
-   (thread OUVRIER, lecon C1 respectee) -> WAV au store local+serveur
-   -> download `<projet>-mixdown.wav`. Refus visible modele BOX.
-3. **PRE-ECOUTE SAMPLES** (cd49674) : ▶ par chip (ui/preview.ts,
-   WebAudio, -3 dB, un seul a la fois, n'arme pas le chip, refus
-   visible si store muet).
-4. **GARDES D'ONGLET** (bf2c8bb, sur 2 incidents utilisateur du soir) :
-   - garde de VERSION : /api/version (identite du processus vite),
-     l'onglet poll 10 s et se RECHARGE seul si la stack a ete relancee
-     sous lui (« vieille version du site » fermee) ;
-   - garde de PROJET : badge topbar + project_id du moteur dans
-     EngineState (champ 7) ; desaccord = bandeau rouge + bouton
-     rejoindre + export REFUSE (l'incident « onglet vide, export qui
-     sonne » etait CE desaccord : onglet ≠ projet du moteur).
-5. Preuves finales : e2e **76/76** (export-mixdown 2/2, sample-preview
-   2/2, tab-guards 2/2), gtests 45/45, tsc 0. **CI VERTE verifiee** sur
-   le push export+pre-ecoute (run 33070584737) ; verdict du push
-   gardes (bf2c8bb) = premier point de synchro ci-dessus.
+1. **docs/AUDIT-6.md** — l'inventaire de ce qui manque face aux DAW
+   usuels (~35 constats etiquetes DESIGNE/REFUSE/SOUS-PESE/NOUVEAU,
+   arbitrage propose, quick wins). A RATIFIER ; l'utilisateur a dit
+   « bosse la-dessus » — les livraisons ci-dessous en sortent.
+2. **EXPORT MIXDOWN UI** (4789a2a) : bouton WAV↓ -> rendu offline sur
+   thread OUVRIER moteur -> store -> telechargement. Refus visible.
+3. **PRE-ECOUTE SAMPLES** (cd49674) : ▶ par chip, WebAudio, -3 dB.
+4. **GARDES D'ONGLET** (bf2c8bb) : version du site (reload auto si la
+   stack a ete relancee sous l'onglet) + projet (badge topbar, bandeau
+   rouge si le moteur joue un AUTRE projet, export refuse). Resout
+   l'incident « rien dans l'arrangement et pourtant l'export sonne ».
+5. **BOUCLE UTILISATEUR** (b813998) : drag sur la bande cycle = poser
+   la region (dblclick efface, Alt sans snap) ; moteur : fin de
+   contenu SEPAREE des braces (boucle off ne coupe jamais), region
+   par le command ring, survit aux rebuilds. CLEAN BUILD fait (layout
+   AudioCommandMessage). Gtest etendu (wrap multi-tours 550->262).
+6. **SCISSION** (5bc6319) : clic droit « Scinder ici » (entree absente
+   si impossible) + Ctrl+E au marqueur ; groupe d'undo = UN Ctrl+Z
+   recolle ; fades repartis ; refus MIDI (assetHash vide).
 
 ## LA DECISION OUVERTE (inchangee)
 
-LE GROS CHANTIER. Candidats : P2P E4 Massive / Effets natifs 4.2-4.3 /
-Vague 3 MIDI / AUDIT-5 + AUDIT-6 a ratifier. **Lire les PREALABLES de
-l'arbitrage AUDIT-6 avant de choisir** (E4 : aucune entree MIDI nulle
-part, pas de CC64/pedale dans le ring ; Vague 3 : notes en LISTE
-contre le design map-a-ids, tempo a caser avant/dedans ; latence figee
-512 sans ASIO). Quick wins restants en TODO 7 : boucle utilisateur
-(CLEAN BUILD obligatoire — AudioCommandMessage change de layout),
-GR meter (avec 4.2), dr_flac/dr_mp3 a l'import.
+LE GROS CHANTIER (E4 Massive / Effets 4.2-4.3 / Vague 3 MIDI) — lire
+les PREALABLES d'AUDIT-6 avant de choisir (MIDI-in inexistant, CC64,
+notes en liste vs map-a-ids, tempo, latence figee). Quick wins
+restants (TODO 7) : GR meter du comp (avec 4.2), dr_flac/dr_mp3 a
+l'import. AUDIT-5 et AUDIT-6 a ratifier formellement.
 
-## A SURVEILLER (pieges payes — dont 2 re-payes aujourd'hui)
+## A SURVEILLER (pieges payes du jour — ne pas re-payer)
 
-- **Jamais de log/fichier temp dans web/** (vite -> EBUSY) : re-frole
-  aujourd'hui (log vite), retire en secondes. Les logs de fond vont au
-  scratchpad de session.
-- Rendu offline SANS mapping --vst3-module = refus BRUYANT (voulu) :
-  tout spec/outil qui rend doit passer les mappings (modele ear).
-- Le store adresse contenu est PARTAGE entre tests : « asset absent »
-  se simule par interception 404, jamais par absence reelle.
-- Layout d'une struct moteur partagee change => CLEAN BUILD (ninja
-  clean) ; crash 0xC0000005 avec gtests verts = soupconner l'ABI.
-- Zombies plugin_host avant rebuild ; suite e2e = serveur NON-secure +
-  port 47821 libre (stack utilisateur = SECURE, basculer/RESTAURER) ;
-  endUndoGroup sans imbrication ; quantum session = loop_len de
-  l'ancre ; le seed s'affiche avant la sync (sondes : attendre).
-- Fichiers de sonde non suivis a la racine web/ (fp.mjs, t3.mjs,
-  t3.png, t7.mjs) + traces/box-3-open.png modifie : PAS a moi, laisses
-  tels quels — menage a arbitrer.
+- preventDefault au pointerdown SUPPRIME le dblclick derive — un drag
+  ne demarre qu'au SEUIL de mouvement, jamais d'effet au down.
+- MIDI = assetHash VIDE (jamais notes.length : un clip MIDI frais a
+  notes vides). La regle vaut pour toute garde future.
+- Une spec qui stocke son etat dans window meurt au premier reload
+  incident — lire l'horloge DOM #position cote Node (idiome pose dans
+  loop-region.spec).
+- Un clic force a position FIXE peut sortir du clip aux petits zooms
+  (le menu de PISTE s'ouvre a la place) — viser le centre par defaut.
+- Messages de commit : JAMAIS de guillemets doubles dans le here-string
+  PowerShell (git recoit un pathspec) ; -replace + Set-Content mojibake
+  l'UTF-8 (guillemets francais) — Edit fichier, pas -replace.
+- Le wrap de boucle est sample-exact A CHAQUE tour : 512 frames peuvent
+  faire DEUX tours d'une petite region (l'arithmetique du gtest (d)).
+- Toujours : jamais de log/temp dans web/ ; clean build si layout de
+  struct moteur change ; e2e = serveur NON-secure + 47821 libre puis
+  RESTAURER la stack secure ; zombies plugin_host avant rebuild.
 
 ## RELANCER / VERIFIER
 
-- Stack : `start-daw.cmd` (ou `scripts\daw.ps1 -Secure`) ; arret
-  `stop-daw.cmd`. Moteur : `engine\rebuild_msvc.bat` (zombies
-  d'abord). Tests : `daw_engine_test.exe` (45/45) ; `cd web ; npm run
-  test:e2e` (74) ; `npx tsc --noEmit`.
-- **La manip 5 minutes** : stack lancee -> onglet studio ->
-  1) bouton **WAV↓** (topbar, a droite de JAM) : le mixdown se rend et
-  se TELECHARGE (studio-mixdown.wav — l'ecouter dans le lecteur) ;
-  2) rail gauche onglet **Samples** : le **▶** d'un chip JOUE le
-  sample (re-clic = stop), sans l'armer ;
-  3) moteur coupe -> le clic WAV↓ FLASHE rouge et dit pourquoi ;
-  4) GARDES : le badge cuivre a cote du titre dit LE projet de
-  l'onglet ; ouvrir un VIEUX onglet -> il se recharge seul en <= 10 s ;
-  un onglet sur un autre projet que le moteur -> bandeau rouge +
-  bouton « Ouvrir <projet> ».
+- Stack : `start-daw.cmd` ; arret `stop-daw.cmd`. Tests :
+  `daw_engine_test.exe` (45/45), `npm run test:e2e` (79), tsc 0.
+- **La manip 5 minutes** : onglet studio ->
+  1) TIRER sur la bande fine au-dessus de la regle : l'etrier cuivre
+  se pose et PLAY boucle dessus ; double-clic dessus : la lecture
+  continue au-dela. 2) Clic droit sur un clip -> « Scinder ici » ;
+  Ctrl+Z recolle. 3) WAV↓ telecharge le mixdown ; ▶ d'un chip
+  pre-ecoute ; le badge cuivre dit le projet de l'onglet.
