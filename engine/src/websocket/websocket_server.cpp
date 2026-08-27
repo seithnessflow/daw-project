@@ -306,6 +306,12 @@ void WebSocketServer::handleTransportCommand(const protocol::TransportCommand& c
         case protocol::TransportCommand::LOOP:
             audio_cmd.command = audio::AudioCommand::SetLoop;
             audio_cmd.loop_enabled = cmd.loop_enabled();
+            // Boucle utilisateur (AUDIT-6 QW) : region posee/effacee par
+            // l'onglet, appliquee par le thread audio via le command ring
+            audio_cmd.set_region = cmd.set_region();
+            audio_cmd.loop_start = cmd.loop_start();
+            audio_cmd.loop_end = cmd.loop_end();
+            audio_cmd.clear_region = cmd.clear_region();
             break;
         default:
             return;

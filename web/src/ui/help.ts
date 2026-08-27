@@ -10,6 +10,8 @@ const SHORTCUTS: Array<[string, string]> = [
   ['Ctrl+Z / Ctrl+Y', 'Annuler / retablir (par geste, collaboratif)'],
   ['Suppr', 'Supprimer le clip selectionne'],
   ['Ctrl+D', 'Dupliquer le clip selectionne sur le pas suivant'],
+  ['Ctrl+E', 'Scinder le clip selectionne au marqueur'],
+  ['Glisser la bande fine de la regle', 'Poser la boucle (double-clic : effacer)'],
   ['+ / -', 'Zoom avant / arriere (centre)'],
   ['Ctrl+molette', 'Zoom autour du curseur'],
   ['W', 'Tout le morceau a l’ecran'],

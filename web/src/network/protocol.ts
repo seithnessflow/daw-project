@@ -38,7 +38,7 @@ export type DecodedMessage =
 
 // Encode message types
 export type EncodeMessage =
-  | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean } }
+  | { type: 'transport'; data: { action: TransportCommand_Action; seekPosition?: number; loopEnabled?: boolean; setRegion?: boolean; loopStart?: number; loopEnd?: number; clearRegion?: boolean } }
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
   | { type: 'tapControl'; data: { enabled: boolean } }
   | { type: 'editor'; data: { nodeId: string; open: boolean } }
@@ -58,6 +58,10 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
           action: msg.data.action,
           seekPosition: msg.data.seekPosition ?? 0,
           loopEnabled: msg.data.loopEnabled ?? false,
+          setRegion: msg.data.setRegion ?? false,
+          loopStart: msg.data.loopStart ?? 0,
+          loopEnd: msg.data.loopEnd ?? 0,
+          clearRegion: msg.data.clearRegion ?? false,
         },
       };
       break;

@@ -18,6 +18,15 @@ message TransportCommand {
     Action action = 1;
     int64 seek_position = 2;  // Only used when action == SEEK (in samples)
     bool loop_enabled = 3;    // Only used when action == LOOP
+    // BOUCLE UTILISATEUR (AUDIT-6 QW, 2026-08-27) - action == LOOP :
+    // set_region pose la region [loop_start, loop_end) en samples (le
+    // wrap se fait sur elle) ; clear_region revient aux braces AUTO
+    // [0, fin du contenu]. Sans l'un ni l'autre : simple toggle (la
+    // region en place est conservee). Etat de PERFORMANCE, jamais CRDT.
+    bool set_region = 4;
+    int64 loop_start = 5;
+    int64 loop_end = 6;
+    bool clear_region = 7;
 }
 
 // Monitor control (solo/mute per track - local to this client)

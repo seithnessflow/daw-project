@@ -245,7 +245,8 @@ export function createTrackUI(
 
 /**
  * Build the ruler row, SPLIT (Logic/Ableton convention): the upper band
- * is reserved for the future loop/cycle brace (inert today), the lower
+ * carries the LOOP/CYCLE brace (drag to set, dblclick to clear - gestures
+ * in app/loop_region.ts, delegated so they survive rebuilds), the lower
  * band is the seek strip - the ONLY place a click seeks.
  */
 export function createRulerUI(laneSeconds: number): HTMLElement {
@@ -260,6 +261,19 @@ export function createRulerUI(laneSeconds: number): HTMLElement {
   ruler.style.width = `${laneSeconds * TIMELINE.pps}px`;
   const cycleBand = document.createElement('div');
   cycleBand.className = 'ruler-cycle';
+  cycleBand.title =
+    'Tirer pour poser la boucle ; double-clic pour l\'effacer';
+  // L'etrier de boucle se REND ici (le zoom reconstruit la regle, donc
+  // il suit) ; l'etat vit dans ctx.loopRegion (performance, par onglet).
+  if (ctx.loopRegion) {
+    const brace = document.createElement('div');
+    brace.className = 'cycle-brace';
+    brace.dataset.role = 'cycle-brace';
+    brace.style.left = `${ctx.loopRegion.startSec * TIMELINE.pps}px`;
+    brace.style.width =
+      `${(ctx.loopRegion.endSec - ctx.loopRegion.startSec) * TIMELINE.pps}px`;
+    cycleBand.appendChild(brace);
+  }
   ruler.appendChild(cycleBand);
   const seekBand = document.createElement('div');
   seekBand.className = 'ruler-seek';

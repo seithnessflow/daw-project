@@ -1031,7 +1031,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     // V1.1: loop braces = the content; the CALLBACK owns wrap and
     // end-stop now (single writer of position_ during playback).
     // --keepalive simply plays looped forever.
-    device.getTransport().setLoopPoints(0, total_length);
+    device.getTransport().setContentEnd(total_length);
     if (opts.keepalive) {
         device.getTransport().setLooping(true);
     }
@@ -1381,7 +1381,10 @@ int doPlayWithServer(const Options& opts) {
                             content_end, c.start_sample + c.length_samples);
                     }
                 }
-                device.getTransport().setLoopPoints(0, content_end);
+                // AUDIT-6 QW boucle : la fin de CONTENU se rafraichit a
+                // chaque rebuild ; la region utilisateur, elle, SURVIT
+                // (setContentEnd n'aligne les braces que sans region)
+                device.getTransport().setContentEnd(content_end);
 
                 // V1.5 / A4-5: stage eviction of children whose node id
                 // left the document (executed below, once retirement-safe).

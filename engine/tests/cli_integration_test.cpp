@@ -3069,9 +3069,16 @@ bool testTransportLoopAndStop() {
 
     std::vector<float> out(1024 * 2, 0.0f);
 
+    // MODIFICATION SIGNALEE (AUDIT-6 QW boucle, 2026-08-27) : le contrat
+    // a change VOLONTAIREMENT - l'arret hors boucle se fait sur la FIN DE
+    // CONTENU (setContentEnd), les braces de boucle ne servent qu'au wrap.
+    // Sans region utilisateur, setContentEnd aligne aussi les braces
+    // (comportement V1.1 conserve). Scenarios (d)(e)(f) ajoutes : region
+    // utilisateur, boucle-off-ne-coupe-pas, rebuild-n-ecrase-pas.
+
     // (a) looping across the brace: 900 + 512 over end=1000
     // -> 100 to the end, wrap to 0, 412 past it. Exactly.
-    transport.setLoopPoints(0, 1000);
+    transport.setContentEnd(1000);
     transport.setLooping(true);
     transport.seek(900);
     transport.play();
@@ -3097,7 +3104,7 @@ bool testTransportLoopAndStop() {
     }
 
     // (c) empty content: end<=start must neither wrap, stop, nor hang
-    transport.setLoopPoints(0, 0);
+    transport.setContentEnd(0);
     transport.setLooping(true);
     transport.seek(0);
     transport.play();
@@ -3106,6 +3113,55 @@ bool testTransportLoopAndStop() {
         std::cout << "FAILED: empty-project guard gave position "
                   << transport.getPosition() << " (expected 512), playing="
                   << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    // (d) REGION UTILISATEUR [200,600), boucle ON, DEUX tours dans un
+    // buffer : 550 -> 50 jusqu'a 600, wrap, 200 -> 400 jusqu'a 600
+    // (256+144, chaque chunk borne a la brace), wrap, 62 restants ->
+    // 262. Exactement - le wrap est sample-exact a CHAQUE tour.
+    transport.setContentEnd(1000);
+    transport.setUserLoop(200, 600);
+    transport.setLooping(true);
+    transport.seek(550);
+    transport.play();
+    audioCallback(nullptr, out.data(), nullptr, 512);
+    if (transport.getPosition() != 262 || !transport.isPlaying()) {
+        std::cout << "FAILED: user-region wrap gave position "
+                  << transport.getPosition() << " (expected 262), playing="
+                  << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    // (e) region posee mais boucle OFF : la region ne COUPE PAS la
+    // lecture - arret a la fin du CONTENU (1000), pas a 600.
+    transport.setLooping(false);
+    transport.seek(550);
+    audioCallback(nullptr, out.data(), nullptr, 512);
+    if (transport.getPosition() != 1000 || transport.isPlaying()) {
+        std::cout << "FAILED: loop-off-with-region gave position "
+                  << transport.getPosition() << " (expected 1000), playing="
+                  << transport.isPlaying() << "\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+
+    // (f) un rebuild (setContentEnd) n'ecrase PAS la region utilisateur ;
+    // clearUserLoop rend les braces AUTO [0, contenu].
+    transport.setContentEnd(2000);
+    if (transport.getLoopEnd() != 600 || !transport.hasUserLoop()) {
+        std::cout << "FAILED: rebuild clobbered the user region (loop_end="
+                  << transport.getLoopEnd() << ")\n";
+        g_callback_context = nullptr;
+        return false;
+    }
+    transport.clearUserLoop();
+    if (transport.getLoopStart() != 0 || transport.getLoopEnd() != 2000 ||
+        transport.hasUserLoop()) {
+        std::cout << "FAILED: clearUserLoop gave [" << transport.getLoopStart()
+                  << "," << transport.getLoopEnd() << ")\n";
         g_callback_context = nullptr;
         return false;
     }

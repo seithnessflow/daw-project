@@ -18,6 +18,17 @@ export interface TransportCommand {
   seekPosition: number;
   /** Only used when action == LOOP */
   loopEnabled: boolean;
+  /**
+   * BOUCLE UTILISATEUR (AUDIT-6 QW, 2026-08-27) - action == LOOP :
+   * set_region pose la region [loop_start, loop_end) en samples (le
+   * wrap se fait sur elle) ; clear_region revient aux braces AUTO
+   * [0, fin du contenu]. Sans l'un ni l'autre : simple toggle (la
+   * region en place est conservee). Etat de PERFORMANCE, jamais CRDT.
+   */
+  setRegion: boolean;
+  loopStart: number;
+  loopEnd: number;
+  clearRegion: boolean;
 }
 
 export enum TransportCommand_Action {
@@ -381,7 +392,15 @@ export interface Message {
 }
 
 function createBaseTransportCommand(): TransportCommand {
-  return { action: 0, seekPosition: 0, loopEnabled: false };
+  return {
+    action: 0,
+    seekPosition: 0,
+    loopEnabled: false,
+    setRegion: false,
+    loopStart: 0,
+    loopEnd: 0,
+    clearRegion: false,
+  };
 }
 
 export const TransportCommand: MessageFns<TransportCommand> = {
@@ -394,6 +413,18 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     }
     if (message.loopEnabled !== false) {
       writer.uint32(24).bool(message.loopEnabled);
+    }
+    if (message.setRegion !== false) {
+      writer.uint32(32).bool(message.setRegion);
+    }
+    if (message.loopStart !== 0) {
+      writer.uint32(40).int64(message.loopStart);
+    }
+    if (message.loopEnd !== 0) {
+      writer.uint32(48).int64(message.loopEnd);
+    }
+    if (message.clearRegion !== false) {
+      writer.uint32(56).bool(message.clearRegion);
     }
     return writer;
   },
@@ -435,6 +466,38 @@ export const TransportCommand: MessageFns<TransportCommand> = {
             message.loopEnabled = reader.bool();
             continue;
           }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.setRegion = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.loopStart = longToNumber(reader.int64());
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.loopEnd = longToNumber(reader.int64());
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.clearRegion = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -460,6 +523,26 @@ export const TransportCommand: MessageFns<TransportCommand> = {
         : isSet(object.loop_enabled)
         ? globalThis.Boolean(object.loop_enabled)
         : false,
+      setRegion: isSet(object.setRegion)
+        ? globalThis.Boolean(object.setRegion)
+        : isSet(object.set_region)
+        ? globalThis.Boolean(object.set_region)
+        : false,
+      loopStart: isSet(object.loopStart)
+        ? globalThis.Number(object.loopStart)
+        : isSet(object.loop_start)
+        ? globalThis.Number(object.loop_start)
+        : 0,
+      loopEnd: isSet(object.loopEnd)
+        ? globalThis.Number(object.loopEnd)
+        : isSet(object.loop_end)
+        ? globalThis.Number(object.loop_end)
+        : 0,
+      clearRegion: isSet(object.clearRegion)
+        ? globalThis.Boolean(object.clearRegion)
+        : isSet(object.clear_region)
+        ? globalThis.Boolean(object.clear_region)
+        : false,
     };
   },
 
@@ -474,6 +557,18 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     if (message.loopEnabled !== false) {
       obj.loopEnabled = message.loopEnabled;
     }
+    if (message.setRegion !== false) {
+      obj.setRegion = message.setRegion;
+    }
+    if (message.loopStart !== 0) {
+      obj.loopStart = Math.round(message.loopStart);
+    }
+    if (message.loopEnd !== 0) {
+      obj.loopEnd = Math.round(message.loopEnd);
+    }
+    if (message.clearRegion !== false) {
+      obj.clearRegion = message.clearRegion;
+    }
     return obj;
   },
 
@@ -485,6 +580,10 @@ export const TransportCommand: MessageFns<TransportCommand> = {
     message.action = object.action ?? 0;
     message.seekPosition = object.seekPosition ?? 0;
     message.loopEnabled = object.loopEnabled ?? false;
+    message.setRegion = object.setRegion ?? false;
+    message.loopStart = object.loopStart ?? 0;
+    message.loopEnd = object.loopEnd ?? 0;
+    message.clearRegion = object.clearRegion ?? false;
     return message;
   },
 };

@@ -245,6 +245,28 @@ export class EngineClient {
   }
 
   /**
+   * Boucle UTILISATEUR (AUDIT-6 QW) : pose la region [start, end) en
+   * samples ET active la boucle (poser = vouloir boucler). Etat de
+   * performance local, jamais le document.
+   */
+  setLoopRegion(startSample: number, endSample: number): void {
+    this.sendBinary(encodeMessage({
+      type: 'transport',
+      data: { action: TransportAction.LOOP, loopEnabled: true,
+        setRegion: true, loopStart: startSample, loopEnd: endSample },
+    }));
+  }
+
+  /** Efface la region : braces AUTO [0, fin du contenu], boucle coupee. */
+  clearLoopRegion(): void {
+    this.sendBinary(encodeMessage({
+      type: 'transport',
+      data: { action: TransportAction.LOOP, loopEnabled: false,
+        clearRegion: true },
+    }));
+  }
+
+  /**
    * Set track monitoring state (solo/mute).
    * Note: Gain is NOT set here - it goes through the Automerge document.
    */

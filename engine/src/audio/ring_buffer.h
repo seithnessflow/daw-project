@@ -177,6 +177,12 @@ struct AudioCommandMessage {
     uint32_t track_index = 0;   // For track-specific commands
     void* graph_ptr = nullptr;  // For UpdateGraph (new graph pointer)
     bool loop_enabled = false;  // For SetLoop command (V1.1)
+    // Boucle utilisateur (AUDIT-6 QW) - SetLoop seulement. LAYOUT CHANGE
+    // 2026-08-27 : clean build obligatoire (regle ABI gravee).
+    bool set_region = false;    // poser [loop_start, loop_end)
+    int64_t loop_start = 0;
+    int64_t loop_end = 0;
+    bool clear_region = false;  // revenir aux braces AUTO
 };
 
 static_assert(std::is_trivially_copyable_v<AudioCommandMessage>);

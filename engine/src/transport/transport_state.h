@@ -87,8 +87,9 @@ public:
     }
 
     /**
-     * Set loop points (for future use).
-     * Currently stored but not enforced.
+     * Set loop points (VIVANT depuis V1.1 - l'ancien « for future use »
+     * mentait, famille F d'AUDIT-5) : le callback wrap sur ces braces
+     * quand looping est actif.
      */
     void setLoopPoints(int64_t start, int64_t end) noexcept {
         loop_start_.store(start, std::memory_order_release);
@@ -96,7 +97,41 @@ public:
     }
 
     /**
-     * Enable/disable looping (for future use).
+     * BOUCLE UTILISATEUR (AUDIT-6 QW) : fin du CONTENU, rafraichie par le
+     * control thread a chaque rebuild. C'est le point d'ARRET quand la
+     * boucle est OFF - distinct des braces de boucle. Sans region
+     * utilisateur, les braces suivent le contenu (comportement V1.1).
+     */
+    void setContentEnd(int64_t end) noexcept {
+        content_end_.store(end, std::memory_order_release);
+        if (!user_loop_.load(std::memory_order_acquire)) {
+            setLoopPoints(0, end);
+        }
+    }
+
+    [[nodiscard]] int64_t getContentEnd() const noexcept {
+        return content_end_.load(std::memory_order_acquire);
+    }
+
+    /** Region de boucle posee par l'utilisateur : les rebuilds ne
+     *  l'ecrasent plus tant qu'elle n'est pas effacee. */
+    void setUserLoop(int64_t start, int64_t end) noexcept {
+        user_loop_.store(true, std::memory_order_release);
+        setLoopPoints(start, end);
+    }
+
+    /** Retour aux braces AUTO [0, fin du contenu]. */
+    void clearUserLoop() noexcept {
+        user_loop_.store(false, std::memory_order_release);
+        setLoopPoints(0, content_end_.load(std::memory_order_acquire));
+    }
+
+    [[nodiscard]] bool hasUserLoop() const noexcept {
+        return user_loop_.load(std::memory_order_acquire);
+    }
+
+    /**
+     * Enable/disable looping (VIVANT depuis V1.1 - le callback l'honore).
      */
     void setLooping(bool enabled) noexcept {
         looping_.store(enabled, std::memory_order_release);
@@ -118,10 +153,13 @@ private:
     std::atomic<bool> playing_{false};
     std::atomic<int64_t> position_{0};
 
-    // Loop points (for future use)
+    // Braces de boucle (wrap du callback) + fin de contenu (point d'arret
+    // hors boucle) + drapeau region-utilisateur (les rebuilds respectent)
     std::atomic<bool> looping_{false};
     std::atomic<int64_t> loop_start_{0};
     std::atomic<int64_t> loop_end_{0};
+    std::atomic<int64_t> content_end_{0};
+    std::atomic<bool> user_loop_{false};
 };
 
 }  // namespace daw::transport

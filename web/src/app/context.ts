@@ -80,6 +80,10 @@ export const ctx = {
   programmaticScroll: false,
   lastPlayheadSec: -1,
   zoomStack: [] as { pps: number; scrollLeft: number }[],
+  // Boucle UTILISATEUR (AUDIT-6 QW) : la region de cycle posee au drag
+  // sur la bande superieure de la regle. Etat de PERFORMANCE local a
+  // l'onglet (jamais le document) ; null = braces auto du moteur.
+  loopRegion: null as { startSec: number; endSec: number } | null,
 };
 
 // ---- DOM anchors ----------------------------------------------------------

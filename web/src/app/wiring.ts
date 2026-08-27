@@ -43,6 +43,7 @@ import { renderTracks } from './render';
 import { wireExport } from './export';
 import { wireVersionGuard } from './version_guard';
 import { wireProjectGuard } from './project_guard';
+import { wireLoopRegion, reassertLoopRegion } from './loop_region';
 
 declare global {
   interface Window {
@@ -214,7 +215,10 @@ export async function init(): Promise<void> {
     // meant every fresh tab silently killed the server-mode keepalive
     // loop and the engine died at end-of-song (the night's stealth
     // silence: position frozen at 24.57).
-    if (els.loopBtn.getAttribute('aria-pressed') === 'true') {
+    if (!reassertLoopRegion() &&
+        els.loopBtn.getAttribute('aria-pressed') === 'true') {
+      // La REGION (si posee) porte deja enabled=true ; sinon, l'ancien
+      // re-assert du simple toggle.
       engineClient.setLoop(true);
     }
     // S8a: ?tap=1 subscribes to the master tap (the jam road's first
@@ -554,6 +558,8 @@ export async function init(): Promise<void> {
   // a ete relancee sous l'onglet) + projet (badge, bandeau de desaccord)
   wireVersionGuard();
   wireProjectGuard();
+  // Boucle utilisateur (AUDIT-6 QW) : drag sur la bande cycle de la regle
+  wireLoopRegion();
   // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
   // + device le lit a chaque ouverture
   engineClient.onPluginCatalog = (entries) => {
@@ -787,6 +793,25 @@ export async function init(): Promise<void> {
         sendLastChange();
         ctx.selectedClipId = copyId;
         renderTracks(true);
+      }
+      return;
+    }
+    // Ctrl+E (AUDIT-6, geste Live) : scinder le clip SELECTIONNE au
+    // marqueur d'insertion. Le mutateur refuse MIDI/bords - refus
+    // silencieux acceptable ici (le geste ne detruit rien).
+    if (e.code === 'KeyE' && (e.ctrlKey || e.metaKey) &&
+        ctx.selectedClipId && ctx.project) {
+      e.preventDefault();
+      const doc = ctx.project.getDocument();
+      const sr = doc.sampleRate || 48000;
+      const track = doc.tracks.find((t) =>
+        t.clips.some((c) => c.id === ctx.selectedClipId));
+      if (track) {
+        const at = Math.round(ctx.insertMarkerSec * sr);
+        if (ctx.project.splitClip(track.id, ctx.selectedClipId, at)) {
+          sendLastChange();
+          renderTracks(true);
+        }
       }
       return;
     }

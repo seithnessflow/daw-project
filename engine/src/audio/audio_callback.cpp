@@ -90,14 +90,18 @@ void audioCallback(
         return;
     }
 
-    // Loop / end-of-content policy (V1.1). The braces live in the
-    // transport atomics; the control thread refreshes them at every
-    // rebuild (setLoopPoints(0, contentEnd)). All loads/stores here are
-    // lock-free - sacred-thread safe. Guard: an empty project
-    // (end <= start) neither wraps nor stops (no zero-grain spin).
+    // Loop / end-of-content policy (V1.1, region utilisateur AUDIT-6 QW).
+    // Les braces vivent dans les atomics du transport ; le control thread
+    // rafraichit la FIN DE CONTENU a chaque rebuild (setContentEnd), et la
+    // region utilisateur (setUserLoop) survit aux rebuilds. Politique :
+    // boucle ON -> wrap sur [loop_start, loop_end) ; boucle OFF -> lecture
+    // jusqu'a la FIN DU CONTENU (une region posee mais boucle off ne coupe
+    // JAMAIS la lecture - modele Live). Guard : bornes vides = ni wrap ni
+    // stop (pas de spin a grain zero). Tout est lock-free.
     const bool looping = ctx->transport->isLooping();
-    const int64_t loop_start = ctx->transport->getLoopStart();
-    const int64_t loop_end = ctx->transport->getLoopEnd();
+    const int64_t loop_start = looping ? ctx->transport->getLoopStart() : 0;
+    const int64_t loop_end = looping ? ctx->transport->getLoopEnd()
+                                     : ctx->transport->getContentEnd();
     const bool bounded = loop_end > loop_start;
 
     // Process audio in fixed-size sub-blocks
@@ -198,6 +202,15 @@ void processCommands(AudioCallbackContext& ctx) noexcept {
                 break;
 
             case AudioCommand::SetLoop:
+                // Region utilisateur d'abord (le toggle s'applique apres,
+                // pour que « poser une region » active la boucle d'un coup)
+                if (cmd->clear_region) {
+                    ctx.transport->clearUserLoop();
+                } else if (cmd->set_region &&
+                           cmd->loop_end > cmd->loop_start &&
+                           cmd->loop_start >= 0) {
+                    ctx.transport->setUserLoop(cmd->loop_start, cmd->loop_end);
+                }
                 ctx.transport->setLooping(cmd->loop_enabled);
                 break;
 
