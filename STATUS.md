@@ -2,13 +2,15 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-27 (T1+T2+T3 TEMPO livres : schema v2 additif + noyau miroir
-entier tempo.ts==tempo.h + resolveMusicalTime moteur + SURFACE WEB
-complete (geometry.ts point de branche, tempo topbar, clips MIDI
-musicaux, piano-roll en ticks, badge/bascule de domaine, grille et
-regle musicales) ; hash de reference INCHANGE ; e2e 99/99, gtests
-51/51, tsc 0, rituel du compositeur a 100 BPM vert ; suite du lot T
-dans TODO 6 et JOURNAL suites 13-15).*
+2026-08-27 (LOT T SOLDE T1+T2+T3+T5 + LOT A6 : schema v2 additif,
+noyau miroir entier tempo.ts==tempo.h, resolveMusicalTime moteur,
+surface web complete (geometry.ts, tempo topbar, clips MIDI musicaux,
+piano-roll en ticks, bascule de domaine), DEUX ancres de determinisme
+(absolu 56729beb61993cd7 INCHANGE + musical c1233ae9d6ab9e83, jumeaux
+gtest/ci.yml), contrat de periode MESURE (piste A : multiples de 256
+= callbacks fixes, 0 partiel, surveille par WARNING) ; e2e 99/99,
+gtests 51/51, tsc 0, rituel du compositeur a 100 BPM vert ; T4 Link
+Etage 2 = seul reliquat du lot T, differe ; JOURNAL suites 13-17).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 

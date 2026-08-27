@@ -1,134 +1,80 @@
 # REPRISE.md — point de reprise au demarrage
 
-## TOUT EN HAUT (2026-08-27, tres tard) : PLAN RATIFIE + SPIKE SOLDE
+## TOUT EN HAUT (2026-08-27, soir) : LA MIGRATION TEMPO EST LIVREE
 
-Le plan post-revue est APPROUVE (fichier de plan de la session ;
-essentiel copie ici) : Lot 0 spike latence [FAIT en une soiree] ->
-Lot P performance [A FAIRE] -> **LOT T MIGRATION TEMPO** (additive-dual
-ratifie « solution la plus elegante » : l'existant garde ses samples
-exacts, le neuf est musical en ticks PPQ 960, noyau entier miroir
-tempo.ts/tempo.h, hash CI et stems SURVIVENT) -> Vague 3 live.
-SPIKE (docs/SPIKE-LATENCE.md) : EXCLUSIF 256 = **16 ms, 0 underrun
-sous charge** (--exclusive livre) ; timeBeginPeriod(1) (le tick 1 ms
-dormait 15,6 ms) ; flux jam broadcaster REPARE (pre-buffer worklet,
-0 underrun contre 238-950) ; pipeline jam mesure ~75 ms hors reseau ->
-VERDICT : jeu direct distant EXCLU ; test Massive jouable en
-MIDI->rendu tour 16 ms->enceintes (~18-20 ms) ; WAN = ecoute.
-Reliquat : mesure LAN 2 machines (courte, portable requis).
-PROCHAINE SESSION : Lot P (perf au regime de preuve) puis **T1**
-(schema v2 + noyau tempo + vecteurs — zero changement de comportement,
-preuve = hash de reference INCHANGE). Verdict CI a verifier : 729f769.
+**A LIRE EN PREMIER — le point de synchro :** deux verdicts CI etaient
+en vol a la cloture : **e512538** (T5 — le hash MUSICAL passe pour la
+PREMIERE fois sous GCC : si rouge, c'est une divergence
+cross-compilateur du noyau tempo, lire le log du job build-linux) et
+**99190f4** (A6). Les sentinelles locales ont peut-etre rendu verdict
+avant la fermeture — sinon : `gh run list --limit 3`. AUCUN travail ne
+s'ouvre avant ces deux verdicts.
 
-*Reecrit le 2026-08-27 nuit (cloture de la journee AUDIT-6 : rapport +
-5 livraisons). Les proprietaires restent STATUS.md (etat), TODO.md
-(file), JOURNAL.md (recit date).*
+## Ce qui a ete fait (session du 27 au soir, JOURNAL suites 13-17)
 
-## L'ETAT EN UNE PHRASE
+LE LOT T (migration tempo ADDITIVE-DUAL, plan ratifie
+`.claude/plans/lazy-crunching-nautilus.md`) est SOLDE en une session,
+plus le Lot P et le Lot A6 :
 
-La journee « faut que ca devienne un DAW » : AUDIT-6 (parite vs
-Ableton/Cubase, a RATIFIER) + CINQ livraisons verifiees — export
-mixdown UI, pre-ecoute des samples, gardes d'onglet (version+projet),
-BOUCLE UTILISATEUR (drag sur la regle), SCISSION de clip (clic droit /
-Ctrl+E) — suite e2e 79/79, gtests 45/45, tsc 0, CI verte sur les deux
-premiers pushes.
+- **Lot P** : perf au regime de preuve (500 pistes = 735 us/bloc en
+  gtest CI, compteurs stems + period/shareMode en telemetrie).
+- **T1** : schema v2 additif + noyau MIROIR 100 % entier
+  `web/src/document/tempo.ts` (BigInt) == `engine/src/graph/tempo.h`
+  (int64), vecteurs d'or partages `fixtures/tempo-vectors.json`
+  (gtest 41 verifs + spec Node 14/14). Creation RESTE v1 (graine
+  vendoree), bump v2 LAZY (ensureV2).
+- **T2** : `resolveMusicalTime()` = LE point d'etranglement moteur
+  (build live, offline_render, stems, fraicheur — cles sur samples
+  RESOLUS), quantum Session musical (1 mesure au registre).
+- **T3** : surface web — `geometry.ts` point de branche geometrie,
+  champ tempo topbar (milli-BPM entier, undo, LWW), clip MIDI frais
+  NAIT musical, piano-roll en ticks, badge ♪ + bascule Rendre
+  musical/absolu, grille+regle musicales, `tempo.spec.ts`. RITUEL DU
+  COMPOSITEUR a 100 BPM VERT (mesure 2 a 2,400 s pile, ratio tempo
+  exact, export x2 stable).
+- **T5** : DEUX ancres de determinisme — absolu `56729beb61993cd7`
+  INCHANGE par tout le lot (la preuve d'additivite) + musical
+  `c1233ae9d6ab9e83` epingle en jumeaux gtest==ci.yml (DECISIONS.md).
+- **Lot A6** : contrat de periode MESURE — demander un multiple de
+  256 = callbacks FIXES (0 partiel en partage 256/512, exclusif fixe) ;
+  piste A suffit, PAS d'accumulateur ; WARNING bruyant si un partiel
+  parait ; proxy_depth = ceil clampe (fix du max(1,n/256)).
+- **T4 (Link Etage 2) : DIFFERE explicitement** — seul reliquat du
+  lot T, session dediee a planifier.
 
-## NOUVEAU (nuit du 27, apres la reecriture ci-dessous) : LE MOTEUR
-## SUIT L'ONGLET
+Etat des suites a la cloture : e2e **99/99**, gtests **51/51**
+(2 hashes ancres), tsc 0. CI verte jusqu'a 2cc73e6 inclus (T3).
 
-Fini le moteur fige sur --project du boot : le bandeau de desaccord
-offre « Jouer <projet> ici » (le moteur bascule, proto SwitchProject,
-jamais d'auto-switch) — prouve sur la VRAIE stack (essai-claude joue,
-puis moteur rendu a studio). + Le transport REFUSE le desaccord ;
-snap de pose = grille du zoom ; + clip MIDI revele le piano-roll ;
-composition-utilisateur complete (essai-claude : beat kit + basse
-Dexed, export traces/essai-claude-mixdown.wav, ear verte).
-ET (suite 9) : IMPORT UNIVERSEL (drop mp3/flac/ogg -> decode
-navigateur au taux du projet -> WAV 16 bits au store, moteur intact,
-prouve au vrai mp3) ; POSE EN COUCHE (clic arme sur position occupee
-= pose, chevauchement=somme) + ANTI-FLAM (meme sample meme pas =
-refus visible) ; cellules piano-roll adressables (data-pitch/step).
-Suite e2e 83/83. CI VERTE sur TOUS les pushes du jour jusqu'a
-af0bd8e inclus ; dernier verdict a verifier : 6c3526a (import).
-Moisson restante : kit de demarrage hors ?lab=1 (concept), GR meter
-(avec 4.2), et les chantiers AUDIT-6 (multi-selection, tempo...).
+## Comment relancer
 
-## POINT DE SYNCHRO (A LIRE EN PREMIER)
+- Stack utilisateur : `start-daw.cmd` (double-clic) — RESTAUREE a la
+  cloture de cette session (serveur SECURE + moteur studio + web).
+- Offre OUVERTE (spike s2, non tranchee par l'utilisateur) : passer
+  `daw.ps1` en `--exclusive --buffer-size 256` (16 ms mesures,
+  0 underrun sous charge) — une ligne a changer, attend son GO.
 
-**Verdict CI attendu sur 5776e24 (pistes typees + fixes des 2 rouges)**.
-Les runs b813998 et 5bc6319 furent ROUGES, causes comprises et FIXEES
-dans 5776e24 : (1) le commit boucle referencait splitClip livre au
-commit suivant — un lot pousse doit compiler SEUL (lecon de decoupage,
-JOURNAL) ; (2) tab-guards partageait un dossier entre deux seeds
-(base.am illisible au 2e passage en CI) — spec hermetique desormais.
-Deja verts : export+pre-ecoute (33070584737), gardes (33072113838).
-Piege : un push docs-seuls ne produit AUCUN run (paths-ignore).
+## Quoi surveiller
 
-## CE QUE LA JOURNEE A LIVRE (2026-08-27, dans l'ordre)
+1. Les deux verdicts CI ci-dessus (e512538, 99190f4).
+2. Le premier passage GCC du hash musical (e512538) est LE point
+   sensible — divergence = probleme de noyau, pas de bruit.
+3. `callback-shape` dans les logs moteur : si `partials>0` parait, le
+   contrat de periode est viole et la piste B (accumulateur) remonte.
 
-1. **docs/AUDIT-6.md** — l'inventaire de ce qui manque face aux DAW
-   usuels (~35 constats etiquetes DESIGNE/REFUSE/SOUS-PESE/NOUVEAU,
-   arbitrage propose, quick wins). A RATIFIER ; l'utilisateur a dit
-   « bosse la-dessus » — les livraisons ci-dessous en sortent.
-2. **EXPORT MIXDOWN UI** (4789a2a) : bouton WAV↓ -> rendu offline sur
-   thread OUVRIER moteur -> store -> telechargement. Refus visible.
-3. **PRE-ECOUTE SAMPLES** (cd49674) : ▶ par chip, WebAudio, -3 dB.
-4. **GARDES D'ONGLET** (bf2c8bb) : version du site (reload auto si la
-   stack a ete relancee sous l'onglet) + projet (badge topbar, bandeau
-   rouge si le moteur joue un AUTRE projet, export refuse). Resout
-   l'incident « rien dans l'arrangement et pourtant l'export sonne ».
-5. **BOUCLE UTILISATEUR** (b813998) : drag sur la bande cycle = poser
-   la region (dblclick efface, Alt sans snap) ; moteur : fin de
-   contenu SEPAREE des braces (boucle off ne coupe jamais), region
-   par le command ring, survit aux rebuilds. CLEAN BUILD fait (layout
-   AudioCommandMessage). Gtest etendu (wrap multi-tours 550->262).
-6. **SCISSION** (5bc6319) : clic droit « Scinder ici » (entree absente
-   si impossible) + Ctrl+E au marqueur ; groupe d'undo = UN Ctrl+Z
-   recolle ; fades repartis ; refus MIDI (assetHash vide).
-7. **PISTES TYPEES audio/MIDI** (5776e24) : le bouton + du COIN (menu
-   Piste audio / Piste MIDI, « + add track » = meme menu), TrackDef.kind
-   additif (legacy = mixte, rien ne casse), badges sur les tetes,
-   gardes de gestes a refus VISIBLE (sample sur MIDI = flash rouge ;
-   clip MIDI / instrument sur audio = absent/flash) ; instrument sur le
-   vide => piste MIDI, effet => piste audio. Suite **80/80**.
+## La suite (ORDRE GRAVE, TODO.md)
 
-## LA DECISION OUVERTE (inchangee)
+1. Reliquat spike : mesure LAN 2 machines (courte, portable TX15).
+2. Le GEL du lot T est LEVE : reprendre l'ordre grave du TODO
+   (tranche 2 item 3 : contrat de periode — kRingSlots=8, refus
+   bruyant, A4-5 ; puis la file d'ordres generique).
+3. T4 Link Etage 2 : a proposer comme session dediee.
+4. Dettes datees fraiches : wrap de boucle = chunk partiel par tour
+   (queue dry via plugins) ; conversion Rendre musical des clips MIDI
+   absolus (conversion de masse des notes) ; scission des clips
+   musicaux.
 
-LE GROS CHANTIER (E4 Massive / Effets 4.2-4.3 / Vague 3 MIDI) — lire
-les PREALABLES d'AUDIT-6 avant de choisir (MIDI-in inexistant, CC64,
-notes en liste vs map-a-ids, tempo, latence figee). Quick wins
-restants (TODO 7) : GR meter du comp (avec 4.2), dr_flac/dr_mp3 a
-l'import. AUDIT-5 et AUDIT-6 a ratifier formellement.
+## Decisions ouvertes
 
-## A SURVEILLER (pieges payes du jour — ne pas re-payer)
-
-- preventDefault au pointerdown SUPPRIME le dblclick derive — un drag
-  ne demarre qu'au SEUIL de mouvement, jamais d'effet au down.
-- MIDI = assetHash VIDE (jamais notes.length : un clip MIDI frais a
-  notes vides). La regle vaut pour toute garde future.
-- Une spec qui stocke son etat dans window meurt au premier reload
-  incident — lire l'horloge DOM #position cote Node (idiome pose dans
-  loop-region.spec).
-- Un clic force a position FIXE peut sortir du clip aux petits zooms
-  (le menu de PISTE s'ouvre a la place) — viser le centre par defaut.
-- Messages de commit : JAMAIS de guillemets doubles dans le here-string
-  PowerShell (git recoit un pathspec) ; -replace + Set-Content mojibake
-  l'UTF-8 (guillemets francais) — Edit fichier, pas -replace.
-- Le wrap de boucle est sample-exact A CHAQUE tour : 512 frames peuvent
-  faire DEUX tours d'une petite region (l'arithmetique du gtest (d)).
-- Toujours : jamais de log/temp dans web/ ; clean build si layout de
-  struct moteur change ; e2e = serveur NON-secure + 47821 libre puis
-  RESTAURER la stack secure ; zombies plugin_host avant rebuild.
-
-## RELANCER / VERIFIER
-
-- Stack : `start-daw.cmd` ; arret `stop-daw.cmd`. Tests :
-  `daw_engine_test.exe` (45/45), `npm run test:e2e` (79), tsc 0.
-- **La manip 5 minutes** : onglet studio ->
-  1) TIRER sur la bande fine au-dessus de la regle : l'etrier cuivre
-  se pose et PLAY boucle dessus ; double-clic dessus : la lecture
-  continue au-dela. 2) Clic droit sur un clip -> « Scinder ici » ;
-  Ctrl+Z recolle. 3) WAV↓ telecharge le mixdown ; ▶ d'un chip
-  pre-ecoute ; le badge cuivre dit le projet de l'onglet.
-  4) Le **+** du coin haut-gauche -> Piste audio / Piste MIDI (badges
-  sur les tetes) ; armer un sample et cliquer le couloir d'une piste
-  MIDI -> refus FLASH rouge ; le poser sur la piste audio -> il se pose.
+- `--exclusive --buffer-size 256` dans daw.ps1 (ci-dessus).
+- Rampes de tempo, tempoMap UI, signatures UI : HORS perimetre T
+  (ecrits, schema seul les porte deja).
