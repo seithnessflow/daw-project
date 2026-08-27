@@ -173,6 +173,14 @@ export interface EngineState {
   pluginChildAlive: boolean;
   /** c-2: cold restart attempts (budget 3) */
   pluginChildRestarts: number;
+  /**
+   * Garde de projet (2026-08-27, « onglet vide mais l'export sonne ») :
+   * le PROJET que ce moteur joue. L'onglet compare a son ?project= et
+   * AFFICHE le desaccord (bandeau + refus d'export) au lieu de laisser
+   * deux verites coexister. Additif : vide (vieux moteur / mode fichier)
+   * = pas de garde.
+   */
+  projectId: string;
 }
 
 /**
@@ -1388,6 +1396,7 @@ function createBaseEngineState(): EngineState {
     pluginBlocksMissed: 0,
     pluginChildAlive: false,
     pluginChildRestarts: 0,
+    projectId: "",
   };
 }
 
@@ -1410,6 +1419,9 @@ export const EngineState: MessageFns<EngineState> = {
     }
     if (message.pluginChildRestarts !== 0) {
       writer.uint32(48).uint32(message.pluginChildRestarts);
+    }
+    if (message.projectId !== "") {
+      writer.uint32(58).string(message.projectId);
     }
     return writer;
   },
@@ -1475,6 +1487,14 @@ export const EngineState: MessageFns<EngineState> = {
             message.pluginChildRestarts = reader.uint32();
             continue;
           }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.projectId = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1519,6 +1539,11 @@ export const EngineState: MessageFns<EngineState> = {
         : isSet(object.plugin_child_restarts)
         ? globalThis.Number(object.plugin_child_restarts)
         : 0,
+      projectId: isSet(object.projectId)
+        ? globalThis.String(object.projectId)
+        : isSet(object.project_id)
+        ? globalThis.String(object.project_id)
+        : "",
     };
   },
 
@@ -1542,6 +1567,9 @@ export const EngineState: MessageFns<EngineState> = {
     if (message.pluginChildRestarts !== 0) {
       obj.pluginChildRestarts = Math.round(message.pluginChildRestarts);
     }
+    if (message.projectId !== "") {
+      obj.projectId = message.projectId;
+    }
     return obj;
   },
 
@@ -1556,6 +1584,7 @@ export const EngineState: MessageFns<EngineState> = {
     message.pluginBlocksMissed = object.pluginBlocksMissed ?? 0;
     message.pluginChildAlive = object.pluginChildAlive ?? false;
     message.pluginChildRestarts = object.pluginChildRestarts ?? 0;
+    message.projectId = object.projectId ?? "";
     return message;
   },
 };

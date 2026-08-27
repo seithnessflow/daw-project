@@ -65,6 +65,41 @@ h1 {
   line-height: 26px;
   box-shadow: none; /* the CLUSTER carries the frame, not each key */
 }
+/* ---- Garde de projet (2026-08-27) : badge + bandeau de desaccord ---- */
+#project-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--copper);
+  background: rgba(230, 165, 82, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(230, 165, 82, 0.25);
+  border-radius: var(--r);
+  padding: 3px 8px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#project-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #ffd9d9;
+  background: #4a1f1f;
+  box-shadow: inset 0 0 0 1px #ff5c5c, 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+#project-banner[hidden] { display: none; }
+#project-banner button {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #120c22;
+  background: #ff8a8a;
+  border-radius: var(--r);
+}
+
 /* ---- Export mixdown (AUDIT-6 QW1) : WAV↓, refus visible modele BOX -- */
 #export-btn {
   width: auto;

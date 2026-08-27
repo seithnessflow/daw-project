@@ -104,6 +104,12 @@ message EngineState {
     uint64 plugin_blocks_missed = 4;   // 2.4c-1: bridge blocks bypassed (child late/dead)
     bool plugin_child_alive = 5;       // c-2: false during a death window / permanent bypass
     uint32 plugin_child_restarts = 6;  // c-2: cold restart attempts (budget 3)
+    // Garde de projet (2026-08-27, « onglet vide mais l'export sonne ») :
+    // le PROJET que ce moteur joue. L'onglet compare a son ?project= et
+    // AFFICHE le desaccord (bandeau + refus d'export) au lieu de laisser
+    // deux verites coexister. Additif : vide (vieux moteur / mode fichier)
+    // = pas de garde.
+    string project_id = 7;
 }
 
 // S8a: a batch of post-master audio blocks for the subscribed tab.

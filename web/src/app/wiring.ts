@@ -41,6 +41,8 @@ import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
 import { wireExport } from './export';
+import { wireVersionGuard } from './version_guard';
+import { wireProjectGuard } from './project_guard';
 
 declare global {
   interface Window {
@@ -548,6 +550,10 @@ export async function init(): Promise<void> {
   };
   // Export mixdown (AUDIT-6 QW1) : bouton WAV de la topbar -> module dedie
   wireExport();
+  // Gardes onglet (2026-08-27) : version du site (reload auto si la stack
+  // a ete relancee sous l'onglet) + projet (badge, bandeau de desaccord)
+  wireVersionGuard();
+  wireProjectGuard();
   // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
   // + device le lit a chaque ouverture
   engineClient.onPluginCatalog = (entries) => {

@@ -13,6 +13,9 @@
 
 import { ctx, PROJECT_ID, SERVER_HTTP, assetAuthHeaders } from './context';
 import { RenderState_Status } from '../network/engine_client';
+// Garde de projet (incident 2026-08-27 « onglet vide, export qui sonne ») :
+// exporter rendrait le projet DU MOTEUR, pas celui de l'onglet - refuser
+// visiblement le desaccord plutot que livrer un WAV surprise.
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
@@ -44,6 +47,13 @@ export function wireExport(): void {
     if (!eng.isConnected()) {
       refuse('MOTEUR NON CONNECTE - la pastille engine est rouge. '
         + 'Relancer start-daw.cmd ou recharger la page (F5).');
+      return;
+    }
+    const enginePid = eng.engineProjectId();
+    if (enginePid && enginePid !== PROJECT_ID) {
+      refuse(`Le moteur joue « ${enginePid} », cet onglet montre `
+        + `« ${PROJECT_ID} » : l'export sortirait l'AUTRE projet. `
+        + 'Utiliser le bandeau pour rejoindre le projet du moteur.');
       return;
     }
     setBusy(true);

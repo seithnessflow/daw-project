@@ -73,11 +73,33 @@ function projectsEndpoint(): Plugin {
   };
 }
 
+/**
+ * Garde de version (2026-08-27, demande utilisateur « ca m'arrive trop
+ * souvent d'ouvrir un onglet qui est une vieille version du site ») :
+ * l'identite de CE processus vite. Un onglet compare la valeur vue au
+ * chargement a celle du serveur courant (poll) - difference = la stack a
+ * ete relancee sous lui, il se RECHARGE seul. DEV-LOCAL ; en prod, un
+ * hash de build servi par le serveur Rust prendra le relais.
+ */
+function versionEndpoint(): Plugin {
+  const serveId = `${Date.now()}-${process.pid}`;
+  return {
+    name: 'version-endpoint',
+    configureServer(server) {
+      server.middlewares.use('/api/version', (_req, res) => {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ v: serveId }));
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     wasm(),
     engineTokenEndpoint(),
     projectsEndpoint(),
+    versionEndpoint(),
   ],
   server: {
     port: 5173,

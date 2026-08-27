@@ -1253,6 +1253,7 @@ int doPlayWithServer(const Options& opts) {
                                      opts.allow_origins.begin(), opts.allow_origins.end());
     wirePluginTelemetry(ws_server, plugin_registry);
     ws_server.setTapRing(&tap_ring);  // S8a
+    ws_server.setProjectId(opts.project_id);  // garde de projet (onglet)
 
     // Export mixdown (AUDIT-6 QW1) : demande navigateur -> instantane du
     // document sous verrou (ICI, thread reseau WS) -> rendu sur le thread

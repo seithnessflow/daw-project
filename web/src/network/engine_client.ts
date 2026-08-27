@@ -279,6 +279,14 @@ export class EngineClient {
     return this.lastPlaying;
   }
 
+  // Garde de projet : le project_id que le MOTEUR joue (EngineState 30 Hz).
+  // '' = inconnu (vieux moteur, mode fichier, pas encore de telemetrie).
+  private engineProjectId_ = '';
+
+  engineProjectId(): string {
+    return this.engineProjectId_;
+  }
+
   /** Read-only snapshot of local monitor state (life layer shading). */
   monitorSnapshot(): Map<string, { solo: boolean; mute: boolean }> {
     return new Map(this.monitorState);
@@ -328,6 +336,7 @@ export class EngineClient {
         );
         break;
       case 'state':
+        if (msg.data.projectId) this.engineProjectId_ = msg.data.projectId;
         this.onState?.(msg.data);
         break;
       case 'audioTap':

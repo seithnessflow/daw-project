@@ -8,6 +8,7 @@
   <body>
     <div class="topbar">
       <h1>MAGIC POTION</h1>
+      <span id="project-badge" title="Le projet que cet onglet montre"></span>
       <div class="transport">
         <button id="play-btn" disabled title="Play (Space)">&#9654;</button>
         <button id="stop-btn" disabled title="Stop (Space)">&#9632;</button>
@@ -63,6 +64,11 @@
         </div>
       </div>
     </div>
+
+    <!-- Garde de projet (2026-08-27) : visible SEULEMENT quand le moteur
+         joue un autre projet que celui de l'onglet - rempli par
+         app/project_guard.ts, jamais un etat qui ment par omission. -->
+    <div id="project-banner" hidden></div>
 
     <!-- Refonte T5 : les slots gardent leurs id (le JS les remplit par id,
          jamais par position) - on ne fait que les RE-PARENTER.

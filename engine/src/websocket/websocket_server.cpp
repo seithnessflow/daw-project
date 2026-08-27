@@ -468,6 +468,8 @@ void WebSocketServer::broadcastTelemetry() {
         state->set_plugin_child_restarts(
             plugin_child_restarts_->load(std::memory_order_relaxed));
     }
+    // Garde de projet : l'onglet compare a son ?project= (vide = pas de garde)
+    state->set_project_id(project_id_);
 
     // F5+ : verite des slots Session (l'UI n'affiche plus un etat local
     // optimiste). Toujours envoyee - une liste vide SIGNIFIE tout arrete.

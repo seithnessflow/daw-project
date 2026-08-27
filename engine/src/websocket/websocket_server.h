@@ -169,8 +169,19 @@ public:
                          uint32_t sample_rate = 0,
                          uint32_t bit_depth = 0);
 
+    /**
+     * Garde de projet : le project_id que CE moteur joue, diffuse dans
+     * EngineState (30 Hz). L'onglet dont le ?project= differe l'affiche
+     * (bandeau) et refuse l'export. A poser avant start() ; vide = mode
+     * fichier, pas de garde.
+     */
+    void setProjectId(std::string project_id) {
+        project_id_ = std::move(project_id);
+    }
+
 private:
     std::function<void(uint32_t)> render_request_handler_;
+    std::string project_id_;
     std::string catalog_frame_;
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,
