@@ -2,13 +2,19 @@
 .topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  /* 2026-08-27 (casse vue au pilotage) : la barre s'est remplie (+ du
+     coin, badge projet, WAV, horloge pairs) et DEBORDAIT sous ~1600 px -
+     titre sur 2 lignes, badge ecrase en « st... », clk sur 3 lignes.
+     Nowrap partout, gap resserre, et SEULS les elements elastiques
+     (badge projet) retrecissent - jamais le texte en colonne. */
+  gap: 10px;
   margin-bottom: 10px;
   padding: 6px 10px;
   background: linear-gradient(rgba(255, 255, 255, 0.02), transparent),
     var(--surface);
   box-shadow: inset 0 0 0 1px var(--hair);
   border-radius: var(--r);
+  min-width: 0;
 }
 h1 {
   margin: 0;
@@ -16,6 +22,8 @@ h1 {
   font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.01em;
+  white-space: nowrap; /* jamais « MAGIC / POTION » en deux lignes */
+  flex: 0 0 auto;
   /* v3 brand moment: the potion pours into the name */
   background: linear-gradient(100deg, var(--text) 20%, var(--potion) 85%);
   -webkit-background-clip: text;
@@ -91,6 +99,10 @@ h1 {
   border-radius: var(--r);
   padding: 3px 8px;
   max-width: 160px;
+  /* l'element ELASTIQUE de la barre : il retrecit (ellipsis) mais
+     jamais sous ~7 caracteres - « st... » illisible etait la casse */
+  min-width: 64px;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -207,6 +219,7 @@ h1 {
   padding: 2px 8px;
   border-radius: 9px;
   box-shadow: inset 0 0 0 1px var(--hair);
+  white-space: nowrap; /* « clk ±1 ms (1) » s'ecrasait sur 3 lignes */
 }
 .status-dot {
   width: 6px;

@@ -1450,3 +1450,21 @@ conserves (studio, ma-piece, inv-proof, pilotes smoke...) - studio
 redevient la tete du menu. Regle pour mes futurs scripts de trace :
 prefixe trace- (masque) et jamais de nom nu. La dette GC des projets
 (AUDIT-5 F) reste ouverte pour les artefacts de pilotage restants.
+
+**2026-08-27 (suite 6 - « le site est full bug » : campagne de sondes) :**
+verification pilotee complete sur la VRAIE stack secure (regle gravee :
+mes yeux d'abord). Verdicts MESURES : (1) UI : 19 gestes pilotes
+(connexions, selection, menus, boucle, play, vues, pre-ecoute, undo,
+zoom, export WAV) = ZERO erreur console/page ; (2) audio offline : ear
+VERTE sur studio (crete -2.56 dBFS, 0 clip, 0 discontinuite, hashs
+stables par etage) ; (3) audio LIVE : sonde telemetrie pendant lecture
+= 56 evenements meters/2.5 s, cretes reelles (0.64 piste / 0.48
+master), 0 UNDERRUN. Le SEUL bug objectif : la TOPBAR debordait (mes
+ajouts du jour : + du coin, badge projet, WAV, clk pairs) - titre sur
+2 lignes, badge ecrase « st... », clk sur 3 lignes. Fixe : nowrap
+titre/status-items, gap 16->10, badge = seul element elastique
+(min 64px + ellipsis). Verifie par captures a 1500/1280.
+Hypothese pour le ressenti « full bug » : pendant mes bascules de
+stack (4 redemarrages moteur/serveur/vite en pleine session), son
+onglet a subi coupures + reconnexions + reloads de version-guard -
+chaotique mais TRANSITOIRE ; symptomes precis demandes s'il en reste.
