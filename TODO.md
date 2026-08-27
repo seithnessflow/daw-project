@@ -111,6 +111,21 @@
    utilisateur, pre-ecoute samples, GR meter du comp, dr_flac/dr_mp3.
    La roadmap parite reste GELEE — rien n'entre en file sans
    ratification.
+   QUICK WINS LANCES (accord utilisateur 2026-08-27 « tu peux lancer
+   une ou plusieurs etapes ») :
+   - [x] EXPORT MIXDOWN UI (4789a2a) : bouton WAV -> RenderRequest ->
+         rendu offline sur thread OUVRIER moteur (render/export_job,
+         jamais la boucle de controle - lecon C1) -> store -> download.
+         Refus visible modele BOX. e2e export-mixdown 2/2 moteur reel.
+   - [x] PRE-ECOUTE SAMPLES (cd49674) : un ▶ par chip (ui/preview,
+         WebAudio, -3 dB, un seul a la fois, n'arme pas le chip).
+         e2e sample-preview 2/2.
+   - [ ] BOUCLE UTILISATEUR (session dediee : loop start/end au proto,
+         flag user-loop moteur SANS que le rebuild l'ecrase, drag sur
+         la bande .ruler-cycle qui attend ; AudioCommandMessage change
+         de layout => CLEAN BUILD obligatoire).
+   - [ ] GR METER du compresseur (avec la session 4.2 EQ3+comp).
+   - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
 
 ## UI — REFONTE « ETABLI MAGIC POTION » + FINITION (2026-08-25) : FINIE
 

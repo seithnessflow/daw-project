@@ -1345,3 +1345,30 @@ velocite ineditable au piano-roll ; /api/projects = middleware Vite,
 pas le serveur ; aucune sauvegarde de secours des .am). Zero ligne de
 code modifiee ; arbitrage propose a ratifier ; roadmap parite toujours
 GELEE. Verdict CI du push docs : a verifier a la reprise.
+
+**2026-08-27 (suite - les 2 premiers quick wins AUDIT-6, code) :**
+l'utilisateur ratifie la direction (« ca me semble logique, faut que ca
+devienne un daw ») et autorise plusieurs etapes. Livre :
+- EXPORT MIXDOWN UI (4789a2a) : LE fil manquant - premiere fois qu'un
+  morceau SORT du DAW par l'interface. Bouton WAV en topbar ->
+  RenderRequest/RenderState (proto 13/14, jumeaux moteur+web copies) ->
+  module render/export_job : rendu offline sur THREAD OUVRIER (la lecon
+  C1 gravee en tete de fichier), meme noyau que --render, WAV pose au
+  store local + pousse au store serveur -> la page telecharge
+  /assets/<hash> et tend le fichier. Refus visible modele BOX (moteur
+  absent, export en cours, echec rendu, store muet). e2e moteur reel
+  export-mixdown 2/2 (RIFF verifie octets, hash au store, AGain dans la
+  chaine rendue) ; gtests 45/45.
+- PRE-ECOUTE SAMPLES (cd49674) : un ▶ par chip de l'onglet Samples
+  (ui/preview.ts : WebAudio, fetch store + Bearer, cache par hash, un
+  seul preview, -3 dB, geste utilisateur uniquement, n'arme pas le
+  chip). e2e sample-preview 2/2 - dont la lecon : le store adresse
+  contenu est PARTAGE entre tests (meme tone = meme hash deja present),
+  « absent du store » se simule par interception 404, pas par absence.
+- Pieges re-payes de justesse : un log de vite ecrit DANS web/ (EBUSY
+  connu) retire en secondes ; le rendu offline sans mapping
+  --vst3-module refuse BRUYAMMENT (voulu - la spec devait passer le
+  mapping comme ear).
+- Reste des quick wins en file (TODO 7) : boucle utilisateur (session
+  dediee, layout AudioCommandMessage => clean build), GR meter (avec
+  4.2), dr_flac/dr_mp3.

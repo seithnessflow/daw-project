@@ -2,8 +2,9 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-26 nuit (D1 reordre pistes + D2 reordre devices + A2 moteur
-automation ; e2e 62/62 ; lecon clean-build ABI).*
+2026-08-27 (AUDIT-6 parite DAW rapporte + 2 quick wins livres : EXPORT
+MIXDOWN UI bout-en-bout et PRE-ECOUTE des samples ; e2e 74/74, gtests
+45/45, tsc 0 ; details TODO 7 et JOURNAL).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 
