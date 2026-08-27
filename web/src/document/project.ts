@@ -573,6 +573,55 @@ export class Project {
   }
 
   /**
+   * SCISSION (AUDIT-6, edition d'echelle) : coupe un clip AUDIO a la
+   * position absolue atSample. Non destructif par nature (deux recettes
+   * sur le meme asset : le droit demarre a offset+left). Fades : le
+   * fade-in reste au gauche, le fade-out passe au droit ; le point de
+   * coupe recoit les anti-clics implicites 4 ms du moteur. UN groupe
+   * d'undo (trim + fades + addClip) = un seul Ctrl+Z recolle.
+   * Refus : clip MIDI (le scheduler couperait des note-offs - dette
+   * datee avec le vrai piano-roll), coupe hors clip ou a moins de
+   * 1024 samples d'un bord (la longueur minimale d'un clip).
+   * @returns l'id du clip droit, ou null si refuse.
+   */
+  splitClip(trackId: string, clipId: string, atSample: number): string | null {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return null;
+    if (!clip.assetHash) return null;  // MIDI (assetHash vide) : refuse
+    const at = Math.round(atSample);
+    const left = at - clip.startSample;
+    const right = clip.startSample + clip.lengthSamples - at;
+    if (left < 1024 || right < 1024) return null;
+    const rightId = `clip-${Math.random().toString(36).slice(2, 10)}`;
+    const fadeIn = clip.fadeInSamples ?? 0;
+    const fadeOut = clip.fadeOutSamples ?? 0;
+    // Automerge refuse undefined : ne poser que les champs presents
+    const rightClip: ClipDef = {
+      id: rightId,
+      assetHash: clip.assetHash,
+      startSample: at,
+      lengthSamples: right,
+      offsetSamples: clip.offsetSamples + left,
+    };
+    if (clip.name !== undefined) rightClip.name = clip.name;
+    if (fadeOut) rightClip.fadeOutSamples = fadeOut;
+    this.beginUndoGroup();
+    this.setClipBounds(trackId, clipId, {
+      startSample: clip.startSample,
+      lengthSamples: left,
+      offsetSamples: clip.offsetSamples,
+    });
+    if (fadeIn || fadeOut) {
+      // le gauche garde son fade-in, perd le fade-out (parti au droit)
+      this.setClipFades(trackId, clipId, fadeIn, 0);
+    }
+    this.addClip(trackId, rightClip);
+    this.endUndoGroup();
+    return rightId;
+  }
+
+  /**
    * D4 (DND-DESIGN.md) : deplace un clip vers une AUTRE piste (drag
    * vertical). COMPROMIS D'IDENTITE ASSUME (grave dans DND-DESIGN) :
    * changer un clip de piste = SUPPRIMER + RECREER (meme id, tous champs

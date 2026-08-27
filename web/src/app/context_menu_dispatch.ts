@@ -8,7 +8,8 @@
  */
 
 import { ctx, sendLastChange } from './context';
-import { isEditorOpen, markEditorOpen } from '../ui/track';
+import { isEditorOpen, markEditorOpen, TIMELINE } from '../ui/track';
+import { snapStep } from './navigation';
 import { addDeviceToTrack } from './placement';
 import { orderedTracks } from '../document/schema';
 import { renderTracks } from './render';
@@ -22,8 +23,32 @@ function closest(el: EventTarget | null, sel: string): HTMLElement | null {
   return el instanceof Element ? (el.closest(sel) as HTMLElement | null) : null;
 }
 
+/**
+ * SCISSION : la position de coupe (samples absolus, snappee a la grille)
+ * pour le clic droit a clickX sur ce clip - ou null si la coupe est
+ * impossible (MIDI, trop pres d'un bord). Sert aussi de garde
+ * d'affichage : l'entree de menu n'apparait que si elle agira.
+ */
+function splitTargetSample(clipEl: HTMLElement, clipId: string,
+  trackId: string, clickX: number): number | null {
+  const project = ctx.project;
+  if (!project) return null;
+  const c = project.getDocument().tracks.find((t) => t.id === trackId)
+    ?.clips.find((x) => x.id === clipId);
+  if (!c || !c.assetHash) return null;  // MIDI = assetHash vide (schema)
+  const lane = clipEl.closest('.track-lane');
+  if (!lane) return null;
+  const sr = project.getDocument().sampleRate || 48000;
+  const sec = (clickX - lane.getBoundingClientRect().left) / TIMELINE.pps;
+  const step = snapStep();
+  const at = Math.round((Math.round(sec / step) * step) * sr);
+  const left = at - c.startSample;
+  const right = c.startSample + c.lengthSamples - at;
+  return (left >= 1024 && right >= 1024) ? at : null;
+}
+
 /** Construit la liste d'actions selon la cible ; null = pas de menu custom. */
-function buildItems(target: EventTarget | null): MenuItem[] | null {
+function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | null {
   const project = ctx.project;
   if (!project) return null;
   const doc = () => project.getDocument();
@@ -80,6 +105,18 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
         } as never);
         sendLastChange(); renderTracks(true);
       } },
+      // SCISSION (AUDIT-6) : a la position du clic droit, snappee a la
+      // grille (Alt indisponible dans un menu : toujours snappe). Le
+      // mutateur refuse MIDI et bords - un refus est silencieux ici car
+      // l'entree n'apparait que si la coupe est possible.
+      ...(splitTargetSample(clipEl, clipId, trackId, clickX) !== null
+        ? [{ label: 'Scinder ici', onClick: () => {
+            const at = splitTargetSample(clipEl, clipId, trackId, clickX);
+            if (at === null) return;
+            project.splitClip(trackId, clipId, at);
+            sendLastChange(); renderTracks(true);
+          } }]
+        : []),
       { separator: true },
       { label: 'Supprimer', danger: true, onClick: () => {
         project.deleteClip(trackId, clipId); sendLastChange(); renderTracks(true);
@@ -231,7 +268,7 @@ function buildItems(target: EventTarget | null): MenuItem[] | null {
 
 export function initContextMenu(): void {
   document.addEventListener('contextmenu', (e) => {
-    const items = buildItems(e.target);
+    const items = buildItems(e.target, e.clientX);
     if (items && items.length) {
       e.preventDefault();
       showContextMenu(e.clientX, e.clientY, items);

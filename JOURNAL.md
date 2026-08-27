@@ -1393,3 +1393,27 @@ mettre a jour les onglets en permanence ». Livre (bf2c8bb) :
 - Extension Chrome non connectee pendant l'incident (pas pu piloter
   les onglets directement) - a reconnecter pour les prochains
   diagnostics d'onglet.
+
+**2026-08-27 (suite 3 - « bosse sur ce qui manque » : boucle + scission) :**
+l'utilisateur ratifie AUDIT-6 en bloc (« fait l'inventaire... et bosse
+la dessus »). Deux fondamentaux d'edition livres :
+- BOUCLE UTILISATEUR : la bande cycle inerte prend vie (drag = poser,
+  dblclick = effacer, Alt = sans snap, Escape annule). Moteur : la FIN
+  DE CONTENU est SEPAREE des braces de boucle - boucle OFF ne coupe
+  jamais la lecture (modele Live) ; la region voyage par le command
+  ring (proto TransportCommand 4-7) et SURVIT aux rebuilds. CLEAN
+  BUILD (layout AudioCommandMessage - regle ABI honoree). Lecon
+  d'arithmetique : le wrap est sample-exact A CHAQUE tour - 512 frames
+  depuis 550 dans [200,600) = DEUX tours -> 262, pas 662 ; c'est mon
+  test qui avait tort, pas le callback.
+- SCISSION : splitClip = groupe d'undo sur mutateurs existants (aucun
+  nouveau type d'op) ; « Scinder ici » au clic droit (entree absente
+  si impossible - refus par absence) ; Ctrl+E au marqueur.
+- Pieges payes : (1) preventDefault sur pointerdown SUPPRIME le
+  dblclick derive - le drag ne demarre qu'au seuil de mouvement,
+  jamais d'effet au down ; (2) un clic force a position fixe peut
+  sortir du clip aux petits zooms (le menu de PISTE s'ouvrait) ;
+  (3) MIDI = assetHash vide, PAS notes.length (un clip MIDI frais a
+  notes:[]) ; (4) une spec qui stocke son etat dans window meurt au
+  premier reload incident - lire l'horloge DOM #position cote Node ;
+  (5) -replace PowerShell + Set-Content mojibake les guillemets UTF-8.

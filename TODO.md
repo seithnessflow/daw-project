@@ -120,10 +120,25 @@
    - [x] PRE-ECOUTE SAMPLES (cd49674) : un ▶ par chip (ui/preview,
          WebAudio, -3 dB, un seul a la fois, n'arme pas le chip).
          e2e sample-preview 2/2.
-   - [ ] BOUCLE UTILISATEUR (session dediee : loop start/end au proto,
-         flag user-loop moteur SANS que le rebuild l'ecrase, drag sur
-         la bande .ruler-cycle qui attend ; AudioCommandMessage change
-         de layout => CLEAN BUILD obligatoire).
+   - [x] BOUCLE UTILISATEUR - FAIT 2026-08-27 soir : drag sur la bande
+         cycle = poser la region (snap grille, Alt sans snap) + boucle
+         active ; dblclick = effacer ; Escape annule le drag ; etrier
+         cuivre rendu par createRulerUI (suit zoom/rebuilds) ; re-assert
+         a la reconnexion moteur. Moteur : content_end SEPARE des braces
+         (boucle OFF ne coupe JAMAIS la lecture - modele Live), region
+         posee via le command ring (set_region/clear_region proto 4-7),
+         les rebuilds ne l'ecrasent plus. CLEAN BUILD fait (layout
+         AudioCommandMessage). gtest etendu (d/e/f : wrap multi-tours
+         sample-exact 550->262, boucle-off-ne-coupe-pas, rebuild-
+         n-ecrase-pas) ; e2e loop-region (moteur reel, preuve par
+         l'horloge DOM - resiliente aux reloads incidents).
+   - [x] SCISSION DE CLIP - FAIT 2026-08-27 soir : Project.splitClip
+         (groupe d'undo trim+fades+addClip = UN Ctrl+Z recolle ; fade-in
+         reste a gauche, fade-out part a droite ; refus MIDI par
+         assetHash vide + bords < 1024) ; clic droit « Scinder ici »
+         (position snappee, entree ABSENTE si coupe impossible) ;
+         Ctrl+E au marqueur ; aide mise a jour. e2e clip-split 2/2
+         (geometrie exacte, fades repartis, undo, refus MIDI).
    - [ ] GR METER du compresseur (avec la session 4.2 EQ3+comp).
    - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
 
