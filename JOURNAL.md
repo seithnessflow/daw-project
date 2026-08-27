@@ -1468,3 +1468,30 @@ Hypothese pour le ressenti « full bug » : pendant mes bascules de
 stack (4 redemarrages moteur/serveur/vite en pleine session), son
 onglet a subi coupures + reconnexions + reloads de version-guard -
 chaotique mais TRANSITOIRE ; symptomes precis demandes s'il en reste.
+
+**2026-08-27 (suite 7 - COMPOSER COMME UN UTILISATEUR, directive) :**
+« il faudrait que tu composes comme un utilisateur et non cote server,
+pour comprendre les problemes ». Fait : projet essai-claude cree PAR LE
+MENU, pistes renommees au clic droit, beat pose au kit arme (4 kicks,
+8 hats), piste MIDI par le + du coin, Dexed pose au clic navigateur,
+ligne de basse ecrite au piano-roll (aria-labels), PLAY, export par le
+bouton -> traces/essai-claude-mixdown.wav (ear verte -2.19 dBFS avant
+ecoute). MOISSON (la directive avait raison, le harnais ne voyait rien) :
+- LE bug numero 1 VECU : le moteur est verrouille sur --project du boot
+  (studio) ; composer sur un NOUVEAU projet = PLAY joue l'AUTRE morceau
+  (bandeau visible mais geste permis). Livre : le TRANSPORT refuse
+  visiblement le desaccord (meme regle que l export, tab-guards etendu).
+  Le VRAI fix - le moteur SUIT le projet de l onglet - est un mecanisme :
+  PROPOSE, pas impose.
+- Frictions moissonnees (a arbitrer) : clic arme sur une position
+  OCCUPEE = pose AVALEE en silence (2 snares perdues - niveau 2/3,
+  couplage avec le concept overlap d AUDIT-6) ; snap de pose FIXE a
+  0.25 s (pas de contretemps fin) et le snap vers une position occupee
+  EMPILE un doublon au meme sample (flam +6 dB silencieux) ; + clip
+  MIDI invisible sous l onglet Rack (decouvrabilite) ; projet vierge
+  sans matiere (le kit ?lab=1 est inconnu d un utilisateur) ; cellules
+  piano-roll sans data-attrs (outillage pilotage).
+- Pieges d outillage payes : toggle du piano-roll = re-run efface les
+  notes ; Start-Process coupe les arguments a l espace (quoter) ;
+  lancer une spec contre la stack SECURE = seed-again pend (bascule
+  d abord, la procedure existait).

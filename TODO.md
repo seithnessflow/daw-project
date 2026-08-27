@@ -141,6 +141,26 @@
          (geometrie exacte, fades repartis, undo, refus MIDI).
    - [ ] GR METER du compresseur (avec la session 4.2 EQ3+comp).
    - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
+   MOISSON DE LA SESSION DE COMPOSITION (2026-08-27, « compose comme un
+   utilisateur ») - a arbitrer :
+   - [ ] LE MOTEUR SUIT LE PROJET DE L'ONGLET (proposition, mecanisme) :
+         aujourd'hui le moteur est fige sur --project du boot ; un
+         NOUVEAU projet cree au menu n'est jamais joue (PLAY/export
+         refusent desormais visiblement, mais le flux « composer sur un
+         projet neuf » exige un redemarrage de stack). Design pressenti :
+         message WS « switch-project » -> ServerClient se reconnecte sur
+         l'autre id, doc remplace, graph rebuild ; verifier sessions/
+         stems/undo. UNE session bornee.
+   - [ ] POSE SUR POSITION OCCUPEE : le clic arme sur un clip existant
+         est AVALE en silence (2 snares perdues en composant) ; et le
+         snap peut EMPILER un doublon au meme sample (flam +6 dB muet).
+         Se decide AVEC le concept chevauchement=somme/remplace
+         (AUDIT-6). Minimum : refus visible OU pose superposee assumee.
+   - [ ] SNAP DE POSE fige a 0.25 s (contretemps fins impossibles au
+         clic arme) - suivre snapStep() du zoom comme les drags.
+   - [ ] DECOUVRABILITE : + clip MIDI cache sous l'onglet Piano-roll ;
+         projet vierge sans matiere (exposer le kit de demarrage hors
+         ?lab=1 ?) ; data-attrs sur les cellules du piano-roll.
    - [x] PISTES TYPEES audio/MIDI - FAIT 2026-08-27 nuit (demande
          utilisateur « il faut des track midi et des tracks audio... un
          bouton dans le coin en haut a gauche ») : TrackDef.kind ADDITIF

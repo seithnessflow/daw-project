@@ -120,6 +120,16 @@ test('badge projet affiche ; moteur sur un AUTRE projet -> bandeau + export refu
     const title = await page.locator('#export-btn').getAttribute('title');
     expect(title).toContain(engineProject);
 
+    // PLAY refuse aussi (session de composition 2026-08-27 : lire ici
+    // jouait l'AUTRE morceau) - flash + raison, transport intact
+    await page.locator('#play-btn').click();
+    await expect(page.locator('#play-btn')).toHaveClass(/refused/);
+    const pTitle = await page.locator('#play-btn').getAttribute('title');
+    expect(pTitle).toContain(engineProject);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() =>
+      (window as any).__dawEngine.isPlaying())).toBe(false);
+
     // Le bouton du bandeau rejoint le projet du moteur -> bandeau eteint
     await banner.locator('button').click();
     await page.waitForURL(`**project=${engineProject}**`, { timeout: 10000 });
