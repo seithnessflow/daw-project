@@ -54,17 +54,22 @@ test('badge projet affiche ; moteur sur un AUTRE projet -> bandeau + export refu
   const createTestDoc = resolveBinary('CREATE_TEST_DOC', 'create_test_doc');
   const engineProject = `e2e-guard-eng-${Date.now()}`;
   const tabProject = `e2e-guard-tab-${Date.now()}`;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'daw-e2e-guard-'));
 
-  // Deux projets seedes : le moteur jouera l'un, l'onglet montrera l'autre
-  execFileSync(createTestDoc, [path.join(dir, 'base.am'), dir, '2'], {
-    encoding: 'utf-8',
-  });
+  // Deux projets seedes : le moteur jouera l'un, l'onglet montrera
+  // l'autre. HERMETIQUE (rouge CI 33075743392) : un DOSSIER et un
+  // base.am PAR seed - deux seeds partageant le meme dossier ont produit
+  // en CI un base.am aux tracks illisibles au second passage.
+  let dir = '';
   for (const p of [engineProject, tabProject]) {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'daw-e2e-guard-'));
+    if (p === engineProject) dir = d;  // le moteur pointe ce dossier
+    execFileSync(createTestDoc, [path.join(d, 'base.am'), d, '2'], {
+      encoding: 'utf-8',
+    });
     execFileSync(
       'node',
-      ['scripts/seed-again.mjs', '--base', path.join(dir, 'base.am'),
-       '--assets', dir, '--project', p],
+      ['scripts/seed-again.mjs', '--base', path.join(d, 'base.am'),
+       '--assets', d, '--project', p],
       { cwd: path.join(REPO_ROOT, 'web'), stdio: 'pipe' }
     );
   }

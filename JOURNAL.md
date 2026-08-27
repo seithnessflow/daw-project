@@ -1417,3 +1417,22 @@ la dessus »). Deux fondamentaux d'edition livres :
   notes:[]) ; (4) une spec qui stocke son etat dans window meurt au
   premier reload incident - lire l'horloge DOM #position cote Node ;
   (5) -replace PowerShell + Set-Content mojibake les guillemets UTF-8.
+
+**2026-08-27 (suite 4 - pistes typees audio/MIDI) :** demande
+utilisateur (« il faut des track midi et des tracks audio, tu peux
+mettre des options dans un bouton dans le coin en haut a gauche »).
+Livre : TrackDef.kind additif (absent = legacy mixte - AUCUN projet
+existant ne change de comportement ; le moteur ignore le champ, c'est
+un contrat d'EDITION) ; le bouton + du COIN (topbar, tout a gauche)
+ouvre le menu Piste audio / Piste MIDI - « + add track » ouvre le
+MEME menu ; fabrique unique makeTrackDef (le jumeau de moule
+wiring/placement, note dans leurs propres commentaires, est resorbe) ;
+badges AUDIO (vert) / MIDI (violet) sur les tetes ; gardes aux 6
+points de pose (clic arme, drop sample, drop WAV, dragover interdit
+navigateur, instrument par clic ou drop, + clip MIDI rack et menu) -
+refus VISIBLE (flash rouge du couloir + title) ou par ABSENCE
+d'entree ; instrument sur le vide => piste MIDI, effet => piste
+audio. Le clic navigateur passe desormais par addDeviceToTrack
+(garde unique). SCHEMA.md documente le champ. e2e track-kinds 1/1
+vert du premier coup (creation, badges, refus, pose, convergence
+2 onglets).

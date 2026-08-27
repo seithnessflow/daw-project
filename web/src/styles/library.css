@@ -98,6 +98,15 @@ body.sample-armed .track-lane {
   color: var(--text-3);
   margin-bottom: 8px;
 }
+/* Garde de kind (pistes typees) : le couloir REFUSE visiblement */
+.track-lane.kind-refused {
+  animation: lane-refused 0.9s ease-out;
+}
+@keyframes lane-refused {
+  0%, 55% { box-shadow: inset 0 0 0 1px #ff5c5c; background: rgba(255, 92, 92, 0.10); }
+  100% { box-shadow: none; }
+}
+
 .track-lane.dropover {
   background: rgba(88, 179, 104, 0.10);
   box-shadow: inset 0 0 0 1px rgba(88, 179, 104, 0.45);

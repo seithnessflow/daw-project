@@ -193,7 +193,10 @@ test.describe('Add track sync', () => {
       expect(initialCount1).toBe(initialCount2);
 
       // Add track in tab 1
+      // MODIF SIGNALEE (pistes typees 2026-08-27) : + add track ouvre
+      // desormais le menu Audio/MIDI - on choisit Piste audio.
       await page1.click('#add-track-btn');
+      await page1.locator('.ctx-menu >> text=+ Piste audio').click();
 
       // Wait for sync on a real condition (no blind sleep)
       const finalCount2 = await waitForTrackCount(page2, initialCount1 + 1);

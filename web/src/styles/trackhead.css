@@ -4,6 +4,25 @@
   align-items: center;
   gap: 6px;
 }
+/* Pistes typees (2026-08-27) : le badge de kind sur la tete */
+.track-kind {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  flex: 0 0 auto;
+}
+.track-kind-audio {
+  color: #9fd9b4;
+  box-shadow: inset 0 0 0 1px rgba(88, 179, 104, 0.45);
+}
+.track-kind-midi {
+  color: #b9a8f5;
+  box-shadow: inset 0 0 0 1px rgba(148, 121, 255, 0.5);
+}
+
 .track-name {
   font-weight: 600;
   font-size: 12px;

@@ -11,7 +11,7 @@ import { ctx, sendLastChange } from './context';
 import { isEditorOpen, markEditorOpen, TIMELINE } from '../ui/track';
 import { snapStep } from './navigation';
 import { addDeviceToTrack } from './placement';
-import { orderedTracks } from '../document/schema';
+import { orderedTracks, trackAcceptsMidi } from '../document/schema';
 import { renderTracks } from './render';
 import { showContextMenu, type MenuItem } from '../ui/context_menu';
 import { startInlineRename } from '../ui/inline_rename';
@@ -254,10 +254,15 @@ function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | nu
       { label: m.mute ? 'Reactiver (unmute)' : 'Muter', onClick: () => setMon('mute', !m.mute) },
       { label: m.solo ? 'Enlever le solo' : 'Solo', onClick: () => setMon('solo', !m.solo) },
       { separator: true },
-      { label: '+ clip MIDI', onClick: () => {
-        project.addMidiClip(trackId, 0, 96000); ctx.selectedTrackId = trackId;
-        sendLastChange(); renderTracks(true); } },
-      { separator: true },
+      // Pistes typees : pas de clip MIDI sur une piste AUDIO (entree
+      // absente = refus par absence, comme Scinder)
+      ...(trackAcceptsMidi(doc().tracks.find((x) => x.id === trackId) ?? {})
+        ? [{ label: '+ clip MIDI', onClick: () => {
+            project.addMidiClip(trackId, 0, 96000);
+            ctx.selectedTrackId = trackId;
+            sendLastChange(); renderTracks(true); } },
+           { separator: true } as MenuItem]
+        : []),
       { label: 'Supprimer la piste', danger: true, onClick: () => {
         project.deleteTrack(trackId); sendLastChange(); renderTracks(true); } },
     ];

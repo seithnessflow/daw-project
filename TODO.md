@@ -141,6 +141,18 @@
          (geometrie exacte, fades repartis, undo, refus MIDI).
    - [ ] GR METER du compresseur (avec la session 4.2 EQ3+comp).
    - [ ] dr_flac/dr_mp3 a l'import (decoder vers le store, WAV canonique).
+   - [x] PISTES TYPEES audio/MIDI - FAIT 2026-08-27 nuit (demande
+         utilisateur « il faut des track midi et des tracks audio... un
+         bouton dans le coin en haut a gauche ») : TrackDef.kind ADDITIF
+         (absent = legacy mixte, rien ne casse ; le moteur l'ignore) ;
+         bouton + du COIN et « + add track » ouvrent le meme menu Piste
+         audio / Piste MIDI ; fabrique UNIQUE makeTrackDef (jumeau
+         wiring/placement resorbe) ; badges AUDIO/MIDI sur les tetes ;
+         GARDES de gestes avec refus visible (sample/WAV refuses sur
+         piste MIDI - flash rouge du couloir ; clip MIDI et instrument
+         refuses sur piste audio - entree absente / flash) ; un
+         instrument depose sur le vide cree une piste MIDI, un effet une
+         piste audio. SCHEMA.md documente. e2e track-kinds 1/1.
 
 ## UI — REFONTE « ETABLI MAGIC POTION » + FINITION (2026-08-25) : FINIE
 

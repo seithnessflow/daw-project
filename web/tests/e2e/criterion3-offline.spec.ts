@@ -85,7 +85,10 @@ test.describe('Criterion 3: offline reconciliation', () => {
       await page2.waitForSelector('[data-track-id]', { timeout: 10000 });
 
       // Third track: the conflict target (distinct edits use the first two)
+      // MODIF SIGNALEE (pistes typees 2026-08-27) : + add track ouvre
+      // desormais le menu Audio/MIDI - on choisit Piste audio.
       await page1.click('#add-track-btn');
+      await page1.locator('.ctx-menu >> text=+ Piste audio').click();
       expect(await waitForTrackCount(page1, 3)).toBe(3);
       expect(await waitForTrackCount(page2, 3)).toBe(3);
 

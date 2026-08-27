@@ -92,10 +92,21 @@ export interface AutomationLaneDef {
   enabled: boolean;
 }
 
+/** Type de piste (2026-08-27, demande utilisateur « il faut des tracks
+ *  midi et des tracks audio »). ADDITIF : absent = piste LEGACY mixte
+ *  (tous les projets existants) - elle accepte tout, rien ne casse.
+ *  Le moteur IGNORE ce champ (il sait deja jouer les deux par clip) :
+ *  le kind est un contrat d'EDITION, applique par les gardes de gestes
+ *  (pas de sample sur une piste MIDI, pas de clip MIDI ni d'instrument
+ *  sur une piste audio). */
+export type TrackKind = 'audio' | 'midi';
+
 export interface TrackDef {
   id: string;
   name: string;
   gain: number;
+  /** Type de piste - ADDITIF, absent = legacy mixte (voir TrackKind). */
+  kind?: TrackKind;
   /** F2 : pan -1 (gauche) .. 0 (centre) .. +1 (droite). ADDITIF - absent sur
    *  les anciens projets (le moteur retombe sur 0 centre). */
   pan?: number;
@@ -151,6 +162,31 @@ export function clipDisplayName(
     return clip.notes ? 'MIDI' : 'clip';
   }
   return stem || 'clip';
+}
+
+/**
+ * FABRIQUE de piste - SOURCE UNIQUE du moule (remplace le jumeau
+ * wiring.ts / placement.ts note dans leurs commentaires). kind absent =
+ * legacy mixte (le bouton du coin passe toujours un kind).
+ */
+export function makeTrackDef(name: string, kind?: TrackKind): TrackDef {
+  const t: TrackDef = {
+    id: `track-${Date.now()}`,
+    name,
+    gain: 1.0,
+    clips: [],
+    chain: [],
+  };
+  if (kind) t.kind = kind;  // Automerge refuse undefined
+  return t;
+}
+
+/** Gardes d'edition du kind (absent = legacy : tout est permis). */
+export function trackAcceptsAudio(t: Pick<TrackDef, 'kind'>): boolean {
+  return t.kind !== 'midi';
+}
+export function trackAcceptsMidi(t: Pick<TrackDef, 'kind'>): boolean {
+  return t.kind !== 'audio';
 }
 
 /**

@@ -90,6 +90,7 @@
 | `chain` | `array<Processor>` | Yes | Processing chain, applied in order. |
 | `order` | `float` | No (D1 2026-08-26, additive) | DISPLAY order (fractional indexing: dropping between neighbors writes their midpoint). The Automerge list keeps CREATION order - objects never move in the list, so concurrent edits keep their identity (docs/DND-DESIGN.md). Consumers sort via `orderedTracks` (web/src/document/schema.ts); absent = the list index. The engine ignores it (mixing is order-independent). |
 | `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | This track's automation lanes. Absent = none. A2 (same day): the engine EVALUATES track-param lanes (`processorId` absent, param `gain`/`pan`; enabled lane WINS over the manual value; mapping gain v*2, pan v*2-1; per-256-frame-block evaluation, engine/src/graph/automation.h mirrors web automationValueAt). Device-param lanes (`processorId` set) stay ignored until A4. |
+| `kind` | `"audio"` \| `"midi"` | No (2026-08-27, additive) | Track TYPE - an EDITING contract enforced by UI gesture guards (no samples/WAV on a `midi` track; no MIDI clips or instruments on an `audio` track). ABSENT = legacy mixed track (accepts everything - every pre-existing project). The ENGINE ignores it (it already plays both clip kinds per track). Factory: `makeTrackDef` (web/src/document/schema.ts), created via the corner `+` button menu. |
 
 ### Clip
 

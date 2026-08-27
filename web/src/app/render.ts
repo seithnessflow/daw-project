@@ -27,6 +27,7 @@ import { renderSession } from '../ui/session';
 import { renderMixer } from '../ui/mixer';
 import { renderAutomationLanes } from '../ui/automation_lane';
 import { cssId } from '../document/sanitize';
+import { trackAcceptsMidi } from '../document/schema';
 import { orderedTracks } from '../document/schema';
 import { initTrackReorder } from './track_reorder';
 import { initDeviceReorder } from './device_reorder';
@@ -213,7 +214,8 @@ export function renderTracks(force = false): void {
 
   // v8 MIDI : piano-roll pour le clip MIDI de la piste (assetHash vide = MIDI).
   // Bouton "+ clip MIDI" si la piste n'en a pas ; sinon la grille du premier.
-  if (selectedTrack) {
+  // Pistes typees : une piste AUDIO n'a ni piano-roll ni "+ clip MIDI".
+  if (selectedTrack && trackAcceptsMidi(selectedTrack)) {
     const midiClip = selectedTrack.clips.find((c) => !c.assetHash);
     const slot = document.createElement('div');
     slot.className = 'piano-roll-slot';

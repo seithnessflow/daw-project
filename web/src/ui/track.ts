@@ -97,6 +97,19 @@ export function createTrackUI(
   nameEl.textContent = track.name;
   titleRow.appendChild(nameEl);
 
+  // Pistes typees (2026-08-27) : le badge dit le kind. Absent = piste
+  // legacy mixte (pas de badge - on n'invente pas un type au vieux doc).
+  if (track.kind) {
+    const kindEl = document.createElement('span');
+    kindEl.className = `track-kind track-kind-${track.kind}`;
+    kindEl.dataset.role = 'track-kind';
+    kindEl.textContent = track.kind === 'midi' ? 'MIDI' : 'AUDIO';
+    kindEl.title = track.kind === 'midi'
+      ? 'Piste MIDI : notes + instrument (pas de samples)'
+      : 'Piste audio : clips/samples (pas de clips MIDI)';
+    titleRow.appendChild(kindEl);
+  }
+
   const monitor = document.createElement('div');
   monitor.className = 'track-monitor';
   for (const kind of ['mute', 'solo'] as const) {

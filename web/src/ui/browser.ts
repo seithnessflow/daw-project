@@ -9,13 +9,12 @@
  * samples (F6 - la barre KIT de l'arrangement est retiree).
  */
 
-import { ctx, sendLastChange } from '../app/context';
-import { renderTracks } from '../app/render';
+import { ctx } from '../app/context';
 // D3 : le rail est la SOURCE des drags ; les cibles (pistes, zone vide) et
 // la pose vivent dans placement.ts. Cycle d'import placement<->browser
 // assume : chaque module n'appelle l'autre qu'a l'execution, jamais a l'eval.
 import { DND_MIME, installBrowserDnd, decorateSampleChips,
-         type BrowserDragPayload } from '../app/placement';
+         addDeviceToTrack, type BrowserDragPayload } from '../app/placement';
 
 type Cat = { uid: string; name: string; vendor: string; subCategories: string };
 const isInst = (e: Cat) =>
@@ -106,12 +105,10 @@ export function renderBrowser(): void {
     });
     it.addEventListener('click', () => {
       if (!ctx.project || !ctx.selectedTrackId) return;
-      ctx.project.addProcessor(ctx.selectedTrackId, {
-        id: 'proc-' + Math.random().toString(36).slice(2, 10),
-        type: 'vst3', uid: e.uid, name: e.name, params: [],
-      } as never);
-      sendLastChange();
-      renderTracks(true);
+      // Pistes typees : le clic passe par la meme garde que le drop
+      // (instrument sur piste audio = refus visible), fabrique unique.
+      addDeviceToTrack({ kind: tab === 'inst' ? 'instrument' : 'effect',
+        uid: e.uid, name: e.name }, ctx.selectedTrackId);
     });
     list.appendChild(it);
   }

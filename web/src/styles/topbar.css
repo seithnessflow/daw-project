@@ -65,6 +65,21 @@ h1 {
   line-height: 26px;
   box-shadow: none; /* the CLUSTER carries the frame, not each key */
 }
+/* ---- Le bouton du COIN (+ piste audio / MIDI, 2026-08-27) ----------- */
+#new-track-btn {
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 28px;
+  padding: 0;
+  border-radius: var(--r);
+  color: #120c22;
+  background: var(--potion);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+#new-track-btn:hover { filter: brightness(1.15); }
+
 /* ---- Garde de projet (2026-08-27) : badge + bandeau de desaccord ---- */
 #project-badge {
   font-size: 10px;

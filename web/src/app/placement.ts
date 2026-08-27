@@ -7,7 +7,8 @@
  */
 
 import { TIMELINE } from '../ui/track';
-import { clipDisplayName, orderedTracks } from '../document/schema';
+import { clipDisplayName, orderedTracks, makeTrackDef,
+         trackAcceptsAudio, trackAcceptsMidi } from '../document/schema';
 import { Library, loadKit, type Kit, type KitSample } from '../ui/library';
 import { decodeDurationSec } from '../ui/waveform';
 import { SERVER_HTTP, assetAuthHeaders } from './context';
@@ -21,9 +22,36 @@ import { markLanded } from './gestures';
  * hash it client-side, PUT through the verifying store, place the clip
  * where it was dropped. Failures are loud, never silent.
  */
+/**
+ * REFUS VISIBLE d'un geste sur un couloir (garde de kind) : le couloir
+ * flashe rouge + la raison en title + console. Jamais un clic/drop qui
+ * ne fait rien en silence (regle des effets annonces).
+ */
+export function flashLaneRefusal(lane: HTMLElement, why: string): void {
+  lane.classList.remove('kind-refused');
+  void lane.offsetWidth;
+  lane.classList.add('kind-refused');
+  lane.title = why;
+  console.error(`geste refuse: ${why}`);
+}
+
+/** Le couloir DOM d'une piste (pour flasher un refus) - null si absent. */
+function laneOf(trackId: string): HTMLElement | null {
+  return document.querySelector(
+    `[data-track-id="${trackId}"] .track-lane`) as HTMLElement | null;
+}
+
 export async function handleFileDrop(
   file: File, trackId: string, laneX: number): Promise<void> {
   if (!ctx.project) return;
+  // Garde de kind : un WAV ne se pose pas sur une piste MIDI
+  const tdef = ctx.project.getDocument().tracks.find((t) => t.id === trackId);
+  if (tdef && !trackAcceptsAudio(tdef)) {
+    const lane = laneOf(trackId);
+    if (lane) flashLaneRefusal(lane,
+      'Piste MIDI : un fichier audio ne se pose pas ici');
+    return;
+  }
   const bytes = await file.arrayBuffer();
   const head = new Uint8Array(bytes.slice(0, 12));
   const ascii = (o: number, n: number) =>
@@ -170,19 +198,30 @@ export function addDeviceToTrack(
   index?: number,
 ): void {
   if (!ctx.project) return;
+  // Garde de kind : un INSTRUMENT ne va pas sur une piste audio (il lui
+  // faut des notes) - refus visible sur le couloir de la cible.
+  if (trackId && payload.kind === 'instrument') {
+    const tdef = ctx.project.getDocument().tracks
+      .find((t) => t.id === trackId);
+    if (tdef && !trackAcceptsMidi(tdef)) {
+      const lane = laneOf(trackId);
+      if (lane) flashLaneRefusal(lane,
+        'Piste audio : un instrument a besoin d\'une piste MIDI');
+      return;
+    }
+  }
   ctx.project.beginUndoGroup();
   if (!trackId) {
-    // Meme moule de TrackDef que le bouton + add track (wiring.ts, recopie
-    // sans le modifier) - la forme doit rester jumelle.
-    const trackCount = ctx.project.getDocument().tracks.length;
-    trackId = `track-${Date.now()}`;
-    ctx.project.addTrack({
-      id: trackId,
-      name: `Track ${trackCount + 1}`,
-      gain: 1.0,
-      clips: [],
-      chain: [],
-    });
+    // Fabrique UNIQUE (l'ancien jumeau wiring/placement est resorbe).
+    // Un instrument cree une piste MIDI ; un effet, une piste audio.
+    const doc = ctx.project.getDocument();
+    const kind = payload.kind === 'instrument' ? 'midi' as const
+                                               : 'audio' as const;
+    const n = doc.tracks.filter((t) => t.kind === kind).length + 1;
+    const def = makeTrackDef(
+      kind === 'midi' ? `MIDI ${n}` : `Audio ${n}`, kind);
+    trackId = def.id;
+    ctx.project.addTrack(def);
   }
   // ProcessorDef au moule du "+ device" vst3 (ui/track.ts) : id, type,
   // uid, name, bypass false, params vides.
@@ -236,6 +275,14 @@ async function placeSampleFromDrop(
     console.error(`drop refused: sample ${name} is not in the palette`);
     return;
   }
+  // Garde de kind : un sample ne se pose pas sur une piste MIDI
+  const tdef = ctx.project.getDocument().tracks.find((t) => t.id === trackId);
+  if (tdef && !trackAcceptsAudio(tdef)) {
+    const lane = laneOf(trackId);
+    if (lane) flashLaneRefusal(lane,
+      'Piste MIDI : un sample ne se pose pas ici');
+    return;
+  }
   const sr = ctx.project.getDocument().sampleRate || 48000;
   const seconds = Math.max(0, Math.round((laneX / TIMELINE.pps) / 0.25) * 0.25);
   const placedId = `clip-${sample.name}-${Date.now()}`;
@@ -270,6 +317,13 @@ export function installBrowserDnd(): void {
     // Sample sur la zone vide : cible refusee (pas de preventDefault =
     // le navigateur montre l'interdit) - pas de lisere menteur.
     if (!trackEl && (isSample || !emptyZone)) return;
+    // Garde de kind : sample au-dessus d'une piste MIDI = interdit
+    // navigateur des le dragover (le seul payload lisible a ce stade).
+    if (trackEl && isSample) {
+      const t = ctx.project?.getDocument().tracks
+        .find((x) => x.id === trackEl.getAttribute('data-track-id'));
+      if (t && !trackAcceptsAudio(t)) return;
+    }
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     if (trackEl) trackEl.classList.add('dnd-drop-track');

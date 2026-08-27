@@ -94,7 +94,10 @@ test.describe('Sync resilience (critere 3 round 2)', () => {
       // DOM) porte data-track-id sur ses VU/pins ; le selecteur nu comptait
       // 10 elements pour 3 pistes. L'intention (nombre de PISTES) et le
       // compte attendu sont inchanges.
+      // MODIF SIGNALEE (pistes typees 2026-08-27) : + add track ouvre
+      // desormais le menu Audio/MIDI - on choisit Piste audio.
       await page.locator('#add-track-btn').click();
+      await page.locator('.ctx-menu >> text=+ Piste audio').click();
       await expect(page.locator('.track[data-track-id]')).toHaveCount(3);
 
       // 2. The server ARRIVES (fresh store: it seeds the project)

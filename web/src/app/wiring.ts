@@ -38,12 +38,14 @@ import { initSplitters } from './splitters';
 import { initRackTabs } from './rack_tabs';
 import { initContextMenu } from './context_menu_dispatch';
 import { TransportSync } from '../network/transport_sync';
-import { handleFileDrop } from './placement';
+import { handleFileDrop, flashLaneRefusal } from './placement';
+import { trackAcceptsAudio } from '../document/schema';
 import { renderTracks } from './render';
 import { wireExport } from './export';
 import { wireVersionGuard } from './version_guard';
 import { wireProjectGuard } from './project_guard';
 import { wireLoopRegion, reassertLoopRegion } from './loop_region';
+import { wireTrackMenu } from './track_menu';
 
 declare global {
   interface Window {
@@ -674,6 +676,13 @@ export async function init(): Promise<void> {
     const armed = ctx.library?.getArmed() ?? null;
     const lane = target.closest('.track-lane') as HTMLElement | null;
     if (armed && lane) {
+      // Garde de kind : un sample ne se pose pas sur une piste MIDI
+      const tdef = ctx.project.getDocument().tracks.find((t) => t.id === id);
+      if (tdef && !trackAcceptsAudio(tdef)) {
+        flashLaneRefusal(lane, 'Piste MIDI : un sample ne se pose pas ici '
+          + '(creer une piste AUDIO avec le bouton + du coin)');
+        return;
+      }
       // Place the armed sample, snapped to a 0.25 s grid
       const sr = ctx.project.getDocument().sampleRate || 48000;
       const x = e.clientX - lane.getBoundingClientRect().left;
@@ -893,19 +902,9 @@ export async function init(): Promise<void> {
     });
   }
 
-  els.addTrackBtn.addEventListener('click', () => {
-    if (!ctx.project) return;
-    const trackCount = ctx.project.getDocument().tracks.length;
-    ctx.project.addTrack({
-      id: `track-${Date.now()}`,
-      name: `Track ${trackCount + 1}`,
-      gain: 1.0,
-      clips: [],
-      chain: [],
-    });
-    sendLastChange();
-    renderTracks();
-  });
+  // Pistes typees (2026-08-27) : le bouton du coin ET « + add track »
+  // ouvrent le meme menu Audio/MIDI (module track_menu, fabrique unique)
+  wireTrackMenu();
 
   void contentSeconds;  // (exported for future callers; silence TS 6133)
 
