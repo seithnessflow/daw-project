@@ -15,11 +15,14 @@ premiers pushes.
 
 ## POINT DE SYNCHRO (A LIRE EN PREMIER)
 
-**Verdicts CI attendus sur b813998 (boucle) et 5bc6319 (scission)** :
-`gh run list` — deux pushes code, deux runs. Deja VERTS : export+
-pre-ecoute (33070584737) et gardes d'onglet (33072113838). Piege :
-un push docs-seuls ne produit AUCUN run (paths-ignore, ecrit dans
-ci.yml).
+**Verdict CI attendu sur 5776e24 (pistes typees + fixes des 2 rouges)**.
+Les runs b813998 et 5bc6319 furent ROUGES, causes comprises et FIXEES
+dans 5776e24 : (1) le commit boucle referencait splitClip livre au
+commit suivant — un lot pousse doit compiler SEUL (lecon de decoupage,
+JOURNAL) ; (2) tab-guards partageait un dossier entre deux seeds
+(base.am illisible au 2e passage en CI) — spec hermetique desormais.
+Deja verts : export+pre-ecoute (33070584737), gardes (33072113838).
+Piege : un push docs-seuls ne produit AUCUN run (paths-ignore).
 
 ## CE QUE LA JOURNEE A LIVRE (2026-08-27, dans l'ordre)
 
@@ -42,6 +45,12 @@ ci.yml).
 6. **SCISSION** (5bc6319) : clic droit « Scinder ici » (entree absente
    si impossible) + Ctrl+E au marqueur ; groupe d'undo = UN Ctrl+Z
    recolle ; fades repartis ; refus MIDI (assetHash vide).
+7. **PISTES TYPEES audio/MIDI** (5776e24) : le bouton + du COIN (menu
+   Piste audio / Piste MIDI, « + add track » = meme menu), TrackDef.kind
+   additif (legacy = mixte, rien ne casse), badges sur les tetes,
+   gardes de gestes a refus VISIBLE (sample sur MIDI = flash rouge ;
+   clip MIDI / instrument sur audio = absent/flash) ; instrument sur le
+   vide => piste MIDI, effet => piste audio. Suite **80/80**.
 
 ## LA DECISION OUVERTE (inchangee)
 
@@ -81,3 +90,6 @@ l'import. AUDIT-5 et AUDIT-6 a ratifier formellement.
   continue au-dela. 2) Clic droit sur un clip -> « Scinder ici » ;
   Ctrl+Z recolle. 3) WAV↓ telecharge le mixdown ; ▶ d'un chip
   pre-ecoute ; le badge cuivre dit le projet de l'onglet.
+  4) Le **+** du coin haut-gauche -> Piste audio / Piste MIDI (badges
+  sur les tetes) ; armer un sample et cliquer le couloir d'une piste
+  MIDI -> refus FLASH rouge ; le poser sur la piste audio -> il se pose.
