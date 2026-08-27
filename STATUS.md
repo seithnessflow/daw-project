@@ -126,6 +126,22 @@ multi-mutations (dupliquer une scene, etc.).
   5 s (0xC0000005) avec des gtests verts. Suite e2e **62/62**, tsc 0,
   gtests 44/44, cargo 9/9.
 
+## Performance (Lot P, revue externe ratifiee — premiers chiffres 2026-08-27)
+
+| Mesure | Valeur | Outil / garde |
+|---|---|---|
+| Graphe 500 pistes, bloc 256 | **735 us = 13,8 % du budget** (5333 us) | gtest `testGraphLoadBudget` (CI, seuil < budget) |
+| Underruns sous charge 28 threads (WASAPI partage 512/374) | **0** / 30 s | `scripts/perf-underruns.ps1` |
+| Underruns sous charge, EXCLUSIF 256 (16 ms) | **0** / 30 s | idem `-Exclusive` |
+| Sortie device : partage / plancher partage / exclusif 256 / 128 | 32 / 23,4 / **16** / 8 ms | ligne `audio-negotiation:` (readback) |
+| Pipeline jam (une machine, hors reseau) | **~75 ms** (pump ~5 + FIFO ~27 + Opus ~20 + NetEq 21-32) | `scripts/measure-jam.mjs` |
+| Underruns worklet broadcaster | **0** (etait 238-950/10 s avant le pre-buffer) | `jamAudio.workletStats()` |
+| Churn stems / verite device | en telemetrie permanente | EngineState champs 8-10 |
+
+Verdict latence (docs/SPIKE-LATENCE.md) : jeu direct sur moteur distant
+EXCLU (~75 ms logiciels) ; test Massive jouable en MIDI->rendu
+tour 16 ms->enceintes de la piece (~18-20 ms) ; WAN = ecoute.
+
 ## Criteres d'acceptation
 
 | # | Critere | Statut | Detail |

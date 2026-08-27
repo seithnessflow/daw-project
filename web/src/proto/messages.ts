@@ -192,6 +192,16 @@ export interface EngineState {
    * = pas de garde.
    */
   projectId: string;
+  /**
+   * LOT P (perf au regime de preuve, 2026-08-27) : le churn des stems
+   * (compteur cumulatif de stems rendus - la question de la revue :
+   * « le badge est-il perime 80 % du temps en edition active ? » se
+   * chiffre avec ce compteur) et la VERITE du device (periode nego-
+   * ciee + mode exclusif reellement obtenu, pas demande).
+   */
+  stemsRenderedTotal: number;
+  devicePeriodFrames: number;
+  deviceExclusive: boolean;
 }
 
 /**
@@ -1515,6 +1525,9 @@ function createBaseEngineState(): EngineState {
     pluginChildAlive: false,
     pluginChildRestarts: 0,
     projectId: "",
+    stemsRenderedTotal: 0,
+    devicePeriodFrames: 0,
+    deviceExclusive: false,
   };
 }
 
@@ -1540,6 +1553,15 @@ export const EngineState: MessageFns<EngineState> = {
     }
     if (message.projectId !== "") {
       writer.uint32(58).string(message.projectId);
+    }
+    if (message.stemsRenderedTotal !== 0) {
+      writer.uint32(64).uint32(message.stemsRenderedTotal);
+    }
+    if (message.devicePeriodFrames !== 0) {
+      writer.uint32(72).uint32(message.devicePeriodFrames);
+    }
+    if (message.deviceExclusive !== false) {
+      writer.uint32(80).bool(message.deviceExclusive);
     }
     return writer;
   },
@@ -1613,6 +1635,30 @@ export const EngineState: MessageFns<EngineState> = {
             message.projectId = reader.string();
             continue;
           }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.stemsRenderedTotal = reader.uint32();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.devicePeriodFrames = reader.uint32();
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.deviceExclusive = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1662,6 +1708,21 @@ export const EngineState: MessageFns<EngineState> = {
         : isSet(object.project_id)
         ? globalThis.String(object.project_id)
         : "",
+      stemsRenderedTotal: isSet(object.stemsRenderedTotal)
+        ? globalThis.Number(object.stemsRenderedTotal)
+        : isSet(object.stems_rendered_total)
+        ? globalThis.Number(object.stems_rendered_total)
+        : 0,
+      devicePeriodFrames: isSet(object.devicePeriodFrames)
+        ? globalThis.Number(object.devicePeriodFrames)
+        : isSet(object.device_period_frames)
+        ? globalThis.Number(object.device_period_frames)
+        : 0,
+      deviceExclusive: isSet(object.deviceExclusive)
+        ? globalThis.Boolean(object.deviceExclusive)
+        : isSet(object.device_exclusive)
+        ? globalThis.Boolean(object.device_exclusive)
+        : false,
     };
   },
 
@@ -1688,6 +1749,15 @@ export const EngineState: MessageFns<EngineState> = {
     if (message.projectId !== "") {
       obj.projectId = message.projectId;
     }
+    if (message.stemsRenderedTotal !== 0) {
+      obj.stemsRenderedTotal = Math.round(message.stemsRenderedTotal);
+    }
+    if (message.devicePeriodFrames !== 0) {
+      obj.devicePeriodFrames = Math.round(message.devicePeriodFrames);
+    }
+    if (message.deviceExclusive !== false) {
+      obj.deviceExclusive = message.deviceExclusive;
+    }
     return obj;
   },
 
@@ -1703,6 +1773,9 @@ export const EngineState: MessageFns<EngineState> = {
     message.pluginChildAlive = object.pluginChildAlive ?? false;
     message.pluginChildRestarts = object.pluginChildRestarts ?? 0;
     message.projectId = object.projectId ?? "";
+    message.stemsRenderedTotal = object.stemsRenderedTotal ?? 0;
+    message.devicePeriodFrames = object.devicePeriodFrames ?? 0;
+    message.deviceExclusive = object.deviceExclusive ?? false;
     return message;
   },
 };

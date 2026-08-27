@@ -8,7 +8,8 @@
 param(
   [string]$DeviceName = "",
   [string]$OutDir = "$env:TEMP\daw-perf",
-  [int]$Seconds = 30
+  [int]$Seconds = 30,
+  [switch]$Exclusive   # WASAPI exclusif (le readback share= fait foi)
 )
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -33,6 +34,7 @@ foreach ($buf in 512, 256, 128) {
   $args = @('--doc', $doc, '--assets', $assets, '--play', '--keepalive',
             '--ws-port', '47831', '--buffer-size', "$buf")
   if ($DeviceName -ne "") { $args += @('--device', ('"' + $DeviceName + '"')) }
+  if ($Exclusive) { $args += @('--exclusive') }
   $p = Start-Process -FilePath $eng -ArgumentList $args `
         -RedirectStandardOutput $log -RedirectStandardError "$out\spike-$buf-err.log" `
         -WindowStyle Hidden -PassThru

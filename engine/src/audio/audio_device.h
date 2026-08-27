@@ -120,6 +120,10 @@ public:
      */
     uint32_t getBufferSize() const { return actual_buffer_size_; }
 
+    /** Lot P : le mode exclusif REELLEMENT obtenu (readback, pas la
+     *  demande - miniaudio retombe en partage en silence). */
+    bool isExclusive() const { return actual_exclusive_; }
+
     /**
      * Get the device name.
      */
@@ -203,6 +207,7 @@ private:
     AudioDeviceState state_ = AudioDeviceState::Uninitialized;
     uint32_t actual_sample_rate_ = 0;
     uint32_t actual_buffer_size_ = 0;
+    bool actual_exclusive_ = false;  // readback, jamais la demande
     std::string device_name_;
 
     // Ring buffers for thread communication

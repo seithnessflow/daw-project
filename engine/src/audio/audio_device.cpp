@@ -164,6 +164,8 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     // Get actual values (may differ from requested)
     actual_sample_rate_ = device_->sampleRate;
     actual_buffer_size_ = device_->playback.internalPeriodSizeInFrames;
+    actual_exclusive_ =
+        device_->playback.shareMode == ma_share_mode_exclusive;
     callback_context_.sample_rate = actual_sample_rate_;
 
     // SPIKE LATENCE (2026-08-27) : la VERITE de la negociation, en clair -

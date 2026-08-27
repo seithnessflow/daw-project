@@ -3899,6 +3899,50 @@ static bool testSessionQuantizedLaunch() {
     return true;
 }
 
+/**
+ * LOT P (revue externe ratifiee 2026-08-27) : la performance entre au
+ * regime de preuve. Charge du GRAPHE seul, CI-able (pas de device) :
+ * 500 pistes (1 GainNode chacune, pas de clips - le travail par piste
+ * inconditionnel d'AUDIT-5 famille D), 1000 blocs de 256 frames.
+ * Budget temps reel d'un bloc a 48 kHz = 5,33 ms ; on REPORTE la
+ * moyenne (la tendance) et on n'asserte que la borne large (< budget)
+ * pour rester stable sur des runners CI partages et bruites.
+ */
+static bool testGraphLoadBudget() {
+    std::cout << "Test: 500-track graph block budget... ";
+    daw::graph::AudioGraph graph;
+    graph.setSampleRate(48000);
+    for (int i = 0; i < 500; ++i) {
+        daw::graph::AudioTrack track;
+        track.id = "t" + std::to_string(i);
+        track.gain = 1.0f;
+        track.chain.push_back(
+            std::make_unique<daw::graph::GainNode>("g" + std::to_string(i), 1.0f));
+        graph.addTrack(std::move(track));
+    }
+    graph.prepare(48000, 256);
+    std::vector<float> out(256 * 2, 0.0f);
+    // Echauffement (allocations paresseuses eventuelles hors mesure)
+    for (int i = 0; i < 10; ++i) graph.process(out.data(), 256, i * 256);
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        graph.process(out.data(), 256, static_cast<int64_t>(i) * 256);
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+    const double us_per_block =
+        std::chrono::duration<double, std::micro>(t1 - t0).count() / 1000.0;
+    const double budget_us = 256.0 / 48000.0 * 1e6;  // 5333 us
+    std::cout << "avg " << us_per_block << " us/bloc (budget "
+              << budget_us << " us, "
+              << (100.0 * us_per_block / budget_us) << "%)... ";
+    if (us_per_block >= budget_us) {
+        std::cout << "FAILED: 500 pistes depassent le budget temps reel\n";
+        return false;
+    }
+    std::cout << "OK\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -3953,6 +3997,7 @@ int main(int argc, char* argv[]) {
     run(testAutomationEvaluator);  // A2
     run(testAutomationRender);     // A2
     run(testStageProbe);           // preuve par etage
+    run(testGraphLoadBudget);      // Lot P : perf au regime de preuve
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);

@@ -1282,6 +1282,9 @@ int doPlayWithServer(const Options& opts) {
     wirePluginTelemetry(ws_server, plugin_registry);
     ws_server.setTapRing(&tap_ring);  // S8a
     ws_server.setProjectId(current_project);  // garde de projet (onglet)
+    // Lot P : compteur de churn des stems (incremente a la publication)
+    std::atomic<uint32_t> stems_rendered_counter{0};
+    ws_server.setStemsCounter(&stems_rendered_counter);
 
     // Export mixdown (AUDIT-6 QW1) : demande navigateur -> instantane du
     // document sous verrou (ICI, thread reseau WS) -> rendu sur le thread
@@ -1637,6 +1640,7 @@ int doPlayWithServer(const Options& opts) {
                             if (!change.empty()) server_client.sendChange(change);
                         }
                     }
+                    stems_rendered_counter.fetch_add(1, std::memory_order_relaxed);
                     std::cout << "Stem published for node " << p.id << ": "
                               << stem.stem_hash.substr(0, 8) << "...\n";
                 }

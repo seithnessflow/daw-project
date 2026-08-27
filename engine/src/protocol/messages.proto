@@ -119,6 +119,14 @@ message EngineState {
     // deux verites coexister. Additif : vide (vieux moteur / mode fichier)
     // = pas de garde.
     string project_id = 7;
+    // LOT P (perf au regime de preuve, 2026-08-27) : le churn des stems
+    // (compteur cumulatif de stems rendus - la question de la revue :
+    // « le badge est-il perime 80 % du temps en edition active ? » se
+    // chiffre avec ce compteur) et la VERITE du device (periode nego-
+    // ciee + mode exclusif reellement obtenu, pas demande).
+    uint32 stems_rendered_total = 8;
+    uint32 device_period_frames = 9;
+    bool device_exclusive = 10;
 }
 
 // S8a: a batch of post-master audio blocks for the subscribed tab.

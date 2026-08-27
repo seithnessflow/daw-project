@@ -126,6 +126,12 @@ public:
         plugin_child_restarts_ = restarts;
     }
 
+    /** Lot P : compteur de churn des stems (possede par main, incremente
+     *  a chaque publication) - meme regle de possession que le reste. */
+    void setStemsCounter(const std::atomic<uint32_t>* counter) {
+        stems_rendered_ = counter;
+    }
+
     /**
      * S8a: attach the master tap ring (owned by the caller, written by
      * the audio callback). The ring's `enabled` flag follows the
@@ -240,6 +246,7 @@ private:
     const std::atomic<uint64_t>* plugin_blocks_missed_ = nullptr;
     const std::atomic<bool>* plugin_child_alive_ = nullptr;
     const std::atomic<uint32_t>* plugin_child_restarts_ = nullptr;
+    const std::atomic<uint32_t>* stems_rendered_ = nullptr;  // Lot P
 
     // S8a: master tap (owned by main; audio-thread writer)
     audio::TapRing* tap_ring_ = nullptr;

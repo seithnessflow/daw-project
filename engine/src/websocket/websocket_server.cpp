@@ -485,6 +485,14 @@ void WebSocketServer::broadcastTelemetry() {
     }
     // Garde de projet : l'onglet compare a son ?project= (vide = pas de garde)
     state->set_project_id(project_id_);
+    // Lot P : churn des stems + verite du device (periode + exclusif
+    // REELLEMENT obtenus - le readback, jamais la demande)
+    if (stems_rendered_) {
+        state->set_stems_rendered_total(
+            stems_rendered_->load(std::memory_order_relaxed));
+    }
+    state->set_device_period_frames(device_->getBufferSize());
+    state->set_device_exclusive(device_->isExclusive());
 
     // F5+ : verite des slots Session (l'UI n'affiche plus un etat local
     // optimiste). Toujours envoyee - une liste vide SIGNIFIE tout arrete.
