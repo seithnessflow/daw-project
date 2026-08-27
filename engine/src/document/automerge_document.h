@@ -145,6 +145,14 @@ public:
     bool setMasterGain(float gain);
 
     /**
+     * T2 : set the root tempoMilliBpm (authoring API, setMasterGain's
+     * family - in production the browser owns the tempo). Bumps
+     * schemaVersion to 2 if below (the engine mirror of ensureV2 :
+     * a musical write is what makes a document v2).
+     */
+    bool setTempoMilliBpm(int64_t milli_bpm);
+
+    /**
      * 2.5-etat: write a chain node's state reference (stateHash +
      * stateVersion). THE exception to "the browser owns the document":
      * only the machine hosting the plugin can serialize its state, so

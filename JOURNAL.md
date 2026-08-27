@@ -1639,3 +1639,28 @@ deux lots du plan ratifie (`.claude/plans/lazy-crunching-nautilus.md`).
   le contrat v2 separe « version creee » (1) de « max supporte » (2).
 - Verdicts CI leves a l'ouverture : s1, s2, Lot P — tous verts.
 Prochain : T2 (resolveMusicalTime, LE point d'etranglement moteur).
+
+**2026-08-27 (suite 14 - T2 : le moteur resout le temps musical) :**
+resolveMusicalTime() (document/resolve_time) = LE point d'etranglement
+unique ticks -> samples, appele a CHAQUE entree du moteur : build
+initial, rebuild live (AVANT buildGraph et content_end), offline_render
+(rendu + calculateProjectLength — son buildGraph prive prend desormais
+un ProjectDef RESOLU), publication des stems et signal de fraicheur
+(les cles serialisent des samples RESOLUS : un doc absolu donne des
+cles byte-identiques, pas de bump stem-v3). En aval, audio_graph /
+clip_player / midi_schedule / automation / graph_common : INTOUCHES.
+Quantum Session : doc v2 -> 1 mesure (signature a tick 0, 4/4 defaut)
+resolue au REGISTRE, echantillonnee AU LAUNCH de l'ancre (un changement
+de tempo n'affecte que les prochains lancements) ; doc v1 -> loop_len
+legacy, F5+ intact. setTempoMilliBpm() moteur (famille setMasterGain,
+bump v2 lazy = le miroir d'ensureV2). L'ecrivain Automerge applique
+l'EXCLUSIVITE DE DOMAINE (un clip/note musical n'ecrit jamais
+startSample/lengthSamples quand le tick est present). Preuves : gtests
+51/51 dont la fixture musicale rendue (hash stable x2 ; 120->90
+milli-BPM deplace le clip musical 96000 -> 128000 AU SAMPLE PRES de la
+prediction noyau, l'absolu ne bouge pas d'un octet), hash de reference
+56729beb61993cd7 INCHANGE, e2e 97/97. Deviation notee : la fixture
+standalone create_musical_doc.cpp attendra T5 (elle nait avec
+EXPECTED_HASH_MUSICAL) — sa substance est deja un gtest.
+Prochain : T3 (surface web — tempo topbar, grille musicale, mutateurs
+dual-aware, piano-roll en ticks, rituel du compositeur a 100 BPM).

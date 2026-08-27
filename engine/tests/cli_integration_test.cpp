@@ -8,6 +8,7 @@
 
 #include "../src/document/automerge_document.h"
 #include "../src/document/schema.h"
+#include "../src/document/resolve_time.h"
 #include "../src/graph/audio_graph.h"
 #include "../src/graph/tempo.h"
 #include "../src/graph/clip_player.h"
@@ -4205,6 +4206,224 @@ bool testMusicalFieldsRoundTrip() {
     return true;
 }
 
+// ---- T2 : resolveMusicalTime, LE point d'etranglement --------------
+
+// Resolution pure (sans Automerge) : previsions du noyau au sample,
+// l'absolu ne bouge JAMAIS, un v1 est un no-op strict.
+bool testMusicalResolvePure() {
+    std::cout << "Test: resolveMusicalTime (pure)... ";
+    daw::document::ProjectDef doc;
+    doc.schema_version = 2;
+    doc.sample_rate = 48000;
+    doc.tempo_milli_bpm = 120000;
+
+    daw::document::TrackDef track;
+    track.id = "t";
+
+    daw::document::ClipDef midi;       // MIDI musical
+    midi.id = "midi";
+    midi.start_tick = 3840;            // mesure 2 @120 -> 96000
+    midi.length_tick = 960;            // 1 noire -> 24000
+    daw::document::NoteDef note;
+    note.start_tick = 240;             // +6000 relatif
+    note.length_tick = 240;            // 6000
+    midi.notes.push_back(note);
+    track.clips.push_back(midi);
+
+    daw::document::ClipDef audio_mus;  // audio musical : contenu en samples
+    audio_mus.id = "audio-mus";
+    audio_mus.asset_hash = "aa";
+    audio_mus.start_tick = 960;        // -> 24000
+    audio_mus.length_samples = 24000;  // JAMAIS etire
+    track.clips.push_back(audio_mus);
+
+    daw::document::ClipDef abs;        // absolu : byte-identique
+    abs.id = "abs";
+    abs.asset_hash = "bb";
+    abs.start_sample = 12345;
+    abs.length_samples = 6789;
+    track.clips.push_back(abs);
+
+    daw::document::AutomationLaneDef lane;
+    lane.id = "lane";
+    lane.param = "gain";
+    lane.time_base_ticks = true;
+    lane.points.push_back({960, 0.5f});
+    track.automation.push_back(lane);
+    doc.tracks.push_back(track);
+
+    daw::document::resolveMusicalTime(doc);
+    const auto& t = doc.tracks[0];
+    if (t.clips[0].start_sample != 96000 || t.clips[0].length_samples != 24000 ||
+        t.clips[0].notes[0].start_sample != 6000 ||
+        t.clips[0].notes[0].length_samples != 6000) {
+        std::cout << "FAILED: clip MIDI musical mal resolu ("
+                  << t.clips[0].start_sample << "/" << t.clips[0].length_samples
+                  << ", note " << t.clips[0].notes[0].start_sample << "/"
+                  << t.clips[0].notes[0].length_samples << ")\n";
+        return false;
+    }
+    if (t.clips[1].start_sample != 24000 || t.clips[1].length_samples != 24000) {
+        std::cout << "FAILED: clip audio musical (position bouge, contenu jamais)\n";
+        return false;
+    }
+    if (t.clips[2].start_sample != 12345 || t.clips[2].length_samples != 6789) {
+        std::cout << "FAILED: le clip ABSOLU a bouge\n";
+        return false;
+    }
+    if (t.automation[0].points[0].t != 24000) {
+        std::cout << "FAILED: lane musicale mal resolue\n";
+        return false;
+    }
+
+    // Un v1 avec des ticks parasites = no-op STRICT
+    daw::document::ProjectDef v1 = doc;
+    v1.schema_version = 1;
+    v1.tracks[0].clips[0].start_sample = 777;
+    daw::document::resolveMusicalTime(v1);
+    if (v1.tracks[0].clips[0].start_sample != 777) {
+        std::cout << "FAILED: un v1 a ete mute\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
+// La fixture musicale rendue (create_musical_doc du plan) : hash stable
+// x2, et 120 -> 90 milli-BPM DEPLACE le musical (prediction noyau au
+// sample, via calculateProjectLength) et PAS l'absolu.
+bool testMusicalRenderMoves() {
+    std::cout << "Test: musical render (120->90 moves musical only)... ";
+    const fs::path dir = fs::temp_directory_path() / "daw-musical-fixture";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir);
+
+    std::vector<int16_t> square(24000 * 2);
+    for (size_t i = 0; i < 24000; ++i) {
+        const int16_t v = (i % 96 < 48) ? int16_t{8192} : int16_t{-8192};
+        square[i * 2] = v;
+        square[i * 2 + 1] = static_cast<int16_t>(-v);
+    }
+    const std::string hashA = writeHashedAsset(dir, 2, square);
+    if (hashA.empty()) {
+        std::cout << "FAILED: asset\n";
+        return false;
+    }
+
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000) || !doc.setTempoMilliBpm(120000)) {
+        std::cout << "FAILED: create/setTempo\n";
+        return false;
+    }
+
+    daw::document::TrackDef abs_track;
+    abs_track.id = "abs";
+    abs_track.name = "Absolu";
+    daw::document::ClipDef abs_clip;
+    abs_clip.id = "clip-abs";
+    abs_clip.asset_hash = hashA;
+    abs_clip.start_sample = 0;
+    abs_clip.length_samples = 24000;
+    abs_track.clips.push_back(abs_clip);
+    doc.addTrack(abs_track);
+
+    daw::document::TrackDef mus_track;
+    mus_track.id = "mus";
+    mus_track.name = "Musical";
+    mus_track.gain = 0.5f;
+    daw::document::ClipDef mus_clip;   // audio musical : mesure 2
+    mus_clip.id = "clip-mus";
+    mus_clip.asset_hash = hashA;
+    mus_clip.start_tick = 3840;        // @120 -> 96000
+    mus_clip.length_samples = 24000;
+    mus_track.clips.push_back(mus_clip);
+    doc.addTrack(mus_track);
+
+    daw::render::RenderConfig config;
+    config.sample_rate = 48000;
+    config.end_sample = -1;
+    daw::render::OfflineRenderer renderer;
+    const std::string out1 = (dir / "m1.wav").string();
+    const std::string out2 = (dir / "m2.wav").string();
+    auto r1 = renderer.render(doc, out1, dir.string(), config);
+    auto r2 = renderer.render(doc, out2, dir.string(), config);
+    if (!r1.success || !r2.success || r1.peak_left <= 0.05) {
+        std::cout << "FAILED: rendu musical (" << r1.error << ")\n";
+        return false;
+    }
+    if (computeFileHash(out1) != computeFileHash(out2)) {
+        std::cout << "FAILED: hash musical instable\n";
+        return false;
+    }
+    const int64_t len120 =
+        daw::render::OfflineRenderer::calculateProjectLength(doc);
+    if (len120 != 120000) {  // 96000 + 24000, prediction noyau
+        std::cout << "FAILED: longueur @120 = " << len120 << " != 120000\n";
+        return false;
+    }
+
+    // 120 -> 90 : le musical bouge (3840 ticks -> 128000), l'absolu non
+    if (!doc.setTempoMilliBpm(90000)) {
+        std::cout << "FAILED: setTempo 90\n";
+        return false;
+    }
+    const int64_t len90 =
+        daw::render::OfflineRenderer::calculateProjectLength(doc);
+    if (len90 != 152000) {  // 128000 + 24000
+        std::cout << "FAILED: longueur @90 = " << len90 << " != 152000\n";
+        return false;
+    }
+    auto snap = doc.getDocument();
+    daw::document::resolveMusicalTime(snap);
+    if (snap.tracks[0].clips[0].start_sample != 0 ||
+        snap.tracks[0].clips[0].length_samples != 24000) {
+        std::cout << "FAILED: l'absolu a bouge avec le tempo\n";
+        return false;
+    }
+    if (snap.tracks[1].clips[0].start_sample != 128000) {
+        std::cout << "FAILED: le musical n'a pas suivi le tempo ("
+                  << snap.tracks[1].clips[0].start_sample << ")\n";
+        return false;
+    }
+
+    fs::remove_all(dir, ec);
+    std::cout << "OK (120: 96000, 90: 128000, absolu fixe)\n";
+    return true;
+}
+
+// Quantum Session musical : v1 = 0 (legacy loop_len), v2 = 1 mesure
+// au registre (signature a tick 0 respectee).
+bool testSessionQuantumMusical() {
+    std::cout << "Test: session quantum musical... ";
+    daw::document::ProjectDef doc;
+    doc.sample_rate = 48000;
+    doc.schema_version = 1;
+    if (daw::document::sessionQuantumSamples(doc) != 0) {
+        std::cout << "FAILED: v1 doit rester legacy (0)\n";
+        return false;
+    }
+    doc.schema_version = 2;
+    if (daw::document::sessionQuantumSamples(doc) != 96000) {  // 4/4 @120
+        std::cout << "FAILED: defaut 4/4 @120 != 96000\n";
+        return false;
+    }
+    doc.tempo_milli_bpm = 90000;
+    if (daw::document::sessionQuantumSamples(doc) != 128000) {
+        std::cout << "FAILED: 4/4 @90 != 128000\n";
+        return false;
+    }
+    doc.tempo_milli_bpm = 120000;
+    doc.time_signature.push_back({0, 3, 4});
+    if (daw::document::sessionQuantumSamples(doc) != 72000) {  // 3/4 @120
+        std::cout << "FAILED: 3/4 @120 != 72000\n";
+        return false;
+    }
+    std::cout << "OK\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -4262,6 +4481,9 @@ int main(int argc, char* argv[]) {
     run(testGraphLoadBudget);      // Lot P : perf au regime de preuve
     run(testTempoKernelVectors);   // T1 : miroir noyau tempo
     run(testMusicalFieldsRoundTrip);  // T1 : cles v2 dans Automerge
+    run(testMusicalResolvePure);      // T2 : point d'etranglement
+    run(testMusicalRenderMoves);      // T2 : fixture musicale rendue
+    run(testSessionQuantumMusical);   // T2 : quantum v2 = 1 mesure
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);

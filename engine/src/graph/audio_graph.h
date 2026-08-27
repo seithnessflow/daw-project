@@ -278,6 +278,16 @@ public:
                     bool stop, bool quantize = false) noexcept;
 
     /**
+     * T2 : quantum Session MUSICAL (doc v2 = 1 mesure resolue au
+     * registre de tempo, samples). 0 = legacy (l'ancre pose quantum =
+     * son loop_len). Echantillonne AU LAUNCH de l'ancre : un
+     * changement de tempo n'affecte que les prochains lancements.
+     */
+    void setMusicalQuantum(int64_t samples) noexcept {
+        musical_quantum_.store(samples, std::memory_order_relaxed);
+    }
+
+    /**
      * F5+ : etat des slots pour la telemetrie (control thread). Un tuple par
      * piste engagee : {track_id, scene_id, queued}.
      */
@@ -394,6 +404,9 @@ private:
     // zero implicitement : reposes au prochain lancement d'ancre.
     std::atomic<int64_t> session_epoch_{0};
     std::atomic<int64_t> session_quantum_{0};
+    // T2 : quantum musical (doc v2), 0 = legacy. Lu par launchSlot a
+    // l'ancre, ecrit par le control thread (setMusicalQuantum).
+    std::atomic<int64_t> musical_quantum_{0};
 
     size_t num_tracks_ = 0;
     std::unique_ptr<std::atomic<float>[]> peak_left_;

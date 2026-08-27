@@ -746,10 +746,19 @@ Ordre grave (la confiance avant le sucre, arbitrage confirme) :
          spec Node 14/14), gardes sanitize, bump v2 LAZY (creation
          RESTE v1, graine vendoree intacte). PREUVE : hash
          56729beb61993cd7 INCHANGE, gtests 48/48.
-       - [ ] T2 : resolveMusicalTime() = LE point d'etranglement moteur
-         (rebuild live, offline_render, export, stems) + quantum
-         Session musical + fixture create_musical_doc (hash stable x2,
-         120->90 deplace le musical, jamais l'absolu).
+       - [x] T2 (2026-08-27) : resolveMusicalTime() = LE point
+         d'etranglement moteur (build initial, rebuild live,
+         offline_render/longueur, publication + fraicheur des stems —
+         cles sur samples RESOLUS), quantum Session musical (doc v2 =
+         1 mesure au registre, echantillonne au launch de l'ancre,
+         legacy intact), setTempoMilliBpm moteur (famille
+         setMasterGain, bump v2 lazy), exclusivite de domaine a
+         l'ecriture (clip/note musical n'ecrit pas ses samples).
+         PREUVE : gtests 51/51 (resolution pure, fixture rendue hash
+         stable x2 + 120->90 = 96000->128000 au sample pres et absolu
+         fixe, quantum 4/4-3/4), hash 56729beb61993cd7 INCHANGE,
+         e2e 97/97. Fixture standalone create_musical_doc.cpp
+         REPORTEE a T5 (elle nait avec EXPECTED_HASH_MUSICAL).
        - [ ] T3 : surface web (champ tempo topbar + ensureV2, grille
          musicale snapTickStep, regle mesures.battements, mutateurs
          dual-aware, piano-roll en ticks, badge + « Rendre musical »,

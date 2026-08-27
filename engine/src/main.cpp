@@ -14,6 +14,7 @@
 
 #include "audio/audio_device.h"
 #include "document/automerge_document.h"
+#include "document/resolve_time.h"  // T2 : temps musical -> samples
 #include "graph/audio_graph.h"
 #include "graph/clip_player.h"
 #include "graph/graph_common.h"
@@ -739,6 +740,10 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     graph->setSampleRate(sample_rate);
     graph->setMasterGain(project.master_gain);  // V1.2
     graph->setMasterAutomation(project.automation);  // A2
+    // T2 : doc v2 -> quantum Session = 1 mesure au registre de tempo
+    // (0 = legacy : loop_len du slot d'ancre, comportement F5+ intact)
+    graph->setMusicalQuantum(
+        daw::document::sessionQuantumSamples(project));
 
     for (const auto& track_def : project.tracks) {
         daw::graph::AudioTrack track;
@@ -990,7 +995,10 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     if (!startDebugProxy(opts, device.getSampleRate(), plugin_registry)) {
         return 1;
     }
-    const auto& project = doc.getDocument();
+    // T2 : LE point d'etranglement temps musical -> samples, AVANT
+    // buildGraph (le graphe ne voit que des samples resolus)
+    auto project = doc.getDocument();
+    daw::document::resolveMusicalTime(project);
 
     const uint32_t proxy_depth =
         (std::max)(1u, device.getBufferSize() / daw::host::kRingBlockSize);
@@ -1429,6 +1437,9 @@ int doPlayWithServer(const Options& opts) {
                 std::lock_guard<std::mutex> lock(doc_mutex);
                 snapshot = doc.getDocument();
             }
+            // T2 : resolution musicale AVANT buildGraph ET le calcul
+            // de content_end ci-dessous (positions resolues partout)
+            daw::document::resolveMusicalTime(snapshot);
 
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
@@ -1564,6 +1575,9 @@ int doPlayWithServer(const Options& opts) {
                 std::lock_guard<std::mutex> lock(doc_mutex);
                 snap = doc.getDocument();
             }
+            // T2 : les stems publies plus bas rendent et CLENT sur des
+            // positions RESOLUES (un doc absolu passe byte-identique)
+            daw::document::resolveMusicalTime(snap);
             for (const auto& t : snap.tracks) {
                 for (const auto& p : t.chain) {
                     if (p.type != "vst3") continue;
@@ -1660,6 +1674,9 @@ int doPlayWithServer(const Options& opts) {
                 std::lock_guard<std::mutex> lock(doc_mutex);
                 fsnap = doc.getDocument();
             }
+            // T2 : la cle recomputee doit voir les MEMES samples
+            // resolus que la cle publiee (sinon faux "perime")
+            daw::document::resolveMusicalTime(fsnap);
             std::ostringstream sf;
             sf << "{\"sf\":1,\"from\":\"engine\",\"nodes\":{";
             bool any = false;

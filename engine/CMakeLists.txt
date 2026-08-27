@@ -209,6 +209,8 @@ add_library(daw_engine_lib STATIC
     src/document/schema.cpp
     src/document/automerge_document.h
     src/document/automerge_document.cpp
+    src/document/resolve_time.h
+    src/document/resolve_time.cpp
     src/transport/transport_state.h
     src/transport/transport_state.cpp
     src/render/offline_render.h

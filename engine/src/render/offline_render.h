@@ -139,10 +139,11 @@ private:
     size_t stem_substituted_nodes_ = 0;
 
     /**
-     * Build audio graph from document.
+     * Build audio graph from a RESOLVED project (T2 : l'appelant est
+     * passe par resolveMusicalTime - le build ne voit que des samples).
      */
     std::unique_ptr<graph::AudioGraph> buildGraph(
-        const document::AutomergeDocument& document,
+        const document::ProjectDef& doc,
         const std::string& asset_dir,
         uint32_t sample_rate
     );

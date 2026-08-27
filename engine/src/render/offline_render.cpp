@@ -2,6 +2,7 @@
 #include "offline_render.h"
 
 #include "../audio/audio_callback.h"  // audio::INTERNAL_BLOCK_SIZE
+#include "../document/resolve_time.h" // T2 : point d'etranglement musical
 #include "../graph/graph_common.h"    // makeClipPlayer / makeGainNode (S3)
 
 #include <algorithm>
@@ -31,14 +32,18 @@ RenderResult OfflineRenderer::render(
         return result;
     }
 
-    const auto& doc = document.getDocument();
+    // T2 : LE point d'etranglement temps musical -> samples. En aval,
+    // le build et le rendu ne voient QUE des samples resolus ; un doc
+    // v1 pur passe byte-identique (resolveMusicalTime = no-op).
+    auto doc = document.getDocument();
+    document::resolveMusicalTime(doc);
 
     // Fresh plugin children per render (one producer per ring)
     bridges_.clear();
     sync_nodes_.clear();
 
     // Build audio graph
-    auto graph = buildGraph(document, asset_dir, config.sample_rate);
+    auto graph = buildGraph(doc, asset_dir, config.sample_rate);
     if (!graph) {
         result.error = "Failed to build audio graph";
         return result;
@@ -230,7 +235,10 @@ RenderResult OfflineRenderer::render(
 int64_t OfflineRenderer::calculateProjectLength(const document::AutomergeDocument& document) {
     int64_t max_end = 0;
 
-    for (const auto& track : document.getDocument().tracks) {
+    // T2 : la longueur se mesure sur les positions RESOLUES
+    auto resolved = document.getDocument();
+    document::resolveMusicalTime(resolved);
+    for (const auto& track : resolved.tracks) {
         for (const auto& clip : track.clips) {
             const int64_t clip_end = clip.start_sample + clip.length_samples;
             if (clip_end > max_end) {
@@ -243,7 +251,7 @@ int64_t OfflineRenderer::calculateProjectLength(const document::AutomergeDocumen
 }
 
 std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
-    const document::AutomergeDocument& document,
+    const document::ProjectDef& doc,  // T2 : deja RESOLU par l'appelant
     const std::string& asset_dir,
     uint32_t sample_rate
 ) {
@@ -252,7 +260,6 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
     stem_substituted_nodes_ = 0;  // per-build accounting (S7 / R5)
     native_latency_ = 0;          // session 4.3 : latence des natifs
 
-    const auto& doc = document.getDocument();
     graph_ptr->setMasterGain(doc.master_gain);  // V1.2: same stage as live
     graph_ptr->setMasterAutomation(doc.automation);  // A2: same stage as live
 

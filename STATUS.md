@@ -2,10 +2,11 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-27 (T1 TEMPO livre : schema v2 additif + noyau miroir entier
-tempo.ts==tempo.h sur vecteurs d'or partages ; hash de reference
-INCHANGE ; e2e 97/97, gtests 48/48, tsc 0 ; suite du lot T dans TODO 6
-et JOURNAL suite 13).*
+2026-08-27 (T1+T2 TEMPO livres : schema v2 additif + noyau miroir
+entier tempo.ts==tempo.h + resolveMusicalTime = LE point
+d'etranglement moteur (graphe/stems/quantum sur samples RESOLUS) ;
+hash de reference INCHANGE ; e2e 97/97, gtests 51/51, tsc 0 ; suite
+du lot T dans TODO 6 et JOURNAL suites 13-14).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 

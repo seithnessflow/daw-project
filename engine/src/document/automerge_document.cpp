@@ -1275,6 +1275,26 @@ bool AutomergeDocument::setMasterGain(float gain) {
     return ok;
 }
 
+bool AutomergeDocument::setTempoMilliBpm(int64_t milli_bpm) {
+    // T2. Famille setMasterGain (authoring pour tests/fixtures ; en
+    // production le navigateur possede le tempo). Le bump v2 est LAZY :
+    // c'est l'ECRIT MUSICAL qui rend le document v2 (miroir d'ensureV2).
+    if (!doc_) {
+        last_error_ = "No document loaded";
+        return false;
+    }
+    ProjectDef current;
+    if (readDocument(current) && current.schema_version < 2) {
+        AMresult* vr = AMmapPutUint(doc_, AM_ROOT, AMstr("schemaVersion"), 2);
+        if (vr) AMresultFree(vr);
+    }
+    AMresult* result =
+        AMmapPutInt(doc_, AM_ROOT, AMstr("tempoMilliBpm"), milli_bpm);
+    const bool ok = checkResult(result, "set tempoMilliBpm");
+    if (result) AMresultFree(result);
+    return ok;
+}
+
 bool AutomergeDocument::withChainNode(
     const std::string& track_id, const std::string& node_id,
     const std::function<bool(const AMobjId*)>& write) {
@@ -1485,11 +1505,18 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
         cr = AMmapPutStr(doc_, clipObjId, AMstr("assetHash"), AMstr(clip.asset_hash.c_str()));
         if (cr) results_to_free.push_back(cr);
 
-        cr = AMmapPutInt(doc_, clipObjId, AMstr("startSample"), clip.start_sample);
-        if (cr) results_to_free.push_back(cr);
-
-        cr = AMmapPutInt(doc_, clipObjId, AMstr("lengthSamples"), clip.length_samples);
-        if (cr) results_to_free.push_back(cr);
+        // v2 : EXCLUSIVITE DE DOMAINE - un clip musical (start_tick
+        // present) ne porte JAMAIS startSample (position ambigue entre
+        // pairs sinon) ; lengthSamples reste legitime pour l'audio
+        // musical (le contenu ne s'etire pas).
+        if (clip.start_tick < 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("startSample"), clip.start_sample);
+            if (cr) results_to_free.push_back(cr);
+        }
+        if (clip.length_tick < 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("lengthSamples"), clip.length_samples);
+            if (cr) results_to_free.push_back(cr);
+        }
 
         cr = AMmapPutInt(doc_, clipObjId, AMstr("offsetSamples"), clip.offset_samples);
         if (cr) results_to_free.push_back(cr);
@@ -1534,10 +1561,17 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
                         if (fr) results_to_free.push_back(fr);
                         fr = AMmapPutInt(doc_, noteObj, AMstr("velocity"), n.velocity);
                         if (fr) results_to_free.push_back(fr);
-                        fr = AMmapPutInt(doc_, noteObj, AMstr("startSample"), n.start_sample);
-                        if (fr) results_to_free.push_back(fr);
-                        fr = AMmapPutInt(doc_, noteObj, AMstr("lengthSamples"), n.length_samples);
-                        if (fr) results_to_free.push_back(fr);
+                        // v2 : exclusivite de domaine (meme regle que
+                        // le clip - une note musicale n'ecrit pas ses
+                        // champs samples)
+                        if (n.start_tick < 0) {
+                            fr = AMmapPutInt(doc_, noteObj, AMstr("startSample"), n.start_sample);
+                            if (fr) results_to_free.push_back(fr);
+                        }
+                        if (n.length_tick < 0) {
+                            fr = AMmapPutInt(doc_, noteObj, AMstr("lengthSamples"), n.length_samples);
+                            if (fr) results_to_free.push_back(fr);
+                        }
                         if (n.start_tick >= 0) {  // v2, additif
                             fr = AMmapPutInt(doc_, noteObj, AMstr("startTick"), n.start_tick);
                             if (fr) results_to_free.push_back(fr);

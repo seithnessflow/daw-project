@@ -458,9 +458,13 @@ bool AudioGraph::launchSlot(const std::string& track_id,
     if (anchor) {
         // F5+ : l'ancre part immediatement et POSE la grille (epoque +
         // quantum = son loop_len). quantize sans reference n'a pas de sens.
+        // T2 : doc v2 -> le quantum est MUSICAL (1 mesure au registre),
+        // echantillonne ICI (au launch) ; 0 = legacy, loop_len.
+        const int64_t mq = musical_quantum_.load(std::memory_order_relaxed);
         session_epoch_.store(now, std::memory_order_relaxed);
-        session_quantum_.store(track->session_slots[idx].loop_len,
-                               std::memory_order_relaxed);
+        session_quantum_.store(
+            mq > 0 ? mq : track->session_slots[idx].loop_len,
+            std::memory_order_relaxed);
     }
     if (!anchor && quantize) {
         // En FILE pour la prochaine frontiere ; le slot courant (s'il y en a
