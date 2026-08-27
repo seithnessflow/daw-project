@@ -493,15 +493,31 @@ export async function init(): Promise<void> {
       }
     }
   };
+  // BALLISTIQUE des VU peints en direct (sonde 2026-08-27 : la console
+  // Mixage paraissait MORTE en lecture - crete 30 Hz brute qui retombe a
+  // ~0 entre deux kicks ; les tetes de piste avaient deja peak-hold +
+  // decroissance via la life layer, la console et le master non). Meme
+  // remede partout : displayed = max(peak, displayed * DECAY) - montee
+  // instantanee, chute ~300 ms, l'oeil suit enfin le son.
+  const VU_DECAY = 0.86;
+  const vuHeld = new Map<string, number>();
+  const held = (key: string, peak: number): number => {
+    const v = Math.max(peak, (vuHeld.get(key) ?? 0) * VU_DECAY);
+    vuHeld.set(key, v);
+    return v;
+  };
   // The life layer eats the telemetry - raw values never hit the DOM
   engineClient.onMeters = (meters, masterLeft, masterRight) => {
     life.setTrackLevels(meters.map(({ trackId, peakLeft, peakRight }) =>
       ({ trackId, peak: Math.max(peakLeft, peakRight) })));
     // V1.2: master VU - direct mutation (30 Hz, two bars, no layout).
     // Red above -1 dBFS (~0.891 linear): the ear's line, now VISIBLE.
+    // Le clipping se juge sur la CRETE VRAIE, l'affichage sur la tenue.
     const CLIP = 0.8913;
-    els.masterVuL.style.width = `${Math.min(100, masterLeft * 100)}%`;
-    els.masterVuR.style.width = `${Math.min(100, masterRight * 100)}%`;
+    const mL = held('__m_l', masterLeft);
+    const mR = held('__m_r', masterRight);
+    els.masterVuL.style.width = `${Math.min(100, mL * 100)}%`;
+    els.masterVuR.style.width = `${Math.min(100, mR * 100)}%`;
     els.masterVuL.classList.toggle('clipping', masterLeft > CLIP);
     els.masterVuR.classList.toggle('clipping', masterRight > CLIP);
     // F3 : la tranche MASTER de la console mixage (les meters par piste ne
@@ -511,21 +527,22 @@ export async function init(): Promise<void> {
       const bl = mm.children[0] as HTMLElement | undefined;
       const br = mm.children[1] as HTMLElement | undefined;
       if (bl) {
-        bl.style.height = `${Math.min(100, masterLeft * 100)}%`;
+        bl.style.height = `${Math.min(100, mL * 100)}%`;
         bl.classList.toggle('clipping', masterLeft > CLIP);
       }
       if (br) {
-        br.style.height = `${Math.min(100, masterRight * 100)}%`;
+        br.style.height = `${Math.min(100, mR * 100)}%`;
         br.classList.toggle('clipping', masterRight > CLIP);
       }
     }
     // T3 : VU inter-device. Les entrees dont l'id est un proc id (pas une
     // piste) alimentent le mini-VU apres chaque device de la chaine.
     for (const m of meters) {
+      const pkHeld = held(m.trackId, Math.max(m.peakLeft, m.peakRight));
       const cover = document.querySelector<HTMLElement>(
         `.device-vu[data-proc-id="${m.trackId}"] > i`);
       if (cover) {
-        const pk = Math.min(100, Math.max(m.peakLeft, m.peakRight) * 100);
+        const pk = Math.min(100, pkHeld * 100);
         // Le cache descend du haut ; ce qui reste (le degrade) = le niveau.
         cover.style.height = `${100 - pk}%`;
       }
@@ -535,12 +552,14 @@ export async function init(): Promise<void> {
       if (mvu) {
         const bl = mvu.children[0] as HTMLElement | undefined;
         const br = mvu.children[1] as HTMLElement | undefined;
+        const hL = held(m.trackId + ':l', m.peakLeft);
+        const hR = held(m.trackId + ':r', m.peakRight);
         if (bl) {
-          bl.style.height = `${Math.min(100, m.peakLeft * 100)}%`;
+          bl.style.height = `${Math.min(100, hL * 100)}%`;
           bl.classList.toggle('clipping', m.peakLeft > CLIP);
         }
         if (br) {
-          br.style.height = `${Math.min(100, m.peakRight * 100)}%`;
+          br.style.height = `${Math.min(100, hR * 100)}%`;
           br.classList.toggle('clipping', m.peakRight > CLIP);
         }
       }

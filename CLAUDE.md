@@ -272,6 +272,18 @@ discontinuite = rouge, on corrige AVANT). Toute mesure affichee (VU, etc.)
 recoit un test au signal connu (ton 2.4b, valeur assertee exactement).
 Ecoute selective : `npm run ear -- --solo <piste> --bypass/--no-bypass`.
 
+LE RITUEL DU COMPOSITEUR (directive utilisateur 2026-08-27, gravee :
+« tout doit etre testable et teste ; compose via l'UI toi-meme un
+projet a chaque fois pour tester si tout fonctionne ; plus tu
+multiplies les actions plus tu comprendras ce qui est mal concu ») :
+chaque session qui touche le socle se VERIFIE en COMPOSANT un projet
+par l'UI seule (menu -> pistes -> matiere -> notes -> mix -> ecoute ->
+export), jamais par le cote serveur/document. Les sondes prouvent que
+rien ne casse ; la composition revele ce qui est MAL CONCU (precedents
+du jour : moteur verrouille sur un projet, snares avalees, doublons
+empiles, editeur invisible, VU sans ballistique - AUCUN vu par les 80
+specs). Multiplier les gestes est la methode, pas du gaspillage.
+
 Les deux gestes de la boucle complete (consignes 2026-08-22) :
 - USAGE LIBRE obligatoire par session UI : dix minutes de manipulation
   exploratoire (pas les gestes scriptes — chercher ce qui cloche en

@@ -1538,3 +1538,26 @@ livraisons de la moisson de composition :
 - Outillage : cellules du piano-roll adressables par data-pitch/step.
 e2e import-formats 3/3 du premier coup ; sonde __dawTranscode exposee
 (idiome __daw*).
+
+**2026-08-27 (suite 10 - passe de tests 2 + doctrine gravee) :**
+directive utilisateur GRAVEE (CLAUDE.md « LE RITUEL DU COMPOSITEUR ») :
+composer par l'UI a chaque session, multiplier les gestes revele le mal
+concu - les specs n'attrapent que les regressions. Passe 2 (Session /
+Mixage / Automation / Devices+BOX sur essai-claude via la bascule) :
+- TROUVE ET CORRIGE : les VU peints en direct (console Mixage, master
+  topbar, VU inter-devices) n'avaient AUCUNE ballistique - crete 30 Hz
+  brute retombant a ~0 entre deux kicks = console qui PARAIT morte en
+  lecture (vu sur capture, confirme par sonde DOM : les barres
+  peignaient 1-8% fugaces). Remede : displayed = max(peak, displayed *
+  0.86) - montee instantanee, chute ~300 ms, le clipping reste juge sur
+  la crete VRAIE. Les tetes de piste (life layer) avaient deja la leur.
+- FAUX POSITIFS de sonde assumes : session-launch « 0 slots » = mon
+  pilote TOGGLAIT (2e clic = stop) - sonde dediee : launch reel VERT
+  (slot playing des 300 ms, continu) ; automation « 0 points » = mon
+  selecteur (la spec produit est verte) - a re-eprouver au prochain
+  rituel de composition.
+- Notes de conception (sans code) : un slot Session vide dit deja
+  « 0 notes » (piege modere) ; la tranche MASTER du mixer sans M/S ni
+  pan (connu AUDIT-6) ; DETTE : aucune spec n'assert les VU peints
+  (la regle « toute mesure affichee recoit un test au signal connu »
+  n'est pas honoree pour les VU console).
