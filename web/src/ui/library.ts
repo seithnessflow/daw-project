@@ -8,7 +8,11 @@
  * a lane click just selects the track.
  *
  * Contract: [data-role="sample"][data-sample-name], aria-pressed = armed.
+ * Pre-ecoute (AUDIT-6 QW) : un ▶ par chip, [data-role="preview"] - clic =
+ * entendre le sample (module ui/preview), sans armer le chip.
  */
+
+import { togglePreview } from './preview';
 
 export interface KitSample {
   name: string;
@@ -64,6 +68,19 @@ export class Library {
         // background composer). Arm the sample, give the keys back.
         chip.blur();
       });
+      // Pre-ecoute : un ▶ DANS le chip (span, pas un bouton imbrique),
+      // clic isole du clic d'armement (stopPropagation). Cible >= 16 px
+      // (regle des poignees : jamais plus petite que son geste).
+      const pv = document.createElement('span');
+      pv.className = 'chip-preview';
+      pv.dataset.role = 'preview';
+      pv.textContent = '▶';
+      pv.title = `Pre-ecouter ${sample.name}`;
+      pv.addEventListener('click', (e) => {
+        e.stopPropagation();  // ecouter n'arme pas
+        void togglePreview(sample.hash, pv);
+      });
+      chip.appendChild(pv);
       this.element.appendChild(chip);
     }
     const hint = document.createElement('span');

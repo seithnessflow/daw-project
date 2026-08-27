@@ -40,6 +40,37 @@
   color: var(--text-3);
   margin-left: 8px;
 }
+/* ---- Pre-ecoute (AUDIT-6 QW) : le ▶ dans le chip ---------------- */
+.sample-chip {
+  position: relative;
+  padding-right: 26px; /* la place du ▶ */
+}
+.chip-preview {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 9px;
+  border-radius: 50%;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.chip-preview:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+.chip-preview.playing {
+  color: #9fd9b4;
+  background: #23412f;
+  box-shadow: 0 0 6px rgba(88, 179, 104, 0.35);
+}
+.chip-preview.refused {
+  animation: export-refused 0.9s ease-out; /* le flash rouge partage */
+}
 /* F6 : dans le rail navigateur, la palette s'empile verticalement (chips
    pleine largeur) - la bande horizontale ne tient pas dans la colonne. */
 .browser-list .library {
