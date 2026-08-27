@@ -19,6 +19,10 @@ test.describe('Menu principal : selecteur de projets', () => {
     expect(ids.length).toBeGreaterThan(0);
     // AUCUN artefact e2e timestampe n'est affiche
     expect(ids.filter((id) => TEST_ARTIFACT.test(id))).toEqual([]);
+    // RENFORCE 2026-08-27 (incident : le menu a envoye l'utilisateur sur
+    // trace-kinds-433956, suffixe court passant l'ancien filtre) : les
+    // PREFIXES de harnais sont masques quel que soit le suffixe.
+    expect(ids.filter((id) => /^(e2e|trace|crit3)-/.test(id))).toEqual([]);
   });
 
   test('ouvrir un projet navigue vers ?project=<id> en preservant le fragment', async ({ page }) => {

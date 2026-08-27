@@ -37,7 +37,12 @@ function timeAgo(mtimeMs: number): string {
 // Les tests e2e creent des projets jetables nommes `<truc>-<timestamp 13
 // chiffres>` ; on les MASQUE du menu (le store en est plein). Les projets
 // nommes a la main (studio, song...) n'ont pas ce suffixe.
-const TEST_ARTIFACT = /-\d{10,}$/;
+// RENFORCE 2026-08-27 (incident utilisateur : le menu l'a envoye sur
+// `trace-kinds-433956`, un artefact de capture a suffixe COURT qui
+// passait le filtre) : les PREFIXES de harnais sont masques aussi,
+// quel que soit le suffixe. Toute spec/trace DOIT nommer ses projets
+// e2e-*/trace-*/crit3-* ou avec un timestamp - jamais un nom nu.
+const TEST_ARTIFACT = /(?:-\d{10,}$)|(?:^(?:e2e|trace|crit3)-)/;
 
 async function fetchProjects(): Promise<ProjectRow[]> {
   try {

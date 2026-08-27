@@ -1436,3 +1436,17 @@ audio. Le clic navigateur passe desormais par addDeviceToTrack
 (garde unique). SCHEMA.md documente le champ. e2e track-kinds 1/1
 vert du premier coup (creation, badges, refus, pose, convergence
 2 onglets).
+
+**2026-08-27 (suite 5 - le menu envoyait l'utilisateur sur mes debris) :**
+la garde de projet a fait SON travail (bandeau « moteur joue studio /
+onglet montre trace-kinds-433956 ») mais l'a attrape sur un projet-
+ARTEFACT de mes captures : le menu trie par recence et mon suffixe
+aleatoire court (1e6) passait le filtre existant (-\d{10,}$). Corrige :
+(1) filtre du menu RENFORCE - prefixes de harnais e2e-/trace-/crit3-
+masques quel que soit le suffixe (menu.ts + assertion ui-menu.spec) ;
+(2) NETTOYAGE du store : 895 fichiers a signature de harnais supprimes
+(timestamp >= 10 chiffres ou prefixe e2e/trace/crit3), 21 vrais projets
+conserves (studio, ma-piece, inv-proof, pilotes smoke...) - studio
+redevient la tete du menu. Regle pour mes futurs scripts de trace :
+prefixe trace- (masque) et jamais de nom nu. La dette GC des projets
+(AUDIT-5 F) reste ouverte pour les artefacts de pilotage restants.
