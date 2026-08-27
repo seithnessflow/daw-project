@@ -1325,3 +1325,23 @@ sequences sur les fichiers partages) + A2 moteur par moi, en parallele.
 - SUITE COMPLETE 70/70 ; moteur 45/45 ; tsc 0. LES CHANTIERS ENTAMES
   SONT SOLDES (DND D1-D4 complet, automation A1-A3 ; restent A4/A5
   minces). Prochain arbitrage : LE gros chantier.
+
+**2026-08-27 (AUDIT-6, session d'audit dediee, lecture seule) :**
+demande utilisateur : comparer le code a ce qui se fait en DAW
+(Ableton/Cubase), dire ce qui manque ou est mal pense. Methode AUDIT-5
+reprise : 3 lectures paralleles exhaustives (UI web ~11,6k L, moteur
+13,8k L / 62 fichiers, schema+serveur+ADRs), croisees avec
+ABLETON-INTEGRALE / SCHEMA-V2 / LINK-DESIGN. Rapport : docs/AUDIT-6.md,
+~35 constats etiquetes [DESIGNE]/[REFUSE]/[SOUS-PESE]/[NOUVEAU].
+Titre : moteur de LECTURE collaboratif, pas encore un DAW — rien
+n'entre (aucun record, aucun MIDI-in a aucun etage), rien ne sort
+(aucun export UI), temps musical inexistant. Constat d'honnetete :
+presque tout l'ecart etait deja nomme/designe dans nos propres docs ;
+les [NOUVEAU] utiles touchent les prerequis des candidats gros-chantier
+(E4 : pas d'entree MIDI ni CC64/pedale ; Vague 3 : notes en LISTE
+contre le design map-a-ids ; latence figee 512 sans ASIO ; master sans
+chaine ; chevauchement de clips = somme ; compresseur sans GR meter ;
+velocite ineditable au piano-roll ; /api/projects = middleware Vite,
+pas le serveur ; aucune sauvegarde de secours des .am). Zero ligne de
+code modifiee ; arbitrage propose a ratifier ; roadmap parite toujours
+GELEE. Verdict CI du push docs : a verifier a la reprise.

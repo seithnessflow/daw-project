@@ -96,6 +96,21 @@
    (dr_libs sur SHA, validation hex des chemins, F1 re-cadre live).
    Candidats connus d'avance couverts : conventions fr/en des
    commentaires, jumeaux, menage build-msvc, KNOWN_VST3_NAMES.
+7. AUDIT-6 « PARITE CONCEPTUELLE » (demande utilisateur 2026-08-27 :
+   comparer le code a Ableton/Cubase, dire ce qui manque ou est mal
+   pense). RAPPORT ECRIT 2026-08-27 : docs/AUDIT-6.md (3 lectures
+   paralleles UI/moteur/schema, ~35 constats etiquetes DESIGNE /
+   REFUSE / SOUS-PESE / NOUVEAU, arbitrage propose a RATIFIER).
+   Titre : moteur de LECTURE collaboratif, pas encore un DAW — rien
+   n'entre (record/MIDI-in absents), rien ne sort (export UI absent),
+   temps musical inexistant. Les [NOUVEAU] touchent les prerequis des
+   candidats gros-chantier (E4 Massive : aucune entree MIDI nulle
+   part, pas de CC64/pedale dans le ring, latence figee 512 sans
+   ASIO ; Vague 3 : notes en liste contre le design map-a-ids de
+   SCHEMA-V2). Quick wins proposes : export mixdown UI, boucle
+   utilisateur, pre-ecoute samples, GR meter du comp, dr_flac/dr_mp3.
+   La roadmap parite reste GELEE — rien n'entre en file sans
+   ratification.
 
 ## UI — REFONTE « ETABLI MAGIC POTION » + FINITION (2026-08-25) : FINIE
 
