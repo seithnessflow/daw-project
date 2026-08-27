@@ -40,6 +40,7 @@ import { initContextMenu } from './context_menu_dispatch';
 import { TransportSync } from '../network/transport_sync';
 import { handleFileDrop } from './placement';
 import { renderTracks } from './render';
+import { wireExport } from './export';
 
 declare global {
   interface Window {
@@ -545,6 +546,8 @@ export async function init(): Promise<void> {
     applySessionState(slots);
     (window as any).__dawSessionSlots = slots;  // sonde de pilotage
   };
+  // Export mixdown (AUDIT-6 QW1) : bouton WAV de la topbar -> module dedie
+  wireExport();
   // 2.5-decouverte : le catalogue arrive une fois a l'auth - le menu
   // + device le lit a chaque ouverture
   engineClient.onPluginCatalog = (entries) => {

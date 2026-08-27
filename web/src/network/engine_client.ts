@@ -10,8 +10,11 @@ import {
   encodeMessage,
   decodeMessage,
   TransportAction,
+  RenderState_Status,
   type EngineState,
 } from './protocol';
+
+export { RenderState_Status };
 
 interface MeterData {
   trackId: string;
@@ -57,6 +60,11 @@ export class EngineClient {
    *  tout arrete ; queued = lance, en attente de son quantum. */
   onSessionState: ((slots: Array<{ trackId: string; sceneId: string;
     queued: boolean }>) => void) | null = null;
+  /** Export mixdown (AUDIT-6 QW1) : STARTED a l'acceptation, puis DONE
+   *  (wavHash telecharger sur /assets/<hash> du serveur) ou FAILED. */
+  onRenderState: ((state: { status: RenderState_Status; wavHash: string;
+    error: string; lengthSamples: number; sampleRate: number;
+    bitDepth: number }) => void) | null = null;
 
   constructor(config: EngineConfig = {}) {
     this.address = config.address ?? '127.0.0.1';
@@ -217,6 +225,17 @@ export class EngineClient {
     }
   }
 
+  /**
+   * Export mixdown : demande au moteur de rendre le document courant
+   * (offline, thread ouvrier moteur) et de publier le WAV au store.
+   * La reponse arrive par onRenderState. bitDepth 0 = defaut moteur (24).
+   */
+  renderRequest(bitDepth = 0): void {
+    const message = encodeMessage({
+      type: 'renderRequest', data: { bitDepth } });
+    this.sendBinary(message);
+  }
+
   setLoop(enabled: boolean): void {
     const message = encodeMessage({
       type: 'transport',
@@ -321,6 +340,16 @@ export class EngineClient {
         break;
       case 'sessionState':
         this.onSessionState?.(msg.data.slots);
+        break;
+      case 'renderState':
+        this.onRenderState?.({
+          status: msg.data.status,
+          wavHash: msg.data.wavHash,
+          error: msg.data.error,
+          lengthSamples: Number(msg.data.lengthSamples),
+          sampleRate: msg.data.sampleRate,
+          bitDepth: msg.data.bitDepth,
+        });
         break;
       case 'error':
         this.onError?.(msg.data.message);

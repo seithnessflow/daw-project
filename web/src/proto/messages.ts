@@ -190,6 +190,76 @@ export interface AudioTap {
   droppedBlocks: number;
 }
 
+/**
+ * EXPORT MIXDOWN (AUDIT-6 quick win 1) : le client demande au moteur de
+ * rendre le document COURANT hors ligne (meme noyau que --render) et de
+ * publier le WAV au store d'assets. Le rendu tourne sur un thread ouvrier
+ * dedie - jamais la boucle de controle (lecon C1), jamais le thread audio.
+ */
+export interface RenderRequest {
+  /** 16 | 24 | 32 ; 0 = defaut (24) */
+  bitDepth: number;
+}
+
+/**
+ * Moteur -> Client : etat de l'export. STARTED a l'acceptation, puis DONE
+ * (wav_hash = sha256 du WAV, disponible sur /assets/<hash> du serveur) ou
+ * FAILED (error lisible). Un seul export a la fois : une demande pendant
+ * un rendu repond FAILED sans toucher au rendu en cours.
+ */
+export interface RenderState {
+  status: RenderState_Status;
+  /** DONE : sha256 du WAV publie au store */
+  wavHash: string;
+  /** FAILED : la raison, lisible */
+  error: string;
+  /** DONE : frames rendues */
+  lengthSamples: number;
+  /** DONE : taux du rendu */
+  sampleRate: number;
+  /** DONE : profondeur du rendu */
+  bitDepth: number;
+}
+
+export enum RenderState_Status {
+  STARTED = 0,
+  DONE = 1,
+  FAILED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function renderState_StatusFromJSON(object: any): RenderState_Status {
+  switch (object) {
+    case 0:
+    case "STARTED":
+      return RenderState_Status.STARTED;
+    case 1:
+    case "DONE":
+      return RenderState_Status.DONE;
+    case 2:
+    case "FAILED":
+      return RenderState_Status.FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return RenderState_Status.UNRECOGNIZED;
+  }
+}
+
+export function renderState_StatusToJSON(object: RenderState_Status): string {
+  switch (object) {
+    case RenderState_Status.STARTED:
+      return "STARTED";
+    case RenderState_Status.DONE:
+      return "DONE";
+    case RenderState_Status.FAILED:
+      return "FAILED";
+    case RenderState_Status.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** 2.5-decouverte: one scanned plugin class (Audio Module Class only) */
 export interface PluginEntry {
   /** 32-hex VST3 class id */
@@ -275,6 +345,10 @@ export interface Message {
   sessionLaunch?:
     | SessionLaunch
     | undefined;
+  /** export mixdown (AUDIT-6 QW1) */
+  renderRequest?:
+    | RenderRequest
+    | undefined;
   /** Engine -> Client */
   position?: TransportPosition | undefined;
   meters?: Meters | undefined;
@@ -291,7 +365,11 @@ export interface Message {
     | PluginCatalog
     | undefined;
   /** F5+ : verite des slots Session */
-  sessionState?: SessionState | undefined;
+  sessionState?:
+    | SessionState
+    | undefined;
+  /** etat de l'export mixdown */
+  renderState?: RenderState | undefined;
 }
 
 function createBaseTransportCommand(): TransportCommand {
@@ -1611,6 +1689,244 @@ export const AudioTap: MessageFns<AudioTap> = {
   },
 };
 
+function createBaseRenderRequest(): RenderRequest {
+  return { bitDepth: 0 };
+}
+
+export const RenderRequest: MessageFns<RenderRequest> = {
+  encode(message: RenderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.bitDepth !== 0) {
+      writer.uint32(8).uint32(message.bitDepth);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRenderRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.bitDepth = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RenderRequest {
+    return {
+      bitDepth: isSet(object.bitDepth)
+        ? globalThis.Number(object.bitDepth)
+        : isSet(object.bit_depth)
+        ? globalThis.Number(object.bit_depth)
+        : 0,
+    };
+  },
+
+  toJSON(message: RenderRequest): unknown {
+    const obj: any = {};
+    if (message.bitDepth !== 0) {
+      obj.bitDepth = Math.round(message.bitDepth);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenderRequest>, I>>(base?: I): RenderRequest {
+    return RenderRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenderRequest>, I>>(object: I): RenderRequest {
+    const message = createBaseRenderRequest();
+    message.bitDepth = object.bitDepth ?? 0;
+    return message;
+  },
+};
+
+function createBaseRenderState(): RenderState {
+  return { status: 0, wavHash: "", error: "", lengthSamples: 0, sampleRate: 0, bitDepth: 0 };
+}
+
+export const RenderState: MessageFns<RenderState> = {
+  encode(message: RenderState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== 0) {
+      writer.uint32(8).int32(message.status);
+    }
+    if (message.wavHash !== "") {
+      writer.uint32(18).string(message.wavHash);
+    }
+    if (message.error !== "") {
+      writer.uint32(26).string(message.error);
+    }
+    if (message.lengthSamples !== 0) {
+      writer.uint32(32).uint64(message.lengthSamples);
+    }
+    if (message.sampleRate !== 0) {
+      writer.uint32(40).uint32(message.sampleRate);
+    }
+    if (message.bitDepth !== 0) {
+      writer.uint32(48).uint32(message.bitDepth);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenderState {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRenderState();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.status = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.wavHash = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.error = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.lengthSamples = longToNumber(reader.uint64());
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.sampleRate = reader.uint32();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.bitDepth = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RenderState {
+    return {
+      status: isSet(object.status) ? renderState_StatusFromJSON(object.status) : 0,
+      wavHash: isSet(object.wavHash)
+        ? globalThis.String(object.wavHash)
+        : isSet(object.wav_hash)
+        ? globalThis.String(object.wav_hash)
+        : "",
+      error: isSet(object.error) ? globalThis.String(object.error) : "",
+      lengthSamples: isSet(object.lengthSamples)
+        ? globalThis.Number(object.lengthSamples)
+        : isSet(object.length_samples)
+        ? globalThis.Number(object.length_samples)
+        : 0,
+      sampleRate: isSet(object.sampleRate)
+        ? globalThis.Number(object.sampleRate)
+        : isSet(object.sample_rate)
+        ? globalThis.Number(object.sample_rate)
+        : 0,
+      bitDepth: isSet(object.bitDepth)
+        ? globalThis.Number(object.bitDepth)
+        : isSet(object.bit_depth)
+        ? globalThis.Number(object.bit_depth)
+        : 0,
+    };
+  },
+
+  toJSON(message: RenderState): unknown {
+    const obj: any = {};
+    if (message.status !== 0) {
+      obj.status = renderState_StatusToJSON(message.status);
+    }
+    if (message.wavHash !== "") {
+      obj.wavHash = message.wavHash;
+    }
+    if (message.error !== "") {
+      obj.error = message.error;
+    }
+    if (message.lengthSamples !== 0) {
+      obj.lengthSamples = Math.round(message.lengthSamples);
+    }
+    if (message.sampleRate !== 0) {
+      obj.sampleRate = Math.round(message.sampleRate);
+    }
+    if (message.bitDepth !== 0) {
+      obj.bitDepth = Math.round(message.bitDepth);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenderState>, I>>(base?: I): RenderState {
+    return RenderState.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenderState>, I>>(object: I): RenderState {
+    const message = createBaseRenderState();
+    message.status = object.status ?? 0;
+    message.wavHash = object.wavHash ?? "";
+    message.error = object.error ?? "";
+    message.lengthSamples = object.lengthSamples ?? 0;
+    message.sampleRate = object.sampleRate ?? 0;
+    message.bitDepth = object.bitDepth ?? 0;
+    return message;
+  },
+};
+
 function createBasePluginEntry(): PluginEntry {
   return { uid: "", name: "", vendor: "", subCategories: "" };
 }
@@ -1909,6 +2225,7 @@ function createBaseMessage(): Message {
     tapControl: undefined,
     editor: undefined,
     sessionLaunch: undefined,
+    renderRequest: undefined,
     position: undefined,
     meters: undefined,
     engineState: undefined,
@@ -1916,6 +2233,7 @@ function createBaseMessage(): Message {
     audioTap: undefined,
     pluginCatalog: undefined,
     sessionState: undefined,
+    renderState: undefined,
   };
 }
 
@@ -1935,6 +2253,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.sessionLaunch !== undefined) {
       SessionLaunch.encode(message.sessionLaunch, writer.uint32(90).fork()).join();
+    }
+    if (message.renderRequest !== undefined) {
+      RenderRequest.encode(message.renderRequest, writer.uint32(106).fork()).join();
     }
     if (message.position !== undefined) {
       TransportPosition.encode(message.position, writer.uint32(26).fork()).join();
@@ -1956,6 +2277,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.sessionState !== undefined) {
       SessionState.encode(message.sessionState, writer.uint32(98).fork()).join();
+    }
+    if (message.renderState !== undefined) {
+      RenderState.encode(message.renderState, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -2011,6 +2335,14 @@ export const Message: MessageFns<Message> = {
             }
 
             message.sessionLaunch = SessionLaunch.decode(reader, reader.uint32());
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.renderRequest = RenderRequest.decode(reader, reader.uint32());
             continue;
           }
           case 3: {
@@ -2069,6 +2401,14 @@ export const Message: MessageFns<Message> = {
             message.sessionState = SessionState.decode(reader, reader.uint32());
             continue;
           }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.renderState = RenderState.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2100,6 +2440,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.session_launch)
         ? SessionLaunch.fromJSON(object.session_launch)
         : undefined,
+      renderRequest: isSet(object.renderRequest)
+        ? RenderRequest.fromJSON(object.renderRequest)
+        : isSet(object.render_request)
+        ? RenderRequest.fromJSON(object.render_request)
+        : undefined,
       position: isSet(object.position) ? TransportPosition.fromJSON(object.position) : undefined,
       meters: isSet(object.meters) ? Meters.fromJSON(object.meters) : undefined,
       engineState: isSet(object.engineState)
@@ -2123,6 +2468,11 @@ export const Message: MessageFns<Message> = {
         : isSet(object.session_state)
         ? SessionState.fromJSON(object.session_state)
         : undefined,
+      renderState: isSet(object.renderState)
+        ? RenderState.fromJSON(object.renderState)
+        : isSet(object.render_state)
+        ? RenderState.fromJSON(object.render_state)
+        : undefined,
     };
   },
 
@@ -2142,6 +2492,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.sessionLaunch !== undefined) {
       obj.sessionLaunch = SessionLaunch.toJSON(message.sessionLaunch);
+    }
+    if (message.renderRequest !== undefined) {
+      obj.renderRequest = RenderRequest.toJSON(message.renderRequest);
     }
     if (message.position !== undefined) {
       obj.position = TransportPosition.toJSON(message.position);
@@ -2163,6 +2516,9 @@ export const Message: MessageFns<Message> = {
     }
     if (message.sessionState !== undefined) {
       obj.sessionState = SessionState.toJSON(message.sessionState);
+    }
+    if (message.renderState !== undefined) {
+      obj.renderState = RenderState.toJSON(message.renderState);
     }
     return obj;
   },
@@ -2187,6 +2543,9 @@ export const Message: MessageFns<Message> = {
     message.sessionLaunch = (object.sessionLaunch !== undefined && object.sessionLaunch !== null)
       ? SessionLaunch.fromPartial(object.sessionLaunch)
       : undefined;
+    message.renderRequest = (object.renderRequest !== undefined && object.renderRequest !== null)
+      ? RenderRequest.fromPartial(object.renderRequest)
+      : undefined;
     message.position = (object.position !== undefined && object.position !== null)
       ? TransportPosition.fromPartial(object.position)
       : undefined;
@@ -2205,6 +2564,9 @@ export const Message: MessageFns<Message> = {
       : undefined;
     message.sessionState = (object.sessionState !== undefined && object.sessionState !== null)
       ? SessionState.fromPartial(object.sessionState)
+      : undefined;
+    message.renderState = (object.renderState !== undefined && object.renderState !== null)
+      ? RenderState.fromPartial(object.renderState)
       : undefined;
     return message;
   },

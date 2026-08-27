@@ -28,6 +28,7 @@
 #include "util/sha256.h"
 
 #include <ixwebsocket/IXHttpClient.h>
+#include "render/export_job.h"
 #include "render/offline_render.h"
 #include "websocket/websocket_server.h"
 
@@ -1253,6 +1254,67 @@ int doPlayWithServer(const Options& opts) {
     wirePluginTelemetry(ws_server, plugin_registry);
     ws_server.setTapRing(&tap_ring);  // S8a
 
+    // Export mixdown (AUDIT-6 QW1) : demande navigateur -> instantane du
+    // document sous verrou (ICI, thread reseau WS) -> rendu sur le thread
+    // OUVRIER de l'ExportJob (jamais cette boucle - lecon C1) -> WAV au
+    // store local + pousse au store serveur -> RenderState a tous les
+    // clients. Declare APRES ws_server : detruit avant lui, son destructeur
+    // joint l'ouvrier - le callback ne peut pas viser un serveur mort.
+    daw::render::ExportJob export_job;
+    ws_server.setRenderRequestHandler([&](uint32_t bit_depth) {
+        daw::render::ExportParams params;
+        {
+            std::lock_guard<std::mutex> lock(doc_mutex);
+            if (!doc.isLoaded()) {
+                ws_server.sendRenderState(
+                    daw::protocol::RenderState::FAILED, "",
+                    "no document loaded yet");
+                return;
+            }
+            params.doc_bytes = doc.toBytes();
+            params.sample_rate = doc.getDocument().sample_rate
+                                     ? doc.getDocument().sample_rate
+                                     : 48000;
+        }
+        params.assets_dir = opts.assets_dir;
+        params.host_exe = hostExePath(opts);
+        params.vst3_modules = opts.vst3_modules;
+        params.bit_depth =
+            (bit_depth == 16 || bit_depth == 24 || bit_depth == 32)
+                ? bit_depth : 24;
+        const bool started = export_job.start(
+            std::move(params),
+            [&ws_server, &opts](daw::render::ExportResult r) {
+                if (!r.ok) {
+                    std::cerr << "Export mixdown FAILED: " << r.error << "\n";
+                    ws_server.sendRenderState(
+                        daw::protocol::RenderState::FAILED, "", r.error);
+                    return;
+                }
+                // Publier au store serveur : l'adresse que le navigateur
+                // telecharge (et tout pair du projet avec lui).
+                if (!putAssetToServer(opts.server_url, r.wav_hash,
+                                      r.wav_bytes)) {
+                    ws_server.sendRenderState(
+                        daw::protocol::RenderState::FAILED, "",
+                        "render ok but store upload failed (engine log)");
+                    return;
+                }
+                ws_server.sendRenderState(
+                    daw::protocol::RenderState::DONE, r.wav_hash, "",
+                    static_cast<uint64_t>(r.samples_rendered),
+                    r.sample_rate, r.bit_depth);
+            });
+        if (!started) {
+            ws_server.sendRenderState(daw::protocol::RenderState::FAILED, "",
+                                      "an export is already running");
+            return;
+        }
+        std::cout << "Export mixdown requested ("
+                  << params.bit_depth << "-bit)\n";
+        ws_server.sendRenderState(daw::protocol::RenderState::STARTED, "", "");
+    });
+
     // Telemetry timing
     auto last_telemetry = std::chrono::steady_clock::now();
     const auto telemetry_interval = std::chrono::milliseconds(1000 / ws_config.telemetry_hz);
@@ -1575,7 +1637,9 @@ int doPlayWithServer(const Options& opts) {
 
     std::cout << "\n\nStopping...\n";
 
-    // Cleanup
+    // Cleanup. L'export d'abord : joindre l'ouvrier AVANT d'arreter le
+    // serveur WS que son callback utilise (aucune tache ne survit).
+    export_job.shutdown();
     ws_server.stop();
     server_client.disconnect();
     device.getTransport().stop();

@@ -117,6 +117,32 @@ message AudioTap {
     uint64 dropped_blocks = 4; // cumulative ring overruns
 }
 
+// EXPORT MIXDOWN (AUDIT-6 quick win 1) : le client demande au moteur de
+// rendre le document COURANT hors ligne (meme noyau que --render) et de
+// publier le WAV au store d'assets. Le rendu tourne sur un thread ouvrier
+// dedie - jamais la boucle de controle (lecon C1), jamais le thread audio.
+message RenderRequest {
+    uint32 bit_depth = 1;  // 16 | 24 | 32 ; 0 = defaut (24)
+}
+
+// Moteur -> Client : etat de l'export. STARTED a l'acceptation, puis DONE
+// (wav_hash = sha256 du WAV, disponible sur /assets/<hash> du serveur) ou
+// FAILED (error lisible). Un seul export a la fois : une demande pendant
+// un rendu repond FAILED sans toucher au rendu en cours.
+message RenderState {
+    enum Status {
+        STARTED = 0;
+        DONE = 1;
+        FAILED = 2;
+    }
+    Status status = 1;
+    string wav_hash = 2;        // DONE : sha256 du WAV publie au store
+    string error = 3;           // FAILED : la raison, lisible
+    uint64 length_samples = 4;  // DONE : frames rendues
+    uint32 sample_rate = 5;     // DONE : taux du rendu
+    uint32 bit_depth = 6;       // DONE : profondeur du rendu
+}
+
 // 2.5-decouverte: one scanned plugin class (Audio Module Class only)
 message PluginEntry {
     string uid = 1;             // 32-hex VST3 class id
@@ -156,6 +182,7 @@ message Message {
         TapControl tap_control = 7;   // S8a
         EditorControl editor = 10;    // open/close a plugin GUI window
         SessionLaunch session_launch = 11;  // F5 : lancer/arreter un slot Session
+        RenderRequest render_request = 13;  // export mixdown (AUDIT-6 QW1)
 
         // Engine -> Client
         TransportPosition position = 3;
@@ -165,5 +192,6 @@ message Message {
         AudioTap audio_tap = 8;       // S8a
         PluginCatalog plugin_catalog = 9;  // 2.5-decouverte
         SessionState session_state = 12;   // F5+ : verite des slots Session
+        RenderState render_state = 14;     // etat de l'export mixdown
     }
 }

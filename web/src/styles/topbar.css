@@ -65,6 +65,25 @@ h1 {
   line-height: 26px;
   box-shadow: none; /* the CLUSTER carries the frame, not each key */
 }
+/* ---- Export mixdown (AUDIT-6 QW1) : WAV↓, refus visible modele BOX -- */
+#export-btn {
+  width: auto;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+#export-btn.busy {
+  color: var(--copper);
+  cursor: progress;
+}
+#export-btn.refused {
+  animation: export-refused 0.9s ease-out;
+}
+@keyframes export-refused {
+  0%, 60% { color: #ff5c5c; box-shadow: inset 0 0 0 1px #ff5c5c, 0 0 8px rgba(255, 92, 92, 0.5); }
+  100% { color: var(--text-3); }
+}
 .position {
   font-family: var(--mono);
   font-size: 15px;

@@ -258,6 +258,19 @@ void WebSocketServer::handleMessage(
                 case protocol::Message::kSessionLaunch:
                     handleSessionLaunch(message.session_launch());
                     break;
+                case protocol::Message::kRenderRequest:
+                    // Export mixdown : deleguer au proprietaire (ExportJob
+                    // sur thread ouvrier). Pas de handler (mode fichier) =
+                    // refus EXPLICITE, jamais un silence.
+                    if (render_request_handler_) {
+                        render_request_handler_(
+                            message.render_request().bit_depth());
+                    } else {
+                        sendRenderState(
+                            protocol::RenderState::FAILED, "",
+                            "export unavailable in this engine mode");
+                    }
+                    break;
                 default:
                     break;
             }
@@ -496,6 +509,23 @@ void WebSocketServer::sendToAll(const protocol::Message& msg) {
     for (const auto& ws : targets) {
         ws->sendBinary(data);
     }
+}
+
+void WebSocketServer::sendRenderState(protocol::RenderState::Status status,
+                                      const std::string& wav_hash,
+                                      const std::string& error,
+                                      uint64_t length_samples,
+                                      uint32_t sample_rate,
+                                      uint32_t bit_depth) {
+    protocol::Message msg;
+    auto* rs = msg.mutable_render_state();
+    rs->set_status(status);
+    rs->set_wav_hash(wav_hash);
+    rs->set_error(error);
+    rs->set_length_samples(length_samples);
+    rs->set_sample_rate(sample_rate);
+    rs->set_bit_depth(bit_depth);
+    sendToAll(msg);
 }
 
 std::string WebSocketServer::serializeWithLength(const protocol::Message& msg) {

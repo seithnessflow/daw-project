@@ -9,19 +9,21 @@
 import {
   Message,
   TransportCommand_Action,
+  RenderState_Status,
   type TransportPosition,
   type Meters,
   type EngineState,
   type AudioTap,
   type PluginCatalog,
   type SessionState,
+  type RenderState,
   type Error as ProtoError,
 } from '../proto/messages';
 
 // Re-export types for convenience
-export { TransportCommand_Action as TransportAction };
+export { TransportCommand_Action as TransportAction, RenderState_Status };
 export type { EngineState, Meters, TransportPosition, AudioTap, PluginCatalog,
-  SessionState };
+  SessionState, RenderState };
 
 // Decoded message types for the client
 export type DecodedMessage =
@@ -31,6 +33,7 @@ export type DecodedMessage =
   | { type: 'audioTap'; data: AudioTap }
   | { type: 'pluginCatalog'; data: PluginCatalog }
   | { type: 'sessionState'; data: SessionState }
+  | { type: 'renderState'; data: RenderState }
   | { type: 'error'; data: ProtoError };
 
 // Encode message types
@@ -39,7 +42,8 @@ export type EncodeMessage =
   | { type: 'setMonitor'; data: { trackId: string; solo: boolean; mute: boolean } }
   | { type: 'tapControl'; data: { enabled: boolean } }
   | { type: 'editor'; data: { nodeId: string; open: boolean } }
-  | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean; quantize: boolean } };
+  | { type: 'sessionLaunch'; data: { sceneId: string; trackId: string; stop: boolean; quantize: boolean } }
+  | { type: 'renderRequest'; data: { bitDepth: number } };
 
 /**
  * Encode a message to binary with length prefix.
@@ -84,6 +88,11 @@ export function encodeMessage(msg: EncodeMessage): Uint8Array {
           stop: msg.data.stop,
           quantize: msg.data.quantize,
         },
+      };
+      break;
+    case 'renderRequest':
+      protoMessage = {
+        renderRequest: { bitDepth: msg.data.bitDepth },
       };
       break;
   }
@@ -145,6 +154,9 @@ export function decodeMessage(data: ArrayBuffer): DecodedMessage | null {
     }
     if (msg.sessionState !== undefined) {
       return { type: 'sessionState', data: msg.sessionState };
+    }
+    if (msg.renderState !== undefined) {
+      return { type: 'renderState', data: msg.renderState };
     }
     if (msg.error !== undefined) {
       return { type: 'error', data: msg.error };

@@ -147,7 +147,30 @@ public:
      */
     void setCatalogFrame(std::string frame) { catalog_frame_ = std::move(frame); }
 
+    /**
+     * Export mixdown (AUDIT-6 QW1) : le proprietaire (main) fournit le
+     * demarrage d'un export. Appele sur le THREAD RESEAU du serveur WS -
+     * le handler doit deleguer le rendu (ExportJob), jamais rendre ici.
+     * Absent (mode fichier) = la demande recoit un FAILED explicite.
+     */
+    void setRenderRequestHandler(std::function<void(uint32_t bit_depth)> h) {
+        render_request_handler_ = std::move(h);
+    }
+
+    /**
+     * Diffuse un RenderState a tous les clients. Thread-safe (sendToAll :
+     * copie sous verrou, envoi hors verrou) - appelable du thread ouvrier
+     * de l'export comme du thread reseau.
+     */
+    void sendRenderState(protocol::RenderState::Status status,
+                         const std::string& wav_hash,
+                         const std::string& error,
+                         uint64_t length_samples = 0,
+                         uint32_t sample_rate = 0,
+                         uint32_t bit_depth = 0);
+
 private:
+    std::function<void(uint32_t)> render_request_handler_;
     std::string catalog_frame_;
     // Message handlers
     void handleMessage(std::shared_ptr<ix::ConnectionState> connectionState,

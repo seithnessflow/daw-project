@@ -213,6 +213,8 @@ add_library(daw_engine_lib STATIC
     src/transport/transport_state.cpp
     src/render/offline_render.h
     src/render/offline_render.cpp
+    src/render/export_job.h
+    src/render/export_job.cpp
     src/render/stem_render.h
     src/render/stem_render.cpp
     src/util/crash_handler.h
