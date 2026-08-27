@@ -157,6 +157,18 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     actual_buffer_size_ = device_->playback.internalPeriodSizeInFrames;
     callback_context_.sample_rate = actual_sample_rate_;
 
+    // SPIKE LATENCE (2026-08-27) : la VERITE de la negociation, en clair -
+    // periode interne, nombre de periodes, et la latence de sortie que ca
+    // implique. C'est la ligne que le tableau du spike lit.
+    std::cerr << "audio-negotiation: requested=" << config.buffer_size_frames
+              << " actual-period=" << actual_buffer_size_
+              << " periods=" << device_->playback.internalPeriods
+              << " rate=" << actual_sample_rate_
+              << " -> device-latency~"
+              << (1000.0 * actual_buffer_size_ *
+                  device_->playback.internalPeriods / actual_sample_rate_)
+              << " ms\n";
+
     // AUDIT-5 A6: a device period that is not a multiple of the 256-frame
     // internal block makes the plugin proxy bypass the partial chunk - that
     // audio goes DRY, silently, while telemetry only says "plugin late". A

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file main.cpp
  * @brief DAW Engine CLI
@@ -125,6 +125,7 @@ struct Options {
     bool list_devices = false;
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
+    uint32_t buffer_size_frames = 512;  // SPIKE LATENCE : enfin reglable
     uint16_t ws_port = 47821;    // Changed default to 47821
     uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
     std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
@@ -201,6 +202,16 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.probe_path = argv[i];
         } else if (arg == "--mute") {
             opts.mute = true;
+        } else if (arg == "--buffer-size") {
+            // SPIKE LATENCE : taille de buffer demandee au device (frames).
+            // La negociation reelle est logguee (audio-negotiation:) - la
+            // valeur obtenue peut differer (WASAPI partage impose parfois
+            // la sienne).
+            if (++i >= argc) {
+                std::cerr << "Error: --buffer-size requires a value\n";
+                return false;
+            }
+            opts.buffer_size_frames = static_cast<uint32_t>(std::stoul(argv[i]));
         } else if (arg == "--ws-port") {
             if (++i >= argc) {
                 std::cerr << "Error: --ws-port requires a value\n";
@@ -945,7 +956,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     daw::audio::AudioDevice device;
     daw::audio::AudioDeviceConfig config;
     config.sample_rate = opts.sample_rate;
-    config.buffer_size_frames = 512;
+    config.buffer_size_frames = opts.buffer_size_frames;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
@@ -1119,7 +1130,7 @@ int doPlayWithServer(const Options& opts) {
     daw::audio::AudioDevice device;
     daw::audio::AudioDeviceConfig config;
     config.sample_rate = opts.sample_rate;
-    config.buffer_size_frames = 512;
+    config.buffer_size_frames = opts.buffer_size_frames;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
@@ -1620,8 +1631,8 @@ int doPlayWithServer(const Options& opts) {
         // Session 3 (fraicheur, arbitrage b) : LE PRODUCTEUR publie la
         // fraicheur de ses stems sur le canal ephemere, toutes les 2 s -
         // pour chaque noeud vst3 qu'il resout, fresh = (cle recomputee ==
-        // cle publiee). Un pair sans signal recent affiche « fraicheur
-        // inconnue » : le badge ne ment jamais par omission.
+        // cle publiee). Un pair sans signal recent affiche Â« fraicheur
+        // inconnue Â» : le badge ne ment jamais par omission.
         if (std::chrono::steady_clock::now() >= next_freshness) {
             next_freshness = std::chrono::steady_clock::now() +
                              std::chrono::seconds(2);

@@ -82,7 +82,7 @@ Chaine « clavier -> moteur local -> P2P -> moteur distant -> oreille » :
 | MIDI-in USB (futur) | ~1-3 ms | ordre de grandeur standard |
 | Buffer moteur local (512 @ 48 k) | 10,7 ms | fige dans le code |
 | Periode WASAPI partage | ~10 ms | mode partage Windows |
-| P2P un sens (2 NAT, STUN, WAN) | ~40 ms | MESURE S8 2026-08-24 |
+| P2P un sens (2 NAT, STUN, WAN) | ~40 ms | CORRIGE (spike s2) : ce chiffre etait le RTT/2 du DATACHANNEL (ping SCTP, jam.ts), PAS une mesure audio ; le jitter buffer NetEq du listener (40-100 ms typiques) n'a JAMAIS ete mesure — c'est l'objet du spike session 2 |
 | P2P un sens (LAN direct) | ~1-5 ms | a mesurer (spike) |
 | Buffer + periode moteur distant | ~20 ms | symetrique local |
 | **Total WAN** | **~80 ms** | injouable en direct |
