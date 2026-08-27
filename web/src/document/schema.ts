@@ -5,14 +5,39 @@
  * Mirrors docs/SCHEMA.md
  */
 
-export const SCHEMA_VERSION = 1;
+import { effectiveMap, type TempoPoint } from './tempo';
 
-/** v8 MIDI : une note du clip. Positions RELATIVES au debut du clip. */
+/**
+ * v2 (migration TEMPO T1, ADDITIVE-DUAL ratifie 2026-08-27) : le
+ * document gagne un domaine MUSICAL (ticks, PPQ 960) A COTE du domaine
+ * absolu (samples). L'existant garde ses samples exacts (warp-off a la
+ * Live) ; le nouveau devient musical. Un champ *Tick PRESENT = objet
+ * musical ; il est alors EXCLUSIF du champ samples correspondant (garde
+ * sanitize). Le bump v2 est LAZY (ensureV2 au premier ecrit musical) -
+ * createEmptyDocument RESTE v1 (invariant du seed vendore, byte-
+ * identique sur les 3 etages).
+ */
+export const SCHEMA_VERSION = 2;
+
+/** Signature rythmique POSITIONNEE (liste d'evenements, non
+ *  automatable). Absent = 4/4 partout. */
+export interface TimeSignatureEvent {
+  tick: number;  // position musicale de l'evenement
+  num: number;   // 1..32
+  den: number;   // 1|2|4|8|16|32
+}
+
+/** v8 MIDI : une note du clip. Positions RELATIVES au debut du clip.
+ *  v2 : les notes d'un clip MUSICAL utilisent startTick/lengthTick (le
+ *  domaine du clip parent gouverne — jamais un mix des deux). */
 export interface NoteDef {
   pitch: number;         // 0..127
   velocity: number;      // 0..127
-  startSample: number;   // relatif au debut du clip
+  startSample: number;   // relatif au debut du clip (domaine absolu)
   lengthSamples: number;
+  /** v2 : position musicale relative au debut du clip (PPQ 960). */
+  startTick?: number;
+  lengthTick?: number;
 }
 
 export interface ClipDef {
@@ -33,6 +58,16 @@ export interface ClipDef {
   /** T7 Session : si present, ce clip est un SLOT du clip-launcher (scene
    *  sceneId), pas un clip de la timeline. Le moteur l'ignore en timeline. */
   sceneId?: string;
+  /** v2 : PRESENCE = clip MUSICAL (position en ticks, resolue en samples
+   *  par le noyau tempo). EXCLUSIF de startSample (garde sanitize —
+   *  startSample deviendra optionnel dans le type en T3, quand
+   *  clipStartSamples() sera LE point de branche geometrie).
+   *  Un clip AUDIO musical : position en ticks, CONTENU en samples
+   *  (deplace par le tempo, jamais etire). */
+  startTick?: number;
+  /** v2 : duree musicale (clips MIDI musicaux). Un clip audio musical
+   *  garde lengthSamples (le contenu ne s'etire pas). */
+  lengthTick?: number;
 }
 
 /** One parameter as a {key, value} pair - a LIST across every consumer
@@ -90,6 +125,9 @@ export interface AutomationLaneDef {
   points: { t: number; v: number }[];
   /** Bypass de la lane (l'etat manuel reprend quand false). */
   enabled: boolean;
+  /** v2 : 'ticks' = les t des points sont des TICKS (lane musicale,
+   *  resolue par le noyau tempo). Absent = samples (legacy). */
+  timeBase?: 'ticks';
 }
 
 /** Type de piste (2026-08-27, demande utilisateur « il faut des tracks
@@ -143,7 +181,36 @@ export interface ProjectDef {
   /** A1 : lanes d'automation du MASTER (target sans processorId = les
    *  parametres racine, ex 'gain' -> masterGain). ADDITIF - absent = rien. */
   automation?: AutomationLaneDef[];
+  /** v2 : tempo du projet en milli-BPM entier (120000 = 120 BPM), LWW,
+   *  bornes 20000..999000. Absent = 120000. */
+  tempoMilliBpm?: number;
+  /** v2 : signatures rythmiques positionnees (absent = 4/4 partout). */
+  timeSignature?: TimeSignatureEvent[];
+  /** v2 : carte de tempo piecewise-constant, TRIEE par tick (absent =
+   *  le registre tempoMilliBpm seul). */
+  tempoMap?: TempoPoint[];
   [key: string]: unknown;  // Index signature for Automerge compatibility
+}
+
+/** v2 : un champ *Tick PRESENT = le clip est MUSICAL. LA definition
+ *  (la presence, jamais la valeur — un startTick 0 est musical). */
+export function isMusicalClip(
+  clip: Pick<ClipDef, 'startTick'>): boolean {
+  return typeof clip.startTick === 'number';
+}
+
+/** v2 : la carte de tempo effective du document (registre + tempoMap
+ *  via le noyau — LA porte unique, jamais lire tempoMap directement). */
+export function effectiveTempoMap(
+  doc: Pick<ProjectDef, 'tempoMilliBpm' | 'tempoMap'>): TempoPoint[] {
+  return effectiveMap(doc.tempoMilliBpm ?? 120000, doc.tempoMap ?? []);
+}
+
+/** v2 : bump LAZY — a appeler DANS un change() avant le premier ecrit
+ *  musical. Un document jamais touche musicalement reste v1 pour
+ *  toujours (le seed vendore reste byte-identique). */
+export function ensureV2(doc: ProjectDef): void {
+  if (doc.schemaVersion < 2) doc.schemaVersion = 2;
 }
 
 /**
@@ -214,6 +281,9 @@ export function migrateDocument(doc: ProjectDef): ProjectDef {
     doc.schemaVersion = 1;
   }
 
+  // v2 est PUREMENT ADDITIF (champs musicaux optionnels) : un lecteur
+  // v2 lit un v1 tel quel, rien a migrer. Le bump 1 -> 2 est LAZY
+  // (ensureV2 au premier ecrit musical), jamais fait ici.
   if (doc.schemaVersion > SCHEMA_VERSION) {
     throw new Error(`Unknown schema version: ${doc.schemaVersion}`);
   }
@@ -223,10 +293,14 @@ export function migrateDocument(doc: ProjectDef): ProjectDef {
 
 /**
  * Create an empty project document.
+ *
+ * RESTE v1 VOLONTAIREMENT (pas SCHEMA_VERSION) : le seed vendore
+ * commun aux 3 etages doit rester byte-identique (invariant A4-3).
+ * Le passage a v2 est lazy via ensureV2 au premier ecrit musical.
  */
 export function createEmptyDocument(sampleRate = 48000): ProjectDef {
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 1,
     sampleRate,
     tracks: [],
   };

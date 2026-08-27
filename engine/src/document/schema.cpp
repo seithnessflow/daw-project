@@ -18,13 +18,12 @@ bool migrateDocument(ProjectDef& doc) {
         return false;
     }
 
-    // Add future migrations here:
-    // if (doc.schema_version == 1) {
-    //     // v1 -> v2 migration
-    //     doc.schema_version = 2;
-    // }
+    // v2 est PUREMENT ADDITIF (champs musicaux optionnels, sentinelles
+    // -1/0 = absent) : un lecteur v2 lit un v1 tel quel, rien a migrer
+    // et on ne bump JAMAIS ici (lazy cote web via ensureV2 - un v1 pur
+    // reste v1, le seed vendore reste byte-identique).
 
-    return doc.schema_version == SCHEMA_VERSION;
+    return doc.schema_version >= 1 && doc.schema_version <= SCHEMA_VERSION;
 }
 
 std::string validateDocument(const ProjectDef& doc) {

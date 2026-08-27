@@ -1,8 +1,36 @@
 # Project Document Schema
 
-**Version:** 1
+**Version:** 2 (additive over 1 — a pure v1 document never changes)
 **Format:** Automerge binary (`.am`)
 **Source of truth:** This file. All three tiers (engine, server, web) conform to it.
+
+## Schema v2 — musical time (ADDITIVE-DUAL, ratified 2026-08-27)
+
+The document gains a MUSICAL domain (ticks, PPQ 960) BESIDE the
+absolute domain (samples). Existing objects keep their exact samples
+(warp-off, a la Live); new musical objects live in ticks and are
+resolved to samples by the shared tempo kernel
+(`web/src/document/tempo.ts` == `engine/src/graph/tempo.h`, an EXACT
+integer mirror verified by `fixtures/tempo-vectors.json`).
+
+New fields, ALL optional (presence of a `*Tick` field = the object is
+musical; the two domains are EXCLUSIVE for a position — a clip carries
+`startTick` OR `startSample`, never both):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| root `tempoMilliBpm` | `int64` | Project tempo in integer milli-BPM (120000 = 120 BPM), LWW, clamped 20000..999000. Absent = 120000. |
+| root `tempoMap` | `array<{tick, milliBpm}>` | Piecewise-constant tempo breakpoints, sorted by tick. Absent = the register alone. Ramps will arrive later, additively. |
+| root `timeSignature` | `array<{tick, num, den}>` | Positioned time-signature events (NOT automatable). Absent = 4/4 everywhere. |
+| clip `startTick` | `int64` | Musical position. PRESENCE = musical clip. A musical AUDIO clip is positioned in ticks but its CONTENT stays in samples (moved by tempo, never stretched — it keeps `lengthSamples`). |
+| clip `lengthTick` | `int64` | Musical length (musical MIDI clips). |
+| note `startTick`/`lengthTick` | `int64` | Musical note positions, relative to the clip. The parent clip's domain governs. |
+| lane `timeBase` | `"ticks"` | Point `t` values are ticks (musical lane). Absent = samples. |
+
+The v1 -> v2 bump is LAZY (`ensureV2` at the first musical write);
+`createEmptyDocument` STAYS v1 (the vendored common seed must remain
+byte-identical across tiers). Durations are differences of positions:
+adjacent musical clips resolve seamlessly by construction.
 
 > **v2 announced (ADR-019, 2026-08-23, design session pending):** v2
 > adds PLACEMENT — each processing node declares which peer hosts it
@@ -141,7 +169,7 @@ converges them today.
 
 ## Invariants
 
-1. **All temporal positions are `int64` sample counts.** Never seconds, never floats. This is non-negotiable.
+1. **All temporal positions are `int64` — sample counts OR ticks (v2), never seconds, never floats.** The two integer domains are exclusive per position (a musical object carries ticks, an absolute one samples); resolution between them goes through the shared integer tempo kernel only. This is non-negotiable.
 
 2. **Binary blobs never enter the document.** Only their SHA-256 hash. Assets are stored separately.
 

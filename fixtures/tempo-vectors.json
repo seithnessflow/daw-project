@@ -1,0 +1,70 @@
+{
+  "comment": "VECTEURS D'OR du noyau tempo (T1). Consommes par LES DEUX moities du miroir: engine/tests/cli_integration_test.cpp (extracteur minimal, paires plates) et web/tests/e2e/tempo-kernel.spec.ts. map = paires plates [tick,milliBpm,...]; ticksToSamples = paires [tick,samplesAttendus,...] via samplesAtTick (canonique); samplesToTicks = paires [sample,tickAttendu,...] via tickAtSample (UI-only). Ne JAMAIS modifier une valeur attendue sans re-deriver a la main (roundDiv half-up).",
+  "ppq": 960,
+  "cases": [
+    {
+      "name": "identity-120bpm-48k",
+      "sampleRate": 48000,
+      "registerMilliBpm": 120000,
+      "map": [0, 120000],
+      "ticksToSamples": [0, 0, 1, 25, 240, 6000, 960, 24000, 3840, 96000, 68719476736, 1717986918400],
+      "samplesToTicks": [0, 0, 25, 1, 24000, 960, 96000, 3840]
+    },
+    {
+      "name": "100bpm-48k",
+      "sampleRate": 48000,
+      "registerMilliBpm": 100000,
+      "map": [0, 100000],
+      "ticksToSamples": [1, 30, 960, 28800, 3840, 115200],
+      "samplesToTicks": [28800, 960, 115200, 3840]
+    },
+    {
+      "name": "90bpm-48k",
+      "sampleRate": 48000,
+      "registerMilliBpm": 90000,
+      "map": [0, 90000],
+      "ticksToSamples": [960, 32000, 1920, 64000],
+      "samplesToTicks": [32000, 960]
+    },
+    {
+      "name": "rounding-133333mbpm-48k",
+      "sampleRate": 48000,
+      "registerMilliBpm": 133333,
+      "map": [0, 133333],
+      "ticksToSamples": [1, 23, 960, 21600],
+      "samplesToTicks": []
+    },
+    {
+      "name": "halfup-boundary-44100",
+      "sampleRate": 44100,
+      "registerMilliBpm": 120000,
+      "map": [0, 120000],
+      "ticksToSamples": [4, 92, 8, 184, 16, 368, 32, 735],
+      "samplesToTicks": []
+    },
+    {
+      "name": "multi-breakpoint-48k",
+      "sampleRate": 48000,
+      "registerMilliBpm": 120000,
+      "map": [0, 120000, 3840, 90000, 7680, 140000],
+      "ticksToSamples": [0, 0, 1920, 48000, 3840, 96000, 5760, 160000, 7680, 224000, 9600, 265143],
+      "samplesToTicks": [48000, 1920, 96000, 3840, 160000, 5760, 224000, 7680, 265143, 9600]
+    },
+    {
+      "name": "implicit-zero-breakpoint",
+      "sampleRate": 48000,
+      "registerMilliBpm": 120000,
+      "map": [3840, 60000],
+      "ticksToSamples": [1920, 48000, 3840, 96000, 7680, 288000],
+      "samplesToTicks": [288000, 7680]
+    },
+    {
+      "name": "register-clamped-low",
+      "sampleRate": 48000,
+      "registerMilliBpm": 5000,
+      "map": [],
+      "ticksToSamples": [960, 144000],
+      "samplesToTicks": [144000, 960]
+    }
+  ]
+}

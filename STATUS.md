@@ -2,9 +2,10 @@
 
 *L'ETAT courant du projet : criteres, composants, procedures vivantes.
 Le recit date vit dans JOURNAL.md (append-only). Derniere mise a jour :
-2026-08-27 (AUDIT-6 parite DAW rapporte + 2 quick wins livres : EXPORT
-MIXDOWN UI bout-en-bout et PRE-ECOUTE des samples ; e2e 74/74, gtests
-45/45, tsc 0 ; details TODO 7 et JOURNAL).*
+2026-08-27 (T1 TEMPO livre : schema v2 additif + noyau miroir entier
+tempo.ts==tempo.h sur vecteurs d'or partages ; hash de reference
+INCHANGE ; e2e 97/97, gtests 48/48, tsc 0 ; suite du lot T dans TODO 6
+et JOURNAL suite 13).*
 
 ## L'INVARIANT PRODUIT (ADR-019)
 

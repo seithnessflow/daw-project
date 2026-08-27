@@ -689,6 +689,43 @@ nouveau hash. Rampes en float pur (divisions et multiplications, pas
 de candidat FMA) — determinisme inter-compilateurs preserve, verifie
 par le meme test. Ancien hash : `89f1a1105dc09e92` (2026-08-21).
 
+### 2026-08-27 — MIGRATION TEMPO : ADDITIVE-DUAL, noyau entier miroir (T1)
+
+Modele ratifie par le proprietaire (« la solution la plus elegante »,
+sequence de la revue externe consignee REVUE-EXTERNE-2026-08-27.md) :
+le document gagne un domaine MUSICAL (ticks, PPQ 960) A COTE du domaine
+absolu (samples). L'existant garde ses samples exacts (warp-off a la
+Live) ; le nouveau devient musical ; la presence d'un champ `*Tick` =
+objet musical, domaines EXCLUSIFS pour une position.
+
+- **Tempo = int64 milli-BPM** (120000 = 120 BPM, LWW, 20000..999000) —
+  jamais un float dans le document (invariant 1 etendu).
+- **tempoMap piecewise-constant** (le tempo saute et tient) : pas de
+  log(), integration EXACTE en entiers. Les rampes viendront en champ
+  additif avec leur propre spec.
+- **Noyau MIROIR bit-identique par construction** : tempo.ts (BigInt)
+  == tempo.h (int64), une seule division canonique
+  `roundDiv(n,d) = (2n+d)/(2d)` (half-up), table de frontieres
+  (arrondi 1x/segment), `samplesAtTick` canonique, `tickAtSample`
+  UI-only, fonctions TOTALES (clamp identique des deux cotes, jamais
+  une exception d'un seul cote). Verifie par les MEMES vecteurs d'or
+  (`fixtures/tempo-vectors.json`) dans le gtest et la spec Node.
+  Borne d'overflow partagee : 2^36 ticks (int64 sur jusqu'a 192 kHz).
+- **La SURVIE du hash CI et des cles de stems** : ce choix SUPERSEDE
+  l'« invalidation one-shot » proposee par la revue externe — un
+  document v1 pur ne bouge JAMAIS (octets identiques), les cles de
+  stems serialisent des samples RESOLUS, `56729beb61993cd7` reste la
+  reference absolue ; un hash de reference MUSICAL s'y AJOUTERA (T5).
+- **Bump v2 LAZY** (`ensureV2` au premier ecrit musical) ;
+  `createEmptyDocument` RESTE v1 — la graine vendoree commune aux 3
+  etages garde son sha256 (decision graine, 2026-08-25). Deviation
+  assumee du plan initial « SCHEMA_VERSION=2 partout ».
+
+Alternatives ecartees : ticks partout avec conversion de l'existant
+(re-echantillonne l'histoire, invalide stems et hash pour rien) ;
+double champ maintenu en parallele sur CHAQUE objet (deux verites qui
+divergent) ; tempo float (poison du determinisme inter-pairs).
+
 ## Resultats historiques 2026-08-20 (resume)
 
 - **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,

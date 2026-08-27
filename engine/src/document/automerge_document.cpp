@@ -142,9 +142,10 @@ bool AutomergeDocument::create(uint32_t sample_rate) {
     // Store the result - it owns the document memory
     doc_result_ = result;
 
-    // Initialize with default structure
+    // Initialize with default structure. La creation RESTE v1 (pas
+    // SCHEMA_VERSION) : invariant du seed vendore, bump v2 lazy.
     ProjectDef def;
-    def.schema_version = SCHEMA_VERSION;
+    def.schema_version = 1;
     def.sample_rate = sample_rate;
 
     if (!writeDocument(def)) {
@@ -409,6 +410,16 @@ static void readAutomationLanes(AMdoc* doc, const AMobjId* parentId,
                 }
                 if (fr) AMresultFree(fr);
 
+                // v2 : timeBase "ticks" = lane musicale (absent = samples)
+                fr = AMmapGet(doc, laneObj, AMstr("timeBase"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToStr(AMresultItem(fr), &strVal)) {
+                    lane.time_base_ticks =
+                        std::string(reinterpret_cast<const char*>(strVal.src),
+                                    strVal.count) == "ticks";
+                }
+                if (fr) AMresultFree(fr);
+
                 // target = map {processorId?, param} (processorId ABSENT =
                 // parametre de piste/master, jamais null - SCHEMA.md)
                 fr = AMmapGet(doc, laneObj, AMstr("target"), nullptr);
@@ -498,6 +509,10 @@ static void writeAutomationLanes(AMdoc* doc, const AMobjId* parentId,
         if (fr) results_to_free.push_back(fr);
         fr = AMmapPutBool(doc, laneObj, AMstr("enabled"), lane.enabled);
         if (fr) results_to_free.push_back(fr);
+        if (lane.time_base_ticks) {  // v2, additif : absent = samples
+            fr = AMmapPutStr(doc, laneObj, AMstr("timeBase"), AMstr("ticks"));
+            if (fr) results_to_free.push_back(fr);
+        }
         fr = AMmapPutObject(doc, laneObj, AMstr("target"), AM_OBJ_TYPE_MAP);
         if (fr && AMresultStatus(fr) == AM_STATUS_OK) {
             const AMobjId* tgtObj = AMitemObjId(AMresultItem(fr));
@@ -544,7 +559,7 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
     }
 
     out = ProjectDef{};
-    out.schema_version = SCHEMA_VERSION;
+    out.schema_version = 1;  // defaut avant lecture (toujours ecrase)
     out.sample_rate = 48000;
 
     // Read schemaVersion
@@ -577,6 +592,77 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
         double f64;
         if (itemToDouble(item, &f64)) {
             out.master_gain = static_cast<float>(f64);
+        }
+    }
+    if (result) AMresultFree(result);
+
+    // v2 : tempo (additif ; absent = sentinelles 0/vide, les
+    // consommateurs resolvent via le noyau tempo)
+    result = AMmapGet(doc_, AM_ROOT, AMstr("tempoMilliBpm"), nullptr);
+    if (result && AMresultStatus(result) == AM_STATUS_OK) {
+        int64_t i64 = 0;
+        if (AMitemToInt(AMresultItem(result), &i64)) {
+            out.tempo_milli_bpm = i64;
+        }
+    }
+    if (result) AMresultFree(result);
+
+    result = AMmapGet(doc_, AM_ROOT, AMstr("tempoMap"), nullptr);
+    if (result && AMresultStatus(result) == AM_STATUS_OK &&
+        AMitemValType(AMresultItem(result)) == AM_VAL_TYPE_OBJ_TYPE) {
+        const AMobjId* mapId = AMitemObjId(AMresultItem(result));
+        const size_t count = AMobjSize(doc_, mapId, nullptr);
+        for (size_t i = 0; i < count; ++i) {
+            AMresult* pr = AMlistGet(doc_, mapId, i, nullptr);
+            if (pr && AMresultStatus(pr) == AM_STATUS_OK &&
+                AMitemValType(AMresultItem(pr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                const AMobjId* ptObj = AMitemObjId(AMresultItem(pr));
+                TempoPointDef pt;
+                int64_t i64 = 0;
+                AMresult* fr = AMmapGet(doc_, ptObj, AMstr("tick"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToInt(AMresultItem(fr), &i64)) pt.tick = i64;
+                if (fr) AMresultFree(fr);
+                fr = AMmapGet(doc_, ptObj, AMstr("milliBpm"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToInt(AMresultItem(fr), &i64)) pt.milli_bpm = i64;
+                if (fr) AMresultFree(fr);
+                out.tempo_map.push_back(pt);
+            }
+            if (pr) AMresultFree(pr);
+        }
+    }
+    if (result) AMresultFree(result);
+
+    result = AMmapGet(doc_, AM_ROOT, AMstr("timeSignature"), nullptr);
+    if (result && AMresultStatus(result) == AM_STATUS_OK &&
+        AMitemValType(AMresultItem(result)) == AM_VAL_TYPE_OBJ_TYPE) {
+        const AMobjId* sigId = AMitemObjId(AMresultItem(result));
+        const size_t count = AMobjSize(doc_, sigId, nullptr);
+        for (size_t i = 0; i < count; ++i) {
+            AMresult* pr = AMlistGet(doc_, sigId, i, nullptr);
+            if (pr && AMresultStatus(pr) == AM_STATUS_OK &&
+                AMitemValType(AMresultItem(pr)) == AM_VAL_TYPE_OBJ_TYPE) {
+                const AMobjId* sObj = AMitemObjId(AMresultItem(pr));
+                TimeSignatureDef sig;
+                int64_t i64 = 0;
+                AMresult* fr = AMmapGet(doc_, sObj, AMstr("tick"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToInt(AMresultItem(fr), &i64)) sig.tick = i64;
+                if (fr) AMresultFree(fr);
+                fr = AMmapGet(doc_, sObj, AMstr("num"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToInt(AMresultItem(fr), &i64))
+                    sig.num = static_cast<int32_t>(i64);
+                if (fr) AMresultFree(fr);
+                fr = AMmapGet(doc_, sObj, AMstr("den"), nullptr);
+                if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                    AMitemToInt(AMresultItem(fr), &i64))
+                    sig.den = static_cast<int32_t>(i64);
+                if (fr) AMresultFree(fr);
+                out.time_signature.push_back(sig);
+            }
+            if (pr) AMresultFree(pr);
         }
     }
     if (result) AMresultFree(result);
@@ -738,8 +824,25 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                             }
                                             if (cr) AMresultFree(cr);
 
+                                            // v2 : domaine musical additif
+                                            // (absent = sentinelle -1)
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("startTick"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToInt(AMresultItem(cr), &i64Val)) {
+                                                clip.start_tick = i64Val;
+                                            }
+                                            if (cr) AMresultFree(cr);
+
+                                            cr = AMmapGet(doc_, clipObjId, AMstr("lengthTick"), nullptr);
+                                            if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
+                                                AMitemToInt(AMresultItem(cr), &i64Val)) {
+                                                clip.length_tick = i64Val;
+                                            }
+                                            if (cr) AMresultFree(cr);
+
                                             // v8 MIDI : notes = liste d'objets
                                             // {pitch, velocity, startSample, lengthSamples}
+                                            // (+ v2 : startTick/lengthTick additifs)
                                             cr = AMmapGet(doc_, clipObjId, AMstr("notes"), nullptr);
                                             if (cr && AMresultStatus(cr) == AM_STATUS_OK &&
                                                 AMitemValType(AMresultItem(cr)) == AM_VAL_TYPE_OBJ_TYPE) {
@@ -767,6 +870,14 @@ bool AutomergeDocument::readDocument(ProjectDef& out) const {
                                                         fr = AMmapGet(doc_, noteObj, AMstr("lengthSamples"), nullptr);
                                                         if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
                                                             AMitemToInt(AMresultItem(fr), &nv)) note.length_samples = nv;
+                                                        if (fr) AMresultFree(fr);
+                                                        fr = AMmapGet(doc_, noteObj, AMstr("startTick"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.start_tick = nv;
+                                                        if (fr) AMresultFree(fr);
+                                                        fr = AMmapGet(doc_, noteObj, AMstr("lengthTick"), nullptr);
+                                                        if (fr && AMresultStatus(fr) == AM_STATUS_OK &&
+                                                            AMitemToInt(AMresultItem(fr), &nv)) note.length_tick = nv;
                                                         if (fr) AMresultFree(fr);
                                                         clip.notes.push_back(note);
                                                     }
@@ -965,6 +1076,69 @@ bool AutomergeDocument::writeDocument(const ProjectDef& def) {
         return false;
     }
     results_to_free.push_back(result);
+
+    // v2 : tempo racine, seulement si PRESENT (sentinelles 0/vide) -
+    // un doc v1 pur garde sa forme byte-identique.
+    if (def.tempo_milli_bpm > 0) {
+        result = AMmapPutInt(doc_, AM_ROOT, AMstr("tempoMilliBpm"),
+                             def.tempo_milli_bpm);
+        if (result) results_to_free.push_back(result);
+    }
+    if (!def.tempo_map.empty()) {
+        result = AMmapPutObject(doc_, AM_ROOT, AMstr("tempoMap"),
+                                AM_OBJ_TYPE_LIST);
+        if (result && AMresultStatus(result) == AM_STATUS_OK) {
+            const AMobjId* mapId = AMitemObjId(AMresultItem(result));
+            results_to_free.push_back(result);
+            for (size_t i = 0; i < def.tempo_map.size(); ++i) {
+                AMresult* pr = AMlistPutObject(doc_, mapId, i, true,
+                                               AM_OBJ_TYPE_MAP);
+                if (pr && AMresultStatus(pr) == AM_STATUS_OK) {
+                    const AMobjId* ptObj = AMitemObjId(AMresultItem(pr));
+                    results_to_free.push_back(pr);
+                    AMresult* fr = AMmapPutInt(doc_, ptObj, AMstr("tick"),
+                                               def.tempo_map[i].tick);
+                    if (fr) results_to_free.push_back(fr);
+                    fr = AMmapPutInt(doc_, ptObj, AMstr("milliBpm"),
+                                     def.tempo_map[i].milli_bpm);
+                    if (fr) results_to_free.push_back(fr);
+                } else if (pr) {
+                    results_to_free.push_back(pr);
+                }
+            }
+        } else if (result) {
+            results_to_free.push_back(result);
+        }
+    }
+    if (!def.time_signature.empty()) {
+        result = AMmapPutObject(doc_, AM_ROOT, AMstr("timeSignature"),
+                                AM_OBJ_TYPE_LIST);
+        if (result && AMresultStatus(result) == AM_STATUS_OK) {
+            const AMobjId* sigId = AMitemObjId(AMresultItem(result));
+            results_to_free.push_back(result);
+            for (size_t i = 0; i < def.time_signature.size(); ++i) {
+                AMresult* pr = AMlistPutObject(doc_, sigId, i, true,
+                                               AM_OBJ_TYPE_MAP);
+                if (pr && AMresultStatus(pr) == AM_STATUS_OK) {
+                    const AMobjId* sObj = AMitemObjId(AMresultItem(pr));
+                    results_to_free.push_back(pr);
+                    AMresult* fr = AMmapPutInt(doc_, sObj, AMstr("tick"),
+                                               def.time_signature[i].tick);
+                    if (fr) results_to_free.push_back(fr);
+                    fr = AMmapPutInt(doc_, sObj, AMstr("num"),
+                                     def.time_signature[i].num);
+                    if (fr) results_to_free.push_back(fr);
+                    fr = AMmapPutInt(doc_, sObj, AMstr("den"),
+                                     def.time_signature[i].den);
+                    if (fr) results_to_free.push_back(fr);
+                } else if (pr) {
+                    results_to_free.push_back(pr);
+                }
+            }
+        } else if (result) {
+            results_to_free.push_back(result);
+        }
+    }
 
     // Create tracks array
     result = AMmapPutObject(doc_, AM_ROOT, AMstr("tracks"), AM_OBJ_TYPE_LIST);
@@ -1331,6 +1505,17 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
             if (cr) results_to_free.push_back(cr);
         }
 
+        // v2 : domaine musical, seulement si present (sentinelle -1) -
+        // un doc v1 pur garde sa forme byte-identique.
+        if (clip.start_tick >= 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("startTick"), clip.start_tick);
+            if (cr) results_to_free.push_back(cr);
+        }
+        if (clip.length_tick >= 0) {
+            cr = AMmapPutInt(doc_, clipObjId, AMstr("lengthTick"), clip.length_tick);
+            if (cr) results_to_free.push_back(cr);
+        }
+
         // v8 MIDI : notes (liste d'objets {pitch,velocity,startSample,
         // lengthSamples}), seulement si non vide (clip audio = pas de champ).
         if (!clip.notes.empty()) {
@@ -1353,6 +1538,14 @@ bool AutomergeDocument::addTrack(const TrackDef& track) {
                         if (fr) results_to_free.push_back(fr);
                         fr = AMmapPutInt(doc_, noteObj, AMstr("lengthSamples"), n.length_samples);
                         if (fr) results_to_free.push_back(fr);
+                        if (n.start_tick >= 0) {  // v2, additif
+                            fr = AMmapPutInt(doc_, noteObj, AMstr("startTick"), n.start_tick);
+                            if (fr) results_to_free.push_back(fr);
+                        }
+                        if (n.length_tick >= 0) {
+                            fr = AMmapPutInt(doc_, noteObj, AMstr("lengthTick"), n.length_tick);
+                            if (fr) results_to_free.push_back(fr);
+                        }
                     } else if (nr) {
                         results_to_free.push_back(nr);
                     }

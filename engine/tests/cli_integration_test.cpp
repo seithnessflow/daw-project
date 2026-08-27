@@ -9,6 +9,7 @@
 #include "../src/document/automerge_document.h"
 #include "../src/document/schema.h"
 #include "../src/graph/audio_graph.h"
+#include "../src/graph/tempo.h"
 #include "../src/graph/clip_player.h"
 #include "../src/graph/utility_node.h"
 #include "../src/graph/eq3_node.h"
@@ -174,9 +175,12 @@ bool testDocumentCreation() {
         return false;
     }
 
+    // CONTRAT v2 (T1, DECISIONS.md 2026-08-27) : la CREATION reste v1
+    // (graine vendoree byte-identique, bump lazy cote web) tandis que
+    // SCHEMA_VERSION = 2 est le max supporte en LECTURE. L'ancienne
+    // assertion == SCHEMA_VERSION testait l'egalite des deux notions.
     const auto& project = doc.getDocument();
-    if (project.schema_version != daw::document::SCHEMA_VERSION ||
-        project.sample_rate != 48000) {
+    if (project.schema_version != 1 || project.sample_rate != 48000) {
         std::cout << "FAILED: Incorrect data\n";
         return false;
     }
@@ -3943,6 +3947,264 @@ static bool testGraphLoadBudget() {
     return true;
 }
 
+// ---- T1 : LE MIROIR, moitie C++ -------------------------------------
+// Le noyau tempo (engine/src/graph/tempo.h) verifie sur LES MEMES
+// vecteurs d'or que la spec Node (fixtures/tempo-vectors.json, consomme
+// par web/tests/e2e/tempo-kernel.spec.ts). Extracteur minimal dedie au
+// format du fichier (paires plates, entiers non negatifs) - pas de lib
+// JSON au moteur.
+namespace {
+
+bool tvFindKey(const std::string& s, size_t& pos, const std::string& key) {
+    const auto p = s.find("\"" + key + "\"", pos);
+    if (p == std::string::npos) return false;
+    pos = p + key.size() + 2;
+    return true;
+}
+
+int64_t tvReadInt(const std::string& s, size_t& pos) {
+    while (pos < s.size() && (s[pos] < '0' || s[pos] > '9')) ++pos;
+    int64_t v = 0;
+    while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') {
+        v = v * 10 + (s[pos] - '0');
+        ++pos;
+    }
+    return v;
+}
+
+std::vector<int64_t> tvReadIntArray(const std::string& s, size_t& pos) {
+    std::vector<int64_t> out;
+    const auto open = s.find('[', pos);
+    const auto close = s.find(']', open);
+    if (open == std::string::npos || close == std::string::npos) return out;
+    size_t p = open + 1;
+    while (p < close) {
+        if (s[p] >= '0' && s[p] <= '9') {
+            int64_t v = 0;
+            while (p < close && s[p] >= '0' && s[p] <= '9') {
+                v = v * 10 + (s[p] - '0');
+                ++p;
+            }
+            out.push_back(v);
+        } else {
+            ++p;
+        }
+    }
+    pos = close + 1;
+    return out;
+}
+
+}  // namespace
+
+bool testTempoKernelVectors() {
+    std::cout << "Test: Tempo kernel golden vectors (miroir de tempo.ts)... ";
+    using namespace daw::tempo;
+
+    // Les memes asserts unitaires que la spec Node.
+    if (roundDiv(1, 2) != 1 || roundDiv(3, 2) != 2 || roundDiv(2, 3) != 1 ||
+        roundDiv(1, 3) != 0 || roundDiv(0, 5) != 0) {
+        std::cout << "FAILED: roundDiv n'est pas half-up\n";
+        return false;
+    }
+    if (clampMilliBpm(5000) != 20000 || clampMilliBpm(1500000) != 999000 ||
+        clampMilliBpm(120000) != 120000) {
+        std::cout << "FAILED: clampMilliBpm hors bornes\n";
+        return false;
+    }
+    if (segSamples(960, 48000, 120000) != 24000) {
+        std::cout << "FAILED: 1 noire @120/48k != 24000\n";
+        return false;
+    }
+
+    const char* candidates[] = {
+        "../fixtures/tempo-vectors.json",     // CI Linux : cwd = engine/
+        "../../fixtures/tempo-vectors.json",  // local : cwd = engine/build-msvc
+        "fixtures/tempo-vectors.json",        // cwd = racine du repo
+    };
+    std::string content;
+    for (const char* p : candidates) {
+        std::ifstream f(p);
+        if (f) {
+            std::stringstream ss;
+            ss << f.rdbuf();
+            content = ss.str();
+            break;
+        }
+    }
+    if (content.empty()) {
+        std::cout << "FAILED: fixtures/tempo-vectors.json introuvable\n";
+        return false;
+    }
+
+    size_t pos = 0;
+    if (!tvFindKey(content, pos, "ppq") || tvReadInt(content, pos) != kPPQ) {
+        std::cout << "FAILED: ppq du fichier != kPPQ\n";
+        return false;
+    }
+
+    int cases = 0;
+    int checks = 0;
+    while (tvFindKey(content, pos, "name")) {
+        const auto q1 = content.find('"', pos);
+        const auto q2 = content.find('"', q1 + 1);
+        const std::string name = content.substr(q1 + 1, q2 - q1 - 1);
+        pos = q2 + 1;
+
+        if (!tvFindKey(content, pos, "sampleRate")) break;
+        const int64_t sr = tvReadInt(content, pos);
+        if (!tvFindKey(content, pos, "registerMilliBpm")) break;
+        const int64_t reg = tvReadInt(content, pos);
+        if (!tvFindKey(content, pos, "map")) break;
+        const auto map_flat = tvReadIntArray(content, pos);
+        if (!tvFindKey(content, pos, "ticksToSamples")) break;
+        const auto t2s = tvReadIntArray(content, pos);
+        if (!tvFindKey(content, pos, "samplesToTicks")) break;
+        const auto s2t = tvReadIntArray(content, pos);
+
+        std::vector<TempoPoint> raw;
+        for (size_t i = 0; i + 1 < map_flat.size(); i += 2) {
+            raw.push_back({map_flat[i], map_flat[i + 1]});
+        }
+        const auto map = effectiveMap(reg, raw);
+        const auto S = buildBoundaryTable(map, sr);
+
+        for (size_t i = 0; i + 1 < t2s.size(); i += 2) {
+            const int64_t got = samplesAtTick(map, S, sr, t2s[i]);
+            if (got != t2s[i + 1]) {
+                std::cout << "FAILED: " << name << " samplesAtTick(" << t2s[i]
+                          << ") = " << got << ", attendu " << t2s[i + 1] << "\n";
+                return false;
+            }
+            ++checks;
+        }
+        for (size_t i = 0; i + 1 < s2t.size(); i += 2) {
+            const int64_t got = tickAtSample(map, S, sr, s2t[i]);
+            if (got != s2t[i + 1]) {
+                std::cout << "FAILED: " << name << " tickAtSample(" << s2t[i]
+                          << ") = " << got << ", attendu " << s2t[i + 1] << "\n";
+                return false;
+            }
+            ++checks;
+        }
+        ++cases;
+    }
+    if (cases < 8 || checks < 30) {
+        std::cout << "FAILED: fichier de vecteurs incomplet (" << cases
+                  << " cas, " << checks << " verifications)\n";
+        return false;
+    }
+
+    // Round-trip tick -> sample -> tick au demi-tick pres (meme carte
+    // que la spec Node).
+    {
+        const auto map = effectiveMap(120000, {{0, 120000},
+                                               {3840, 87654},
+                                               {9999, 543210}});
+        const auto S = buildBoundaryTable(map, 48000);
+        for (const int64_t tick : {int64_t(0), int64_t(1), int64_t(959),
+                                   int64_t(3840), int64_t(3841), int64_t(9998),
+                                   int64_t(9999), int64_t(20000),
+                                   int64_t(123456)}) {
+            const int64_t s = samplesAtTick(map, S, 48000, tick);
+            const int64_t back = tickAtSample(map, S, 48000, s);
+            if (back < tick - 1 || back > tick + 1) {
+                std::cout << "FAILED: round-trip tick " << tick << " -> "
+                          << back << "\n";
+                return false;
+            }
+        }
+    }
+
+    std::cout << "OK (" << cases << " cas, " << checks
+              << " verifications)\n";
+    return true;
+}
+
+// T1 : round-trip Automerge des cles v2 (startTick/lengthTick clip et
+// note, timeBase de lane) - la lecture/ecriture ajoutee dans
+// automerge_document.cpp n'est exercee par rien d'autre. Le root tempo
+// (tempoMilliBpm/tempoMap/timeSignature) s'ecrit cote web ; sa lecture
+// moteur sera exercee par la fixture musicale en T2.
+bool testMusicalFieldsRoundTrip() {
+    std::cout << "Test: v2 musical fields round-trip... ";
+    daw::document::AutomergeDocument doc;
+    if (!doc.create(48000)) {
+        std::cout << "FAILED: create\n";
+        return false;
+    }
+
+    daw::document::TrackDef track;
+    track.id = "track-musical";
+    track.name = "Musical";
+
+    daw::document::ClipDef clip;
+    clip.id = "clip-musical";
+    clip.asset_hash = "";
+    clip.start_tick = 3840;   // clip musical
+    clip.length_tick = 960;
+    daw::document::NoteDef note;
+    note.pitch = 64;
+    note.velocity = 90;
+    note.start_tick = 240;
+    note.length_tick = 240;
+    clip.notes.push_back(note);
+    track.clips.push_back(clip);
+
+    daw::document::ClipDef absolute;
+    absolute.id = "clip-absolu";
+    absolute.asset_hash = "deadbeef";
+    absolute.start_sample = 1000;
+    absolute.length_samples = 2000;
+    track.clips.push_back(absolute);
+
+    daw::document::AutomationLaneDef lane;
+    lane.id = "lane-ticks";
+    lane.param = "gain";
+    lane.time_base_ticks = true;
+    lane.points.push_back({0, 0.5f});
+    track.automation.push_back(lane);
+
+    if (!doc.addTrack(track)) {
+        std::cout << "FAILED: addTrack\n";
+        return false;
+    }
+
+    // Round-trip via les octets (toBytes -> loadFromBytes), pas juste
+    // le cache en memoire
+    const auto bytes = doc.toBytes();
+    daw::document::AutomergeDocument doc2;
+    if (bytes.empty() || !doc2.loadFromBytes(bytes.data(), bytes.size())) {
+        std::cout << "FAILED: save/load\n";
+        return false;
+    }
+    const auto def = doc2.getDocument();
+    if (def.tracks.size() != 1 || def.tracks[0].clips.size() != 2) {
+        std::cout << "FAILED: structure perdue\n";
+        return false;
+    }
+    const auto& c0 = def.tracks[0].clips[0];
+    const auto& c1 = def.tracks[0].clips[1];
+    if (!c0.isMusical() || c0.start_tick != 3840 || c0.length_tick != 960 ||
+        c0.notes.size() != 1 || c0.notes[0].start_tick != 240 ||
+        c0.notes[0].length_tick != 240) {
+        std::cout << "FAILED: champs musicaux perdus au round-trip\n";
+        return false;
+    }
+    if (c1.isMusical() || c1.start_tick != -1 || c1.length_tick != -1 ||
+        c1.start_sample != 1000) {
+        std::cout << "FAILED: clip absolu contamine (sentinelles)\n";
+        return false;
+    }
+    if (def.tracks[0].automation.size() != 1 ||
+        !def.tracks[0].automation[0].time_base_ticks) {
+        std::cout << "FAILED: timeBase de lane perdu\n";
+        return false;
+    }
+
+    std::cout << "OK\n";
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== DAW Engine Integration Tests ===\n\n";
 
@@ -3998,6 +4260,8 @@ int main(int argc, char* argv[]) {
     run(testAutomationRender);     // A2
     run(testStageProbe);           // preuve par etage
     run(testGraphLoadBudget);      // Lot P : perf au regime de preuve
+    run(testTempoKernelVectors);   // T1 : miroir noyau tempo
+    run(testMusicalFieldsRoundTrip);  // T1 : cles v2 dans Automerge
 #ifdef DAW_PLUGIN_HOST_EXE
     run(testPluginHostEnumeration);
     run(testPluginHostBadModule);

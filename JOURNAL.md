@@ -1609,3 +1609,33 @@ la plus elegante ») est approuve. Le spike a tout livre en une soiree :
   piege etait GRAVE dans CLAUDE.md, re-verifie en headed avant de
   conclure ; la vraie cause etait la resolution timer, pas la page.
 Prochain : reliquat LAN 2 machines (court), puis Lot P, puis LOT T.
+
+**2026-08-27 (suite 13 - LOT P puis T1 : le noyau tempo entre) :**
+deux lots du plan ratifie (`.claude/plans/lazy-crunching-nautilus.md`).
+- LOT P (48a01dc, CI verte) : la performance au regime de preuve —
+  testGraphLoadBudget (500 pistes = 735 us/bloc, 13,8 % du budget
+  temps reel 5333 us, en gtest donc en CI), compteur stems_rendered
+  + period/shareMode en telemetrie EngineState (champs 8-10),
+  scripts/perf-underruns.ps1 versionne (critere 5 sous charge en une
+  commande), STATUS.md gagne sa section Performance.
+- T1 TEMPO (ADDITIVE-DUAL ratifie, DECISIONS.md) : le noyau MIROIR
+  100 % entier — web/src/document/tempo.ts (BigInt) == 
+  engine/src/graph/tempo.h (int64), une seule division canonique
+  roundDiv half-up, table de frontieres (arrondi 1x/segment), borne
+  d'overflow PARTAGEE 2^36 ticks, fonctions TOTALES (clamp identique
+  des deux cotes, jamais une exception d'un seul cote). Les DEUX
+  moities verifiees par LES MEMES vecteurs d'or
+  (fixtures/tempo-vectors.json, 8 cas derives a la main) : gtest 41
+  verifications + spec Node tempo-kernel 14/14. Schema v2 ADDITIF
+  (clip/note startTick/lengthTick, lane timeBase, racine
+  tempoMilliBpm/tempoMap/timeSignature) lu et ecrit par les deux
+  etages (round-trip Automerge couvert par un gtest dedie), gardes
+  sanitize (exclusivite de domaine), bump v2 LAZY via ensureV2 — la
+  creation RESTE v1 (graine vendoree byte-identique, deviation
+  assumee du plan, consignee).
+- LA PREUVE T1 : hash de reference 56729beb61993cd7 INCHANGE sur le
+  moteur v2 = l'additivite acceptee par les octets. Test modifie
+  SIGNALE : testDocumentCreation assertait creation==SCHEMA_VERSION,
+  le contrat v2 separe « version creee » (1) de « max supporte » (2).
+- Verdicts CI leves a l'ouverture : s1, s2, Lot P — tous verts.
+Prochain : T2 (resolveMusicalTime, LE point d'etranglement moteur).

@@ -17,9 +17,27 @@
 namespace daw::document {
 
 /**
- * Current schema version.
+ * Current schema version (le MAX supporte en lecture).
+ *
+ * v2 (migration TEMPO T1, 2026-08-27) : domaine MUSICAL additif (ticks,
+ * PPQ 960) A COTE des samples. Champ *_tick present (sentinelle -1 =
+ * absent) = objet musical. Un document v1 pur ne bouge JAMAIS ; la
+ * creation reste v1 (bump lazy cote web via ensureV2).
  */
-constexpr uint32_t SCHEMA_VERSION = 1;
+constexpr uint32_t SCHEMA_VERSION = 2;
+
+/** v2 : breakpoint de la carte de tempo (piecewise-constant). */
+struct TempoPointDef {
+    int64_t tick = 0;
+    int64_t milli_bpm = 120000;  // borne 20000..999000 (clampee au noyau)
+};
+
+/** v2 : signature rythmique positionnee (non automatable). */
+struct TimeSignatureDef {
+    int64_t tick = 0;
+    int32_t num = 4;
+    int32_t den = 4;
+};
 
 /**
  * Processor definition.
@@ -80,6 +98,10 @@ struct NoteDef {
     uint8_t velocity = 100;    // 0..127
     int64_t start_sample = 0;  // relatif au debut du clip
     int64_t length_samples = 0;
+    // v2 : positions musicales relatives au clip (PPQ 960). Sentinelle
+    // -1 = absent (note absolue). Le domaine du clip parent gouverne.
+    int64_t start_tick = -1;
+    int64_t length_tick = -1;
 };
 
 /**
@@ -100,6 +122,14 @@ struct ClipDef {
     // T7 Session : si non vide, ce clip est un SLOT du clip-launcher (pas
     // la timeline) - le moteur l'IGNORE en construisant le graphe timeline.
     std::string scene_id;
+    // v2 : sentinelle -1 = absent. start_tick >= 0 = clip MUSICAL
+    // (position en ticks, resolue en samples par resolveMusicalTime en
+    // T2 AVANT buildGraph - le graphe ne voit que des samples).
+    // Un clip audio musical garde length_samples (contenu jamais etire).
+    int64_t start_tick = -1;
+    int64_t length_tick = -1;
+
+    [[nodiscard]] bool isMusical() const { return start_tick >= 0; }
 };
 
 /**
@@ -124,6 +154,9 @@ struct AutomationLaneDef {
     std::string param;         // "gain" | "pan" | cle native | id VST3 decimal
     bool enabled = true;
     std::vector<AutomationPointDef> points;
+    // v2 : true = les t des points sont des TICKS (lane musicale,
+    // resolue en T2). false = samples (legacy).
+    bool time_base_ticks = false;
 };
 
 struct TrackDef {
@@ -144,12 +177,22 @@ struct TrackDef {
  * Project document.
  */
 struct ProjectDef {
-    uint32_t schema_version = SCHEMA_VERSION;
+    // La CREATION reste v1 (seed vendore byte-identique) ; v2 n'arrive
+    // que par un document qui le porte deja (bump lazy cote web).
+    uint32_t schema_version = 1;
     uint32_t sample_rate = 48000;
     float master_gain = 1.0f;  // V1.2: root masterGain, additive (1.0 when absent)
     std::vector<TrackDef> tracks;
     // A2 : lanes d'automation du MASTER (racine, additif).
     std::vector<AutomationLaneDef> automation;
+    // v2 : tempo du projet en milli-BPM entier (120000 = 120 BPM), LWW.
+    // Sentinelle 0 = absent du document (les consommateurs resolvent a
+    // 120000 via le noyau) - la presence est preservee au round-trip.
+    int64_t tempo_milli_bpm = 0;
+    // v2 : carte de tempo piecewise-constant, triee par tick (vide =
+    // le registre seul) et signatures positionnees (vide = 4/4).
+    std::vector<TempoPointDef> tempo_map;
+    std::vector<TimeSignatureDef> time_signature;
 };
 
 /**

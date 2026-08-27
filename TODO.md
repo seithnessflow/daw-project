@@ -736,9 +736,27 @@ Ordre grave (la confiance avant le sucre, arbitrage confirme) :
        enveloppes de clip (abs/mod) suivent, pipeline prevu des le debut.
 5. [ ] SENDS/RETOURS + GROUPES (+ sidechain=resampling : routage a 3
        prises, un champ input:{sourceTrackId, tap}).
-6. [ ] TEMPO — LA migration (double timestamp secondes<->beats, tempo
-       LWW-register facon Link, signature = evenements) : ouvre metronome,
-       grilles metriques, grooves. Session de cadrage dediee AVANT.
+6. [~] TEMPO — LA migration, EN COURS (plan ratifie 2026-08-27,
+       modele ADDITIVE-DUAL « solution la plus elegante » — DECISIONS.md ;
+       tout le reste GELE pendant le lot T) :
+       - [x] T1 (2026-08-27) : schema v2 additif (startTick/lengthTick,
+         timeBase lanes, racine tempoMilliBpm/tempoMap/timeSignature),
+         noyau MIROIR entier tempo.ts (BigInt) == tempo.h (int64),
+         vecteurs d'or fixtures/tempo-vectors.json (gtest 41 verifs +
+         spec Node 14/14), gardes sanitize, bump v2 LAZY (creation
+         RESTE v1, graine vendoree intacte). PREUVE : hash
+         56729beb61993cd7 INCHANGE, gtests 48/48.
+       - [ ] T2 : resolveMusicalTime() = LE point d'etranglement moteur
+         (rebuild live, offline_render, export, stems) + quantum
+         Session musical + fixture create_musical_doc (hash stable x2,
+         120->90 deplace le musical, jamais l'absolu).
+       - [ ] T3 : surface web (champ tempo topbar + ensureV2, grille
+         musicale snapTickStep, regle mesures.battements, mutateurs
+         dual-aware, piano-roll en ticks, badge + « Rendre musical »,
+         rituel du compositeur A 100 BPM).
+       - [ ] T4 : Link Etage 2 — DIFFERE explicitement (session dediee).
+       - [ ] T5 : re-ancrage determinisme (EXPECTED_HASH_MUSICAL jumeau
+         gtest+ci.yml MEME commit ; specs v2 adaptees = signalees).
 7. [ ] LES DEPASSEMENTS (ou notre architecture bat l'original) :
        undo per-acteur persistant navigable (historique Automerge) ;
        freeze = cache de rendu prouvable par hash ; export/stems
