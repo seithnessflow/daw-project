@@ -13,6 +13,19 @@ BOUCLE UTILISATEUR (drag sur la regle), SCISSION de clip (clic droit /
 Ctrl+E) — suite e2e 79/79, gtests 45/45, tsc 0, CI verte sur les deux
 premiers pushes.
 
+## NOUVEAU (nuit du 27, apres la reecriture ci-dessous) : LE MOTEUR
+## SUIT L'ONGLET
+
+Fini le moteur fige sur --project du boot : le bandeau de desaccord
+offre « Jouer <projet> ici » (le moteur bascule, proto SwitchProject,
+jamais d'auto-switch) — prouve sur la VRAIE stack (essai-claude joue,
+puis moteur rendu a studio). + Le transport REFUSE le desaccord ;
+snap de pose = grille du zoom ; + clip MIDI revele le piano-roll ;
+composition-utilisateur complete (essai-claude : beat kit + basse
+Dexed, export traces/essai-claude-mixdown.wav, ear verte). Moisson
+restante au TODO 7 (pose avalee sur position occupee, kit de
+demarrage). Verdict CI a verifier : af0bd8e (+ 95be372 compo).
+
 ## POINT DE SYNCHRO (A LIRE EN PREMIER)
 
 **Verdict CI attendu sur 5776e24 (pistes typees + fixes des 2 rouges)**.
