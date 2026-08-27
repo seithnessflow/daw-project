@@ -1561,3 +1561,23 @@ Mixage / Automation / Devices+BOX sur essai-claude via la bascule) :
   pan (connu AUDIT-6) ; DETTE : aucune spec n'assert les VU peints
   (la regle « toute mesure affichee recoit un test au signal connu »
   n'est pas honoree pour les VU console).
+
+**2026-08-27 (suite 11 - revue externe recue et consignee) :** le
+brief a ete analyse par une session Fable 5 externe. Cinq critiques,
+TOUTES acceptees (deux nuancees sur les faits) : (1) le biais de
+methode - la verification pilotee selectionne le prouvable-au-bit et
+a repousse tout le LIVE ; (2) des preuves de correction jamais de
+performance (critere 5 sans charge, churn des stems non chiffre) ;
+(3) la migration tempo = dette a interets composes (invalidation
+one-shot des cles de stems + hash CI : moins cher maintenant) ;
+(4) danger de derive en clone appauvri d Ableton (garde-fou adopte :
+toute surface nouvelle nomme sa contribution au differenciateur) ;
+(5) Windows-only a strategiser (ADR-015 existe, la ligne macOS non)
+et la PHYSIQUE de la latence non calculee. Calcul preliminaire fait
+avec les mesures acquises : WAN ~80 ms (jam direct impossible -
+quantise ou monitoring local S8), LAN ~45 ms (jouable SEULEMENT si
+les buffers descendent - ASIO/exclusif devient prerequis chiffre).
+Arbitrage propose A RATIFIER (docs/REVUE-EXTERNE-2026-08-27.md) :
+spike budget-latence -> migration TEMPO seule et gelee -> Vague 3
+avec l entree live dedans (E4 en fruit mur) + la performance au
+regime de preuve. Le choix binaire « Massive vs Vague 3 » est retire.
