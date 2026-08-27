@@ -774,8 +774,17 @@ Ordre grave (la confiance avant le sucre, arbitrage confirme) :
          = mesure 2 a 2,400 s pile, ratio 100->90 = 1,111 exact,
          absolu fixe, export x2 hash stable e1d19415a6e48728).
        - [ ] T4 : Link Etage 2 — DIFFERE explicitement (session dediee).
-       - [ ] T5 : re-ancrage determinisme (EXPECTED_HASH_MUSICAL jumeau
-         gtest+ci.yml MEME commit ; specs v2 adaptees = signalees).
+       - [x] T5 (2026-08-27) : re-ancrage determinisme —
+         EXPECTED_HASH_MUSICAL `c1233ae9d6ab9e83` epingle en JUMEAUX
+         (expected_musical dans cli_integration_test.cpp ==
+         EXPECTED_HASH_MUSICAL dans ci.yml, MEME commit, consigne
+         DECISIONS.md). La reference absolue 56729beb61993cd7 reste
+         INTACTE (la preuve d'additivite de tout le lot T). Aucune
+         spec v2 a adapter : la suite etait deja verte (une seule
+         retombee, ui-rename, corrigee par le design en T3).
+         gtests 51/51 double-ancres.
+       LOT T SOLDE (T4 Link Etage 2 = seul reliquat, DIFFERE en
+       session dediee). Le GEL est leve a la cloture de session.
 7. [ ] LES DEPASSEMENTS (ou notre architecture bat l'original) :
        undo per-acteur persistant navigable (historique Automerge) ;
        freeze = cache de rendu prouvable par hash ; export/stems

@@ -726,6 +726,19 @@ Alternatives ecartees : ticks partout avec conversion de l'existant
 double champ maintenu en parallele sur CHAQUE objet (deux verites qui
 divergent) ; tempo float (poison du determinisme inter-pairs).
 
+### 2026-08-27 — nouveau hash de reference MUSICAL `c1233ae9d6ab9e83` (T5)
+
+Le second ancrage du determinisme, A COTE de `56729beb61993cd7` (qui
+reste la reference ABSOLUE, inchangee par toute la migration tempo —
+la preuve d'additivite). La fixture musicale (testMusicalRenderMoves) :
+un clip audio ABSOLU (carre 500 Hz a 0) + un clip audio MUSICAL
+(meme asset, startTick 3840 = mesure 2, tempo 120000 milli-BPM,
+contenu en samples jamais etire), rendue offline par le chemin
+resolveMusicalTime -> noyau entier. Jumeaux : `expected_musical`
+(cli_integration_test.cpp) == `EXPECTED_HASH_MUSICAL` (ci.yml), a
+mettre a jour ENSEMBLE et a documenter ici. Une deviation = une
+regression du noyau tempo ou de la resolution, jamais un bruit.
+
 ## Resultats historiques 2026-08-20 (resume)
 
 - **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,

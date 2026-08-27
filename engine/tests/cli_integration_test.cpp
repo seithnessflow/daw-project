@@ -4353,8 +4353,20 @@ bool testMusicalRenderMoves() {
         std::cout << "FAILED: rendu musical (" << r1.error << ")\n";
         return false;
     }
-    if (computeFileHash(out1) != computeFileHash(out2)) {
+    const std::string mhash = computeFileHash(out1);
+    if (mhash != computeFileHash(out2)) {
         std::cout << "FAILED: hash musical instable\n";
+        return false;
+    }
+    // T5 : LE hash de reference MUSICAL - jumeau de ci.yml
+    // (EXPECTED_HASH_MUSICAL, meme commit). Une deviation = une
+    // regression du rendu musical (noyau tempo ou resolution), a
+    // documenter dans DECISIONS.md comme pour 56729beb61993cd7.
+    const std::string expected_musical = "c1233ae9d6ab9e83";
+    if (mhash != expected_musical) {
+        std::cout << "FAILED: hash musical devie de la reference\n"
+                  << "  Got:      " << mhash << "\n"
+                  << "  Expected: " << expected_musical << "\n";
         return false;
     }
     const int64_t len120 =

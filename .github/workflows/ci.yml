@@ -15,6 +15,11 @@ on:
 env:
   # Criterion 1 reference (asserted inside daw_engine_test; see DECISIONS.md)
   EXPECTED_HASH: 56729beb61993cd7
+  # T5 tempo: MUSICAL render reference (asserted inside daw_engine_test,
+  # testMusicalRenderMoves - the tempo kernel's determinism anchor).
+  # Twin of expected_musical in engine/tests/cli_integration_test.cpp:
+  # update BOTH in the same commit, document in DECISIONS.md.
+  EXPECTED_HASH_MUSICAL: c1233ae9d6ab9e83
 
 jobs:
   build-linux:

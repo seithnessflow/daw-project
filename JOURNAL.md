@@ -1699,3 +1699,17 @@ exact et l'absolu ne bouge pas d'un pixel, export offline x2 =
 hash stable (e1d19415a6e48728). Suite 99/99, tsc 0.
 Prochain : T5 (EXPECTED_HASH_MUSICAL jumeau gtest+ci.yml ; T4 Link
 Etage 2 reste explicitement differe).
+
+**2026-08-27 (suite 16 - T5 : le determinisme musical a son ancre) :**
+EXPECTED_HASH_MUSICAL `c1233ae9d6ab9e83` epingle en JUMEAUX dans le
+meme commit (expected_musical au gtest testMusicalRenderMoves ==
+EXPECTED_HASH_MUSICAL en env de ci.yml), consigne DECISIONS.md avec la
+recette de la fixture (clip absolu + clip musical mesure 2, meme asset
+carre, chemin resolveMusicalTime -> noyau entier). La reference
+absolue 56729beb61993cd7 traverse TOUT le lot T inchangee - la preuve
+d'additivite par les octets. Aucune spec n'a du etre adaptee au
+contrat v2 (la suite etait verte avant/apres ; l'unique retombee,
+ui-rename, avait ete corrigee par le design). gtests 51/51.
+LOT T : T1+T2+T3+T5 SOLDES en une session ; T4 (Link Etage 2) reste
+explicitement differe. Prochain : verdict CI GCC sur le hash musical
+(premier passage cross-compilateur), puis leve du gel.
