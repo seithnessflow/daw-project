@@ -1,5 +1,24 @@
 # REPRISE.md — point de reprise au demarrage
 
+## TOUT EN HAUT (2026-08-27, tres tard) : PLAN RATIFIE + SPIKE SOLDE
+
+Le plan post-revue est APPROUVE (fichier de plan de la session ;
+essentiel copie ici) : Lot 0 spike latence [FAIT en une soiree] ->
+Lot P performance [A FAIRE] -> **LOT T MIGRATION TEMPO** (additive-dual
+ratifie « solution la plus elegante » : l'existant garde ses samples
+exacts, le neuf est musical en ticks PPQ 960, noyau entier miroir
+tempo.ts/tempo.h, hash CI et stems SURVIVENT) -> Vague 3 live.
+SPIKE (docs/SPIKE-LATENCE.md) : EXCLUSIF 256 = **16 ms, 0 underrun
+sous charge** (--exclusive livre) ; timeBeginPeriod(1) (le tick 1 ms
+dormait 15,6 ms) ; flux jam broadcaster REPARE (pre-buffer worklet,
+0 underrun contre 238-950) ; pipeline jam mesure ~75 ms hors reseau ->
+VERDICT : jeu direct distant EXCLU ; test Massive jouable en
+MIDI->rendu tour 16 ms->enceintes (~18-20 ms) ; WAN = ecoute.
+Reliquat : mesure LAN 2 machines (courte, portable requis).
+PROCHAINE SESSION : Lot P (perf au regime de preuve) puis **T1**
+(schema v2 + noyau tempo + vecteurs — zero changement de comportement,
+preuve = hash de reference INCHANGE). Verdict CI a verifier : 729f769.
+
 *Reecrit le 2026-08-27 nuit (cloture de la journee AUDIT-6 : rapport +
 5 livraisons). Les proprietaires restent STATUS.md (etat), TODO.md
 (file), JOURNAL.md (recit date).*
