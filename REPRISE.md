@@ -2,11 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le dernier push de la session (« ProcessContext ring v12 »,
-`git log -1`). Regle du jour : la CI se lit UNE fois par session, sur
-le dernier push (CLAUDE.md §5). `gh run list --limit 3`. AUCUN travail
-ne s'ouvre avant ce verdict. (1a0fce4, l'avant-dernier, est VERT.)
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
+de code de la session (ProcessContext ring v12, e7bae9a) est VERT en CI
+(run 33186614464). Aucun verdict en vol.
 
 - **ProcessContext (ring v12)** : les plugins recoivent position du
   bloc, tempo entier du document, play/stop, 4/4 (AUDIT-6 §6 solde) ;
