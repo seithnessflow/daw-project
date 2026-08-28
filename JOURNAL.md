@@ -1730,3 +1730,36 @@ sites de build (l'ancien max(1, n/256) donnait 1 pour 374). Dette
 datee consignee (TODO tranche 2 item 3) : le wrap de boucle cree
 encore un chunk partiel par tour. gtests 51/51, hash absolu et musical
 INCHANGES.
+
+**2026-08-28 (rangement documentaire — « les fichiers se contredisent ») :**
+demande utilisateur : ranger et nettoyer, le projet n'etait plus
+travaillable (audits et directives contradictoires). Lecture integrale des
+37 documents (~540 Ko) puis verification des faits contre le code
+(schema.ts, --help, compteurs, CI). Contradictions trouvees : trois
+« ordres graves » coexistants dans TODO (88 Ko, ~80 % de [x] avec leurs
+recits) ; criteres recopies dans CLAUDE/STATUS/README avec des chiffres
+differents (21, 29, 41, 44, 51 gtests ; 36, 62, 99 e2e) ; README portant
+la loi ABROGEE « rien de temps reel ne traverse le serveur » et « pas
+encore : undo, MIDI, tempo, automation » (tous livres) ; STATUS redevenu
+un journal (blocs dates dupliques du JOURNAL) et se contredisant (critere
+3 « JAMAIS TESTE » vs smoke 1bis tenu) ; CLAUDE.md gelant « zero audit /
+zero fusion de docs tant que la tranche 3 ... » (tranche close depuis le
+24) et « parite GELEE » alors que fades/automation/tempo sont livres ;
+SECURITY listant C2-distante en RESTE alors que F1 est fait ; deux
+ADR-015 ; SCHEMA.md « rien de ceci n'existe » sur des stems shippes, sans
+pan/kind/notes/scenes/stem/state ; 4 docs morts, 1 script a l'abandon.
+Fait (markdown seul, zero code, zero test touche) : CLAUDE.md reecrit en
+regles vivantes au present (§3 = la carte des documents, UN proprietaire
+par information, « le fait va au JOURNAL, l'item fait est SUPPRIME de
+TODO ») ; STATUS.md = etat court ; TODO.md = une file (ordre grave de la
+cloture du 27 / decisions ouvertes / dettes datees par source / backlog) ;
+SECURITY re-trie ; README verite ; docs/README.md index avec statut ;
+docs/audits/AUDIT-1..6 ; docs/archive/ (docs morts + copies integrales
+des anciens CLAUDE/STATUS/TODO) ; ligne `Statut :` en tete de chaque doc
+de docs/ ; DECISIONS.md index des ADR + ADR-008 clos + ADR-014 amende +
+critere 4 consigne ; ADR-019 §6 amende (gel -> garde-fou anti-clone) ;
+SCHEMA.md aligne sur schema.ts. `start_engine.ps1` supprime (A4-16.4),
+AMELIORATIONS.md archive. Points de synchro : les deux verdicts CI
+attendus (e512538, 99190f4) sont VERTS ; le ring v10 (kRingSlots 8,
+estampilles par slot) est NON COMMITE dans l'arbre, non verifie — REPRISE
+le porte en premier.

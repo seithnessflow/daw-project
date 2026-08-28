@@ -1,3 +1,5 @@
+*Statut (2026-08-28) : RAPPORT, lecture seule. Ce qui en reste ouvert est trace dans TODO.md (§1.6 ratifications, §2 decisions, §3 dettes) — ce fichier ne se met plus a jour. Index : docs/README.md.*
+
 # AUDIT-5 — Harmonisation & santé transversale
 
 *Session d'audit dédiée, lecture seule, 2026-08-25. HEAD = f5a8a51.

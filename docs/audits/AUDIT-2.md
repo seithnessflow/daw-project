@@ -1,3 +1,5 @@
+*Statut (2026-08-28) : ARCHIVE — rapport d'audit 2, lecture seule, date. Ses reliquats ouverts sont traces dans TODO.md (dettes datees) ; les items soldes dans JOURNAL.md. Index : docs/README.md.*
+
 # AUDIT-2.md
 
 *Audit lecture seule — 2026-08-21. Question directrice : qu'est-ce qui va ceder

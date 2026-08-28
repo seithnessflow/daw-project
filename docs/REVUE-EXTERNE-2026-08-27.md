@@ -1,5 +1,12 @@
 # Revue externe du 2026-08-27 — consignation et arbitrage propose
 
+*Statut (2026-08-28) : REFERENCE — l'arbitrage propose ci-dessous a ete
+RATIFIE le 2026-08-27 (JOURNAL suite 12 : « le plan complet est
+approuve ») et execute pour ses deux premiers points (spike sessions 1-2,
+Lot P, migration TEMPO T1-T5 livree le soir meme). La suite (Vague 3 avec
+l'entree live, perf au regime de preuve, garde-fou anti-clone) est dans
+TODO.md ordre grave et CLAUDE.md §2.*
+
 *Une session Fable 5 externe a analyse docs/BRIEF-EXTERNE-FABLE5.md.
 Ce fichier consigne ses critiques, la reponse point par point de la
 session de dev (validee sur le code), et l'arbitrage propose A

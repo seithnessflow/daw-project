@@ -1,3 +1,5 @@
+*Statut : ARCHIVE (2026-08-28) — prompt one-shot de l'audit 2 (2026-08-21), conserve pour la forme de la commande.*
+
 # Prompt d'audit 2 — a coller dans une session neuve (Fable/Opus, sans historique)
 
 ---

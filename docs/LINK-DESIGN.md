@@ -1,5 +1,11 @@
 # LINK-DESIGN.md — synchronisation du transport inter-machines (cadrage)
 
+*Statut (2026-08-28) : LIVRE pour l'Etage 1 (L1a horloge, L1b ancres,
+L1c rejoin + suspension jam — verts deux machines 2026-08-24, ecart
+<= 16 ms). Etage 2 (grille au quantum musical) = T4, DIFFERE en session
+dediee (le tempo existe depuis le 2026-08-27). §7 (politique latence
+heterogene) = decision ouverte, TODO §2.*
+
 *Session de cadrage 2026-08-24, exigee par TODO avant toute ligne de
 code. Declencheur : constat utilisateur pendant le smoke deux machines,
 « les deux sites ne sont pas synchronises » — chaque moteur possede son

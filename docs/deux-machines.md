@@ -1,5 +1,9 @@
 # Deux machines — remonter le montage
 
+*Statut (2026-08-28) : VIVANT (runbook). §5 = la procedure securisee
+(daw.ps1 -Secure + tunnel + #stoken). Reserve honnete inchangee : le
+chemin LIVE guest avec un vrai plugin n'a pas ete rejoue bout-en-bout.*
+
 *Session outillage 2026-08-23. Fixe = mb668 (192.168.1.10, Ethernet) ;
 portable = TX15, utilisateur `flow`, sur partage de connexion telephone
 (10.102.x — NAT, injoignable en entrant). Tout ce qui traverse passe

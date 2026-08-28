@@ -1,5 +1,10 @@
 # MAGIC POTION — brief pour analyse externe
 
+*Statut (2026-08-28) : REFERENCE datee — instantane du 2026-08-27 MIDI
+(avant la migration tempo du soir : « le temps musical n'existe pas » y
+est donc PERIME, comme les compteurs de tests). Reste la meilleure vue
+d'ensemble du produit en une lecture ; l'etat courant est dans STATUS.md.*
+
 *Rédigé le 2026-08-27 pour une session Fable 5 externe, sans accès au
 dépôt. Tout état annoncé ici est VÉRIFIÉ (suites de tests, CI, sondes
 pilotées) à la date d'écriture. Auteur du brief : la session Claude qui
@@ -261,7 +266,7 @@ Un audit comparatif complet face à Ableton/Cubase existe (AUDIT-6,
   (file + ordre grave), `JOURNAL.md` (chronique datée complète).
 - `docs/ADR-019-differenciateur-distribue.md` (la loi),
   `docs/SCHEMA.md` + `docs/SCHEMA-V2-DESIGN.md` (document),
-  `docs/AUDIT-5.md` (santé du code), `docs/AUDIT-6.md` (parité DAW),
+  `docs/audits/AUDIT-5.md` (santé du code), `docs/audits/AUDIT-6.md` (parité DAW),
   `docs/ABLETON-INTEGRALE.md` (le manuel Live 12 mappé sur le projet,
   designs CRDT des grandes couches absentes),
   `docs/P2P-ENGINES-DESIGN.md`, `docs/LINK-DESIGN.md` (sync/tempo).

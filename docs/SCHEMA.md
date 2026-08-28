@@ -32,13 +32,11 @@ The v1 -> v2 bump is LAZY (`ensureV2` at the first musical write);
 byte-identical across tiers). Durations are differences of positions:
 adjacent musical clips resolve seamlessly by construction.
 
-> **v2 announced (ADR-019, 2026-08-23, design session pending):** v2
-> adds PLACEMENT — each processing node declares which peer hosts it
-> (negotiated by capability) — and rendered-stem references (stem key =
-> hash of input audio + class-uid + param state + time range) so a peer
-> WITHOUT the plugin plays the plugin's output from the asset store.
-> Nothing of this exists in v1 or in code yet; do not build against it
-> before the design session lands here.
+> **Status 2026-08-28.** Stems and plugin state SHIPPED (2026-08-23, fields
+> on Processor below — engine-authored). PLACEMENT (each node declaring
+> which peer hosts it, ADR-019 §2) was never designed: today a node whose
+> uid does not resolve locally is substituted by its stem. Open decision,
+> TODO.md §2.
 >
 > **Also on the v2 design session's table (consigned 2026-08-25):
 > LISTENING PLACES** — each participant has their own listening
@@ -119,6 +117,15 @@ adjacent musical clips resolve seamlessly by construction.
 | `order` | `float` | No (D1 2026-08-26, additive) | DISPLAY order (fractional indexing: dropping between neighbors writes their midpoint). The Automerge list keeps CREATION order - objects never move in the list, so concurrent edits keep their identity (docs/DND-DESIGN.md). Consumers sort via `orderedTracks` (web/src/document/schema.ts); absent = the list index. The engine ignores it (mixing is order-independent). |
 | `automation` | `array<AutomationLane>` | No (A1 2026-08-26, additive) | This track's automation lanes. Absent = none. A2 (same day): the engine EVALUATES track-param lanes (`processorId` absent, param `gain`/`pan`; enabled lane WINS over the manual value; mapping gain v*2, pan v*2-1; per-256-frame-block evaluation, engine/src/graph/automation.h mirrors web automationValueAt). Device-param lanes (`processorId` set) stay ignored until A4. |
 | `kind` | `"audio"` \| `"midi"` | No (2026-08-27, additive) | Track TYPE - an EDITING contract enforced by UI gesture guards (no samples/WAV on a `midi` track; no MIDI clips or instruments on an `audio` track). ABSENT = legacy mixed track (accepts everything - every pre-existing project). The ENGINE ignores it (it already plays both clip kinds per track). Factory: `makeTrackDef` (web/src/document/schema.ts), created via the corner `+` button menu. |
+| `pan` | `float` | No (F2 2026-08-25, additive) | -1 (left) .. 0 (center) .. +1 (right), applied POST-chain. Linear centre-neutral law (pan 0 == unchanged, deterministic hash preserved) - not equal-power (dated debt). Absent = 0. |
+
+### Scenes (Session view, T7 2026-08-25, additive)
+
+Root `scenes: array<{id, name}>` - one scene = one ROW of the clip
+launcher. Absent = no Session view. A session slot is a Clip carrying
+`sceneId` (see Clip); the engine ignores such clips on the timeline and
+launches them on demand (quantized launch, engine truth in telemetry).
+Performance state (which slot plays/is queued) is NEVER in the document.
 
 ### Clip
 
@@ -132,6 +139,18 @@ adjacent musical clips resolve seamlessly by construction.
 | `offsetSamples` | `int64` | Yes | Offset into the source asset. |
 | `fadeInSamples` | `int64` | No | V1.6, additive. Explicit fade-in length. 0 or absent = the engine's implicit 4 ms anti-click ramp (sample_rate/250, clamped to half the clip - see docs/DECISIONS.md 2026-08-23). |
 | `fadeOutSamples` | `int64` | No | V1.6, additive. Same contract as `fadeInSamples`, at the tail. |
+| `notes` | `array<Note>` | No (v8 MIDI, additive) | PRESENT = MIDI clip (`assetHash` is then the empty string; `offsetSamples` unused). The clip's audio is the instrument at the head of the track chain. NOTE: implemented as a LIST without ids; SCHEMA-V2-DESIGN §4 asked for a MAP with stable ids (concurrent note insertions can diverge) - additive fix planned with the MIDI wave (TODO ordre grave 4). |
+| `sceneId` | `string` | No (T7, additive) | PRESENT = this clip is a Session SLOT of scene `sceneId`, not a timeline clip. |
+| `startSample` / `lengthSamples` | | | Since v2 (T3) both are OPTIONAL in the type: a MUSICAL clip carries `startTick` (and `lengthTick` for MIDI) instead. Every consumer reads geometry through `geometry.clipStartSamples` (web) / `resolveMusicalTime` (engine), never the raw field. |
+
+### Note (inside `Clip.notes`)
+
+| Field | Type | Description |
+|---|---|---|
+| `pitch` | `int` | 0..127 |
+| `velocity` | `int` | 0..127 (UI writes 100; not yet editable - TODO) |
+| `startSample` / `lengthSamples` | `int64` | Relative to the clip start (absolute clip). |
+| `startTick` / `lengthTick` | `int64` | Relative to the clip start (musical clip). The parent clip's domain governs - never a mix. |
 
 ### Processor
 
@@ -141,7 +160,13 @@ adjacent musical clips resolve seamlessly by construction.
 | `type` | `string` | Yes | Processor type identifier. |
 | `uid` | `string` | vst3 only | 32-hex VST3 class id. The document NEVER carries module paths - uid -> module resolution is host-side (`--vst3-module`). |
 | `bypass` | `bool` | Yes (default false) | 2.4d: bypass is DOCUMENT state, driven from the tab. Live vst3: dry time-aligned (latency kept, pipeline warm). Offline / zero-latency nodes: identity. |
-| `params` | `list<{key, value}>` | Yes | Parameter pairs as a LIST of `{key: string, value: float}` maps (list-of-pairs, not a map: iterable by index across every consumer). |
+| `params` | `list<{key, value}>` | Yes | Parameter pairs as a LIST of `{key: string, value: float}` maps (list-of-pairs, not a map: iterable by index across every consumer; the engine keeps DOCUMENT order - it feeds the stem key). |
+| `name` | `string` | No (additive) | Display name written by the tab at add time (the device title bar). The engine ignores it. |
+| `stateHash` | `string` | No (2.5-etat 2026-08-23, additive, ENGINE-authored) | SHA-256 of the plugin's opaque state blob in the store (`IComponent::getState`; controller state not yet serialized - TODO). Only the machine hosting the plugin writes it. |
+| `stateVersion` | `int` | No (additive, ENGINE-authored) | LWW counter for `stateHash` (two hashes do not order themselves; no binary state merge). |
+| `stemHash` | `string` | No (S7 2026-08-23, additive, ENGINE-authored) | SHA-256 of the rendered stem WAV (float32) in the store - the node's rendered truth for peers without the plugin. The stem covers the node AND its whole upstream chain (post-clips, pre-track-gain); a peer substitutes the chain by the stem of the LAST unresolvable vst3 node. |
+| `stemKey` | `string` | No (additive, ENGINE-authored) | Input-cache freshness key (`stem-v2`: uid, module version tag, sample rate, state hash, ordered params, resolved clip geometry/fades/upstream gain). Stale = UI badge state, never a playback block. Never an assertion of bit-exact re-render (ADR-019 amendment). |
+| `stemLatencySamples` | `int64` | No (additive, ENGINE-authored) | Declared PDC of the rendered chain: the stem player reads AHEAD by this amount. |
 
 ### AutomationLane
 
@@ -165,7 +190,16 @@ converges them today.
 | Type | Parameters | Description |
 |------|------------|-------------|
 | `builtin.gain` | key `"gain"`: float (0.0-2.0) | Simple gain stage. |
-| `vst3` (c-2, 2026-08-22) | keys are VST3 param ids as DECIMAL STRINGS (e.g. `"0"`), values normalized 0.0-1.0 | Out-of-process VST3 plugin (ADR-017). An engine that cannot resolve the uid SIGNALS and skips the node (live) or FAILS the render (offline) - never a silent different sound. |
+| `builtin.utility` (4.1, 2026-08-25) | `gain`, `pan`, mono, phase (keys and units: `NATIVE_PARAM_SPECS`, web/src/ui/track.ts - the single UI source; engine mirror in graph/utility_node) | Gain / balance-law pan / mono sum / polarity. Smoothing starts on target (bit-exact). |
+| `builtin.eq3` (4.2) | 3 bands (low/mid/high gains + freqs), see `NATIVE_PARAM_SPECS` | Biquads computed off-callback. |
+| `builtin.comp` (4.2) | threshold, `ratio`, attack, release, makeup, see `NATIVE_PARAM_SPECS` | Detector + smoothed gain. Gain-reduction meter not yet published (TODO). |
+| `builtin.drive` (4.3) | drive, mix, see `NATIVE_PARAM_SPECS` | 4x oversampled saturation, first real PDC client (16 samples declared). |
+| `builtin.delay` (4.3) | time (ms, awaiting musical sync), `feedback`, mix, see `NATIVE_PARAM_SPECS` | Sample-exact impulse, decay = feedback. |
+| `vst3` (c-2, 2026-08-22) | keys are VST3 param ids as DECIMAL STRINGS (e.g. `"0"`), values normalized 0.0-1.0 | Out-of-process VST3 plugin (ADR-017). An engine that cannot resolve the uid SIGNALS and plays the node's STEM if one exists (live), or FAILS the render (offline) - never a silent different sound. |
+
+Param KEYS of the native nodes are declared once in `NATIVE_PARAM_SPECS`
+(web) and read by name in the engine nodes - a manual twin (AUDIT-5 F);
+this table names the types, the code names the keys.
 
 ## Invariants
 
@@ -173,7 +207,7 @@ converges them today.
 
 2. **Binary blobs never enter the document.** Only their SHA-256 hash. Assets are stored separately.
 
-3. **`schemaVersion` exists from v1.** Migration code exists from v1, even if empty.
+3. **`schemaVersion` exists from v1.** Migration code exists from v1, even if empty. (Known gap, AUDIT-4 A4-8: `migrateDocument`/`validateDocument` are not called at load time on either tier - a corrupt document loads silently. Tracked in TODO.)
 
 4. **IDs are immutable.** Once assigned, a track/clip/processor ID never changes.
 
@@ -181,26 +215,13 @@ converges them today.
 
 ## Migration
 
-### From v0 (nonexistent) to v1
+### v1 -> v2
 
-No migration needed. v1 is the initial version.
-
-```typescript
-function migrate(doc: any): ProjectDocument {
-  const version = doc.schemaVersion ?? 0;
-
-  if (version === 0) {
-    // No v0 documents exist. This branch is never taken.
-    // Placeholder for the migration pattern.
-  }
-
-  if (version > 1) {
-    throw new Error(`Unknown schema version: ${version}`);
-  }
-
-  return doc as ProjectDocument;
-}
-```
+Purely ADDITIVE: a v2 reader reads a v1 document as is; nothing to
+rewrite. The bump is LAZY (`ensureV2` inside the change that performs
+the first musical write); `createEmptyDocument` stays v1 so the vendored
+common seed keeps its bytes. A reader refuses `schemaVersion > 2`
+(`migrateDocument`, web/src/document/schema.ts).
 
 ## Example Document
 

@@ -1,5 +1,10 @@
 # DND-DESIGN.md — drag & drop generalise (proposition, a arbitrer)
 
+*Statut (2026-08-28) : LIVRE — D3 (2026-08-26 soir), D1 + D2 (nuit du
+26), D4 clips entre pistes + slots Session (2026-08-27). `TrackDef.order`
+fractionnaire documente dans docs/SCHEMA.md ; `moveProcessor` en
+remove+insert avec sa fenetre de perte concurrente assumee.*
+
 *Ecrit le 2026-08-26 (demande utilisateur : « pouvoir drag and drop un peu
 tous les elements, track, plugins, instruments »). PROPOSITION — decoupage
 a arbitrer, rien construit.*

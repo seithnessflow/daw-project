@@ -1,5 +1,11 @@
 # Streaming jam — dossier de cadrage (S8)
 
+*Statut (2026-08-28) : LIVRE — option A ratifiee et implementee (S8a/b/c,
+2026-08-24, validee a l'oreille deux machines / deux NAT, STUN seul) ;
+flux broadcaster propre depuis le pre-buffer d'amorcage (2026-08-27).
+Mesures reelles du pipeline (~75 ms logiciels hors reseau) :
+docs/SPIKE-LATENCE.md. TURN self-host = dette datee (TODO).*
+
 *Session de cadrage 2026-08-24. Statut : PROPOSITION a ratifier —
 aucune ligne de code avant l'arbitrage (nouvelle surface techno).
 Rappel de la revue : c'est LE morceau qu'on coupe s'il deborde.*

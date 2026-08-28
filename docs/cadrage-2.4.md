@@ -1,5 +1,11 @@
 # Cadrage 2.4 — l'hote VST3, tranche fine
 
+*Statut (2026-08-28) : REFERENCE — les choix d'outillage sont EN VIGUEUR
+(SDK VST3 direct sans JUCE, pin `v3.8.1_build_84` cite par ci.yml, route
+GPLv3 tranchee : LICENSE + DECISIONS.md) ; le decoupage 2.4a-d est LIVRE
+(2026-08-22, le bypass s'entend depuis un onglet). Le detail de l'hote
+depuis : docs/ADR-017 et STATUS.md.*
+
 Objectif inchange (TODO.md) : UN plugin de gain VST3 connu s'instancie dans
 un processus isole, traite de l'audio, et son bypass s'entend. Un plugin,
 un parametre, une preuve. Cadre technique : ADR-017 (proxys, registre,

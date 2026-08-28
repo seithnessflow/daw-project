@@ -1,89 +1,86 @@
-# SECURITY.md — audit et etat
+# SECURITY.md — etat securite (corrige / reste)
 
-*Audit defensif 2026-08-22 (lecture des 3 etages : serveur Rust, moteur
-C++, web TS). Modele de menace : mono-utilisateur local AUJOURD'HUI, mais
-le produit est COLLABORATIF (pairs distants = futur declare). Les
-corrections faites ce jour sont marquees [FAIT] ; le reste est priorise
-et suivi dans TODO.md.*
+*Proprietaire de l'etat securite. Modele de menace : mono-utilisateur
+local au quotidien, mais le produit est COLLABORATIF et le serveur est
+EXPOSE par un tunnel public a chaque smoke deux machines — donc « distant »
+= LIVE, pas futur. Audit d'origine 2026-08-22 ; apports AUDIT-4
+(2026-08-23) et AUDIT-5 (2026-08-25), rapports dans docs/audits/.
+Trie a jour au 2026-08-28.*
 
-## CORRIGE (verifie par AUDIT-4, 2026-08-23)
+## Regle d'exploitation (tant que l'auth n'est qu'un token partage)
 
-- **C1 — Path traversal dans `project_id`** : `..\..\evil` en URL
-  ouvrait une ecriture/lecture de `.am` hors de ./projects (le backslash
-  Windows n'est pas decode par la couche URL). Validation
-  `^[A-Za-z0-9_-]{1,64}$` au handler WS (`api/websocket.rs`,
-  `valid_project_id`) ET refus dans le store (`file_store.rs::project_path`
-  renvoie Result) — defense en profondeur.
-- **C2 (moitie locale) — drive-by website bloque** : garde d'Origin
-  local-first sur ws ET assets (`api/origin.rs` : autorise localhost/
-  127.0.0.1/[::1] toute origine, refuse toute origine navigateur
-  cross-machine ; absente = client natif exempt, comme le moteur).
-  `allow_origin(Any)` retire du CORS (liste 5173). Tests unitaires
-  origin + e2e.
-- **H1 — Token moteur** : 32 octets d'un CSPRNG OS (BCryptGenRandom sur
-  Windows, /dev/urandom ailleurs) au lieu de mt19937_64 ; comparaison
-  constant-time (`constantTimeEquals`). Token reste 64 hex.
-- **H2 (moitie cap)** : cap de frame WS 8 Mo pose.
-- **M2** : garde de longueur en `size_t` (`websocket_server.cpp`) —
-  plus de wrap 32-bit.
-- **M3** : parseur WAV borne chaque champ AVANT lecture/alloc
-  (`plugin_host_main.cpp::readWav16Stereo`) — plus d'OOB ni d'alloc 2 Go.
-- **M5** : document hostile — `document/sanitize.ts` (clampSamples borne
-  les spans ; cssId/CSS.escape sur les 6 selecteurs interpolant un id)
-  applique dans track/life/gestures/render.
+Un tunnel `cloudflared` ne s'ouvre qu'avec `scripts\daw.ps1 -Secure`
+(token serveur genere, `DAW_SERVER_TOKEN`) : l'URL partagee porte le
+secret, on la traite comme un mot de passe, et **jamais un tunnel ouvert
+hors test**. Procedure : docs/deux-machines.md §5.
 
-## RESTE, par priorite (suivi TODO « SECURITE »)
+## CORRIGE
 
-- **C2 (moitie distante) — RE-CADRE LIVE, PAS FUTUR (AUDIT-5 F1,
-  2026-08-25)** : le serveur n'a AUCUNE auth. La procedure deux-machines
-  documentee (`cloudflared tunnel --url http://localhost:3000`,
-  docs/deux-machines.md) publie ce serveur loopback sur une URL HTTPS
-  PUBLIQUE a CHAQUE smoke : quiconque a l'URL lit tout le projet, ecrit
-  des changes que le moteur applique sans validation, R/W le store, et
-  REJOINT le jam (ecoute du master, cf. F2 : relais signal verbatim,
-  identite `from` auto-declaree). Ce n'est donc ni « au 1er pair » ni
-  reserve a `DAW_SERVER_BIND=0.0.0.0` — c'est vrai a chaque tunnel ouvert.
-  Mitigation minimale (~5 lignes Rust) : token partage en header verifie
-  AVANT l'upgrade WS et sur `/assets`, OU Cloudflare Access. L'auth
-  complete se concoit avec le critere 3 (identites/invitations). D'ici
-  la : traiter l'URL du tunnel comme un mot de passe, ne JAMAIS laisser
-  un tunnel ouvert hors test. Detail complet + F2..F11 : docs/AUDIT-5.md.
-- **H2 (reste)** : sortir le parse Automerge de dessous store_lock (ou
+- **C1 path traversal `project_id`** : validation `^[A-Za-z0-9_-]{1,64}$`
+  au handler WS ET refus dans le store (defense en profondeur).
+- **C2 locale (drive-by)** : garde d'Origin local-first sur ws et assets
+  (`api/origin.rs`), CORS restreint a 5173. Tests unitaires + e2e.
+- **C2 distante (serveur sans auth derriere un tunnel) — F1 AUDIT-5,
+  FAIT 2026-08-25** : auth OPT-IN par token partage (env
+  `DAW_SERVER_TOKEN`) — premier message WS `auth:<token>` +
+  `Authorization: Bearer` sur `/assets`, comparaison temps constant ;
+  clients moteur (env) et web (fragment `#stoken`, jamais au reseau)
+  faits ; `daw.ps1 -Secure` active tout. Sans env var : dev inchange.
+  Tests Rust `auth_token` 2/2.
+- **H1 token moteur** : 32 octets CSPRNG (BCryptGenRandom / urandom),
+  comparaison constant-time.
+- **H2 (cap)** : cap de frame WS 8 Mo.
+- **M2** : garde de longueur en `size_t` (`websocket_server.cpp`).
+- **M3** : parseur WAV borne champ par champ (`plugin_host_main.cpp`).
+- **M5** : document hostile — `document/sanitize.ts` (clamp des spans,
+  `CSS.escape` sur les selecteurs interpolant un id).
+- **B3** : `dr_libs` epingle sur un SHA (`b55a0d9a`), GIT_SHALLOW retire.
+- **B5** : `util/path_safety.h` `isPathComponentSafe` aux 4 frontieres ou
+  une chaine du document devient un chemin (asset_hash, stem_hash,
+  node_id en ecriture, fetch hash + URL) — ferme le traversal lecture/
+  ecriture et l'injection CRLF. Garde `testPathComponentSafety`.
+- **M1** (uid non quote) : couvert par la meme validation de frontiere.
+- **A1/A2 (integrite du son, AUDIT-5)** : int/f64 tolerant, cle de stem
+  a pleine precision (stem-v2) — pas de la securite stricto sensu, mais
+  un stem faux declare frais est une atteinte a la verite de lecture.
+
+## RESTE, par priorite (suivi TODO.md)
+
+- **B2 — relais `signal:` verbatim, identite `from` auto-declaree** :
+  un JOIN forge fait repondre le diffuseur (flux master + IP reelles via
+  ICE) ; `bye`/`ta:`/`sf:` forges = DoS jam / controle du transport d'un
+  pair / badge fraicheur menteur. Mitige par F1 (il faut le token pour
+  parler au relais) ; reste ouvert entre pairs authentifies. Se concoit
+  avec les identites (critere 3 redefini).
+- **M4 — token en query `?token=`** : le fragment `#token` est scrube
+  (bon chemin) ; la branche legacy query subsiste dans `wiring.ts` et
+  n'est PAS scrubee (historique/Referer). C'est un RETRAIT a faire, pas
+  un design.
+- **H3 fichiers TEMP** : Low sur Windows (ACL `%TEMP%` owner-only
+  mesuree) ; **High sur POSIX/CI** (`/tmp` world-writable, token mode
+  0644, branche `#else` de `writeTokenFile`). Reste : `CREATE_NEW`/
+  `O_EXCL` + tmp unique pour le PUT assets (A4-15.1).
+- **H2 (reste)** : sortir le parse Automerge de dessous `store_lock` (ou
   le borner davantage).
-- **H3 — RE-CADRE (AUDIT-5, mesure 2026-08-25)** : sur Windows les
-  permissions par defaut de `%TEMP%` sont DEJA owner-only (System +
-  Administrators + l'utilisateur ; mesure ACL) — un autre utilisateur
-  local NON-admin ne peut ni lire le token ni ouvrir le `.shm`. Donc
-  H3 = **Low sur Windows** (reste : `CREATE_NEW`/`O_EXCL` contre un
-  meme-utilisateur qui pre-cree le chemin — pas une frontiere) et
-  **High sur POSIX/CI** (`/tmp` world-writable, token mode 0644 : le
-  vrai risque, branche `#else` de writeTokenFile). Le tmp partage du PUT
-  assets (A4-15.1) se regle du meme geste (nom unique).
-- **M1 — la garde ne tient PLUS (AUDIT-5)** : l'arg class_uid non quote
-  etait « garde par la table --vst3-module », mais depuis 2.5-decouverte
-  la map est AUSSI peuplee par le scan `--vst3-dir` (uid pris dans les
-  metadonnees du plugin) — le uid n'est plus CLI-controle. Valider
-  `^[0-9A-Fa-f]{32}$` a la frontiere (lie F5/F9).
-- **M4 — A MOITIE FAIT (AUDIT-5)** : le token passe par le FRAGMENT
-  (#token, scrub immediat via replaceState, jamais au reseau) — bon
-  chemin. RESTE : la branche legacy `?token=` (query) subsiste et n'est
-  PAS scrubee (reste en historique/Referer) — la supprimer. Ce n'est
-  plus « un design a decider », c'est un retrait.
-- **B3 dr_libs epingle FAIT 2026-08-25** (commit 2681ea8) : le parseur
-  dr_wav de chaque asset pair etait sur `GIT_TAG master` ; epingle sur
-  un SHA. (AUDIT-5 F3/B3.)
-- **L1** : overflow signe `start_sample+length_samples`
-  (`clip_player.cpp`).
-- **L2** : PUT assets bufferise 512 Mo en RAM — streamer/limiter.
-- **Apports AUDIT-4 (2026-08-23, details AUDIT-4.md)** : A4-15.2 fsync
-  manquant avant rename (durabilite) ; A4-15.3 noms reserves Windows
-  acceptes comme project_id (CON, NUL...) ; A4-15.4 bras IPv6 mort dans
-  origin.rs (fail-closed, sans danger, mais [::1] legitime bloque et
-  zero test IPv6).
+- **B4** : `?server=` non valide + outbox non scopee au serveur = un lien
+  peut exfiltrer les changes en file.
+- **B6** : `/api/engine-token` protege seulement par l'ordonnancement des
+  middlewares vite — un bump de version pourrait rendre le token lisible
+  par tout site visite. Vaut aussi pour `/api/projects` (AUDIT-6 §10).
+- **B7** : `AssetCache` sans eviction (OOM) ; `setState` de plugins tiers
+  nourri par les octets d'un pair (crash-DoS persistant) ; cache de
+  scan non echappe (redirection uid -> DLL persistante).
+- **L1** : overflow signe `start_sample + length_samples` (`clip_player`).
+- **L2** : PUT assets bufferise jusqu'a 512 Mo en RAM — streamer/limiter.
+- **A4-15** : fsync manquant avant rename (durabilite) ; noms reserves
+  Windows acceptes comme `project_id` (CON, NUL...) ; bras IPv6 `[::1]`
+  mort dans `origin.rs` (fail-closed, mais zero test IPv6).
+- Le moteur ne loggue pas les connexions WS acceptees.
 
-## Acquis a garder (l'audit les a valides)
+## Acquis a garder (valides par les audits)
 
-- Store d'assets : hex + SHA-256 verifies, refus au mismatch ; le moteur
-  re-verifie les corps tires. Le document porte des UID, jamais des
-  chemins (bloque la RCE par chemin de plugin). Le web rend toutes les
-  chaines du document via textContent (pas de XSS).
+Store d'assets : hex + SHA-256 verifies, refus au mismatch, le moteur
+re-verifie les corps tires. Le document porte des UID, jamais des
+chemins (bloque la RCE par chemin de plugin). Le web rend les chaines du
+document via `textContent` (pas de XSS). Thread audio sans syscall ni
+allocation (static_asserts). Token moteur par port, livre par fragment.

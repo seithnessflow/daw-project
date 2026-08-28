@@ -1,3 +1,5 @@
+*Statut : ARCHIVE (2026-08-28) — runbook du test des mains 2.4, supplante par scripts\daw.ps1 et le rituel du compositeur (CLAUDE.md §8). Ses commandes (seed-again, ?token=) ne sont plus la voie normale.*
+
 # Test des mains — jalon 2.4
 
 *Prealable OBLIGATOIRE a la session de re-cadrage 2.5 (TODO). Les notes

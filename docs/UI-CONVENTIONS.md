@@ -1,5 +1,12 @@
 # UI-CONVENTIONS.md — ce que les grands DAW ont deja arbitre
 
+*Statut (2026-08-28) : REFERENCE (recherche 2026-08-22). Les « decisions
+adoptees » de la fin ont ete appliquees par la refonte « etabli Magic
+Potion » (2026-08-25) puis le rack en bas (2026-08-26) ; le seek vit sur
+la regle, le clic couloir selectionne. Les mecaniques profondes 1-5 sont
+en place sauf l'etat CONTROLLER (seul le Component est serialise) et le
+scan `moduleinfo.json` (on passe par l'enfant) — TODO.*
+
 *Recherche 2026-08-22 (5 agents : Ableton Live 11/12, Cubase 13/14,
 Logic Pro 10.7/11, suites stock, mecanique profonde du hosting).
 Rapports complets dans l'historique de session ; ici : ce qui converge,

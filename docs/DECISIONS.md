@@ -2,10 +2,39 @@
 
 Ce document trace chaque décision technique non triviale, sa justification, et les alternatives écartées.
 
-*Registre UNIQUE depuis 2026-08-23 (fusion AUDIT-4) : l'ancien
-`DECISIONS.md` racine (decisions produit + resultats de tests) vit
-desormais ici, dans la section « Decisions produit et resultats de
-tests » en fin de fichier. Un seul proprietaire par information.*
+*Statut : VIVANT. Registre UNIQUE depuis 2026-08-23 (fusion AUDIT-4) :
+l'ancien `DECISIONS.md` racine (decisions produit + resultats de tests)
+vit ici, dans la section « Decisions produit et resultats de tests » en
+fin de fichier. Un seul proprietaire par information.*
+
+## Index des ADR (inline ici, ou fichiers separes dans docs/)
+
+| ADR | Titre | Statut | Ou |
+|---|---|---|---|
+| 001 | Audio thread constraints | Accepte | inline |
+| 002 | Document ownership (le navigateur possede le doc, sauf stem/state hashes — amende ADR-019/AUDIT-5) | Accepte | inline |
+| 003 | Sample-based timing (etendu aux ticks v2 : entiers toujours) | Accepte | inline |
+| 004 | Graph as projection | Accepte | inline |
+| 005 | WebSocket library — websocketpp jamais appliquee, ixwebsocket reel | Remplace | inline |
+| 006 | WAV loading (dr_wav) ; autres formats : decodage NAVIGATEUR a l'import (2026-08-27), pas dr_mp3/dr_flac | Accepte, note | inline |
+| 007 | Protobuf for engine protocol | Accepte | inline |
+| 008 | Chrome Local Network Access | VALIDE 2026-08-23 (campagne consignee plus bas) | inline |
+| 009 | No database in slice 1 | Accepte | inline |
+| 010 | Double-buffer graph swap (mecanisme reel : pointeur brut + generation, note AUDIT-2) | Accepte, annote | inline |
+| 011 | Telemetry rate 30 Hz | Accepte | inline |
+| 012 | Automerge-C integration | Accepte | inline |
+| 013 | Automerge-C build integration (chemins WSL historiques) | Resolu | inline |
+| 014 | Network topology (triangle) — sa justification « rien de temps reel ne traverse le serveur » est ABROGEE par ADR-019 | Accepte, amende | inline |
+| 015 | WSL audio limitations | OBSOLETE | inline |
+| 015 | Windows native build — **collision de numero** avec le chapitre ci-dessus ; le FICHIER est la decision vivante, le chapitre l'historique WSL qu'il remplace | Accepte | `ADR-015-windows-native-build.md` |
+| 016 | Automerge version alignment | Accepte | `ADR-016-automerge-version-alignment.md` |
+| 017 | Plugin process isolation | Accepte | `ADR-017-plugin-process-isolation.md` |
+| 018 | Fixed block size 256 (renumerote depuis 016) | Accepte | inline |
+| 019 | Le differenciateur distribue (LA loi, l'invariant, criteres 3/6) | Accepte, §6 amende 2026-08-27 | `ADR-019-differenciateur-distribue.md` |
+
+Decisions produit sans numero d'ADR (section finale) : licence GPL-3.0,
+compaction (verdict A), hashes de reference (absolu + musical), graine
+deterministe par copie, migration tempo ADDITIVE-DUAL, campagne LNA.
 
 ## ADR-001: Audio Thread Constraints
 
@@ -166,7 +195,13 @@ Utiliser **dr_wav** (header-only, partie de la famille dr_libs).
 
 ### Note
 
-Les autres formats (MP3, FLAC, OGG) arriveront en tranche 2 via dr_mp3, dr_flac, stb_vorbis.
+> **Note 2026-08-27.** Les autres formats (MP3, FLAC, OGG, M4A) sont
+> decodes PAR LE NAVIGATEUR a l'import (`OfflineAudioContext` au taux du
+> projet, re-encodage WAV PCM 16 bits vers le store) : le moteur ne lit
+> que du WAV canonique et dr_mp3/dr_flac ne sont pas inclus. 16 bits
+> assume (dette datee FLAC 24 bits).
+
+Texte d'origine : les autres formats (MP3, FLAC, OGG) arriveront en tranche 2 via dr_mp3, dr_flac, stb_vorbis.
 
 ---
 
@@ -200,7 +235,12 @@ Utiliser **Protocol Buffers** avec préfixe de longueur (4 bytes big-endian).
 
 ## ADR-008: Chrome Local Network Access
 
-**Statut:** En investigation
+**Statut:** VALIDE 2026-08-23 (sceau sur le vrai Chrome 151/Windows 11 ;
+resultats de campagne dans « Critere 4 » en fin de fichier). Le texte
+ci-dessous est l'hypothese d'origine. Realite : pas de preflight HTTP a
+implementer cote moteur — le carve-out loopback fait que le tunnel ne
+sert que la page, l'URL WS reste 127.0.0.1 ; `--allow-origin` autorise
+l'origine publique.
 **Date:** 2026-08-20
 
 ### Contexte
@@ -383,7 +423,15 @@ set(AUTOMERGE_BUILD_DIR "${AUTOMERGE_C_DIR}/build")
 
 ## ADR-014: Network Topology (Triangle)
 
-**Statut:** Accepté
+> **Amendement 2026-08-23 (ADR-019).** La justification « Rien de temps
+> réel ne traverse le serveur distant » est ABROGÉE telle qu'écrite :
+> elle interdisait le produit. Loi en vigueur : aucun audio n'est TRAITÉ
+> côté serveur ; l'audio inter-pairs voyage en P2P ; le serveur fait du
+> signaling (+ TURN éventuel) et sert le store. Le triangle lui-même
+> (navigateur ↔ moteur en direct sur 127.0.0.1, gros transferts par
+> HTTP) reste vrai.
+
+**Statut:** Accepté, amendé
 **Date:** 2026-08-20
 
 ### Contexte
@@ -628,6 +676,36 @@ Recommandation (3 lignes):
    ~100 000 changes (mesurable: taille > 5 Ko ou load web > 500 ms).
 3. Coalescing des drags cote client (1 change a la relache, /50): assurance
    bon marche, optionnelle, a prendre lors d'une future session web courte.
+
+## Critere 4 : LNA Chrome — campagne 2026-08-23 (resultats acquis)
+
+ETABLI sur le VRAI Chrome 151.0.7922.170 / Windows 11, profils vierges,
+oracle temporel automatise, puis SCEAU dans le navigateur de
+l'utilisateur (sonde granted, canari 4 ms, onopen 3 ms, AUTH OK +
+telemetrie 23 ms) :
+
+1. Invite Chrome apparue et autorisee -> WS connecte depuis une page
+   HTTPS publique (trycloudflare) au moteur local (`--allow-origin`).
+2. `fetch` ET WebSocket sont TOUS DEUX soumis au LNA et savent
+   declencher la demande (etat prompt -> les deux pendent en attente ;
+   aucun echec immediat : le pire cas « subit sans pouvoir demander »
+   est ecarte).
+3. ZERO GESTE : une connexion lancee au chargement declenche l'invite —
+   l'onboarding « connexion au chargement » est viable.
+4. `permissions.query('local-network-access' | 'local-network')` expose
+   l'etat (prompt/granted lus en reel) -> l'UI n'a jamais a deviner ;
+   feature-detection OBLIGATOIRE (Firefox/Safari sans API).
+5. Auth prouvee de bout en bout quand permis ; token perime -> close
+   4001 (signature distincte de 1006), l'onglet re-recupere le token et
+   retente UNE fois.
+
+Mecanisme : carve-out loopback (le tunnel ne sert que la page ; l'URL WS
+est 127.0.0.1). INCONNUS DATES (documentation, non bloquants) : texte
+exact de l'invite, semantique du dismissal (Echap) et du refus explicite,
+duree de memorisation, Firefox/Safari, `--allow-origin` en prod,
+audio/telemetrie soutenus par ce chemin. Canari `fetch` mode cors NON
+CONCLUSIF sur ce moteur (400 sans CORS = « Failed to fetch » meme reseau
+ouvert). Le moteur ne loggue pas les connexions acceptees (dette).
 
 ## Critere 1: nouveau hash de reference - 2026-08-21
 

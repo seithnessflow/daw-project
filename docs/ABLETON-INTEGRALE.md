@@ -1,5 +1,11 @@
 # ABLETON-INTEGRALE.md — le manuel Live 12 entier, mappe sur Magic Potion
 
+*Statut (2026-08-28) : REFERENCE stable. Depuis sa redaction, ont ete
+LIVRES : fades (§2.1), pan de piste (§2.4), Utility (§3), automation
+(§4, A1-A3), tempo (§4, migration additive-dual — le modele LWW retenu),
+boucle utilisateur, scission. Le manuel = reference PONCTUELLE, jamais
+une source d'items (CLAUDE.md §7).*
+
 *Lecture integrale 2026-08-22 (6 passes paralleles sur le manuel officiel :
 Session/lancement/grooves ; Arrangement/ClipView/warp/recording/comping ;
 mix/routing/automation/enveloppes ; devices/racks/M4L/references ;

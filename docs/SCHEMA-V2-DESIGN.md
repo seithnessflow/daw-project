@@ -1,5 +1,14 @@
 # SCHEMA v2 — dossier de conception (placement, stems, MIDI)
 
+*Statut (2026-08-28) : LIVRE EN PARTIE. §2 etat de plugin et §3 stems
+sont implementes (2026-08-23 ; cle passee en `stem-v2` avec module
+version tag + pleine precision, AUDIT-5 A2) ; §4 clips MIDI implementes
+en LISTE sans ids (ecart avec la MAP demandee ici — a corriger de facon
+additive avec la vague MIDI, TODO ordre grave 4) ; le PLACEMENT n'a
+jamais ete concu (decision ouverte, TODO §2). Contrat en vigueur :
+docs/SCHEMA.md. Note : « v2 » ici designait ce dossier ; le
+`schemaVersion` 2 reel est la migration TEMPO additive-dual (2026-08-27).*
+
 *Session de design de l'entrelacs (2026-08-23), APRES critere-3-vrai.
 Statut : PROPOSITION — rien ici n'est implemente ; l'implementation
 suit l'ordre grave (2.5-etat -> stems S7 -> streaming). Les clips MIDI

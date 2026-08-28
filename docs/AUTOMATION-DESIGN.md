@@ -1,5 +1,11 @@
 # AUTOMATION-DESIGN.md — enveloppes de parametres (proposition, a arbitrer)
 
+*Statut (2026-08-28) : LIVRE A1-A3 (document 2026-08-26, moteur gain/pan/
+master miroir exact 2026-08-26, UI lane 2026-08-27) ; v2 tempo a ajoute
+`timeBase: 'ticks'` (lane musicale). RESTENT A4 (params de device VST3 +
+cle de stem etendue) et A5 (courbes/confort) — TODO. Contrat en vigueur :
+docs/SCHEMA.md « AutomationLane ».*
+
 *Ecrit le 2026-08-26 (tranche 3 de la reprise : « design d'abord »). PROPOSITION —
 rien n'est construit. L'arbitrage utilisateur decide du decoupage et du GO.*
 

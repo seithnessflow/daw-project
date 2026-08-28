@@ -1,80 +1,78 @@
 # REPRISE.md — point de reprise au demarrage
 
-## TOUT EN HAUT (2026-08-27, soir) : LA MIGRATION TEMPO EST LIVREE
+## TOUT EN HAUT (2026-08-28) : RANGEMENT DOCUMENTAIRE FAIT, RING v10 EN ATTENTE
 
-**A LIRE EN PREMIER — le point de synchro :** deux verdicts CI etaient
-en vol a la cloture : **e512538** (T5 — le hash MUSICAL passe pour la
-PREMIERE fois sous GCC : si rouge, c'est une divergence
-cross-compilateur du noyau tempo, lire le log du job build-linux) et
-**99190f4** (A6). Les sentinelles locales ont peut-etre rendu verdict
-avant la fermeture — sinon : `gh run list --limit 3`. AUCUN travail ne
-s'ouvre avant ces deux verdicts.
+**Point de synchro — LEVE :** les deux verdicts CI attendus a la cloture du
+27 (e512538 T5 hash musical sous GCC, 99190f4 A6) sont **VERTS**
+(runs 33098055746 et 33098555758, `gh run list`). Aucun verdict en vol :
+le rangement ci-dessous est markdown-only (la CI ignore `**.md`).
 
-## Ce qui a ete fait (session du 27 au soir, JOURNAL suites 13-17)
+**Travail NON COMMITE dans l'arbre (a traiter en premier) :** le ring
+v10 — `shared_audio_ring.h` (kRingSlots 4 -> 8, estampilles par slot
+A4-5, invariant input-dechire grave), `proxy_node.cpp`, `plugin_bridge.cpp`,
+`plugin_host_main.cpp`, `main.cpp` (clamp de profondeur bruyant),
+`cli_integration_test.cpp` (gtest ajoute) + `traces/box-3-open.png`.
+7 fichiers, ~175 lignes, NON verifie. Layout de struct partagee change
+=> **CLEAN build obligatoire** (`ninja clean`), gtests, spec proxy, puis
+commit. C'est l'item 2 de l'ordre grave, entame le 27 au soir.
+Le binaire `daw_engine.exe` de build-msvc est ANTERIEUR a ce diff
+(son `--help` ne connait pas `--exclusive`/`--buffer-size` alors que
+main.cpp les a) : ne pas lui faire confiance avant rebuild.
 
-LE LOT T (migration tempo ADDITIVE-DUAL, plan ratifie
-`.claude/plans/lazy-crunching-nautilus.md`) est SOLDE en une session,
-plus le Lot P et le Lot A6 :
+## Ce qui a ete fait (session du 2026-08-28 : rangement)
 
-- **Lot P** : perf au regime de preuve (500 pistes = 735 us/bloc en
-  gtest CI, compteurs stems + period/shareMode en telemetrie).
-- **T1** : schema v2 additif + noyau MIROIR 100 % entier
-  `web/src/document/tempo.ts` (BigInt) == `engine/src/graph/tempo.h`
-  (int64), vecteurs d'or partages `fixtures/tempo-vectors.json`
-  (gtest 41 verifs + spec Node 14/14). Creation RESTE v1 (graine
-  vendoree), bump v2 LAZY (ensureV2).
-- **T2** : `resolveMusicalTime()` = LE point d'etranglement moteur
-  (build live, offline_render, stems, fraicheur — cles sur samples
-  RESOLUS), quantum Session musical (1 mesure au registre).
-- **T3** : surface web — `geometry.ts` point de branche geometrie,
-  champ tempo topbar (milli-BPM entier, undo, LWW), clip MIDI frais
-  NAIT musical, piano-roll en ticks, badge ♪ + bascule Rendre
-  musical/absolu, grille+regle musicales, `tempo.spec.ts`. RITUEL DU
-  COMPOSITEUR a 100 BPM VERT (mesure 2 a 2,400 s pile, ratio tempo
-  exact, export x2 stable).
-- **T5** : DEUX ancres de determinisme — absolu `56729beb61993cd7`
-  INCHANGE par tout le lot (la preuve d'additivite) + musical
-  `c1233ae9d6ab9e83` epingle en jumeaux gtest==ci.yml (DECISIONS.md).
-- **Lot A6** : contrat de periode MESURE — demander un multiple de
-  256 = callbacks FIXES (0 partiel en partage 256/512, exclusif fixe) ;
-  piste A suffit, PAS d'accumulateur ; WARNING bruyant si un partiel
-  parait ; proxy_depth = ceil clampe (fix du max(1,n/256)).
-- **T4 (Link Etage 2) : DIFFERE explicitement** — seul reliquat du
-  lot T, session dediee a planifier.
+La doc se contredisait (trois « ordres graves » coexistants, criteres
+recopies avec des chiffres differents, README portant la loi ABROGEE,
+STATUS redevenu un journal, TODO de 88 Ko a 80 % de [x], deux ADR-015,
+audits eparpilles racine/docs). Fait, sans toucher au code :
 
-Etat des suites a la cloture : e2e **99/99**, gtests **51/51**
-(2 hashes ancres), tsc 0. CI verte jusqu'a 2cc73e6 inclus (T3).
+- **Un proprietaire par information, applique** (CLAUDE.md §3, la carte
+  des documents). CLAUDE.md = regles vivantes seulement (21 -> ~14 Ko,
+  sans historique) ; STATUS.md = etat court ; TODO.md = UNE file
+  (ordre grave / decisions ouvertes / dettes datees / backlog, 88 -> ~15 Ko,
+  zero item fait) ; SECURITY.md re-trie ; README.md verite (loi ADR-019,
+  capacites, CLI, structure).
+- `docs/audits/AUDIT-1..6.md` (les six rapports, lecture seule) ;
+  `docs/archive/` (docs morts + copies integrales des anciens CLAUDE/
+  STATUS/TODO du 27) ; `docs/README.md` = index avec statut par doc ;
+  chaque doc de conception porte une ligne `Statut :` en tete.
+- docs/DECISIONS.md : index des ADR (collision ADR-015 nommee), ADR-008
+  clos (LNA valide), ADR-014 amende par ADR-019, ADR-006 note import ;
+  ADR-019 §6 amende (gel -> garde-fou anti-clone). docs/SCHEMA.md
+  aligne sur schema.ts (pan, kind, notes, scenes, stems/etat, name).
+- Supprime : `start_engine.ps1` (3e chemin de demarrage a l'abandon,
+  A4-16.4). `AMELIORATIONS.md` archive (aucune entree depuis le 22 —
+  JOURNAL est le registre de fait).
 
 ## Comment relancer
 
-- Stack utilisateur : `start-daw.cmd` (double-clic) — RESTAUREE a la
-  cloture de cette session (serveur SECURE + moteur studio + web).
-- Offre OUVERTE (spike s2, non tranchee par l'utilisateur) : passer
-  `daw.ps1` en `--exclusive --buffer-size 256` (16 ms mesures,
-  0 underrun sous charge) — une ligne a changer, attend son GO.
+- Stack : `start-daw.cmd` (double-clic) ou `scripts\daw.ps1 -Secure`.
+  Arret : `stop-daw.cmd`. Avant tout rebuild moteur : tuer les
+  `plugin_host.exe` zombies.
+- Offre OUVERTE (non tranchee) : passer `daw.ps1` en
+  `--exclusive --buffer-size 256` (16 ms, 0 underrun sous charge).
 
 ## Quoi surveiller
 
-1. Les deux verdicts CI ci-dessus (e512538, 99190f4).
-2. Le premier passage GCC du hash musical (e512538) est LE point
-   sensible — divergence = probleme de noyau, pas de bruit.
-3. `callback-shape` dans les logs moteur : si `partials>0` parait, le
-   contrat de periode est viole et la piste B (accumulateur) remonte.
+1. Le ring v10 non commite (ci-dessus) : ne pas empiler dessus sans
+   l'avoir verifie ou range (stash) explicitement.
+2. `callback-shape` dans les logs moteur : `partials>0` = contrat de
+   periode viole, la piste B (accumulateur) remonte (TODO dettes A6).
+3. Le premier passage GCC du hash musical est passe (vert) — toute
+   divergence future = regression du noyau tempo, jamais du bruit.
 
-## La suite (ORDRE GRAVE, TODO.md)
+## La suite (ORDRE GRAVE, TODO.md §1)
 
-1. Reliquat spike : mesure LAN 2 machines (courte, portable TX15).
-2. Le GEL du lot T est LEVE : reprendre l'ordre grave du TODO
-   (tranche 2 item 3 : contrat de periode — kRingSlots=8, refus
-   bruyant, A4-5 ; puis la file d'ordres generique).
-3. T4 Link Etage 2 : a proposer comme session dediee.
-4. Dettes datees fraiches : wrap de boucle = chunk partiel par tour
-   (queue dry via plugins) ; conversion Rendre musical des clips MIDI
-   absolus (conversion de masse des notes) ; scission des clips
-   musicaux.
+1. Reliquat spike : mesure LAN 2 machines (portable TX15).
+2. Contrat de periode, fin : ring v10 (verifier + commit), refus de
+   demarrer hors contrat, puis la file d'ordres generique (A3-1).
+3. T4 Link Etage 2 : session dediee a proposer.
+4. Vague 3 MIDI + entree live (test Massive en demo de fin).
+5. Performance au regime de preuve (suite Lot P).
+6. Ratifications AUDIT-5 F / AUDIT-6 refontes.
 
 ## Decisions ouvertes
 
-- `--exclusive --buffer-size 256` dans daw.ps1 (ci-dessus).
-- Rampes de tempo, tempoMap UI, signatures UI : HORS perimetre T
-  (ecrits, schema seul les porte deja).
+Liste complete et a jour : TODO.md §2 (exclusif dans daw.ps1, overlap
+au drag, mute document, ASIO, placement + lieux d'ecoute, politique
+latence heterogene, auth, macOS, veille samod, kit de demarrage).

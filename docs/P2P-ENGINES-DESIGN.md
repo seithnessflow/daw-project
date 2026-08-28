@@ -1,5 +1,13 @@
 # P2P-ENGINES-DESIGN.md — moteurs pair-a-pair (proposition, a arbitrer)
 
+*Statut (2026-08-28) : PROPOSITION, rien construit. E4 a ete RECADRE par
+le spike latence (docs/SPIKE-LATENCE.md, 2026-08-27) : le jeu direct sur
+un moteur distant via le pipeline jam est EXCLU (~75 ms logiciels) ; la
+forme jouable du test Massive = MIDI sur le LAN -> rendu sur la tour en
+exclusif 256 -> enceintes de la piece, retour vers le portable en
+monitoring differe. E4 tombe en demonstration de fin de Vague 3 (TODO
+ordre grave 4). E1-E3 restent a arbitrer (proposer, ne pas construire).*
+
 *Ecrit le 2026-08-26 (tranche 4 de la reprise). PROPOSITION d'architecture —
 rien n'est construit (regle : proposer, pas construire a l'aveugle).
 Cadre : ADR-019 (aucun audio traite cote serveur ; serveur = signaling).*

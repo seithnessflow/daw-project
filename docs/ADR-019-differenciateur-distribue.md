@@ -89,6 +89,16 @@ dans la boucle de monitoring.
 
 ### 6. LNA passe premier, la parite Ableton est gelee
 
+> **Amendement (programme 2026-08-23, ratifications 2026-08-27).** Le gel
+> LITTERAL est leve : LNA (2026-08-23), stems S7 (2026-08-23) et
+> streaming S8 (2026-08-24) sont verts, et l'entrelacement est ratifie
+> (vague 1 habitabilite, fades, automation, tempo livres). Ce qui
+> remplace le gel : la file (TODO.md ordre grave, item par item) et le
+> **garde-fou anti-clone** (revue externe 2026-08-27) — toute surface
+> nouvelle nomme sa contribution au differenciateur (collab / stems /
+> P2P) ou reste en file. Le placement (§2) n'a toujours pas ete concu :
+> decision ouverte, TODO.md §2.
+
 - Le test LNA Chrome est le PREMIER geste du nouvel ordre : si
   l'hypothese « site distant -> moteur local » tombe, l'architecture
   entiere est a revoir — on le sait avant de construire dessus.

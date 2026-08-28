@@ -28,49 +28,61 @@ tagline, today.)*
 ```
 
 The document is an Automerge CRDT (binary `.am`), synced by the server;
-assets are content-addressed by SHA-256 in a verifying store; nothing
-real-time crosses the remote server.
+assets are content-addressed by SHA-256 in a verifying store. **The law
+(ADR-019): no audio is ever PROCESSED server-side; audio between peers
+travels P2P (WebRTC); the server only does signaling (+ optional TURN)
+and serves the store.**
 
-## Scope so far
+**The product invariant (ADR-019): a peer who does NOT have a plugin
+installed still hears that plugin's output.** The machine that owns the
+plugin renders "stems" (the node's audio, keyed by a hash of all its
+inputs) into the content-addressed store; the peer without the plugin
+plays the stem in place of the unresolved node, with a 3-state
+freshness badge. Proven byte-for-byte across two machines / two
+networks, including with commercial plugins.
 
-**Foundational milestone:** two browser tabs on the same project — move a
-fader in tab A, it moves in tab B, and the sound changes; a VST3 plugin
-runs in an isolated process and its bypass is audible from a tab.
+## What it does today (2026-08-28)
 
-**Features:**
-- Project documents = Automerge binary (`.am`), collaborative CRDT
-- Play WAV clips with sample-accurate positioning
-- Per-track gain + out-of-process VST3 chain with bypass
-- Offline render to WAV (deterministic: same document = same hash)
-- Timeline UI (clips, drag/resize, waveforms, overview, drop-your-WAV)
-- CLI for testing without a browser
+- Collaborative editing of one project from several machines, each
+  with its own native engine (CRDT convergence, offline-first, undo by
+  inverse operations that never rewinds a peer's work).
+- Arrangement: audio and MIDI tracks, clips (move / trim / split /
+  fades / rename / duplicate / drag across tracks), user loop, snap
+  grid, zoom / minimap / follow; automation lanes (gain / pan / master)
+  drawn with the mouse and evaluated bit-exactly by the engine.
+- Musical time (schema v2, additive): integer milli-BPM tempo, ticks
+  (PPQ 960) beside absolute samples, an integer tempo kernel mirrored
+  in TypeScript and C++ and pinned by shared golden vectors.
+- Session view (scenes, quantized launch with engine truth), mixer
+  console (faders, pan, local mute/solo, ballistic VU meters).
+- Out-of-process VST3 hosting: one child process per instance, shared
+  memory ring, crash = cold restart (never the engine's death), native
+  GUI windows on demand, VST3 folder scan / catalogue, drag & drop.
+  Five native effects (utility, EQ3, compressor, drive, delay).
+- Plugin state and rendered stems in the store; freshness badges.
+- P2P jam streaming (WebRTC, STUN, two NATs crossed for real) and
+  Link-style transport sync between machines (session clock + anchors).
+- Deterministic offline render (reference hashes asserted on two OSes,
+  per-stage `--probe` proof), one-click mixdown export, universal import
+  (mp3 / flac / ogg decoded in the browser to canonical WAV at project
+  rate), sample preview.
+- WASAPI shared or **exclusive** mode (`--exclusive --buffer-size 256`
+  = 16 ms measured, 0 underruns under load).
 
-**Not yet:** recording, MIDI, undo, tempo/bars, automation (see TODO
-roadmap and docs/ABLETON-INTEGRALE.md).
+**Not yet** (see TODO.md and docs/audits/AUDIT-6.md): audio recording and
+live MIDI input, sends / returns / groups, master device chain,
+multi-selection / clipboard, ASIO, project backups. Live state
+(criteria, test counts) lives in STATUS.md — this file does not repeat
+it.
 
 ## Prerequisites
 
-- **CMake** 3.20+
-- **C++ compiler** with C++20 support (GCC 10+, Clang 12+, MSVC 2019+)
-- **Rust** toolchain (for automerge-c and server)
-- **Node.js** 18+ (for web client and fixture generation)
-- **Protobuf** compiler (`protoc`)
-
-### Install on Ubuntu/Debian
-
-```bash
-sudo apt update
-sudo apt install cmake build-essential protobuf-compiler
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install nodejs
-```
-
-### Install on macOS
-
-```bash
-brew install cmake protobuf node rust
-```
+Primary development platform is **Windows 11 native with MSVC** (no
+WSL); Linux/GCC is used by CI only. You need Visual Studio Build Tools
+2022 (C++ workload + CMake + Ninja), a Rust toolchain (MSVC target),
+Node.js 20+ and `protoc`. Setup details: `docs/ADR-015-windows-native-build.md`.
+The Linux recipe (pinned automerge-c commit, VST3 SDK tag) is
+`.github/workflows/ci.yml`, the authoritative build script.
 
 ## Quick Start
 
@@ -108,49 +120,24 @@ cp test-assets/test_tone.wav "test-assets/${ASSET_HASH}.wav"
 On Windows the engine builds with MSVC in `engine\build-msvc`
 (`..\rebuild_msvc.bat`); see STATUS.md for the local commands.
 
-## Acceptance Criteria Verification
+## Acceptance Criteria
 
-### 1. Deterministic WAV Rendering
+Six criteria (deterministic render, CLI test without browser,
+two-machine convergence, Chrome Local Network Access from a public
+HTTPS origin, WASAPI without underruns, the stems invariant). Their
+current status, proofs and living procedures are owned by `STATUS.md`;
+reference hashes and measurement history by `docs/DECISIONS.md`.
 
 ```bash
-# Render twice and compare hashes (the reference hash 56729beb61993cd7 is
-# asserted inside daw_engine_test; see docs/DECISIONS.md)
+# Deterministic render: render twice, compare (the two reference hashes,
+# absolute 56729beb61993cd7 and musical c1233ae9d6ab9e83, are asserted
+# inside daw_engine_test AND ci.yml)
 ./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out1.wav --assets engine/test-assets
 ./engine/build/daw_engine --doc engine/test-assets/test.am --render /tmp/out2.wav --assets engine/test-assets
 sha256sum /tmp/out1.wav /tmp/out2.wav
-```
 
-### 2. CLI Integration Test
-
-```bash
-./engine/build/daw_engine_test          # 21 tests, no browser needed
-```
-
-### 3. Two-Tab Sync
-
-```bash
-# Terminal 1: Start server
-cd server && cargo run
-
-# Terminal 2: Start web client
-cd web && npm run dev
-
-# Open http://localhost:5173 in two browser tabs
-# Modify gain in one tab, observe change in the other
-```
-
-### 4. Chrome Local Network Access
-
-See `docs/DECISIONS.md` ADR-008 for investigation results (still untested).
-
-### 5. 10-Minute Stability Test
-
-```bash
-# Play a long project for 10 minutes (fixtures/test10min.am is tracked;
-# regenerate its asset with create_test_doc if missing)
-./engine/build/daw_engine --doc fixtures/test10min.am --play --assets fixtures
-
-# Monitor the "Underruns" counter - should stay at 0
+# CLI integration tests, no browser needed
+./engine/build/daw_engine_test
 ```
 
 ## Project Structure
@@ -158,29 +145,37 @@ See `docs/DECISIONS.md` ADR-008 for investigation results (still untested).
 ```
 /engine     C++ audio engine
   /src
-    /audio      Audio device, callback, ring buffer
-    /graph      Audio graph, processors, clip player
+    /audio      Audio device (miniaudio/WASAPI), sacred callback, ring buffers
+    /graph      Audio graph, native nodes, clip player, tempo kernel, automation
+    /host       Out-of-process VST3 host: shared ring, proxy node, bridge, plugin_host.exe
     /document   Automerge wrapper, schema
-    /transport  Play/stop/seek state
-    /render     Offline rendering
+    /network    Client to the sync server (document + asset fetch)
+    /protocol   Protobuf (browser<->engine, engine<->plugin_host)
+    /render     Offline render, stems, export job, per-stage probe
+    /transport  Play/stop/seek/loop state (lock-free atomics)
+    /websocket  Local WebSocket server (auth, telemetry 30 Hz, commands)
+    /util       SHA-256, crash handler, path safety
+  /tests        gtest-style integration tests (cli_integration_test.cpp)
 
-/server     Rust sync server
+/server     Rust sync server (axum)
   /src
-    /api        WebSocket handlers
-    /document   Automerge relay, persistence
+    /api        WebSocket sync + signal relay, asset store, origin/auth guards
+    /document   File store (.am per project, atomic), vendored seed
 
-/web        TypeScript web client
+/web        TypeScript web client (Vite, no framework)
   /src
-    /app        Wiring, gestures, rendering
-    /document   Automerge wrapper
-    /network    WebSocket clients
-    /proto      Generated protobuf code (npm run proto:gen)
-    /ui         Timeline, tracks, meters, life layer
+    /app        Wiring, gestures, rendering, navigation, guards, paradigms
+    /document   Automerge wrapper, schema, tempo kernel, geometry, undo, sanitize
+    /network    WebSocket clients (server, engine), jam (WebRTC), transport sync
+    /proto      Generated protobuf code
+    /ui         Tracks, mixer, session, piano-roll, browser, meters, life layer
+  /tests/e2e    Playwright specs (real engine spawned on critical paths)
 
-/scripts     Stack launchers (daw.ps1, start-stack.ps1)
-/third_party Pinned SDKs (VST3, automerge) - not committed
-/docs        Architecture decisions, schema
-/fixtures    Test files
+/scripts     Stack launcher (daw.ps1), perf/latency benches, two-machine tools
+/docs        Decisions (ADRs), schema, designs, audits/, archive/ — see docs/README.md
+/fixtures    Test files (golden tempo vectors, seed documents)
+/traces      Visual traces of piloted sessions
+/third_party Pinned SDKs (VST3, automerge) — not committed
 ```
 
 ## Engine CLI Reference
@@ -197,16 +192,24 @@ Options:
   --project <id>     Project ID for server sync (default: 'default')
   --doc <file>       Project document file (Automerge binary .am)
   --play             Play the project through audio device
+  --start-stopped    With --play: device up, transport stopped until a PLAY command
+  --exclusive        WASAPI exclusive mode (period honored, readback logged)
+  --buffer-size <n>  Requested device period in frames (default 512)
+  --editors          Open each VST3 plugin's native GUI window
+  --vst3-dir <dir>   Scan a VST3 folder (repeatable; cached, crash-isolated)
+  --vst3-module <uid>=<path.vst3>
+                     Resolve a chain node (class uid) to a module (repeatable)
   --render <file>    Render to WAV file
+  --probe <file>     With --render: per-stage audio proof JSON (peak/rms/hash
+                     between every chain node of every track)
   --assets <dir>     Directory containing audio assets (default: same as doc)
   --info             Show project information
   --mute             Use null audio backend (silent playback for testing)
+  --keepalive        File mode: loop the document instead of exiting at its end
   --sample-rate <n>  Sample rate for rendering (default: 48000)
   --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)
   --ws-port <n>      WebSocket server port (default: 47821)
-  --vst3-module <uid>=<path.vst3>
-                     Resolve a VST3 class uid to a module path (repeatable)
-  --allow-origin <o> Allow an extra browser Origin on the WebSocket
+  --allow-origin <o> Allow an extra browser Origin on the WebSocket (repeatable)
   --solo <track-id>  Solo specified track (repeatable)
   --mute-track <id>  Mute specified track (repeatable)
   --list-devices     List available audio devices and exit
@@ -214,14 +217,18 @@ Options:
 ```
 
 `--doc` and `--server` are mutually exclusive; `--render`/`--info` require
-`--doc`. Debug flags (`--debug-proxy-again`, `--debug-rebuild-delay-ms`)
-are listed by `daw_engine --help`.
+`--doc`. `daw_engine --help` is authoritative (debug hooks such as
+`--debug-proxy-again` are listed there). The engine token is written to
+`%TEMP%\daw-engine-token-<port>` (JSON) and delivered to the page by
+`scripts\daw.ps1`.
 
 ## Document Format
 
-See `docs/SCHEMA.md` for the complete schema specification.
+See `docs/SCHEMA.md` for the complete schema specification (v2 is
+additive over v1: musical fields in ticks appear beside absolute
+samples; a pure v1 document never changes).
 
-Example:
+Minimal v1 example:
 
 ```json
 {
@@ -253,8 +260,15 @@ See `docs/DECISIONS.md` for detailed rationale.
 
 - **Audio thread is sacred:** No allocations, no locks, no syscalls
 - **Document ownership:** Browser owns the document, engine projects it
-- **Sample-based timing:** All positions in int64 samples, never float seconds
+  (except stem/state hashes, authored only by the engine hosting the plugin)
+- **Integer timing:** All positions are int64 — samples, or ticks resolved
+  by the shared integer tempo kernel — never float seconds
 - **Graph as projection:** Rebuilt on every document change, atomic swap
+- **Plugins out of process (ADR-017), audio never through the server,
+  stems for peers without the plugin (ADR-019)**
+
+Working regime for contributors and for the AI session that develops the
+project: `CLAUDE.md`. Current state: `STATUS.md`. Queue: `TODO.md`.
 
 ## Development
 

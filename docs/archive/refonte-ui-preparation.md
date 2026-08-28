@@ -1,3 +1,5 @@
+*Statut : ARCHIVE (2026-08-28) — preparation de la refonte UI (2026-08-22) ; la refonte est livree (timeline, puis etabli Magic Potion 2026-08-25). Le contrat de selection (§3) est en vigueur.*
+
 # Preparation de la session refonte UI
 
 *Prepare le 2026-08-22, pendant la sentinelle du push outillage (#61).

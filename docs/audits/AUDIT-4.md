@@ -1,3 +1,5 @@
+*Statut (2026-08-28) : ARCHIVE — rapport d'audit 4, lecture seule, date. Ses reliquats ouverts sont traces dans TODO.md (dettes datees) ; les items soldes dans JOURNAL.md. Index : docs/README.md.*
+
 # AUDIT-4.md
 
 *Audit lecture seule — 2026-08-23, post-jalon 2.4 et post-corrections

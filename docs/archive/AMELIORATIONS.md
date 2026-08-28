@@ -1,3 +1,5 @@
+*Statut : ARCHIVE (2026-08-28) — registre sans entree depuis le 2026-08-22 ; JOURNAL.md a pris le relais de fait (chaque amelioration y est racontee avec son declencheur). Restaurer si l'utilisateur veut un registre separe.*
+
 # AMELIORATIONS.md — le registre des ameliorations « worth »
 
 *Regle (demandee 2026-08-22) : des que l'agent voit une amelioration qui

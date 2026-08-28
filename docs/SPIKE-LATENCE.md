@@ -1,5 +1,9 @@
 # SPIKE BUDGET LATENCE — mesures et verdicts
 
+*Statut (2026-08-28) : VIVANT — sessions 1 et 2 FAITES (2026-08-27),
+verdict rendu ; reliquat = mesure LAN 2 machines (TODO ordre grave 1).
+Les mesures resumees vivent aussi dans STATUS.md « Performance ».*
+
 *Spike ratifie (revue externe 2026-08-27, sequence : spike -> tempo ->
 Vague 3 live). Objectif : LE tableau mesure de la chaine
 clavier -> moteur local -> P2P -> moteur distant -> oreille, et le

@@ -1,5 +1,12 @@
 # ADR-015: Windows Native Build
 
+*Statut : VIVANT (la decision). La PROCEDURE ci-dessous est historique
+(2026-08-20 : chemins `build/_deps/automerge-src`, hash `f40af882` — un
+hash de silence depuis invalide) : la recette de build en vigueur est
+`engine\rebuild_msvc.bat` (CLAUDE.md §13) et, pour les pins, `ci.yml`.
+Collision de numero : le chapitre « ADR-015 WSL » de DECISIONS.md est
+l'ancienne decision que celle-ci remplace.*
+
 ## Status
 Accepted
 
