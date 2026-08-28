@@ -24,7 +24,14 @@ param(
     # fragment (#stoken, never sent to the network). USE IT before exposing
     # the server by a tunnel - it closes the no-auth hole. Without it (local
     # dev default) there is no auth, behaviour unchanged.
-    [switch]$Secure
+    [switch]$Secure,
+    # Vague 3 (2026-08-28) : port MIDI d'entree a ouvrir (sous-chaine du nom,
+    # ex. -MidiIn "Minilab3 MIDI" ; liste : daw_engine --list-midi-devices).
+    # Le moteur route le clavier vers la premiere piste qui a un instrument
+    # (ou -MidiTrack <id>). Partage 512 : jamais l'exclusif par defaut (il
+    # prend la carte et coupe le reste - Twitch compris).
+    [string]$MidiIn = "",
+    [string]$MidiTrack = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -99,9 +106,12 @@ $muteArg = if ($Mute) { " --mute" } else { "" }
 # 2026-08-26 : --editors RETIRE - il ouvrait TOUTES les fenetres de plugin au
 # spawn (verrue v1), en desaccord avec le bouton BOX (etat web « ferme »").
 # Les fenetres s'ouvrent A LA DEMANDE (BOX / clic droit), ring v9.
-$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped$muteArg " +
+$midiArg = if ($MidiIn -ne "") { " --midi-in `"$MidiIn`"" } else { "" }
+if ($MidiTrack -ne "") { $midiArg += " --midi-track `"$MidiTrack`"" }
+$engineArgs = "--server ws://localhost:3000 --project $PROJECT --play --start-stopped$muteArg$midiArg " +
               "--assets ..\test-assets --vst3-module $AGAIN_UID=VST3\again.vst3 " +
               "--vst3-dir `"C:\Program Files\Common Files\VST3`""
+if ($MidiIn -ne "") { Write-Status "MIDI in: '$MidiIn' -> premiere piste avec instrument$(if ($MidiTrack -ne '') { " (ou piste '$MidiTrack')" })" }
 $engineProc = Start-Process -FilePath $engineExe -ArgumentList $engineArgs `
     -WorkingDirectory $engineDir -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput (Join-Path $tempDir "daw-engine.log") `

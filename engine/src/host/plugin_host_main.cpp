@@ -1208,6 +1208,53 @@ int runServe(const std::string& segment_path, const std::string& module_path,
     return 0;
 }
 
+// Vague 3 (2026-08-28) : `--params <module> --uid <uid>` - la liste des
+// parametres du plugin (id, titre, unites, defaut normalise, drapeaux)
+// en TSV sur stdout. C'est la cle qui permet de MANIPULER un plugin sans
+// sa fenetre : `params: [{key: "<id>", value}]` dans le document (le
+// moteur pousse par le FIFO param du ring -> IParameterChanges). Meme
+// ceremonie que --process/--serve (headless), controleur acquis pour
+// lire IEditController.
+int runParams(const std::string& module_path, const std::string& uid_str) {
+    using namespace Steinberg;
+    PluginInstance inst;
+    std::string err;
+    if (!inst.setup(module_path, uid_str, 48000.0, err)) {
+        std::cerr << "plugin_host error: " << err << std::endl;
+        return 1;
+    }
+    inst.acquireController();
+    auto* ctrl = inst.edit.controller.get();
+    if (!ctrl) {
+        std::cerr << "plugin_host error: no edit controller (headless plugin)" << std::endl;
+        inst.teardown();
+        return 1;
+    }
+    const int32 n = ctrl->getParameterCount();
+    std::cout << "id\ttitle\tunits\tdefault\tsteps\tflags\n";
+    for (int32 i = 0; i < n; ++i) {
+        Vst::ParameterInfo info{};
+        if (ctrl->getParameterInfo(i, info) != kResultOk) continue;
+        // UTF-16 -> ASCII (portable : la CI Linux compile ce fichier ;
+        // les titres de parametres sont ASCII en pratique)
+        auto ascii = [](const Vst::TChar* s) {
+            std::string out;
+            for (; s && *s; ++s) out += (*s < 128) ? static_cast<char>(*s) : '?';
+            return out;
+        };
+        std::cout << info.id << '\t' << ascii(info.title) << '\t' << ascii(info.units) << '\t'
+                  << info.defaultNormalizedValue << '\t' << info.stepCount << '\t'
+                  << ((info.flags & Vst::ParameterInfo::kCanAutomate) ? "auto" : "")
+                  << ((info.flags & Vst::ParameterInfo::kIsReadOnly) ? " ro" : "")
+                  << ((info.flags & Vst::ParameterInfo::kIsBypass) ? " bypass" : "")
+                  << ((info.flags & Vst::ParameterInfo::kIsList) ? " list" : "")
+                  << '\n';
+    }
+    std::cerr << "plugin_host: " << n << " parameter(s)" << std::endl;
+    inst.teardown();
+    return 0;
+}
+
 }  // namespace
 
 int runEnumerate(const std::string& path);
@@ -1217,6 +1264,9 @@ int main(int argc, char* argv[]) {
 
     if (mode == "--enumerate" && argc == 3) {
         return runEnumerate(argv[2]);
+    }
+    if (mode == "--params" && argc == 5 && std::string(argv[3]) == "--uid") {
+        return runParams(argv[2], argv[4]);
     }
 
     if (mode == "--serve") {

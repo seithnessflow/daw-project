@@ -1937,3 +1937,23 @@ crete 0,18, 0 underrun. Piege paye : LNK1168 sur plugin_host.exe (un
 enfant vivant verrouille l'exe — tuer AVANT de rebuild, regle CLAUDE.md
 §12 que j'ai grillee une fois). Annule une non-regression lancee
 pendant que le moteur de l'utilisateur tenait 47821.
+
+**2026-08-28 (soir, suite — « tu peux manipuler le plugin toi-meme ? »
+oui, prouve ; « je vais pouvoir composer assiste par IA ») :** trois
+voies, deux prouvees ce soir : (1) MIDI CC via IMidiMapping — CC64
+sustain sur Dexed : crete 0,131 une seconde APRES le note-off contre
+0,000 sans pedale ; (2) le DOCUMENT — `plugin_host --params <module>
+--uid <uid>` (nouveau mode, TSV id/titre/unites/defaut/drapeaux ; Dexed
+= 2237 parametres dont 48 Cutoff, 49 Resonance, 50 Output, puis les
+2080 pseudo-CC JUCE) -> `__dawProject.setProcessorParam(track, proc,
+'50', v)` -> ring param FIFO -> IParameterChanges : Output 0.9 pousse
+pendant le jeu, notes a +0,5 s..+12 s toutes a 0,12, aucun trou ;
+(3) la fenetre native (BOX) reste la voie humaine. `daw.ps1 -MidiIn
+<nom> [-MidiTrack <id>]` livre (verifie : `-Mute -MidiIn MagicPotion`
+-> `midi-in: opened` dans daw-engine-err.log, `-Stop` propre). Le
+transitoire (note muette apres une sequence de changements) est REVU
+sur Dexed : Output 1.0 -> 0.15 -> 1.0 espaces de 2,4 s = muet ensuite ;
+un seul changement = jamais. Lie a la double sequence capture d'etat
+-> stateHash -> rebuild par geste ; non deterministe ; c'est LE cas
+d'usage « l'IA pousse un param pendant que l'humain joue », donc
+prioritaire (TODO §3).

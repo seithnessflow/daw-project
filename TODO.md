@@ -36,8 +36,10 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    (a) FAIT 2026-08-28 — MiniLab 3 a l'oreille de l'utilisateur
    (« c'est style en vrai » ; gresillement = enfant en retard a
    priorite normale, corrige par MMCSS Pro Audio : 1356 blocs rates ->
-   0 ; « oui ! ») ; (b) `daw.ps1 -MidiIn <nom>` pour la stack
-   quotidienne (partage 512, jamais exclusif par defaut) ;
+   0 ; « oui ! ») ; (b) FAIT — `daw.ps1 -MidiIn <nom> [-MidiTrack <id>]`
+   (partage 512, jamais exclusif par defaut) ; (b') FAIT —
+   `plugin_host --params <module> --uid <uid>` = la liste des parametres
+   (la cle pour piloter un plugin par le document sans sa fenetre) ;
    (c) la dette TRANSITOIRE DX10 ci-dessous (§3 moteur).
    Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
    synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
@@ -199,10 +201,16 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   rebuild stateHash (la 2e capture d'etat) -> MUETTE bien que routee
   (forwarded) et drainee par l'enfant (« cc 64 not mapped » loggue) ; a
   4 s tout sonne ; projet existant : sonne a 1,2 s comme a 5 s ;
-  Dexed/Surge XT jamais touches. Repro : `midi-in.spec.ts` avec 1,5 s au
-  lieu de 4. Pistes : capture d'etat (getState) pendant la note, ou
-  swap de graphe v=4 + estampilles par slot. Declencheur : un
-  utilisateur qui joue juste apres avoir pose un instrument.
+  Repro : `midi-in.spec.ts` avec 1,5 s au lieu de 4. VU AUSSI SUR DEXED
+  (soir) : `setProcessorParam` Output 1.0 -> 0.15 -> 1.0 espaces de
+  2,4 s => notes MUETTES apres le retour a 1.0 ; un seul changement
+  (0.9) => jamais muet (notes a +0,5/1,5/3/5/8/12 s toutes a 0,12).
+  Non deterministe, lie a la sequence capture d'etat -> stateHash ->
+  rebuild qui suit CHAQUE changement de param (2 rebuilds + 2 captures
+  par geste). Pistes : capture d'etat (getState) pendant la note, ou
+  swap de graphe + estampilles par slot. Declencheur : composer assiste
+  (un param pousse par l'IA pendant que l'utilisateur joue) — c'est le
+  CAS D'USAGE, donc prioritaire dans la Vague 3.
 - **PAS DE LIMITEUR DE SORTIE** : un instrument live avec un patch
   chaud ecreterait le DAC, rien ne protege les moniteurs (chaine master
   absente, AUDIT-6 §7). Point produit, pas un incident (l'alerte
