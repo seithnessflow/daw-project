@@ -180,7 +180,11 @@ NE JAMAIS demander a l'utilisateur de tester ce que je peux voir.
   Toute mesure affichee (VU...) recoit un test au signal connu.
   Exception accordee : pour tester le son, je peux declencher play et
   bouger plugins/params — en surveillant le gain (mesurer d'abord,
-  proteger les T8V).
+  proteger les T8V). **Instrument LIVE (MIDI-in) : `ear` n'existe pas
+  pour lui — MESURER en `--mute` d'abord (crete de la piste dans les
+  meters), et n'ecouter qu'avec le gain de la piste plafonne (<= 0,25)
+  ou sur un projet frais sans etat restaure.** Precedent 2026-08-28 :
+  un patch Dexed restaure a crete a +19 dBFS sur une note vel 70.
 - **LE RITUEL DU COMPOSITEUR** : chaque session qui touche le socle se
   verifie en COMPOSANT un projet par l'UI seule (menu -> pistes ->
   matiere -> notes -> mix -> ecoute -> export), jamais cote serveur/

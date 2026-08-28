@@ -10,10 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun verdict CI en vol (session B verte, 2026-08-28 nuit).
-- PREALABLE UTILISATEUR : creer le port loopMIDI « MagicPotion » ->
-  rejouer `npx playwright test tests/e2e/midi-in.spec.ts` (preuve pilotee
-  du port en vrai) puis la manip audible.
+- Verdict CI du push « preuve MIDI en vrai » (voir REPRISE.md).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
@@ -31,14 +28,15 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    cible, gate monitoring a l'arret, 4 tests, 59/59, specs 25/25.
    **Session B LIVREE 2026-08-28** : port WinMM + stub Linux, CLI
    `--list-midi-devices` / `--midi-in <nom>` / `--midi-track <id>`,
-   contrats de log, outil `midi_send`, spec `midi-in.spec.ts` (skip
-   propre sans le port). RESTE du maillon 1 : (a) le port loopMIDI
-   « MagicPotion » (utilisateur) -> spec verte = preuve pilotee du port
-   en vrai ; (b) la manip audible : `daw_engine --server ... --play
-   --start-stopped --exclusive --buffer-size 256 --midi-in <clavier>` sur
-   un projet avec Dexed -> une touche -> le son ; lire `midi-in stats`
-   (queue-lat + pipeline ~16 ms = le total percu) ; (c) `daw.ps1
-   -MidiIn <nom>` pour que la stack de tous les jours l'ouvre.
+   contrats de log, outil `midi_send`, spec `midi-in.spec.ts`. PROUVE
+   EN VRAI 2026-08-28 (port loopMIDI « MagicPotion » cree par le
+   registre) : matrice DX10 / Dexed / Surge XT verte, CC64 + pitch-bend
+   traduits via IMidiMapping (2080 assignations sur les JUCE), latence de
+   file 0,3-17 ms, pipeline 10,7 ms en exclusif 256. RESTE du maillon 1 :
+   (a) la manip a l'oreille de l'UTILISATEUR avec son clavier (`--midi-in
+   <nom>` ; MESURER muet d'abord, gain de piste plafonne — precedent
+   +19 dBFS) ; (b) `daw.ps1 -MidiIn <nom>` pour la stack quotidienne ;
+   (c) la dette TRANSITOIRE DX10 ci-dessous (§3 moteur).
    Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
    synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
    (ecart SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ;
@@ -186,6 +184,20 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   pas de fallback « parametre devine ». Le chemin IMidiMapping n'est
   prouve par aucun test (AGain ne declare rien) — preuve au premier vrai
   synthe (Vague 3).
+- **TRANSITOIRE MIDI live (2026-08-28, repro precise)** : projet FRAIS,
+  instrument mda DX10 ajoute par la page, note envoyee ~1,5 s apres le
+  rebuild stateHash (la 2e capture d'etat) -> MUETTE bien que routee
+  (forwarded) et drainee par l'enfant (« cc 64 not mapped » loggue) ; a
+  4 s tout sonne ; projet existant : sonne a 1,2 s comme a 5 s ;
+  Dexed/Surge XT jamais touches. Repro : `midi-in.spec.ts` avec 1,5 s au
+  lieu de 4. Pistes : capture d'etat (getState) pendant la note, ou
+  swap de graphe v=4 + estampilles par slot. Declencheur : un
+  utilisateur qui joue juste apres avoir pose un instrument.
+- **PAS DE LIMITEUR DE SORTIE** : un instrument live avec un patch
+  chaud (Dexed restaure : +19 dBFS a vel 70) ecrete le DAC ; rien ne
+  protege les moniteurs (chaine master absente, AUDIT-6 §7). Un clamp
+  doux au master (ou un vrai limiteur) est un prealable a « jouer
+  live » pour de vrai.
 - MIDI live (session A) : placement sample-exact des evenements par
   timestamp (v1 = offset 0, gigue <= un sous-bloc de 5,3 ms) ;
   changement de piste cible a travers un rebuild sans all-notes-off (le

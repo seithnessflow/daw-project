@@ -1863,3 +1863,33 @@ pilotee (a rejouer), puis la manip audible : `daw_engine ... --exclusive
 --buffer-size 256 --midi-in <clavier>` sur un projet Dexed. Non prouve
 tant que le port n'existe pas : le chemin WinMM -> callback en vrai (le
 routage l'est par gtest, le port par le smoke CLI).
+
+**2026-08-28 (Vague 3, la preuve en vrai — port cree, trois synthes, une
+alerte) :** l'utilisateur ne sait pas manier loopMIDI (« tu devrais pouvoir
+en generer toi-meme ») : port « MagicPotion » cree par le REGISTRE
+(`HKCU\Software\Tobias Erichsen\loopMIDI\Ports`, DWORD 1) + redemarrage de
+loopMIDI (ports Stream Deck conserves). La spec `midi-in.spec.ts` devient
+une MATRICE : mda DX10 (toujours), Dexed et Surge XT (installes sur la
+tour) ; CC64 + pitch-bend + note envoyes par `midi_send` ; asserts :
+crete de la piste > 0 transport ARRETE, `midi-in stats` forwarded=4
+dropped=0 unrouted=0, et la ligne `plugin_host: midi-mapping N` du log
+enfant (`%TEMP%\daw-ring-*.shm.log`) — DX10 declare 32 assignations,
+Dexed et Surge 2080 (JUCE : 16 canaux x 130) : LE CHEMIN CC64/PITCH-BEND
+VIA IMidiMapping EST PROUVE sur deux vrais synthes. Latence de FILE
+mesuree 0,3-17 ms (typique 4-7 ms), pipeline 21,3 ms en partage 512,
+**10,7 ms en exclusif 256**. Trois pieges payes : (1) `waitUntil` des
+helpers est SYNCHRONE — un predicat async est « vrai » tout de suite
+(la premiere spec a echoue pour ca alors que le moteur SONNAIT, crete
+0,16 dans son log) ; (2) TRANSITOIRE DX10 : sur un projet FRAIS, la
+note envoyee ~1,5 s apres le rebuild stateHash est MUETTE (evenements
+routes ET draines par l'enfant, log « cc 64 not mapped » present, mais
+crete nulle) ; a 4 s tout va bien ; sur un projet existant, 1,2 s comme
+5 s sonnent ; Dexed/Surge ne le font pas -> dette datee avec repro, la
+spec attend 4 s ; (3) **ALERTE MONITEURS** : le test audible sur
+essai-claude (exclusif 256, Dexed, vel 70) a produit une crete de
+**9,2** (+19 dBFS, ecrete par le DAC) sur les T8V — deux notes de
+0,5 s ; le meme projet en --mute donne 3,5. Le patch Dexed restaure
+(stateHash) est tres chaud et rien ne limite la sortie (pas de chaine
+master, AUDIT-6 §7). Regle gravee (CLAUDE.md §8) : un test audible
+d'instrument live se MESURE muet d'abord et ne s'ecoute qu'avec un gain
+de piste plafonne. Non fait : `daw.ps1 -MidiIn`.
