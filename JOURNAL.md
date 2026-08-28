@@ -1893,3 +1893,47 @@ essai-claude (exclusif 256, Dexed, vel 70) a produit une crete de
 master, AUDIT-6 §7). Regle gravee (CLAUDE.md §8) : un test audible
 d'instrument live se MESURE muet d'abord et ne s'ecoute qu'avec un gain
 de piste plafonne. Non fait : `daw.ps1 -MidiIn`.
+
+**2026-08-28 (MiniLab 3 branche — et l'alerte +19 dBFS etait FAUSSE) :**
+port « Minilab3 MIDI » vu par `--list-midi-devices` ; projet `minilab`
+(piste MIDI + Dexed d'usine, gain 0,25) prepare par script Playwright
+(extension Chrome non connectee), onglet ouvert pour l'utilisateur ;
+phase MUETTE : l'utilisateur joue -> `midi-in stats: events=72
+forwarded=72 dropped=0 unrouted=0 queue-lat last=10.1 ms max=15.4 ms`,
+« ca trigger bien la track midi ». CORRECTION DU RECORD : les cretes
+« 9,2 » (essai-claude audible), « 3,5 » (muet) et « 9,0 » (minilab)
+etaient un ARTEFACT DE MON PARSING — `sort -n` sur des valeurs en
+notation scientifique (`9.23917e-19`, `3.53928e-35`...) lues comme 9,2.
+Vraies cretes recalculees (awk) : essai-claude audible **0,097**
+(-20 dBFS), muet 0,11, minilab 0,12. Aucun coup de canon n'a eu lieu ;
+l'alerte et le « precedent » graves dans CLAUDE.md §8 / TODO sont
+retires ; la regle « mesurer muet d'abord, gain plafonne » reste (elle
+est bonne), sans le faux precedent ; la dette « limiteur de sortie »
+reste comme point produit (AUDIT-6 §7), pas comme incident. Lecon
+d'outillage : jamais `sort -n` sur des flottants C++ — awk `+0`.
+
+**2026-08-28 (MiniLab 3 a l'oreille — « c'est style en vrai », et le
+gresillement avait une cause) :** phase audible sur la ZenGo (exclusif
+256, Dexed d'usine, gain 0,25) : l'utilisateur joue et entend
+(« c'est style en vrai, ca gresille un peu, ca vient ptet du preset »).
+Diagnostic par la mesure, pas par le preset : sonde `pluginBlocksMissed`
+via la telemetrie pendant le jeu = **~58 % des blocs servis DRY** (+2165
+en 20 s) avec 0 underrun device ; controle sans fenetre Dexed et SANS
+note : ~46 % rates quand meme -> ni la GUI, ni la charge DSP :
+l'ORDONNANCEMENT. L'enfant plugin_host attendait ses blocs en yield-spin
+a priorite normale ; a profondeur 1 (exclusif 256) la fenetre est de
+5,3 ms et le coeur cede a n'importe qui. Fix : thread serve en **MMCSS
+« Pro Audio » critical** (`AvSetMmThreadCharacteristics`, fallback
+TIME_CRITICAL), la pratique DAW standard. Mesure A/B, memes 20 notes
+par `midi_send` : **1356 blocs rates -> 0** (partage 512 + MMCSS ; a
+mesurer encore : exclusif 256 + MMCSS, pour separer priorite et
+profondeur). Deuxieme retour utilisateur : « ca doit pas bloquer le
+lecteur video de Twitch » -> l'exclusif prend le device : DECISION,
+l'exclusif n'est jamais par defaut (partage 512 = stack quotidienne,
+exclusif = option explicite d'une session de jeu). Relance en partage
+512 + MMCSS sur le MiniLab : « oui ! » — gresillement disparu ; stats
+finales events=30 forwarded=30 dropped=0 queue-lat 2,8 ms (max 14,7),
+crete 0,18, 0 underrun. Piege paye : LNK1168 sur plugin_host.exe (un
+enfant vivant verrouille l'exe — tuer AVANT de rebuild, regle CLAUDE.md
+§12 que j'ai grillee une fois). Annule une non-regression lancee
+pendant que le moteur de l'utilisateur tenait 47821.

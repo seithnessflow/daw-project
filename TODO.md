@@ -33,9 +33,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    registre) : matrice DX10 / Dexed / Surge XT verte, CC64 + pitch-bend
    traduits via IMidiMapping (2080 assignations sur les JUCE), latence de
    file 0,3-17 ms, pipeline 10,7 ms en exclusif 256. RESTE du maillon 1 :
-   (a) la manip a l'oreille de l'UTILISATEUR avec son clavier (`--midi-in
-   <nom>` ; MESURER muet d'abord, gain de piste plafonne — precedent
-   +19 dBFS) ; (b) `daw.ps1 -MidiIn <nom>` pour la stack quotidienne ;
+   (a) FAIT 2026-08-28 — MiniLab 3 a l'oreille de l'utilisateur
+   (« c'est style en vrai » ; gresillement = enfant en retard a
+   priorite normale, corrige par MMCSS Pro Audio : 1356 blocs rates ->
+   0 ; « oui ! ») ; (b) `daw.ps1 -MidiIn <nom>` pour la stack
+   quotidienne (partage 512, jamais exclusif par defaut) ;
    (c) la dette TRANSITOIRE DX10 ci-dessous (§3 moteur).
    Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
    synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
@@ -68,8 +70,12 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 2. Decisions ouvertes (l'utilisateur tranche ; pas de code avant)
 
-- `daw.ps1` en `--exclusive --buffer-size 256` (16 ms mesures, 0 underrun
-  sous charge) : une ligne, attend le GO.
+- `daw.ps1` en `--exclusive --buffer-size 256` : **NON par defaut**
+  (utilisateur 2026-08-28 : « ca doit pas bloquer le lecteur video de
+  Twitch » — l'exclusif prend le device). Le partage 512 (32 ms) reste
+  la stack quotidienne ; l'exclusif = option explicite pour une session
+  de jeu. A mesurer : exclusif 256 + MMCSS enfant (les ~50 % de blocs
+  rates a profondeur 1 venaient-ils de la priorite seule ?).
 - Chevauchement de clips au DRAG : somme (modele moteur actuel, pose en
   couche) ou remplacement a la Live (§4).
 - Mute : dans le document (decision de mix) ou ephemere par client
@@ -184,6 +190,10 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   pas de fallback « parametre devine ». Le chemin IMidiMapping n'est
   prouve par aucun test (AGain ne declare rien) — preuve au premier vrai
   synthe (Vague 3).
+- **Profondeur 1 (exclusif 256) a re-mesurer avec MMCSS** : avant la
+  priorite, ~50 % de blocs rates meme sans note ; le partage 512 + MMCSS
+  donne 0. Si l'exclusif 256 + MMCSS rate encore, la politique de
+  profondeur (ceil(period/256)) doit gagner un bloc de marge (+5,3 ms).
 - **TRANSITOIRE MIDI live (2026-08-28, repro precise)** : projet FRAIS,
   instrument mda DX10 ajoute par la page, note envoyee ~1,5 s apres le
   rebuild stateHash (la 2e capture d'etat) -> MUETTE bien que routee
@@ -194,9 +204,10 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   swap de graphe v=4 + estampilles par slot. Declencheur : un
   utilisateur qui joue juste apres avoir pose un instrument.
 - **PAS DE LIMITEUR DE SORTIE** : un instrument live avec un patch
-  chaud (Dexed restaure : +19 dBFS a vel 70) ecrete le DAC ; rien ne
-  protege les moniteurs (chaine master absente, AUDIT-6 §7). Un clamp
-  doux au master (ou un vrai limiteur) est un prealable a « jouer
+  chaud ecreterait le DAC, rien ne protege les moniteurs (chaine master
+  absente, AUDIT-6 §7). Point produit, pas un incident (l'alerte
+  +19 dBFS du 2026-08-28 etait un artefact de parsing ; vraies cretes
+  ~0,1). Un clamp doux au master ou un limiteur = prealable a « jouer
   live » pour de vrai.
 - MIDI live (session A) : placement sample-exact des evenements par
   timestamp (v1 = offset 0, gigue <= un sous-bloc de 5,3 ms) ;

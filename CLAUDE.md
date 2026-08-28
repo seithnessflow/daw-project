@@ -182,9 +182,10 @@ NE JAMAIS demander a l'utilisateur de tester ce que je peux voir.
   bouger plugins/params — en surveillant le gain (mesurer d'abord,
   proteger les T8V). **Instrument LIVE (MIDI-in) : `ear` n'existe pas
   pour lui — MESURER en `--mute` d'abord (crete de la piste dans les
-  meters), et n'ecouter qu'avec le gain de la piste plafonne (<= 0,25)
-  ou sur un projet frais sans etat restaure.** Precedent 2026-08-28 :
-  un patch Dexed restaure a crete a +19 dBFS sur une note vel 70.
+  meters), et n'ecouter qu'avec le gain de la piste plafonne (<= 0,25).**
+  Et lire les cretes avec un outil qui comprend la notation scientifique
+  des flottants C++ (`awk '{v=$3+0}'`), jamais `sort -n` — une fausse
+  alerte a +19 dBFS est nee de la le 2026-08-28.
 - **LE RITUEL DU COMPOSITEUR** : chaque session qui touche le socle se
   verifie en COMPOSANT un projet par l'UI seule (menu -> pistes ->
   matiere -> notes -> mix -> ecoute -> export), jamais cote serveur/

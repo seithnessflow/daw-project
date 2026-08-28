@@ -52,6 +52,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <avrt.h>  // MMCSS : AvSetMmThreadCharacteristics (lib avrt)
+#pragma comment(lib, "avrt.lib")
 #else
 #include <cerrno>
 #include <csignal>
@@ -918,6 +920,27 @@ int runServe(const std::string& segment_path, const std::string& module_path,
 
     // Ready signal: the bridge's start() waits for a nonzero heartbeat
     ring->child_heartbeat.store(1, std::memory_order_release);
+#ifdef _WIN32
+    // Vague 3 (mesure 2026-08-28, MiniLab sur Dexed en exclusif 256) : en
+    // priorite NORMALE, le thread serve ratait ~46-58 % des blocs meme
+    // sans note (le yield-spin cede le coeur a n'importe qui) -> blocs
+    // DRY = gresillement audible. La pratique DAW standard : MMCSS
+    // « Pro Audio » (le meme registre que le thread audio du moteur via
+    // miniaudio), CRITICAL. Echec = fallback TIME_CRITICAL classique,
+    // jamais un refus (le plugin sert quand meme).
+    {
+        DWORD task_index = 0;
+        HANDLE mm = AvSetMmThreadCharacteristicsA("Pro Audio", &task_index);
+        if (mm) {
+            AvSetMmThreadPriority(mm, AVRT_PRIORITY_CRITICAL);
+            std::cerr << "plugin_host: serve thread MMCSS Pro Audio (critical)" << std::endl;
+        } else if (SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL)) {
+            std::cerr << "plugin_host: serve thread TIME_CRITICAL (MMCSS unavailable)" << std::endl;
+        } else {
+            std::cerr << "plugin_host warning: could not raise serve thread priority" << std::endl;
+        }
+    }
+#endif
     std::cerr << "plugin_host: serving on " << segment_path << " at "
               << ring->sample_rate << " Hz" << std::endl;
 
