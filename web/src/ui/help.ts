@@ -10,7 +10,7 @@ const SHORTCUTS: Array<[string, string]> = [
   ['Ctrl+Z / Ctrl+Y', 'Annuler / retablir (par geste, collaboratif)'],
   ['Shift+clic / lasso dans une lane', 'Selectionner plusieurs clips (glisser un clip du lot = deplacer le lot)'],
   ['Suppr', 'Supprimer le(s) clip(s) selectionne(s)'],
-  ['Ctrl+D', 'Dupliquer la selection en bloc, sur le pas suivant sa fin'],
+  ['Ctrl+D', 'Dupliquer : la plage du lasso (silences compris) ou le bloc de clips selectionnes'],
   ['Ctrl+E', 'Scinder le clip selectionne au marqueur'],
   ['Glisser la bande fine de la regle', 'Poser la boucle (double-clic : effacer)'],
   ['+ / -', 'Zoom avant / arriere (centre)'],

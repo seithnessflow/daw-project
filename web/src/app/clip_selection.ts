@@ -12,6 +12,7 @@ import type { ClipDef } from '../document/schema';
 
 /** Selectionne un clip ; `additive` (Shift/Ctrl) l'ajoute ou le retire. */
 export function selectClip(clipId: string, trackId: string, additive = false): void {
+  ctx.timeSelection = null;   // un clic de clip remplace la plage de temps
   if (additive) {
     if (ctx.selectedClipIds.has(clipId) && ctx.selectedClipIds.size > 1) {
       ctx.selectedClipIds.delete(clipId);
@@ -33,6 +34,12 @@ export function selectClip(clipId: string, trackId: string, additive = false): v
 export function clearClipSelection(): void {
   ctx.selectedClipIds.clear();
   ctx.selectedClipId = null;
+  ctx.timeSelection = null;
+}
+
+/** La plage de temps (lasso), ou null. */
+export function setTimeSelection(startSec: number, endSec: number): void {
+  ctx.timeSelection = endSec > startSec ? { startSec, endSec } : null;
 }
 
 /** Remplace le lot (lasso) ; le principal = le dernier de la liste. */

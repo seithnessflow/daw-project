@@ -17,8 +17,9 @@ de code de la session (selection multiple des clips, 9332f14) est VERT
 - **Selection multiple des CLIPS** (demande utilisateur « comme dans
   Ableton ») : Shift/Ctrl+clic, lasso depuis le vide d'une lane, glisser
   un clip du lot = deplacer le lot (meme delta, un undo), Ctrl+D =
-  dupliquer le bloc apres sa fin (selection sur les copies), Suppr = le
-  lot. `clip_selection.ts` (le principal reste `selectedClipId`). Spec
+  dupliquer la PLAGE du lasso (selection de temps visible, silences
+  compris, la plage suit les copies) ou le bloc des clips sans plage,
+  Suppr = le lot. `clip_selection.ts` (le principal reste `selectedClipId`). Spec
   `clips-multiselect.spec.ts` ; clip-drag/selection/split/dnd/undo verts.
 - **Notes a ids stables** : `NoteDef.id` additif, `updateNote(track,
   clip, id, patch)` undoable — le socle de la velocite editable et du

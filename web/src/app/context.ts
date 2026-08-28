@@ -71,6 +71,10 @@ export const ctx = {
   selectedClipId: null as string | null,
   /** Le LOT selectionne (clip_selection.ts) ; contient toujours selectedClipId. */
   selectedClipIds: new Set<string>(),
+  /** Selection de TEMPS posee par le lasso (secondes, snappee a la grille) :
+   *  Ctrl+D duplique cette plage - silences compris - pas seulement les
+   *  clips (Ableton). Effacee par un clic (lane ou clip). */
+  timeSelection: null as { startSec: number; endSec: number } | null,
   justDragged: false,   // a finished drag must not fire the click path
 
   // Navigation (potion A1/A2)

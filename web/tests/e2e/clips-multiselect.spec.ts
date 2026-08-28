@@ -82,8 +82,21 @@ test('Shift+clic, deplacer le lot, lasso, Ctrl+D en bloc, Suppr', async ({ page 
   await expect(page.locator('[data-role="clip-lasso"]')).toHaveCount(0);
   expect(await selectedIds(page)).toEqual([a.id, b.id].sort());
   expect(await clips(page)).toHaveLength(2);   // un lasso ne pose rien
+  // ... et il pose une SELECTION DE TEMPS (la plage balayee, snappee), visible
+  const range = await page.evaluate(() => {
+    const band = document.querySelector('[data-role="time-selection"]') as HTMLElement | null;
+    return band ? { left: parseFloat(band.style.left), width: parseFloat(band.style.width) } : null;
+  });
+  expect(range).not.toBeNull();
+  const sr = await page.evaluate(() => (window as any).__dawProject.getDocument().sampleRate || 48000);
+  // pps deduit de la geometrie d'un clip (left px <-> startSample)
+  const pps = await page.evaluate(({ id, start, sr }) => {
+    const el = document.querySelector(`.clip[data-clip-id="${id}"]`) as HTMLElement;
+    return parseFloat(el.style.left) / (start / sr);
+  }, { id: b.id, start: b.start, sr });
+  expect(pps).toBeGreaterThan(0);
 
-  // Ctrl+D : le lot se duplique en BLOC apres sa fin, selection sur les copies
+  // Ctrl+D : la PLAGE se duplique (silences compris), selection sur les copies
   await page.keyboard.press('Control+d');
   cs = await clips(page);
   expect(cs).toHaveLength(4);
@@ -92,7 +105,17 @@ test('Shift+clic, deplacer le lot, lasso, Ctrl+D en bloc, Suppr', async ({ page 
   const blockEnd = Math.max(a.end, b.end);
   expect(copies[0].start).toBeGreaterThanOrEqual(blockEnd);
   expect(copies[1].start - copies[0].start).toBe(gap);
-  expect(copies[0].start - a.start).toBe(copies[1].start - b.start);   // meme decalage
+  const shift = copies[0].start - a.start;
+  expect(shift).toBe(copies[1].start - b.start);   // meme decalage
+  // Le decalage = la LONGUEUR DE LA PLAGE, pas celle du bloc de clips
+  expect(shift).toBeGreaterThan(blockEnd - a.start);
+  expect(shift).toBe(Math.round(range!.width / pps * sr));
+  // La plage a suivi les copies (Ctrl+D a nouveau enchaine)
+  const range2 = await page.evaluate(() => {
+    const band = document.querySelector('[data-role="time-selection"]') as HTMLElement | null;
+    return band ? parseFloat(band.style.left) : null;
+  });
+  expect(range2).toBeCloseTo(range!.left + range!.width, 3);
   // Un seul Ctrl+Z retire les deux copies
   await page.keyboard.press('Control+z');
   expect(await clips(page)).toHaveLength(2);

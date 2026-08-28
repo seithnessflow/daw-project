@@ -2115,3 +2115,19 @@ glisser A -> B suit, un Ctrl+Z rend les deux, clic de lane = rien,
 lasso = les deux, Ctrl+D = 4 clips en bloc + undo/redo, Suppr du lot +
 undo) ; clip-drag / clip-selection / clip-split / dnd-clips / undo-redo
 verts ; tsc 0.
+
+**2026-08-28 (nuit, suite — Ctrl+D prend les silences) :** retour
+utilisateur : « le comportement du Ctrl+D ne prend pas les silences ».
+Juste : dans Ableton le lasso de l'arrangement est une SELECTION DE
+TEMPS et Ctrl+D duplique la plage (silences avant / entre / apres
+compris), pas le seul bloc des clips. Livre : le lasso pose
+`ctx.timeSelection` (la plage balayee, snappee a la grille vers
+l'exterieur), rendue par une bande sur chaque lane (`.time-sel`,
+`data-role="time-selection"`) tant qu'elle existe ; Ctrl+D avec une
+plage decale les copies de la LONGUEUR DE LA PLAGE et fait suivre la
+plage (Ctrl+D enchaine) ; sans plage (clics), le bloc des clips comme
+avant. Un clic (lane ou clip) efface la plage. Spec etendue : bande
+presente, decalage = largeur de la bande (pps deduit de la geometrie
+d'un clip) et > longueur du bloc, la plage a suivi les copies. Trace
+visuelle : lasso puis Ctrl+D, 288000/720000 -> copies 1152000/1584000
+(decalage 864000 = la plage). 9 specs voisines vertes, tsc 0.

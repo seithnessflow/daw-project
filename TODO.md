@@ -53,8 +53,10 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    refusee et montree ; spec piano-roll-gestures) ; ~~selection
    multiple + lasso + Ctrl+D sur les CLIPS~~ FAIT 2026-08-28 (demande
    utilisateur « comme dans Ableton » : Shift/Ctrl+clic, lasso depuis le
-   vide d'une lane, glisser = deplacer le lot, Ctrl+D = dupliquer le
-   bloc, Suppr = le lot, un geste = un undo ; spec clips-multiselect) ;
+   vide d'une lane = selection de TEMPS visible, glisser = deplacer le
+   lot, Ctrl+D = dupliquer la plage silences compris — ou le bloc des
+   clips sans plage —, Suppr = le lot, un geste = un undo ; spec
+   clips-multiselect) ;
    piano-roll musical (nom des notes, zoom, plus d'une mesure) ;
    ~~ProcessContext~~ FAIT 2026-08-28 (ring v12, trace enfant :
    tempo 120 -> 93,5, playing 0 -> 1 ; reste l'oreille d'un LFO sync). Le **test Massive** (clavier du

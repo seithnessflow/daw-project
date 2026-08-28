@@ -328,3 +328,9 @@ body.compact-tracks .clip-name {
   background: rgba(141, 122, 230, 0.16);
 }
 .tracks.lassoing, .tracks.lassoing * { cursor: crosshair !important; user-select: none; }
+.time-sel {
+  position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none;
+  background: rgba(141, 122, 230, 0.10);
+  border-left: 1px solid rgba(214, 205, 255, 0.55);
+  border-right: 1px solid rgba(214, 205, 255, 0.55);
+}

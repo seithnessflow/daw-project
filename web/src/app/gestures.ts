@@ -17,7 +17,7 @@ import { snapStep, snapSecMusical } from './navigation';
 import { isMusicalClip } from '../document/schema';
 import { renderTracks } from './render';
 import { cssId } from '../document/sanitize';
-import { selectClip, setClipSelection, selectedClips, isClipSelected } from './clip_selection';
+import { selectClip, setClipSelection, selectedClips, isClipSelected, setTimeSelection } from './clip_selection';
 
 const isAdditive = (e: PointerEvent | MouseEvent): boolean => e.shiftKey || e.ctrlKey || e.metaKey;
 
@@ -432,11 +432,13 @@ export function beginClipLasso(e: PointerEvent): void {
   const additive = isAdditive(e);
   const x0 = e.clientX, y0 = e.clientY;
   let moved = false;
+  let lastX: number | null = null;
   let rect: HTMLElement | null = null;
   const tracks = document.getElementById('tracks');
   const onMove = (ev: PointerEvent) => {
     const dx = ev.clientX - x0, dy = ev.clientY - y0;
     if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+    lastX = ev.clientX;
     if (!moved) {
       moved = true;
       rect = document.createElement('div');
@@ -471,6 +473,17 @@ export function beginClipLasso(e: PointerEvent): void {
     setTimeout(() => { ctx.justDragged = false; }, 0);
     const first = selectedClips()[0];
     if (first) ctx.selectedTrackId = first.trackId;
+    // Le lasso est aussi une SELECTION DE TEMPS (Ableton) : la plage
+    // balayee, snappee a la grille vers l'exterieur - c'est elle que
+    // Ctrl+D duplique, silences compris.
+    const laneEl = document.querySelector('#tracks .track-lane');
+    if (laneEl && lastX !== null) {
+      const left = laneEl.getBoundingClientRect().left;
+      const step = snapStep();
+      const s1 = Math.max(0, Math.min(x0, lastX) - left) / TIMELINE.pps;
+      const s2 = Math.max(0, Math.max(x0, lastX) - left) / TIMELINE.pps;
+      setTimeSelection(Math.floor(s1 / step) * step, Math.ceil(s2 / step) * step);
+    }
     renderTracks(true);
   };
   window.addEventListener('pointermove', onMove);

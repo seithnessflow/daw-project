@@ -182,6 +182,20 @@ export function renderTracks(force = false): void {
   marker.className = 'insert-marker';
   marker.id = 'insert-marker';
   els.tracks.appendChild(marker);
+
+  // Selection de TEMPS (lasso, 2026-08-28) : une bande sur chaque lane,
+  // la plage que Ctrl+D duplique - visible tant qu'elle existe.
+  if (ctx.timeSelection) {
+    const { startSec, endSec } = ctx.timeSelection;
+    for (const lane of els.tracks.querySelectorAll<HTMLElement>('.track-lane')) {
+      const band = document.createElement('div');
+      band.className = 'time-sel';
+      band.dataset.role = 'time-selection';
+      band.style.left = `${startSec * TIMELINE.pps}px`;
+      band.style.width = `${(endSec - startSec) * TIMELINE.pps}px`;
+      lane.appendChild(band);
+    }
+  }
   updateInsertMarker();
 
   // Selection reflection (C1): the selected clip is unambiguous

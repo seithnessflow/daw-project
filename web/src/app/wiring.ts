@@ -844,7 +844,17 @@ export async function init(): Promise<void> {
         const grid = snapStep() * sr;
         const blockStart = Math.min(...lot.map((x) => clipStartSamples(x.clip, doc)));
         const blockEnd = Math.max(...lot.map((x) => clipEndSamples(x.clip, doc)));
-        const shift = Math.ceil(blockEnd / grid) * grid - blockStart;
+        // Une PLAGE de temps (lasso) : c'est elle qui se duplique, silences
+        // avant / entre / apres compris (utilisateur 2026-08-28 : « le
+        // Ctrl+D ne prend pas les silences ») ; sans plage, le bloc des
+        // clips, colle au pas de grille suivant sa fin.
+        const range = ctx.timeSelection;
+        const shift = range
+          ? Math.round((range.endSec - range.startSec) * sr)
+          : Math.ceil(blockEnd / grid) * grid - blockStart;
+        if (range) {
+          ctx.timeSelection = { startSec: range.startSec + shift / sr, endSec: range.endSec + shift / sr };
+        }
         const copies: string[] = [];
         ctx.project.beginUndoGroup();
         let k = 0;
