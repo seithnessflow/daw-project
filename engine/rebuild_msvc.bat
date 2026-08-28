@@ -10,5 +10,7 @@ if not exist "%VCVARS%" (
 call "%VCVARS%"
 cd /d %~dp0build-msvc
 rem M8/R10 settled: the tests and the host build WITH the engine - running
-rem a stale daw_engine_test after a rebuild was a lie waiting to happen
-ninja daw_engine daw_engine_test plugin_host
+rem a stale daw_engine_test after a rebuild was a lie waiting to happen.
+rem create_test_doc too (2026-08-28): the e2e specs spawn it, and a clean
+rem build without it turned 3 specs red for nothing.
+ninja daw_engine daw_engine_test plugin_host create_test_doc

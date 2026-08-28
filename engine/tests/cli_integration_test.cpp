@@ -24,6 +24,8 @@
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
 #include "../src/host/proxy_node.h"
+#include "../src/host/proxy_depth.h"
+#include "../src/audio/audio_device.h"
 #include "../src/util/sha256.h"
 #include "../src/util/path_safety.h"
 #include "../src/websocket/websocket_server.h"
@@ -2452,6 +2454,152 @@ bool testStaleSlotDetection() {
     return true;
 }
 
+// v11 (A3-1 « la file est generique ») : le FIFO MIDI transporte note-on,
+// note-off, CC et pitch-bend au format fil ; popMidiEvent est LE decodeur
+// (le meme que l'enfant). Ordre FIFO exact, champs exacts, et file pleine =
+// le plus VIEUX est ecrase, jamais le producteur bloque.
+bool testMidiEventQueue() {
+    std::cout << "Test: MIDI event queue (generic, ring v11)... ";
+    using daw::host::MidiEvent;
+    using daw::host::MidiKind;
+    auto ring = std::make_unique<daw::host::SharedAudioRing>();
+    std::memset(static_cast<void*>(ring.get()), 0,
+                sizeof(daw::host::SharedAudioRing));
+
+    MidiEvent probe;
+    if (daw::host::popMidiEvent(ring.get(), probe)) {
+        std::cout << "FAILED: FIFO vide qui rend un evenement\n";
+        return false;
+    }
+
+    // Les 4 sortes, dans l'ordre, sur le fil : note-on C4 v100 ch0 @0,
+    // CC64 (sustain) 127 ch1 @17, pitch-bend centre (LSB 0, MSB 64) ch2
+    // @255, note-off C4 v0 ch0 @100 (la forme v8 conservee)
+    MidiEvent on;
+    on.kind = MidiKind::NoteOn; on.channel = 0; on.data1 = 60; on.data2 = 100;
+    on.sample_offset = 0;
+    daw::host::pushMidiEvent(ring.get(), on);
+    MidiEvent cc;
+    cc.kind = MidiKind::ControlChange; cc.channel = 1; cc.data1 = 64; cc.data2 = 127;
+    cc.sample_offset = 17;
+    daw::host::pushMidiEvent(ring.get(), cc);
+    MidiEvent pb;
+    pb.kind = MidiKind::PitchBend; pb.channel = 2; pb.data1 = 0; pb.data2 = 64;
+    pb.sample_offset = 255;
+    daw::host::pushMidiEvent(ring.get(), pb);
+    daw::host::pushMidiEvent(ring.get(), false, 60, 0, 0, 100);  // forme v8
+
+    const MidiEvent expect[4] = {on, cc, pb, MidiEvent{MidiKind::NoteOff, 0, 60, 0, 100}};
+    for (int i = 0; i < 4; ++i) {
+        MidiEvent got;
+        if (!daw::host::popMidiEvent(ring.get(), got)) {
+            std::cout << "FAILED: evenement " << i << " manquant\n";
+            return false;
+        }
+        const auto& e = expect[i];
+        if (got.kind != e.kind || got.channel != e.channel || got.data1 != e.data1 ||
+            got.data2 != e.data2 || got.sample_offset != e.sample_offset) {
+            std::cout << "FAILED: evenement " << i << " decode faux (kind="
+                      << int(got.kind) << " ch=" << int(got.channel)
+                      << " d1=" << int(got.data1) << " d2=" << int(got.data2)
+                      << " off=" << got.sample_offset << ")\n";
+            return false;
+        }
+    }
+    if (daw::host::midiPitchBend14(pb.data1, pb.data2) != 8192) {
+        std::cout << "FAILED: pitch-bend 14 bits (LSB 0, MSB 64) != 8192\n";
+        return false;
+    }
+    if (daw::host::popMidiEvent(ring.get(), probe)) {
+        std::cout << "FAILED: un 5e evenement fantome\n";
+        return false;
+    }
+
+    // File pleine : kMidiQueueSlots + 3 CC numerotes -> les 3 plus VIEUX
+    // sont ecrases, le premier lu porte le numero 3, le dernier le numero
+    // kMidiQueueSlots + 2, et on en lit exactement kMidiQueueSlots.
+    for (uint32_t i = 0; i < daw::host::kMidiQueueSlots + 3; ++i) {
+        MidiEvent e;
+        e.kind = MidiKind::ControlChange; e.channel = 0;
+        e.data1 = static_cast<uint8_t>(i & 0x7F);
+        e.data2 = 0;
+        e.sample_offset = i;
+        daw::host::pushMidiEvent(ring.get(), e);
+    }
+    uint32_t count = 0, first = 0, last = 0;
+    MidiEvent got;
+    while (daw::host::popMidiEvent(ring.get(), got)) {
+        if (count == 0) first = got.sample_offset;
+        last = got.sample_offset;
+        ++count;
+    }
+    if (count != daw::host::kMidiQueueSlots || first != 3 ||
+        last != daw::host::kMidiQueueSlots + 2) {
+        std::cout << "FAILED: file pleine (count=" << count << " first=" << first
+                  << " last=" << last << ")\n";
+        return false;
+    }
+
+    std::cout << "OK (4 sortes decodees dans l'ordre, pleine = plus vieux ecrase)\n";
+    return true;
+}
+
+// A3-2 (contrat de periode) : la profondeur proxy est ceil(period/256)
+// et le ring la REFUSE au-dela de kRingSlots-2 - plus aucun clamp.
+bool testProxyDepthContract() {
+    std::cout << "Test: proxy depth contract (A3-2)... ";
+    const struct { uint32_t period; uint32_t depth; bool ok; } cases[] = {
+        {256, 1, true},  {374, 2, true},   {512, 2, true},
+        {1024, 4, true}, {1536, 6, true},  {1537, 0, false}, {4096, 0, false},
+    };
+    for (const auto& c : cases) {
+        const auto d = daw::host::proxyDepthFor(c.period);
+        if (d.has_value() != c.ok || (c.ok && *d != c.depth)) {
+            std::cout << "FAILED: period " << c.period << " -> "
+                      << (d ? std::to_string(*d) : std::string("REFUSED"))
+                      << ", attendu " << (c.ok ? std::to_string(c.depth) : "REFUSED")
+                      << "\n";
+            return false;
+        }
+    }
+    if (daw::host::proxyDepthRefusal(4096).find("REFUSED") == std::string::npos) {
+        std::cout << "FAILED: le message de refus ne dit pas REFUSED\n";
+        return false;
+    }
+    std::cout << "OK (1..6 servis, 1537+ refuses)\n";
+    return true;
+}
+
+// A3-3 (contrat de periode) : un device dont la periode NEGOCIEE n'est
+// pas un multiple de 256 ne demarre pas (backend null : la periode
+// demandee est honoree telle quelle, c'est ce qui rend le cas testable
+// sans materiel). 512 demarre ; 374 (le plancher partage de la ZenGo)
+// est refuse ; l'objet reste sain apres le refus (pas de double uninit).
+bool testDevicePeriodRefusal() {
+    std::cout << "Test: device period refusal (A3-3)... ";
+    {
+        daw::audio::AudioDevice dev;
+        daw::audio::AudioDeviceConfig cfg;
+        cfg.use_null_backend = true;
+        cfg.buffer_size_frames = 374;
+        if (dev.initialize(cfg)) {
+            std::cout << "FAILED: periode 374 acceptee (buffer="
+                      << dev.getBufferSize() << ")\n";
+            return false;
+        }
+        // Apres un refus, l'objet doit pouvoir etre reutilise proprement
+        cfg.buffer_size_frames = 512;
+        if (!dev.initialize(cfg) || dev.getBufferSize() != 512) {
+            std::cout << "FAILED: 512 refuse apres le refus de 374 (buffer="
+                      << dev.getBufferSize() << ")\n";
+            return false;
+        }
+        dev.shutdown();
+    }
+    std::cout << "OK (374 refuse, 512 accepte, objet sain)\n";
+    return true;
+}
+
 bool testProxyNodePipeline() {
     std::cout << "Test: Proxy node one-frame pipeline... ";
 
@@ -4575,6 +4723,9 @@ int main(int argc, char* argv[]) {
     run(testPluginBridgeTransparency);
     run(testProxyNodePipeline);
     run(testStaleSlotDetection);   // A4-5 : ring v10, estampilles par slot
+    run(testMidiEventQueue);       // v11 : FIFO MIDI generique (note/CC/bend)
+    run(testProxyDepthContract);   // A3-2 : refus au-dela de kRingSlots-2
+    run(testDevicePeriodRefusal);  // A3-3 : periode non multiple de 256 = refus
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);

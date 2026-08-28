@@ -1783,3 +1783,31 @@ de le rebuild a la main (note TODO). Arbitrage utilisateur du jour
 (« je suis chaud, go ») : la Vague 3 avec l'entree MIDI live passe
 DEVANT T4 Link Etage 2 ; premier maillon = clavier USB sur la tour ->
 note entendue en exclusif 256, latence mesuree.
+
+**2026-08-28 (suite — le contrat de periode est CLOS, le rail MIDI est
+pose) :** sur « continue » : (1) REFUS de demarrer hors contrat — une
+periode negociee non multiple de 256 (`audio_device.cpp`, message avec la
+sortie : 512 en partage ou --exclusive 256) ou une profondeur > kRingSlots-2
+(`host/proxy_depth.h`, une seule redaction pour les deux chemins de
+main.cpp) n'ouvrent plus le device. Consequence assumee : l'exclusif 128
+(8 ms) et le plancher partage 374 sont refuses tant que la piste B
+(accumulateur) n'existe pas — TODO dettes A6. Au passage A4-13 solde
+(echec d'init = etat Uninitialized, plus de double uninit par le
+destructeur). (2) RING v11 : le FIFO MIDI devient GENERIQUE au format fil
+(kind + data1/data2 7 bits : note-on/off, CC, pitch-bend LSB/MSB) —
+`pushMidiEvent(ring, MidiEvent)`, la forme note v8 conservee pour les
+appelants, `popMidiEvent` = LE decodeur (enfant ET gtest). Cote enfant :
+VST3 n'a pas d'evenement CC, un controleur EST un parametre declare — le
+controleur d'edition est desormais acquis UNE fois a la ceremonie
+(`EditController`, apres la restauration d'etat, partage avec la fenetre
+qui ne cree plus le sien : un jumeau de moins), `MidiParamMap` interroge
+IMidiMapping (16 canaux x 132 numeros), le drain traduit CC/PB en points
+d'IParameterChanges a leur offset ; non declare = ignore et loggue une
+fois. Preuves : gtests **55/55** (`testMidiEventQueue` 4 sortes + file
+pleine, `testProxyDepthContract` 1..6/1537+, `testDevicePeriodRefusal`
+374 refuse/512 accepte sur backend null), hash absolu inchange, specs
+moteur reel fader-to-engine + stem-freshness + export-mixdown + tempo
+**10/10**. Non prouve : le chemin IMidiMapping sur un vrai synthe (AGain
+ne declare rien) — au premier maillon de la Vague 3. Menage :
+`rebuild_msvc.bat` construit `create_test_doc`. Piege paye : ne JAMAIS
+editer un .bat pendant que cmd l'execute (lecture par offset).

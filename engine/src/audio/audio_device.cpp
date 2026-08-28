@@ -162,7 +162,10 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     // Initialize device
     if (ma_device_init(context_.get(), &device_config, device_.get()) != MA_SUCCESS) {
         ma_context_uninit(context_.get());
-        state_ = AudioDeviceState::Error;
+        // A4-13 : le contexte est detruit et le device n'a jamais ete
+        // initialise - rester en Uninitialized pour que shutdown() (le
+        // destructeur y passe) ne les re-uninit pas (UB, double free).
+        state_ = AudioDeviceState::Uninitialized;
         return false;
     }
 
@@ -193,17 +196,28 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
                   device_->playback.internalPeriods / actual_sample_rate_)
               << " ms\n";
 
-    // AUDIT-5 A6: a device period that is not a multiple of the 256-frame
-    // internal block makes the plugin proxy bypass the partial chunk - that
-    // audio goes DRY, silently, while telemetry only says "plugin late". A
-    // real WASAPI shared-mode period (e.g. 480) hits this. Be loud (the real
-    // fix - handle partial chunks / clamp depth from the true period - is a
-    // dedicated session).
+    // CONTRAT DE PERIODE (A3-3 / AUDIT-5 A6, refus depuis 2026-08-28) : une
+    // periode qui n'est pas un multiple du bloc interne de 256 produit un
+    // chunk PARTIEL a chaque callback, que le proxy plugin sert DRY
+    // (proxy_node:13) - jusqu'a ~47 % de l'audio bypasse le plugin, la
+    // telemetrie dit juste « plugin late ». Mesure 2026-08-27 : demander un
+    // multiple de 256 (256/512 en partage, tout en exclusif) donne des
+    // callbacks FIXES ; le plancher partage de la ZenGo est 374 (demande
+    // 256 ou 128 en mode partage), l'exclusif 128 est un 128 honore -
+    // tous deux HORS contrat. On ne demarre pas hors contrat : la sortie
+    // est ecrite dans le message. Le vrai fix (accumulateur amont, piste B)
+    // attend son declencheur (TODO, dettes A6).
     if (actual_buffer_size_ % INTERNAL_BLOCK_SIZE != 0) {
-        std::cerr << "WARNING: device period " << actual_buffer_size_
+        std::cerr << "ERROR: device period " << actual_buffer_size_
                   << " frames is not a multiple of " << INTERNAL_BLOCK_SIZE
-                  << " - plugins bypass the partial chunk (silently dry). "
-                     "Prefer a power-of-two buffer. AUDIT-5 A6.\n";
+                  << " (internal block) - REFUSED (contrat de periode A3-3): "
+                  << "the plugins would bypass every partial chunk. "
+                  << "Request a multiple of 256 (--buffer-size 512 in shared "
+                  << "mode, --exclusive --buffer-size 256 for 16 ms).\n";
+        ma_device_uninit(device_.get());
+        ma_context_uninit(context_.get());
+        state_ = AudioDeviceState::Uninitialized;  // rien a re-detruire
+        return false;
     }
 
     // Get device name

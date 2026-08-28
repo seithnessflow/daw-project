@@ -25,6 +25,7 @@
 #include "host/plugin_bridge.h"
 #include "host/plugin_scan.h"
 #include "host/proxy_node.h"
+#include "host/proxy_depth.h"
 #include "network/server_client.h"
 #include "util/sha256.h"
 
@@ -742,24 +743,19 @@ bool writeBlobToAssets(const std::string& assets_dir, const std::string& hash,
     return true;
 }
 
-// A3-2 (contrat de periode) : profondeur proxy = ceil(period/256),
-// plafond kRingSlots-2. Le clamp est BRUYANT - l'ancien clamp
-// silencieux etait une promesse de prose que le code ne tenait pas
-// (famille des 47 runs). Depasser le plafond legitimement = bump
-// kLayoutVersion (plus de slots), jamais un min() muet.
-static uint32_t proxyDepthFor(uint32_t buffer_frames) {
-    const uint32_t needed =
-        (buffer_frames + daw::host::kRingBlockSize - 1) /
-        daw::host::kRingBlockSize;
-    const uint32_t cap = daw::host::kRingSlots - 2;
-    if (needed > cap) {
-        std::cerr << "WARNING: periode " << buffer_frames
-                  << " frames -> depth " << needed << " > plafond " << cap
-                  << " (kRingSlots-2) - CLAMPE. Le ring plugin est "
-                  << "sous-provisionne : reduire --buffer-size ou bump "
-                  << "kLayoutVersion avec plus de slots.\n";
+// A3-2 (contrat de periode) : la profondeur proxy vit dans
+// host/proxy_depth.h - ceil(period/256), et REFUS (nullopt) au-dela du
+// plafond kRingSlots-2. Plus de clamp, ni muet (pre-v10) ni bruyant (v10) :
+// hors contrat, le moteur ne demarre pas et dit pourquoi.
+static bool resolveProxyDepth(uint32_t buffer_frames, uint32_t& depth) {
+    const auto d = daw::host::proxyDepthFor(buffer_frames);
+    if (!d) {
+        std::cerr << "ERROR: " << daw::host::proxyDepthRefusal(buffer_frames)
+                  << "\n";
+        return false;
     }
-    return (std::min)(cap, (std::max)(1u, needed));
+    depth = *d;
+    return true;
 }
 
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
@@ -1035,8 +1031,9 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     auto project = doc.getDocument();
     daw::document::resolveMusicalTime(project);
 
-    // A6/A3-2 : ceil + clamp BRUYANT (helper unique proxyDepthFor)
-    const uint32_t proxy_depth = proxyDepthFor(device.getBufferSize());
+    // A6/A3-2 : ceil, ou REFUS hors contrat (host/proxy_depth.h)
+    uint32_t proxy_depth = 1;
+    if (!resolveProxyDepth(device.getBufferSize(), proxy_depth)) return 1;
     std::shared_ptr<daw::graph::AudioGraph> graph =
         buildGraph(project, device.getSampleRate(), opts.assets_dir,
                    asset_cache, plugin_registry, opts, proxy_depth);
@@ -1205,6 +1202,12 @@ int doPlayWithServer(const Options& opts) {
     std::cout << "Audio Device: " << device.getDeviceName() << "\n"
               << "Sample Rate: " << device.getSampleRate() << " Hz\n"
               << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
+
+    // A3-2 : la profondeur proxy est fixee UNE fois par la periode
+    // negociee (elle ne change pas d'un rebuild a l'autre) - et hors
+    // contrat, on ne demarre pas.
+    uint32_t proxy_depth = 1;
+    if (!resolveProxyDepth(device.getBufferSize(), proxy_depth)) return 1;
 
     // Document: written by the network thread (load/apply under doc_mutex),
     // snapshotted by the builder in the main loop. The builder NEVER reads
@@ -1478,8 +1481,7 @@ int doPlayWithServer(const Options& opts) {
 
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
-                plugin_registry, opts,
-                proxyDepthFor(device.getBufferSize()));
+                plugin_registry, opts, proxy_depth);
             if (graph) {
                 if (opts.debug_rebuild_delay_ms > 0) {
                     // Test hook: simulate an expensive (plugin) build

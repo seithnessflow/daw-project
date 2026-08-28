@@ -10,50 +10,48 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun (ring v10 vert en CI, 2026-08-28).
+- Verdict CI du push ring v11 (voir REPRISE.md) — a lever avant de coder.
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
 
-1. **Contrat de periode — reste** (A3-2 + A3-3) : le ring v10
-   (kRingSlots=8, estampilles par slot A4-5, invariant input-dechire,
-   clamp bruyant) est LIVRE 2026-08-28. Reste : refus de DEMARRER hors
-   contrat (periode non multiple de 256 apres negociation, ou depth >
-   kRingSlots-2) au lieu du WARNING + clamp ; puis la **file d'ordres
-   GENERIQUE** (A3-1 : evenements `{type, id, value}` — param
-   aujourd'hui, note/CC demain) pour que l'entree MIDI live s'y branche
-   sans re-bump de layout. Menage au passage : `rebuild_msvc.bat` ne
-   construit pas `create_test_doc` (les specs en dependent — un clean
-   build les fait tomber, vu 2026-08-28).
-2. **VAGUE 3 — MIDI + instruments AVEC l'entree LIVE dedans** (sequence
+1. **VAGUE 3 — MIDI + instruments AVEC l'entree LIVE dedans** (sequence
    ratifiee 2026-08-27, docs/REVUE-EXTERNE-2026-08-27.md ; passee devant
    T4 le 2026-08-28 : le spike a montre que la grille inter-machines sert
-   un usage qui n'existe pas encore, l'entree live fait le DAW).
+   un usage qui n'existe pas encore, l'entree live fait le DAW). Le
+   contrat de periode est CLOS (2026-08-28 : ring v10 + refus de demarrer
+   hors contrat + FIFO MIDI generique v11 note/CC/pitch-bend, CC/PB
+   traduits par l'enfant via IMidiMapping) : le rail est pose.
    PREMIER MAILLON, le plus bete et le plus prouvable : **MIDI-in moteur
-   (clavier USB sur la tour) -> file d'ordres -> instrument de tete de
-   chaine -> note entendue, latence mesuree en exclusif 256 (< 20 ms
-   vise)**. Pas de Web MIDI, pas de CC64, pas de piano-roll d'abord.
-   Ensuite : Web MIDI ; CC64/pitch-bend/canal dans le ring (§5) ; notes
-   en MAP a ids stables (ecart SCHEMA-V2 §4 vs la LISTE implementee —
-   champ additif) ; velocite/longueur/deplacement des notes editables
-   (§5) ; piano-roll musical ; ProcessContext rempli pour les VST3
-   (tempo/position/play-state, §6). Le **test Massive** (clavier du
+   (clavier USB sur la tour, WinMM) -> pushMidiEvent sur le ring de
+   l'instrument de tete de chaine de la piste ARMEE -> note entendue,
+   latence mesuree en exclusif 256 (< 20 ms vise)**. Pas de Web MIDI ni
+   de piano-roll d'abord. Prealable a resoudre au cadrage : le ring n'a
+   qu'UN producteur (ProxyNode, thread audio) — l'entree live doit
+   passer par le thread audio (file SPSC MIDI-in -> callback ->
+   ProxyNode::emitMidi), jamais un second ecrivain sur le ring.
+   Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
+   synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
+   (ecart SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ;
+   velocite/longueur/deplacement des notes editables (§5) ; piano-roll
+   musical ; ProcessContext rempli pour les VST3 (tempo/position/
+   play-state, §6). Le **test Massive** (clavier du
    portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de
    vague, dans la forme tranchee par le spike : MIDI LAN -> rendu tour
    en exclusif 256 -> enceintes de la piece ; le retour vers le portable
    est du monitoring differe, pas du jeu.
-3. **Reliquat spike latence** : mesure LAN 2 machines (tour <-> portable
+2. **Reliquat spike latence** : mesure LAN 2 machines (tour <-> portable
    TX15), dix minutes quand le portable est allume ; confirme le terme
    reseau (~1-5 ms attendu, ne change pas le verdict de
    docs/SPIKE-LATENCE.md). Ne bloque rien — se glisse ou il peut.
-4. **T4 — Link Etage 2** (grille au quantum musical, rejoin aligne) :
+3. **T4 — Link Etage 2** (grille au quantum musical, rejoin aligne) :
    session dediee A PROPOSER (cadrage docs/LINK-DESIGN.md §3, le tempo
    existe desormais). Recule derriere la Vague 3.
-5. **La performance au regime de preuve (suite du Lot P)** : compteur
+4. **La performance au regime de preuve (suite du Lot P)** : compteur
    de churn des stems + fraicheur moyenne en edition simulee ; latence
    aller-retour en telemetrie permanente ; les declencheurs mesurables
    d'AUDIT-5 (load doc, gel de boucle, frame web, memoire cache).
-6. **Ratifications en attente** (arbitrages proposes, rien n'entre en
+5. **Ratifications en attente** (arbitrages proposes, rien n'entre en
    file sans l'utilisateur) : AUDIT-5 famille F « harmonisation »
    (session dediee : jumeaux, SPLITTER, code mort, commentaires faux) ;
    AUDIT-6 refontes planifiees — tranche EDITION D'ECHELLE
@@ -105,9 +103,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 - **A5 PDC live** : aucun alignement inter-pistes en live (la latence est
   declaree partout, appliquee seulement aux stems). Avant la Vague 3
   instrument (instrument a latence + piste seche).
-- **A6 chunks partiels** : le contrat de periode est mesure/surveille ;
-  le vrai fix (accumulateur amont, piste B) attend un declencheur :
-  buffer 128 exclusif ou une periode non multiple de 256 observee.
+- **A6 chunks partiels** : hors contrat = REFUS de demarrer (2026-08-28),
+  donc l'exclusif 128 (8 ms) et le plancher partage 374 sont REFUSES
+  aujourd'hui. Le vrai fix (accumulateur amont, piste B) attend un
+  declencheur : un utilisateur qui veut 8 ms, ou un device sans periode
+  multiple de 256 en partage.
   Dette liee : le wrap de BOUCLE cree un chunk partiel par tour (queue
   <= 255 frames en dry via plugins) — declencheur : plugin + region +
   oreille.
@@ -157,7 +157,6 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   `UpdateGraph`/`SetGain`/`graph_ptr`, `loop_*` atomics, stubs
   `generate/receiveSyncMessage`, `GraphBuilder::build` (divergent).
 - A4-12 rendu 32 bits : crete clippee positive -> INT_MIN.
-- A4-13 double `ma_context_uninit` sur echec d'`initialize()`.
 - A4-14 menu : `std::stoul` non protege (`--ws-port abc` = terminate) ;
   port pris = retry infini a 100 Hz ; garde frame_count > 65536 ;
   underruns uint64 tronques en uint32.
@@ -172,7 +171,12 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 - `.shm` orphelins dans TEMP apres crash moteur ; extension `.wav`
   cosmetique sur les blobs d'etat.
 - Segment ring : commentaire `proxy_node.cpp` « DRY bypass of N-1 » a
-  realigner sur le code v10.
+  realigner sur le code v10 ; en-tete de `shared_audio_ring.h` dit encore
+  « kRingSlots=4 covers depth<=2 ».
+- CC/pitch-bend non declares par un plugin = ignores (loggues une fois) :
+  pas de fallback « parametre devine ». Le chemin IMidiMapping n'est
+  prouve par aucun test (AGain ne declare rien) — preuve au premier vrai
+  synthe (Vague 3).
 - Morts silencieuses 0xc0000409 en run audible (~2 h) : instrumentees
   (crash handler), pas reproduites depuis.
 

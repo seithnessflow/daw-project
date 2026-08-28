@@ -31,7 +31,9 @@
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstmessage.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 
+#include <bitset>
 #include <map>
 
 #include <algorithm>
@@ -282,12 +284,115 @@ public:
     }
 };
 
+// ---- Le controleur d'edition, acquis UNE fois par instance (v11) ----------
+// Avant v11 la fenetre creait son propre controleur a l'ouverture ; le
+// mapping MIDI (IMidiMapping) en a besoin des la ceremonie, sans fenetre.
+// Un seul controleur par instance : la fenetre le REUTILISE (deux
+// controleurs = deux vues de l'etat, les edits GUI iraient au second).
+// Classe dediee si le composant en declare une, sinon le composant
+// lui-meme (effets mono-classe). Echec = headless (pas de map, pas de
+// fenetre), jamais un echec de l'instance.
+struct EditController {
+    Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
+    bool is_component = false;
+
+    bool acquire(VST3::Hosting::Module::Ptr& module,
+                 Steinberg::IPtr<Steinberg::Vst::IComponent>& component,
+                 Steinberg::Vst::HostApplication& host_app) {
+        using namespace Steinberg;
+        Steinberg::TUID ctrl_tuid{};
+        if (component->getControllerClassId(ctrl_tuid) == kResultOk) {
+            controller = module->getFactory()
+                             .createInstance<Vst::IEditController>(
+                                 VST3::UID::fromTUID(ctrl_tuid));
+            if (controller && controller->initialize(&host_app) != kResultOk) {
+                controller = nullptr;
+            }
+        }
+        if (!controller) {
+            controller = FUnknownPtr<Vst::IEditController>(component);
+            is_component = static_cast<bool>(controller);
+        }
+        if (!controller) return false;
+        // Connexion composant <-> controleur (meme process : directe)
+        {
+            FUnknownPtr<Vst::IConnectionPoint> cp_comp(component);
+            FUnknownPtr<Vst::IConnectionPoint> cp_ctrl(controller);
+            if (cp_comp && cp_ctrl && !is_component) {
+                cp_comp->connect(cp_ctrl);
+                cp_ctrl->connect(cp_comp);
+            }
+        }
+        // Synchroniser le controleur sur l'etat courant du processeur
+        if (!is_component) {
+            BlobStream s;
+            if (component->getState(&s) == kResultOk) {
+                s.seek(0, IBStream::kIBSeekSet, nullptr);
+                controller->setComponentState(&s);
+            }
+        }
+        return true;
+    }
+
+    void release() {
+        if (controller) {
+            controller->setComponentHandler(nullptr);
+            if (!is_component) controller->terminate();
+            controller = nullptr;
+        }
+    }
+};
+
+// ---- Table MIDI -> parametre (v11, IMidiMapping) ----------------------------
+// VST3 n'a pas d'evenement CC : un controleur EST un parametre que le
+// plugin DECLARE par canal (getMidiControllerAssignment). On interroge la
+// table une fois a la ceremonie (canaux 0..15, CC 0..127 + pitch-bend) ;
+// au drain, un CC/pitch-bend devient un point d'IParameterChanges a son
+// offset. Non declare = ignore (compte, jamais un parametre devine).
+struct MidiParamMap {
+    static constexpr int kSlots = Steinberg::Vst::kCountCtrlNumber;  // 0..131
+    Steinberg::Vst::ParamID ids[16][kSlots];
+    bool any = false;
+
+    MidiParamMap() {
+        for (auto& row : ids)
+            for (auto& id : row) id = Steinberg::Vst::kNoParamId;
+    }
+
+    void build(Steinberg::Vst::IEditController* controller) {
+        using namespace Steinberg;
+        if (!controller) return;
+        FUnknownPtr<Vst::IMidiMapping> mm(controller);
+        if (!mm) return;
+        int mapped = 0;
+        for (int16 ch = 0; ch < 16; ++ch) {
+            for (int16 cc = 0; cc < kSlots; ++cc) {
+                Vst::ParamID id = Vst::kNoParamId;
+                if (mm->getMidiControllerAssignment(0, ch, cc, id) == kResultTrue &&
+                    id != Vst::kNoParamId) {
+                    ids[ch][cc] = id;
+                    ++mapped;
+                }
+            }
+        }
+        any = mapped > 0;
+        std::cerr << "plugin_host: midi-mapping " << mapped
+                  << " controller assignment(s)"
+                  << (any ? "" : " (plugin declares none - CC/pitch-bend dropped)")
+                  << std::endl;
+    }
+
+    Steinberg::Vst::ParamID lookup(uint8_t channel, int cc) const {
+        if (channel > 15 || cc < 0 || cc >= kSlots) return Steinberg::Vst::kNoParamId;
+        return ids[channel][cc];
+    }
+};
+
 #ifdef _WIN32
 struct EditorWindow {
     HWND hwnd = nullptr;
     Steinberg::IPtr<Steinberg::IPlugView> view;
-    Steinberg::IPtr<Steinberg::Vst::IEditController> controller;
-    bool controller_is_component = false;  // effet mono-classe : pas de terminate dedie
+    Steinberg::IPtr<Steinberg::Vst::IEditController> controller;  // EMPRUNTE a l'instance (v11)
     GuiParamSink handler;
     // 2026-08-26 : pointeur vers ring->editor_open - la croix (X) y ecrit 0
     // pour que l'etat desire suive la realite (voir WM_CLOSE).
@@ -318,49 +423,17 @@ struct EditorWindow {
         }
     }
 
-    bool open(VST3::Hosting::Module::Ptr& module,
-              Steinberg::IPtr<Steinberg::Vst::IComponent>& component,
-              Steinberg::Vst::HostApplication& host_app,
+    bool open(Steinberg::IPtr<Steinberg::Vst::IEditController>& shared_controller,
               const std::string& title) {
         using namespace Steinberg;
-        // 1. Le controleur d'edition : classe dediee, ou le composant
-        //    lui-meme (effets mono-classe)
-        Steinberg::TUID ctrl_tuid{};
-        if (component->getControllerClassId(ctrl_tuid) == kResultOk) {
-            controller = module->getFactory()
-                             .createInstance<Vst::IEditController>(
-                                 VST3::UID::fromTUID(ctrl_tuid));
-            if (controller &&
-                controller->initialize(&host_app) != kResultOk) {
-                controller = nullptr;
-            }
-        }
-        if (!controller) {
-            controller = FUnknownPtr<Vst::IEditController>(component);
-            controller_is_component = static_cast<bool>(controller);
-        }
+        // 1-3 (v11) : le controleur est celui de l'instance, deja
+        //    initialise/connecte/synchronise a la ceremonie (EditController)
+        controller = shared_controller;
         if (!controller) {
             std::cerr << "plugin_host: no edit controller - headless" << std::endl;
             return false;
         }
         controller->setComponentHandler(&handler);
-        // 2. Connexion composant <-> controleur (meme process : directe)
-        {
-            FUnknownPtr<Vst::IConnectionPoint> cp_comp(component);
-            FUnknownPtr<Vst::IConnectionPoint> cp_ctrl(controller);
-            if (cp_comp && cp_ctrl && !controller_is_component) {
-                cp_comp->connect(cp_ctrl);
-                cp_ctrl->connect(cp_comp);
-            }
-        }
-        // 3. Synchroniser le controleur sur l'etat courant du processeur
-        if (!controller_is_component) {
-            BlobStream s;
-            if (component->getState(&s) == kResultOk) {
-                s.seek(0, IBStream::kIBSeekSet, nullptr);
-                controller->setComponentState(&s);
-            }
-        }
         // 4. La vue
         view = owned(controller->createView(Vst::ViewType::kEditor));
         if (!view) {
@@ -432,8 +505,9 @@ struct EditorWindow {
             hwnd = nullptr;
         }
         if (controller) {
+            // v11 : le controleur appartient a l'instance - on rend juste
+            // la main (le handler GUI ne doit plus recevoir d'edits)
             controller->setComponentHandler(nullptr);
-            if (!controller_is_component) controller->terminate();
             controller = nullptr;
         }
     }
@@ -443,12 +517,10 @@ struct EditorWindow {
 // fixture AGain plat, prive de ses ressources VSTGUI, crashe dans
 // createView). Garde SEH - la fonction hote n'a AUCUN objet a derouler.
 static bool openEditorGuarded(EditorWindow& w,
-                              VST3::Hosting::Module::Ptr& module,
-                              Steinberg::IPtr<Steinberg::Vst::IComponent>& component,
-                              Steinberg::Vst::HostApplication& host_app,
+                              Steinberg::IPtr<Steinberg::Vst::IEditController>& controller,
                               const std::string& title) {
     __try {
-        return w.open(module, component, host_app, title);
+        return w.open(controller, title);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         std::fprintf(stderr,
                      "plugin_host: editor open CRASHED (0x%08lX) - headless\n",
@@ -468,6 +540,21 @@ struct PluginInstance {
     Steinberg::Vst::HostApplication host_app;
     bool active = false;
     Steinberg::int32 num_audio_in = 1;  // v8 : 0 pour un instrument
+    // v11 : le controleur d'edition (optionnel - headless sinon) et la
+    // table MIDI -> parametre qu'il declare. Acquis apres la ceremonie
+    // (voir acquireController), partages avec la fenetre.
+    EditController edit;
+    MidiParamMap midi_map;
+
+    void acquireController() {
+        if (!component) return;
+        if (!edit.acquire(module, component, host_app)) {
+            std::cerr << "plugin_host: no edit controller - headless, no midi mapping"
+                      << std::endl;
+            return;
+        }
+        midi_map.build(edit.controller.get());
+    }
 
     bool setup(const std::string& module_path, const std::string& uid_str,
                double sample_rate, std::string& error) {
@@ -559,6 +646,7 @@ struct PluginInstance {
     Steinberg::uint32 latency_samples = 0;
 
     void teardown() {
+        edit.release();  // v11 : avant le composant (il y est connecte)
         if (component) {
             if (active) {
                 component->setActive(false);
@@ -793,6 +881,13 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }
     }
 
+    // v11 : le controleur d'edition + la table MIDI->parametre, acquis
+    // APRES la restauration d'etat (le controleur se synchronise sur
+    // l'etat restaure) et AVANT toute fenetre (qui l'emprunte). Toutes
+    // plateformes : le mapping MIDI ne depend pas d'une fenetre.
+    inst.acquireController();
+    std::bitset<16 * MidiParamMap::kSlots> midi_unmapped_warned;
+
     // Fenetrage v1 : la GUI s'ouvre AVANT le pret (elle fait partie de la
     // ceremonie) ; son echec est un WARNING, jamais une mort - le plugin
     // sert l'audio avec ou sans fenetre.
@@ -805,8 +900,7 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         if (slash != std::string::npos) editor_title = editor_title.substr(slash + 1);
     }
     if (editor) {
-        openEditorGuarded(editor_win, inst.module, inst.component,
-                          inst.host_app, editor_title);
+        openEditorGuarded(editor_win, inst.edit.controller, editor_title);
     }
     // v9 : etat DESIRE de la fenetre qu'on a honore en dernier. On agit sur
     // les TRANSITIONS de ring->editor_open (le message kEditor), pas sur le
@@ -864,8 +958,7 @@ int runServe(const std::string& segment_path, const std::string& module_path,
             if (want != last_editor_want) {
                 last_editor_want = want;
                 if (want) {
-                    openEditorGuarded(editor_win, inst.module, inst.component,
-                                      inst.host_app, editor_title);
+                    openEditorGuarded(editor_win, inst.edit.controller, editor_title);
                 } else {
                     editor_win.close();
                 }
@@ -978,43 +1071,67 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         }
 #endif
 
-        // v8 MIDI : draine le FIFO de notes dans l'IEventList de CE bloc
-        // (meme discipline SPSC que les params). C'est le canal qui fait
-        // SONNER un instrument : sans lui, un synthe ne recoit aucune note.
+        // v8 MIDI, GENERIQUE v11 : draine le FIFO d'evenements de CE bloc
+        // (popMidiEvent = le SEUL decodeur, partage avec le gtest). Notes
+        // -> IEventList (le canal qui fait SONNER un instrument) ; CC et
+        // pitch-bend -> IParameterChanges via la table IMidiMapping (VST3
+        // n'a pas d'evenement CC). Non declare par le plugin = ignore,
+        // compte une fois par (canal, controleur).
         Vst::EventList event_list{static_cast<int32>(daw::host::kMidiQueueSlots)};
-        while (true) {
-            uint64_t r = ring->midi_read_idx.load(std::memory_order_relaxed);
-            if (r >= ring->midi_write_idx.load(std::memory_order_acquire)) break;
-            const uint32_t mslot = static_cast<uint32_t>(r % daw::host::kMidiQueueSlots);
-            const uint8_t mtype = ring->midi_type[mslot];
-            const uint8_t mpitch = ring->midi_pitch[mslot];
-            const uint8_t mvel = ring->midi_velocity[mslot];
-            const uint8_t mchan = ring->midi_channel[mslot];
-            const uint32_t moff = ring->midi_offset[mslot];
-            // Reclame le slot AVANT de faire confiance a la paire (course
-            // file-pleine, comme les params).
-            if (!ring->midi_read_idx.compare_exchange_strong(
-                    r, r + 1, std::memory_order_acq_rel)) {
-                continue;
+        daw::host::MidiEvent mev;
+        while (daw::host::popMidiEvent(ring, mev)) {
+            const int32 off = static_cast<int32>(mev.sample_offset);
+            switch (mev.kind) {
+                case daw::host::MidiKind::NoteOn:
+                case daw::host::MidiKind::NoteOff: {
+                    Vst::Event ev{};
+                    ev.busIndex = 0;
+                    ev.sampleOffset = off;
+                    ev.flags = Vst::Event::kIsLive;
+                    if (mev.kind == daw::host::MidiKind::NoteOn) {
+                        ev.type = Vst::Event::kNoteOnEvent;
+                        ev.noteOn.channel = mev.channel;
+                        ev.noteOn.pitch = mev.data1;
+                        ev.noteOn.velocity = static_cast<float>(mev.data2) / 127.0f;
+                        ev.noteOn.noteId = -1;
+                    } else {
+                        ev.type = Vst::Event::kNoteOffEvent;
+                        ev.noteOff.channel = mev.channel;
+                        ev.noteOff.pitch = mev.data1;
+                        ev.noteOff.velocity = static_cast<float>(mev.data2) / 127.0f;
+                        ev.noteOff.noteId = -1;
+                    }
+                    event_list.addEvent(ev);
+                    break;
+                }
+                case daw::host::MidiKind::ControlChange:
+                case daw::host::MidiKind::PitchBend: {
+                    const bool bend = mev.kind == daw::host::MidiKind::PitchBend;
+                    const int cc = bend ? Vst::kPitchBend : mev.data1;
+                    const Vst::ParamID pid = inst.midi_map.lookup(mev.channel, cc);
+                    if (pid == Vst::kNoParamId) {
+                        const size_t key = mev.channel * MidiParamMap::kSlots + cc;
+                        if (key < midi_unmapped_warned.size() && !midi_unmapped_warned[key]) {
+                            midi_unmapped_warned[key] = true;
+                            std::cerr << "plugin_host: midi " << (bend ? "pitch-bend" : "cc")
+                                      << (bend ? "" : " " + std::to_string(cc))
+                                      << " ch" << int(mev.channel)
+                                      << " not mapped by the plugin - dropped" << std::endl;
+                        }
+                        break;
+                    }
+                    const double norm = bend
+                        ? static_cast<double>(daw::host::midiPitchBend14(mev.data1, mev.data2)) / 16383.0
+                        : static_cast<double>(mev.data2) / 127.0;
+                    int32 queue_index = 0;
+                    auto* queue = param_changes.addParameterData(pid, queue_index);
+                    if (queue) {
+                        int32 point_index = 0;
+                        queue->addPoint(off, norm, point_index);
+                    }
+                    break;
+                }
             }
-            Vst::Event ev{};
-            ev.busIndex = 0;
-            ev.sampleOffset = static_cast<int32>(moff);
-            ev.flags = Vst::Event::kIsLive;
-            if (mtype == 1) {
-                ev.type = Vst::Event::kNoteOnEvent;
-                ev.noteOn.channel = mchan;
-                ev.noteOn.pitch = mpitch;
-                ev.noteOn.velocity = static_cast<float>(mvel) / 127.0f;
-                ev.noteOn.noteId = -1;
-            } else {
-                ev.type = Vst::Event::kNoteOffEvent;
-                ev.noteOff.channel = mchan;
-                ev.noteOff.pitch = mpitch;
-                ev.noteOff.velocity = static_cast<float>(mvel) / 127.0f;
-                ev.noteOff.noteId = -1;
-            }
-            event_list.addEvent(ev);
         }
 
         // Zero-copy: VST3 channel pointers aim straight into the segment

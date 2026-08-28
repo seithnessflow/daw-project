@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 10;      // v10: kRingSlots 8 + stamps par slot (A4-5) ; v9: editor_open ; v8: MIDI FIFO
+inline constexpr uint32_t kLayoutVersion = 11;      // v11: FIFO MIDI GENERIQUE (note/CC/pitch-bend, format fil) ; v10: kRingSlots 8 + stamps par slot (A4-5) ; v9: editor_open ; v8: MIDI FIFO
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kMidiQueueSlots = 256;    // power of two; note events per block, drained by the child
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
@@ -133,19 +133,25 @@ struct SharedAudioRing {
     // uint64 pour garder les offsets multiples de 8 (pas de padding).
     std::atomic<uint64_t> plugin_latency_samples;
 
-    // ---- MIDI event channel (v8): SPSC FIFO, meme moule que les params ----
-    // L'ENGINE (thread de controle) pousse les evenements de note du bloc ;
-    // l'ENFANT les DRAINE dans l'IEventList VST3 avant process(). Meme
-    // discipline d'indices que le FIFO param (slots plain, ordonnes par les
-    // index). Les notes sont TRANSITOIRES : jamais rejouees a un cold restart
-    // (contrairement aux params) - un restart envoie un all-notes-off. Plein
-    // = on ecrase la plus VIEILLE (avance read_idx), le controle ne stalle
-    // jamais (un debordement > 256 notes/bloc n'est jamais legitime).
+    // ---- MIDI event channel (v8, GENERIQUE v11): SPSC FIFO ---------------
+    // L'ENGINE pousse les evenements MIDI du bloc ; l'ENFANT les DRAINE
+    // avant process() : notes -> IEventList VST3, CC / pitch-bend ->
+    // IParameterChanges via IMidiMapping (VST3 n'a pas d'evenement CC : un
+    // controleur EST un parametre que le plugin declare). Meme discipline
+    // d'indices que le FIFO param (slots plain, ordonnes par les index).
+    // FORMAT FIL MIDI (v11, A3-1 « la file est generique ») : kind +
+    // data1/data2 7 bits, comme sur le cable - note (pitch, velocite), CC
+    // (controleur, valeur), pitch-bend (LSB, MSB). Un evenement nouveau
+    // (aftertouch, program) = un kind de plus, JAMAIS un bump de layout.
+    // Les evenements sont TRANSITOIRES : jamais rejoues a un cold restart
+    // (contrairement aux params) - un restart envoie un all-notes-off.
+    // Plein = on ecrase le plus VIEUX (avance read_idx), le producteur ne
+    // stalle jamais (> 256 evenements/bloc n'est jamais legitime).
     std::atomic<uint64_t> midi_write_idx;
     std::atomic<uint64_t> midi_read_idx;
-    uint8_t  midi_type[kMidiQueueSlots];      // 0 = note-off, 1 = note-on
-    uint8_t  midi_pitch[kMidiQueueSlots];     // 0..127
-    uint8_t  midi_velocity[kMidiQueueSlots];  // 0..127
+    uint8_t  midi_kind[kMidiQueueSlots];      // MidiKind (0 off, 1 on, 2 CC, 3 pitch-bend)
+    uint8_t  midi_data1[kMidiQueueSlots];     // pitch | controleur | LSB (0..127)
+    uint8_t  midi_data2[kMidiQueueSlots];     // velocite | valeur | MSB (0..127)
     uint8_t  midi_channel[kMidiQueueSlots];   // 0..15
     uint32_t midi_offset[kMidiQueueSlots];    // offset en samples DANS le bloc
 
@@ -197,9 +203,9 @@ static_assert(offsetof(SharedAudioRing, gui_edit_seq) == 80 + kParamQueueSlots *
 static_assert(offsetof(SharedAudioRing, plugin_latency_samples) == 88 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, midi_write_idx) == 96 + kParamQueueSlots * 12);
 static_assert(offsetof(SharedAudioRing, midi_read_idx) == 104 + kParamQueueSlots * 12);
-static_assert(offsetof(SharedAudioRing, midi_type) == 112 + kParamQueueSlots * 12);
-static_assert(offsetof(SharedAudioRing, midi_pitch) == 112 + kParamQueueSlots * 12 + kMidiQueueSlots);
-static_assert(offsetof(SharedAudioRing, midi_velocity) == 112 + kParamQueueSlots * 12 + 2 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, midi_kind) == 112 + kParamQueueSlots * 12);
+static_assert(offsetof(SharedAudioRing, midi_data1) == 112 + kParamQueueSlots * 12 + kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, midi_data2) == 112 + kParamQueueSlots * 12 + 2 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, midi_channel) == 112 + kParamQueueSlots * 12 + 3 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, midi_offset) == 112 + kParamQueueSlots * 12 + 4 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, in_slot_seq) ==
@@ -220,15 +226,35 @@ static_assert(sizeof(SharedAudioRing) ==
                   2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 
-// Ecrit UN evenement de note dans le FIFO MIDI (SPSC, single writer). Utilise
-// par PluginBridge (offline, thread de controle) ET ProxyNode (live, thread
+// ---- Le FIFO MIDI generique (v11) ------------------------------------------
+enum class MidiKind : uint8_t {
+    NoteOff = 0,        // data1 = pitch, data2 = velocite de relachement
+    NoteOn = 1,         // data1 = pitch, data2 = velocite
+    ControlChange = 2,  // data1 = controleur 0..127, data2 = valeur 0..127
+    PitchBend = 3,      // data1 = LSB, data2 = MSB (14 bits, 8192 = centre)
+};
+
+struct MidiEvent {
+    MidiKind kind = MidiKind::NoteOff;
+    uint8_t channel = 0;        // 0..15
+    uint8_t data1 = 0;          // 7 bits
+    uint8_t data2 = 0;          // 7 bits
+    uint32_t sample_offset = 0; // dans le bloc
+};
+
+// Valeur 14 bits d'un pitch-bend (LSB puis MSB, comme sur le fil).
+inline constexpr uint16_t midiPitchBend14(uint8_t lsb, uint8_t msb) noexcept {
+    return static_cast<uint16_t>((static_cast<uint16_t>(msb & 0x7F) << 7) |
+                                 (lsb & 0x7F));
+}
+
+// Ecrit UN evenement dans le FIFO MIDI (SPSC, single writer). Utilise par
+// PluginBridge (offline, thread de controle) ET ProxyNode (live, thread
 // audio) - JAMAIS les deux sur le meme ring simultanement (regle
 // un-producteur-par-ring, cf. proxy_node.h). RT-safe : que des atomics et des
-// ecritures de slots plain, aucune alloc/syscall. Plein = ecrase la plus
-// vieille (avance read_idx), l'ecrivain ne stalle jamais.
-inline void pushMidiEvent(SharedAudioRing* ring, bool note_on, uint8_t pitch,
-                          uint8_t velocity, uint8_t channel,
-                          uint32_t sample_offset) noexcept {
+// ecritures de slots plain, aucune alloc/syscall. Plein = ecrase le plus
+// vieux (avance read_idx), l'ecrivain ne stalle jamais.
+inline void pushMidiEvent(SharedAudioRing* ring, const MidiEvent& ev) noexcept {
     const uint64_t w = ring->midi_write_idx.load(std::memory_order_relaxed);
     uint64_t r = ring->midi_read_idx.load(std::memory_order_acquire);
     if (w - r >= kMidiQueueSlots) {
@@ -236,12 +262,49 @@ inline void pushMidiEvent(SharedAudioRing* ring, bool note_on, uint8_t pitch,
                                                     std::memory_order_acq_rel);
     }
     const uint32_t slot = static_cast<uint32_t>(w % kMidiQueueSlots);
-    ring->midi_type[slot] = note_on ? 1 : 0;
-    ring->midi_pitch[slot] = pitch;
-    ring->midi_velocity[slot] = velocity;
-    ring->midi_channel[slot] = channel;
-    ring->midi_offset[slot] = sample_offset;
+    ring->midi_kind[slot] = static_cast<uint8_t>(ev.kind);
+    ring->midi_data1[slot] = ev.data1 & 0x7F;
+    ring->midi_data2[slot] = ev.data2 & 0x7F;
+    ring->midi_channel[slot] = ev.channel & 0x0F;
+    ring->midi_offset[slot] = ev.sample_offset;
     ring->midi_write_idx.store(w + 1, std::memory_order_release);
+}
+
+// La forme note (v8) conservee : les appelants existants (schedule de
+// timeline, session, all-notes-off, bridge offline) ne changent pas.
+inline void pushMidiEvent(SharedAudioRing* ring, bool note_on, uint8_t pitch,
+                          uint8_t velocity, uint8_t channel,
+                          uint32_t sample_offset) noexcept {
+    MidiEvent ev;
+    ev.kind = note_on ? MidiKind::NoteOn : MidiKind::NoteOff;
+    ev.channel = channel;
+    ev.data1 = pitch;
+    ev.data2 = velocity;
+    ev.sample_offset = sample_offset;
+    pushMidiEvent(ring, ev);
+}
+
+// Lit UN evenement (single reader : l'enfant). Reclame le slot AVANT de
+// faire confiance a son contenu : si le producteur a ecrase ce slot
+// pendant la lecture (course file-pleine), le CAS echoue et l'appelant
+// re-boucle sur le slot frais. false = FIFO vide. Meme fonction dans
+// l'enfant et dans le gtest : le decodage n'a qu'un exemplaire.
+inline bool popMidiEvent(SharedAudioRing* ring, MidiEvent& out) noexcept {
+    while (true) {
+        uint64_t r = ring->midi_read_idx.load(std::memory_order_relaxed);
+        if (r >= ring->midi_write_idx.load(std::memory_order_acquire)) return false;
+        const uint32_t slot = static_cast<uint32_t>(r % kMidiQueueSlots);
+        out.kind = static_cast<MidiKind>(ring->midi_kind[slot]);
+        out.data1 = ring->midi_data1[slot];
+        out.data2 = ring->midi_data2[slot];
+        out.channel = ring->midi_channel[slot];
+        out.sample_offset = ring->midi_offset[slot];
+        if (ring->midi_read_idx.compare_exchange_strong(
+                r, r + 1, std::memory_order_acq_rel)) {
+            return true;
+        }
+        // le producteur nous a depasses : le slot etait perime, on relit
+    }
 }
 
 }  // namespace daw::host
