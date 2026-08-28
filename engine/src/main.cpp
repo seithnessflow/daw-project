@@ -28,6 +28,7 @@
 #include "host/proxy_depth.h"
 #include "midi/midi_input.h"
 #include "midi/midi_in_cli.h"
+#include "util/net_loopback.h"
 #include "network/server_client.h"
 #include "util/sha256.h"
 
@@ -646,7 +647,8 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
     }
 
     // ws://host:port -> http://host:port (wss -> https)
-    std::string http_base = server_ws_url;
+    // localhost -> 127.0.0.1 (util/net_loopback.h : 2 s de connect IPv6 evites)
+    std::string http_base = daw::util::preferIpv4Loopback(server_ws_url);
     if (http_base.rfind("wss://", 0) == 0) {
         http_base = "https://" + http_base.substr(6);
     } else if (http_base.rfind("ws://", 0) == 0) {
@@ -715,7 +717,8 @@ bool putAssetToServer(const std::string& server_ws_url,
                       const std::string& hash,
                       const std::vector<uint8_t>& bytes) {
     if (server_ws_url.empty() || hash.empty()) return false;
-    std::string http_base = server_ws_url;
+    // localhost -> 127.0.0.1 (util/net_loopback.h : 2 s de connect IPv6 evites)
+    std::string http_base = daw::util::preferIpv4Loopback(server_ws_url);
     if (http_base.rfind("wss://", 0) == 0) {
         http_base = "https://" + http_base.substr(6);
     } else if (http_base.rfind("ws://", 0) == 0) {
@@ -1495,8 +1498,21 @@ int doPlayWithServer(const Options& opts) {
     const auto telemetry_interval = std::chrono::milliseconds(1000 / ws_config.telemetry_hz);
 
     // Main loop
+    // AUDIT-5 C1 / Lot P : le GEL de la boucle de controle, instrumente
+    // (un tour > 50 ms = un appel bloquant dedans : fetch, PUT, spawn,
+    // rendu de stem, saveState). Le thread audio ne gele pas, mais la
+    // telemetrie et le pump s'arretent - a lire quand « rien ne bouge ».
+    auto last_iter = std::chrono::steady_clock::now();
     while (g_running) {
         auto now = std::chrono::steady_clock::now();
+        {
+            const auto iter_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                now - last_iter).count();
+            if (iter_ms > 50) {
+                std::cerr << "control-loop stall: " << iter_ms << " ms\n";
+            }
+            last_iter = now;
+        }
 
         // ---- Bascule de projet (le moteur suit l'onglet) --------------
         if (switch_pending.exchange(false, std::memory_order_acq_rel)) {
@@ -1702,13 +1718,27 @@ int doPlayWithServer(const Options& opts) {
                     auto* h = plugin_registry.find(p.id);
                     if (!h || !h->bridge || !h->bridge->isRunning()) continue;
                     std::vector<uint8_t> blob;
+                    const auto t_save0 = std::chrono::steady_clock::now();
                     if (!h->bridge->saveState(blob, 2000) || blob.empty()) continue;
+                    const auto t_save1 = std::chrono::steady_clock::now();
                     const std::string sha = daw::util::sha256Hex(
                         reinterpret_cast<const char*>(blob.data()), blob.size());
                     if (sha == p.state_hash) continue;  // settled
                     if (!writeBlobToAssets(opts.assets_dir, sha, blob)) continue;
+                    const auto t_put0 = std::chrono::steady_clock::now();
                     if (!opts.server_url.empty()) {
                         putAssetToServer(opts.server_url, sha, blob);
+                    }
+                    const auto t_put1 = std::chrono::steady_clock::now();
+                    {
+                        // C1 : attribution du gel de la boucle (mesure)
+                        const auto ms = [](auto a, auto b) {
+                            return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+                        };
+                        if (ms(t_save0, t_put1) > 50) {
+                            std::cerr << "state-capture timing: saveState=" << ms(t_save0, t_save1)
+                                      << " ms, put=" << ms(t_put0, t_put1) << " ms\n";
+                        }
                     }
                     {
                         std::lock_guard<std::mutex> lock(doc_mutex);

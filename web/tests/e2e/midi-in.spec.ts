@@ -128,17 +128,16 @@ async function playOneNote(page: Page, synth: Synth, modulePath: string, sendExe
       'enfant plugin jamais servi',
     ).toBe(true);
     // ... puis que la capture d'etat post-rebuild ait ecrit stateHash au
-    // document, que le rebuild qui en decoule soit passe ET que la
-    // seconde capture (1 s apres) soit derriere nous : sur mda DX10 une
-    // note qui tombe dans cette transition (~3 s apres l'ajout de
-    // l'instrument) reste MUETTE alors que les evenements sont routes et
-    // draines (observe 2026-08-28 - dette datee TODO, repro : ce test
-    // avec 1,5 s d'attente au lieu de 4). La spec vise le regime etabli.
+    // document et que le rebuild qui en decoule soit passe. Le « transitoire
+    // DX10 » (note muette ~1,5 s apres) etait un ARTEFACT : la boucle de
+    // controle gelait 2 s par PUT d'asset (ixwebsocket tentait ::1 sur
+    // « localhost », util/net_loopback.h) et la telemetrie ne voyait pas la
+    // note qui jouait. Corrige 2026-08-28 ; MIDI_IN_SETTLE_MS pour explorer.
     expect(
       await waitUntil(() => countInFile(logPath, 'Graph updated') >= rebuilds0 + 2, 20000),
       'le rebuild stateHash n est pas arrive',
     ).toBe(true);
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(Number(process.env.MIDI_IN_SETTLE_MS || 1500));
 
     // Espion meters sur la piste cible
     await page.evaluate((tid) => {

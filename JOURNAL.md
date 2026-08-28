@@ -1957,3 +1957,27 @@ un seul changement = jamais. Lie a la double sequence capture d'etat
 -> stateHash -> rebuild par geste ; non deterministe ; c'est LE cas
 d'usage « l'IA pousse un param pendant que l'humain joue », donc
 prioritaire (TODO §3).
+
+**2026-08-28 (nuit — le « transitoire DX10 » avait une cause, et elle
+coutait 2 s partout) :** instrumentation plutot que conjecture : (1) le
+child loggue ou atterrit chaque note-on et s'il saute/ne publie pas un
+bloc -> la note MUETTE arrivait a temps (bloc 361, newest 361), sortie
+publiee : le son ETAIT produit ; (2) `control-loop stall: N ms` (le
+declencheur C1 d'AUDIT-5, enfin instrumente) -> **2068 ms** de gel
+juste apres « State captured » ; (3) attribution : `saveState=2 ms,
+put=2008 ms`. Le PUT HTTP d'un blob de 4 Ko vers le serveur LOCAL prenait
+2 s : `curl [::1]:3000` = 2137 ms (timeout), `127.0.0.1` = 89 ms,
+`localhost` = 411 ms (curl fait la course des deux) — ixwebsocket tente
+`::1` d'abord et attend son timeout avant l'IPv4, le serveur n'ecoutant
+qu'en 127.0.0.1. Chaque PUT/GET d'asset, chaque capture d'etat, chaque
+stem publie et la connexion WS initiale du moteur payaient 2 s de gel
+de boucle de controle : telemetrie figee, ring de telemetrie deborde
+-> « la note est muette » alors qu'elle jouait ; aussi le « Dexed 0.15
+-> 1.0 muet » (deux captures = deux gels). Fix : `util/net_loopback.h`
+`preferIpv4Loopback` (localhost -> 127.0.0.1, applique aux PUT/GET
+d'assets et a ServerClient) + gtest. Verifie : DX10 a 1,5 s VERT, plus
+aucun `control-loop stall` > 50 ms dans le run ; les instruments (stall
+log, capture timing, note-on/skip/torn du child, bornes) restent en
+place — ce sont les yeux qu'AUDIT-5 reclamait. La dette « transitoire
+MIDI live » est FERMEE ; reste C1 (HTTP sur le thread de controle,
+~90 ms par PUT local, secondes a travers un tunnel).

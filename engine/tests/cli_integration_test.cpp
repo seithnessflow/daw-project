@@ -28,6 +28,7 @@
 #include "../src/audio/audio_device.h"
 #include "../src/midi/midi_parse.h"
 #include "../src/midi/live_midi.h"
+#include "../src/util/net_loopback.h"
 #include "../src/util/sha256.h"
 #include "../src/util/path_safety.h"
 #include "../src/websocket/websocket_server.h"
@@ -2813,6 +2814,29 @@ bool testLiveMidiRouting() {
     return true;
 }
 
+// util/net_loopback.h : `localhost` -> `127.0.0.1` (le connect ::1 de
+// ixwebsocket coutait 2 s par PUT/GET/WS - gel de la boucle de controle).
+bool testPreferIpv4Loopback() {
+    std::cout << "Test: prefer IPv4 loopback for localhost URLs... ";
+    const struct { const char* in; const char* out; } cases[] = {
+        {"ws://localhost:3000", "ws://127.0.0.1:3000"},
+        {"http://localhost:3000/assets/ab", "http://127.0.0.1:3000/assets/ab"},
+        {"wss://localhost", "wss://127.0.0.1"},
+        {"ws://localhost.example:3000", "ws://localhost.example:3000"},  // pas un loopback
+        {"wss://abc.trycloudflare.com", "wss://abc.trycloudflare.com"},
+        {"ws://127.0.0.1:3000", "ws://127.0.0.1:3000"},
+    };
+    for (const auto& c : cases) {
+        const auto got = daw::util::preferIpv4Loopback(c.in);
+        if (got != c.out) {
+            std::cout << "FAILED: " << c.in << " -> " << got << " (attendu " << c.out << ")\n";
+            return false;
+        }
+    }
+    std::cout << "OK (6 cas)\n";
+    return true;
+}
+
 // A3-2 (contrat de periode) : la profondeur proxy est ceil(period/256)
 // et le ring la REFUSE au-dela de kRingSlots-2 - plus aucun clamp.
 bool testProxyDepthContract() {
@@ -4999,6 +5023,7 @@ int main(int argc, char* argv[]) {
     run(testMidiShortParse);        // Vague 3 etape 1 : parseur MIDI court
     run(testLiveMidiDrain);         // Vague 3 etape 2 : file SPSC + drain
     run(testLiveMidiRouting);       // Vague 3 etape 3 : routage vers l'instrument
+    run(testPreferIpv4Loopback);    // localhost -> 127.0.0.1 (2 s de connect ::1 evites)
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "server_client.h"
+#include "../util/net_loopback.h"
 
 #include <ixwebsocket/IXNetSystem.h>
 #include <ixwebsocket/IXWebSocket.h>
@@ -36,7 +37,9 @@ bool ServerClient::connect(const ServerConfig& config) {
     }
 
     // Build URL: ws://localhost:3000/ws/{project_id}
-    std::string url = config_.url + "/ws/" + config_.project_id;
+    // localhost -> 127.0.0.1 : ixwebsocket tente ::1 d'abord et y attend ~2 s
+    // (serveur en 127.0.0.1 seul) - util/net_loopback.h, mesure 2026-08-28
+    std::string url = daw::util::preferIpv4Loopback(config_.url) + "/ws/" + config_.project_id;
     std::cout << "ServerClient: Connecting to " << url << std::endl;
 
     ws_ = std::make_unique<ix::WebSocket>();

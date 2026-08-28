@@ -196,21 +196,16 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   priorite, ~50 % de blocs rates meme sans note ; le partage 512 + MMCSS
   donne 0. Si l'exclusif 256 + MMCSS rate encore, la politique de
   profondeur (ceil(period/256)) doit gagner un bloc de marge (+5,3 ms).
-- **TRANSITOIRE MIDI live (2026-08-28, repro precise)** : projet FRAIS,
-  instrument mda DX10 ajoute par la page, note envoyee ~1,5 s apres le
-  rebuild stateHash (la 2e capture d'etat) -> MUETTE bien que routee
-  (forwarded) et drainee par l'enfant (« cc 64 not mapped » loggue) ; a
-  4 s tout sonne ; projet existant : sonne a 1,2 s comme a 5 s ;
-  Repro : `midi-in.spec.ts` avec 1,5 s au lieu de 4. VU AUSSI SUR DEXED
-  (soir) : `setProcessorParam` Output 1.0 -> 0.15 -> 1.0 espaces de
-  2,4 s => notes MUETTES apres le retour a 1.0 ; un seul changement
-  (0.9) => jamais muet (notes a +0,5/1,5/3/5/8/12 s toutes a 0,12).
-  Non deterministe, lie a la sequence capture d'etat -> stateHash ->
-  rebuild qui suit CHAQUE changement de param (2 rebuilds + 2 captures
-  par geste). Pistes : capture d'etat (getState) pendant la note, ou
-  swap de graphe + estampilles par slot. Declencheur : composer assiste
-  (un param pousse par l'IA pendant que l'utilisateur joue) — c'est le
-  CAS D'USAGE, donc prioritaire dans la Vague 3.
+- ~~TRANSITOIRE MIDI live~~ FERME 2026-08-28 : c'etait un gel de 2 s de
+  la boucle de controle a chaque PUT/GET d'asset (`localhost` -> `::1`
+  d'abord dans ixwebsocket, serveur en 127.0.0.1) qui figeait la
+  telemetrie — la note jouait, la mesure ne la voyait pas. Fix
+  `util/net_loopback.h`. Instruments gardes : `control-loop stall`,
+  `state-capture timing`, note-on/skip/torn cote child.
+- **C1 (reste)** : HTTP toujours sur le thread de controle (~90 ms par
+  PUT local mesure, des secondes a travers un tunnel), fetch d'asset et
+  spawn idem. Le stall log le rend VISIBLE ; le fix = thread de service
+  (export_job en est le moule).
 - **PAS DE LIMITEUR DE SORTIE** : un instrument live avec un patch
   chaud ecreterait le DAC, rien ne protege les moniteurs (chaine master
   absente, AUDIT-6 §7). Point produit, pas un incident (l'alerte

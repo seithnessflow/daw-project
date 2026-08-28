@@ -79,7 +79,8 @@ Regles :
 1. Lire `REPRISE.md` -> `STATUS.md` -> le bloc ORDRE GRAVE de `TODO.md`.
    Rien d'autre.
 2. Honorer le point de synchro : verdict CI / build / test annonce en
-   attente = le lever AVANT de coder (`gh run list --limit 3`).
+   attente = le lever AVANT de coder (`gh run list --limit 3`). En cours
+   de session, la CI ne se consulte qu'au dernier push (§5).
 3. Verifier qu'aucune tache d'arriere-plan de la veille ne survit
    (moteur / serveur / vite / `plugin_host` orphelins).
 4. Plan en 3 lignes max (hypothese, actions, critere de succes), puis
@@ -95,9 +96,14 @@ Regles :
    nouveaux items a leur place. JOURNAL.md : le recit.
 3. Commit, push.
 4. REECRIRE REPRISE.md (digest 30 s).
-5. AUCUNE session ne se clot sur un push sans verdict CI, OU sans que le
-   verdict attendu soit transmis a la session suivante comme PREMIER
-   point de synchro. Le rituel exige le verdict, pas la surveillance.
+5. Le verdict CI se lit UNE fois par session, sur le DERNIER push (pas
+   apres chaque commit — arbitrage utilisateur 2026-08-28 : « la CI peut
+   etre verifiee moins souvent »). Les pushes intermediaires ne
+   s'attendent pas. Ce qui reste absolu : aucune session ne se clot sans
+   connaitre le verdict du dernier push, OU sans le transmettre a la
+   session suivante comme PREMIER point de synchro (lecon des 47 runs
+   rouges jamais regardes). Une CI rouge en cours de session = on
+   s'arrete et on regarde.
 
 ## 6. Regime de livraison (prime sur tout)
 
@@ -169,6 +175,12 @@ NE JAMAIS demander a l'utilisateur de tester ce que je peux voir.
 - **« X marche pas » alors que mes pilotes sont verts** : verifier SON
   onglet / SA connexion d'abord (logs moteur : zero trace = probleme de
   connexion), et rendre tout echec VISIBLE dans l'UI.
+- **Un silence MESURE par la telemetrie n'est pas un silence** : avant
+  d'accuser l'audio, lire `control-loop stall:` dans le log moteur (la
+  telemetrie vit sur la boucle de controle ; un gel = meters figes,
+  ring deborde). Precedent 2026-08-28 : « note muette » = PUT d'asset
+  de 2 s. Instrumenter (cote child : note-on / skip / torn) avant de
+  conjecturer.
 - **Boucle UI** : petit lot (hot-reload) -> `npm run snap` -> grille ->
   chemin audio touche ? -> `npm run ear` -> toutes les ~10 iterations ou
   niveau 3-4 : full.png + 3 lignes, attendre. Invariants Playwright

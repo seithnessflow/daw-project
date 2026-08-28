@@ -1047,6 +1047,16 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         // traiter serait calculer sur un bloc futur et le publier sous
         // un mauvais numero). Skip : l'engine sert dry et compte.
         if (ring->in_slot_seq[slot].load(std::memory_order_acquire) != seq) {
+            // Diagnostic (borne) : combien de blocs l'enfant saute parce que
+            // l'engine a deja recouvert leur entree (= il est en retard de
+            // plus de kRingSlots blocs)
+            static uint32_t skipped_logged = 0;
+            if (skipped_logged < 20) {
+                ++skipped_logged;
+                std::cerr << "plugin_host: input of seq " << seq << " already overwritten (slot stamp "
+                          << ring->in_slot_seq[slot].load(std::memory_order_relaxed)
+                          << ", newest " << newest << ") - skipped" << std::endl;
+            }
             continue;
         }
 
@@ -1117,6 +1127,15 @@ int runServe(const std::string& segment_path, const std::string& module_path,
                         ev.noteOn.pitch = mev.data1;
                         ev.noteOn.velocity = static_cast<float>(mev.data2) / 127.0f;
                         ev.noteOn.noteId = -1;
+                        // Diagnostic (borne a 40 lignes) : ou atterrit chaque
+                        // note-on - transitoire « note muette apres rebuild »
+                        static uint32_t noteon_logged = 0;
+                        if (noteon_logged < 40) {
+                            ++noteon_logged;
+                            std::cerr << "plugin_host: note-on " << int(mev.data1)
+                                      << " v" << int(mev.data2) << " in block seq " << seq
+                                      << " (newest " << newest << ")" << std::endl;
+                        }
                     } else {
                         ev.type = Vst::Event::kNoteOffEvent;
                         ev.noteOff.channel = mev.channel;
@@ -1194,6 +1213,13 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         // compte). Le heartbeat avance quand meme (l'enfant est vivant).
         if (ring->in_slot_seq[slot].load(std::memory_order_acquire) == seq) {
             ring->out_slot_seq[slot].store(seq, std::memory_order_release);
+        } else {
+            static uint32_t torn_logged = 0;
+            if (torn_logged < 20) {
+                ++torn_logged;
+                std::cerr << "plugin_host: output of seq " << seq
+                          << " NOT published (input torn during process)" << std::endl;
+            }
         }
         ring->output_seq.store(seq, std::memory_order_release);
         ring->child_heartbeat.store(++beats, std::memory_order_release);
