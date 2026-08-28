@@ -10,8 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Verdict CI du push « Vague 3 session B » (voir REPRISE.md) — a lever
-  avant de coder.
+- Aucun verdict CI en vol (session B verte, 2026-08-28 nuit).
 - PREALABLE UTILISATEUR : creer le port loopMIDI « MagicPotion » ->
   rejouer `npx playwright test tests/e2e/midi-in.spec.ts` (preuve pilotee
   du port en vrai) puis la manip audible.

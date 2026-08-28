@@ -2,11 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : L'ENTREE MIDI LIVE EST LA — IL MANQUE LE PORT
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le push « Vague 3 session B » (`git log -1`) : premier passage sous
-GCC du STUB MIDI-in (Linux ne compile pas `midi_input_winmm.cpp`), de
-`midi_in_cli.cpp` et de la spec `midi-in` (qui doit SKIP en CI). `gh run
-list --limit 3`. AUCUN travail ne s'ouvre avant ce verdict.
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** La session B
+(de50ac5) est VERTE en CI (run 33175890220 : stub Linux, midi_in_cli, la
+spec midi-in skippe proprement). Aucun verdict en vol.
 
 **Point de synchro UTILISATEUR :** le port loopMIDI « MagicPotion »
 n'existe pas encore sur la tour (`daw_engine --list-midi-devices` ne
