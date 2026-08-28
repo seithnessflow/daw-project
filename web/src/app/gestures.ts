@@ -17,6 +17,9 @@ import { snapStep, snapSecMusical } from './navigation';
 import { isMusicalClip } from '../document/schema';
 import { renderTracks } from './render';
 import { cssId } from '../document/sanitize';
+import { selectClip, setClipSelection, selectedClips, isClipSelected } from './clip_selection';
+
+const isAdditive = (e: PointerEvent | MouseEvent): boolean => e.shiftKey || e.ctrlKey || e.metaKey;
 
 /** Touch mode A: a freshly placed clip "lands" (CSS decides if it shows). */
 export function markLanded(clipId: string): void {
@@ -48,10 +51,37 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
 
   const startX = e.clientX;
   const startY = e.clientY;
+  const additive = isAdditive(e);
   const origSec = clipStartSamples(clip, doc) / sr;
   let moved = false;
   let pendingSec = origSec;
   let writeRaf = 0;
+  // 2026-08-28 : glisser un clip du LOT deplace tout le lot du meme
+  // delta (chacun borne a 0) ; glisser un clip HORS lot le selectionne
+  // seul d'abord (Shift/Ctrl : l'ajoute). Le lot ne change pas de piste
+  // (l'axe Y reste au clip seul).
+  const wasSelected = isClipSelected(clipId);
+  if (!wasSelected) selectClip(clipId, trackId, additive);
+  const lot = selectedClips()
+    .filter((x) => x.clip.id !== clipId)
+    .map((x) => ({
+      trackId: x.trackId, clipId: x.clip.id,
+      origSec: clipStartSamples(x.clip, doc) / sr,
+      el: document.querySelector(`[data-clip-id="${cssId(x.clip.id)}"]`) as HTMLElement | null,
+    }));
+  const placeLot = (sec: number): void => {
+    const delta = sec - origSec;
+    for (const m of lot) {
+      const s = Math.max(0, m.origSec + delta);
+      if (m.el) m.el.style.left = `${s * TIMELINE.pps}px`;
+    }
+  };
+  const writeLot = (sec: number): void => {
+    const delta = sec - origSec;
+    for (const m of lot) {
+      ctx.project!.setClipStart(m.trackId, m.clipId, Math.max(0, m.origSec + delta) * sr);
+    }
+  };
   // D4 : piste cible d'un drag VERTICAL (null = on reste sur sa piste).
   // L'axe X garde tout le comportement existant (snap, ecritures rAF sur
   // la piste d'ORIGINE) ; l'axe Y ne fait que viser une autre lane - la
@@ -101,9 +131,10 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
     }
     clipEl.style.left = `${sec * TIMELINE.pps}px`;
     pendingSec = sec;
+    placeLot(sec);
     // D4 : surligner la piste cible quand le pointeur survole la lane
     // d'une AUTRE piste (classe existante .dnd-drop-track, dnd.css).
-    const targetEl = laneTrackAt(ev.clientY);
+    const targetEl = lot.length ? null : laneTrackAt(ev.clientY);
     const targetId = targetEl?.getAttribute('data-track-id') ?? null;
     const next = targetId && targetId !== trackId ? targetId : null;
     if (next !== dropTrackId) {
@@ -115,6 +146,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       writeRaf = requestAnimationFrame(() => {
         writeRaf = 0;
         ctx.project!.setClipStart(trackId, clipId, pendingSec * sr);
+        writeLot(pendingSec);
         sendLastChange();
       });
     }
@@ -139,6 +171,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       } else {
         // Sur sa propre piste : comportement existant inchange.
         ctx.project!.setClipStart(trackId, clipId, pendingSec * sr);
+        writeLot(pendingSec);
       }
       ctx.project!.endUndoGroup();  // V1.3
       sendLastChange();
@@ -150,9 +183,12 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
       // (2 snares perdues en composant, 2026-08-27). On laisse l'event
       // 'click' buller vers le placeur de wiring (pas de justDragged).
       if (ctx.library?.getArmed()) return;
-      // A plain click on the title bar: select the clip (and its track)
-      ctx.selectedClipId = clipId;
-      ctx.selectedTrackId = trackId;
+      // A plain click on the title bar: select the clip (and its track) ;
+      // Shift/Ctrl : ajoute / retire du lot (clip_selection.ts). Un clip
+      // deja dans le lot : Shift le RETIRE ; hors lot : deja ajoute au
+      // pointerdown (pas de double bascule).
+      if (!additive) selectClip(clipId, trackId, false);
+      else if (wasSelected) selectClip(clipId, trackId, true);
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
       renderTracks(true);
@@ -176,6 +212,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
     if (moved) {
       clipEl.style.left = `${origSec * TIMELINE.pps}px`;
       ctx.project!.setClipStart(trackId, clipId, origSec * sr);
+      writeLot(origSec);
       ctx.project!.endUndoGroup();
       sendLastChange();
       // Le relachement qui suit un drag ANNULE ne doit pas devenir un
@@ -200,6 +237,7 @@ export function beginClipDrag(e: PointerEvent, handle: HTMLElement): void {
  */
 export function beginFadeDrag(e: PointerEvent, handleEl: HTMLElement): void {
   if (!ctx.project) return;
+  const additive = isAdditive(e);
   const clipEl = handleEl.closest('.clip') as HTMLElement | null;
   const trackEl = handleEl.closest('[data-track-id]') as HTMLElement | null;
   if (!clipEl || !trackEl) return;
@@ -261,8 +299,7 @@ export function beginFadeDrag(e: PointerEvent, handleEl: HTMLElement): void {
       renderTracks(true);
     } else {
       // Handles rule: plain click selects (same branch as edges)
-      ctx.selectedClipId = clipId;
-      ctx.selectedTrackId = trackId;
+      selectClip(clipId, trackId, additive);
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
       renderTracks(true);
@@ -274,6 +311,7 @@ export function beginFadeDrag(e: PointerEvent, handleEl: HTMLElement): void {
 
 export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
   if (!ctx.project) return;
+  const additive = isAdditive(e);
   const clipEl = edgeEl.closest('.clip') as HTMLElement | null;
   const trackEl = edgeEl.closest('[data-track-id]') as HTMLElement | null;
   if (!clipEl || !trackEl) return;
@@ -373,12 +411,67 @@ export function beginClipResize(e: PointerEvent, edgeEl: HTMLElement): void {
       // title bar. Session B fix: this branch did not exist, so a tiny
       // clip (entirely covered by its 6px edges) could NEVER be
       // selected - and Delete silently did nothing.
-      ctx.selectedClipId = clipId;
-      ctx.selectedTrackId = trackId;
+      selectClip(clipId, trackId, additive);
       ctx.justDragged = true;
       setTimeout(() => { ctx.justDragged = false; }, 0);
       renderTracks(true);
     }
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+}
+
+/**
+ * 2026-08-28 : LASSO de clips depuis le vide d'une lane. Un rectangle
+ * (position fixed, coordonnees ecran) ; les clips dont le rect le touche
+ * forment la selection (Shift/Ctrl : s'ajoutent). Un clic sans mouvement
+ * n'est PAS un lasso : le clic de lane (marqueur, pose) garde son sens.
+ */
+export function beginClipLasso(e: PointerEvent): void {
+  if (!ctx.project) return;
+  const additive = isAdditive(e);
+  const x0 = e.clientX, y0 = e.clientY;
+  let moved = false;
+  let rect: HTMLElement | null = null;
+  const tracks = document.getElementById('tracks');
+  const onMove = (ev: PointerEvent) => {
+    const dx = ev.clientX - x0, dy = ev.clientY - y0;
+    if (!moved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+    if (!moved) {
+      moved = true;
+      rect = document.createElement('div');
+      rect.className = 'clip-lasso';
+      rect.dataset.role = 'clip-lasso';
+      document.body.appendChild(rect);
+      tracks?.classList.add('lassoing');
+    }
+    const x1 = Math.min(x0, ev.clientX), x2 = Math.max(x0, ev.clientX);
+    const y1 = Math.min(y0, ev.clientY), y2 = Math.max(y0, ev.clientY);
+    rect!.style.left = `${x1}px`; rect!.style.top = `${y1}px`;
+    rect!.style.width = `${x2 - x1}px`; rect!.style.height = `${y2 - y1}px`;
+    const hits: string[] = [];
+    for (const el of document.querySelectorAll<HTMLElement>('#tracks .clip[data-clip-id]')) {
+      const r = el.getBoundingClientRect();
+      if (r.right >= x1 && r.left <= x2 && r.bottom >= y1 && r.top <= y2) hits.push(el.dataset.clipId!);
+    }
+    setClipSelection(hits, additive);
+    // Reflet immediat sans re-rendu (le re-rendu vient au relachement)
+    for (const el of document.querySelectorAll<HTMLElement>('#tracks .clip[data-clip-id]')) {
+      if (ctx.selectedClipIds.has(el.dataset.clipId!)) el.setAttribute('aria-selected', 'true');
+      else el.removeAttribute('aria-selected');
+    }
+  };
+  const onUp = () => {
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    tracks?.classList.remove('lassoing');
+    rect?.remove();
+    if (!moved) return;   // un clic : le 'click' de lane fait son travail
+    ctx.justDragged = true;
+    setTimeout(() => { ctx.justDragged = false; }, 0);
+    const first = selectedClips()[0];
+    if (first) ctx.selectedTrackId = first.trackId;
+    renderTracks(true);
   };
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);

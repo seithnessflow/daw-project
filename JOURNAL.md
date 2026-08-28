@@ -2088,3 +2088,30 @@ ASSUME — c'est la duree d'un vrai geste, pas un masque de race —, lasso
 verte sur e88fbfd (gestes v1). Demande utilisateur consignee en tete de
 vague : la meme selection + lasso + Ctrl+D sur les CLIPS de
 l'arrangement (« comme dans Ableton »).
+
+**2026-08-28 (nuit, suite — selection multiple des CLIPS, « comme dans
+Ableton ») :** demande utilisateur en direct (« le faire sur les clips
+serait top, pour pouvoir Ctrl+D comme dans Ableton ») - nommee hors
+ordre et passee devant le reste de la vague. Additif : `ctx.
+selectedClipIds` (le lot) a cote de `selectedClipId` (le principal,
+toujours dans le lot - Ctrl+E, menus, split restent a un clip) ;
+`app/clip_selection.ts` (selectClip additif, setClipSelection,
+selectedClips qui lache les ids disparus). Gestes : clic = un clip,
+Shift/Ctrl+clic = ajoute/retire (un clip hors lot est ajoute au
+pointerdown pour que le glisser parte avec le lot ; le clic qui suit ne
+re-bascule pas - un premier rouge de spec l'a montre), LASSO depuis le
+vide d'une lane (rectangle fixed en coordonnees ecran, clips dont le
+rect est touche ; un clic sans mouvement reste le clic de lane :
+marqueur / pose), glisser un clip du lot = TOUT le lot du meme delta
+(chacun borne a 0, snap calcule sur le clip tenu, ecritures rAF pour
+tous, Echap remet tout ; le lot ne change pas de piste - l'axe Y reste
+au clip seul), Suppr = le lot (un undo), Ctrl+D = le lot en BLOC :
+copies decalees de la longueur du bloc [debut du premier, fin du
+dernier] arrondie a la grille (les ecarts sont conserves), un undo,
+selection sur les copies. Un undo/redo ne conserve pas la selection
+(assume, note dans la spec). Aide « ? » mise a jour. Spec
+`clips-multiselect.spec.ts` (deux clips poses par l'UI, Shift+clic,
+glisser A -> B suit, un Ctrl+Z rend les deux, clic de lane = rien,
+lasso = les deux, Ctrl+D = 4 clips en bloc + undo/redo, Suppr du lot +
+undo) ; clip-drag / clip-selection / clip-split / dnd-clips / undo-redo
+verts ; tsc 0.

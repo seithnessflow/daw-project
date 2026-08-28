@@ -3,9 +3,9 @@
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
 **A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le dernier push de la session (« gestes du piano-roll », `git log
--1`) ; `gh run list --limit 3`. L'avant-dernier push de code (8c53698,
-notes a ids stables) est VERT (run 33188483347).
+sur le dernier push de la session (« selection multiple des clips »,
+`git log -1`) ; `gh run list --limit 3`. Les pushes precedents sont
+VERTS jusqu'a e88fbfd (gestes v1 du piano-roll, run 33190237491).
 
 - **Le piano-roll en modele de selection** (retour utilisateur « je peux
   pas deplacer ni selectionner » : la v1 effacait la note au clic) :
@@ -15,8 +15,12 @@ notes a ids stables) est VERT (run 33188483347).
   geste = un undo ; adresse occupee refusee et montree ; le rack ne se
   reconstruit pas pendant un geste et garde son scroll (ouvert centre
   sur C4). Spec `piano-roll-gestures.spec.ts` (glisser lent compris).
-- **Demande utilisateur a suivre** : la meme selection multiple + lasso
-  + Ctrl+D sur les CLIPS de l'arrangement (« comme dans Ableton »).
+- **Selection multiple des CLIPS** (demande utilisateur « comme dans
+  Ableton ») : Shift/Ctrl+clic, lasso depuis le vide d'une lane, glisser
+  un clip du lot = deplacer le lot (meme delta, un undo), Ctrl+D =
+  dupliquer le bloc apres sa fin (selection sur les copies), Suppr = le
+  lot. `clip_selection.ts` (le principal reste `selectedClipId`). Spec
+  `clips-multiselect.spec.ts` ; clip-drag/selection/split/dnd/undo verts.
 - **Notes a ids stables** : `NoteDef.id` additif, `updateNote(track,
   clip, id, patch)` undoable — le socle de la velocite editable et du
   deplacement des notes ; spec 2 onglets en concurrence verte.

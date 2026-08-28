@@ -69,6 +69,8 @@ export const ctx = {
   // Selection (one selected object at a time)
   selectedTrackId: null as string | null,
   selectedClipId: null as string | null,
+  /** Le LOT selectionne (clip_selection.ts) ; contient toujours selectedClipId. */
+  selectedClipIds: new Set<string>(),
   justDragged: false,   // a finished drag must not fire the click path
 
   // Navigation (potion A1/A2)

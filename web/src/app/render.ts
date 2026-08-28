@@ -185,11 +185,18 @@ export function renderTracks(force = false): void {
   updateInsertMarker();
 
   // Selection reflection (C1): the selected clip is unambiguous
-  if (ctx.selectedClipId) {
+  // 2026-08-28 : le LOT (clip_selection.ts) ; le principal en fait partie
+  if (ctx.selectedClipId && !ctx.selectedClipIds.has(ctx.selectedClipId)) {
+    ctx.selectedClipIds.add(ctx.selectedClipId);
+  }
+  for (const id of [...ctx.selectedClipIds]) {
     const el = els.tracks.querySelector(
-      `[data-clip-id="${cssId(ctx.selectedClipId)}"]`) as HTMLElement | null;
+      `[data-clip-id="${cssId(id)}"]`) as HTMLElement | null;
     if (el) el.setAttribute('aria-selected', 'true');
-    else ctx.selectedClipId = null;
+    else ctx.selectedClipIds.delete(id);
+  }
+  if (ctx.selectedClipId && !ctx.selectedClipIds.has(ctx.selectedClipId)) {
+    ctx.selectedClipId = [...ctx.selectedClipIds].pop() ?? null;
   }
 
   // Device View for the selected track (bypass and params are DOCUMENT

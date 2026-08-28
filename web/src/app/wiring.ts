@@ -20,14 +20,15 @@ import {
   SERVER_URL, SERVER_TOKEN, ENGINE_PORT, PROJECT_ID, LAB_MODE,
 } from './context';
 import { isMusicalClip } from '../document/schema';
-import { clipEndSamples, sampleToTick } from '../document/geometry';
+import { clipStartSamples, clipEndSamples, sampleToTick } from '../document/geometry';
+import { clearClipSelection, selectedClips, setClipSelection } from './clip_selection';
 import { clampTick } from '../document/sanitize';
 import {
   setZoom, fitAll, snapStep, contentSeconds,
   updateInsertMarker, refreshOverview, updateFollowUI,
 } from './navigation';
 import { startPlayback, stopPlayback } from './transport';
-import { beginClipDrag, beginClipResize, beginFadeDrag, markLanded } from './gestures';
+import { beginClipDrag, beginClipResize, beginFadeDrag, beginClipLasso, markLanded } from './gestures';
 import { toggleHelp, isHelpOpen } from '../ui/help';
 import { JamChannel } from '../network/jam';
 import { JamAudio } from '../network/jam_audio';
@@ -685,7 +686,13 @@ export async function init(): Promise<void> {
       return;
     }
     const handle = target.closest('[data-role="clip-handle"]') as HTMLElement | null;
-    if (handle) beginClipDrag(e, handle);
+    if (handle) { beginClipDrag(e, handle); return; }
+    // 2026-08-28 : glisser depuis le VIDE d'une lane = LASSO de clips
+    // (un clic sans mouvement reste le clic de lane : marqueur, pose)
+    const lane = target.closest('.track-lane') as HTMLElement | null;
+    if (lane && !target.closest('.clip') && e.button === 0 && !ctx.library?.getArmed()) {
+      beginClipLasso(e);
+    }
   });
 
   els.tracks.addEventListener('click', (e) => {
@@ -746,7 +753,7 @@ export async function init(): Promise<void> {
     // Lane click (unarmed): select the track AND set the insert marker
     // (Ableton: one click, two effects). Deselects any selected clip.
     const hadSelectedClip = ctx.selectedClipId !== null;
-    ctx.selectedClipId = null;
+    clearClipSelection();
     if (lane) {
       const x = e.clientX - lane.getBoundingClientRect().left;
       const mStep = snapStep();  // le marqueur suit la meme grille
@@ -810,13 +817,14 @@ export async function init(): Promise<void> {
     if ((e.code === 'Delete' || e.code === 'Backspace') &&
         ctx.selectedClipId && ctx.project) {
       e.preventDefault();
-      const doc = ctx.project.getDocument();
-      const track = doc.tracks.find((t) =>
-        t.clips.some((c) => c.id === ctx.selectedClipId));
-      if (track) {
-        ctx.project.deleteClip(track.id, ctx.selectedClipId!);
+      // 2026-08-28 : TOUT le lot, un seul undo
+      const lot = selectedClips();
+      if (lot.length) {
+        ctx.project.beginUndoGroup();
+        for (const { trackId, clip } of lot) ctx.project.deleteClip(trackId, clip.id);
+        ctx.project.endUndoGroup();
         sendLastChange();
-        ctx.selectedClipId = null;
+        clearClipSelection();
         renderTracks(true);
       }
       return;
@@ -827,29 +835,41 @@ export async function init(): Promise<void> {
       e.preventDefault();
       const doc = ctx.project.getDocument();
       const sr = doc.sampleRate || 48000;
-      const track = doc.tracks.find((t) =>
-        t.clips.some((c) => c.id === ctx.selectedClipId));
-      const clip = track?.clips.find((c) => c.id === ctx.selectedClipId);
-      if (track && clip) {
+      // 2026-08-28 : le LOT se duplique en BLOC (Ableton) : les copies
+      // gardent leurs ecarts, decalees de la longueur du bloc [debut du
+      // premier, fin du dernier] arrondie a la grille ; un seul undo ;
+      // la selection passe sur les copies.
+      const lot = selectedClips();
+      if (lot.length) {
         const grid = snapStep() * sr;
-        const start = Math.ceil(clipEndSamples(clip, doc) / grid) * grid;
-        const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
-        const copyId = `clip-${stem}-${Date.now()}`;
-        // Copie INTEGRALE (fix 2026-08-26 : l'objet a 5 champs perdait
-        // notes/fades/name du clip duplique), plain() car proxy Automerge
-        // T3 dual-aware : le musical se colle en ticks, l'absolu en samples
-        const dupCopy = {
-          ...(JSON.parse(JSON.stringify(clip)) as typeof clip),
-          id: copyId,
-        };
-        if (isMusicalClip(clip)) {
-          dupCopy.startTick = clampTick(sampleToTick(doc, start));
-        } else {
-          dupCopy.startSample = Math.round(start);
+        const blockStart = Math.min(...lot.map((x) => clipStartSamples(x.clip, doc)));
+        const blockEnd = Math.max(...lot.map((x) => clipEndSamples(x.clip, doc)));
+        const shift = Math.ceil(blockEnd / grid) * grid - blockStart;
+        const copies: string[] = [];
+        ctx.project.beginUndoGroup();
+        let k = 0;
+        for (const { trackId, clip } of lot) {
+          const start = clipStartSamples(clip, doc) + shift;
+          const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
+          const copyId = `clip-${stem}-${Date.now()}${lot.length > 1 ? `-${k++}` : ''}`;
+          // Copie INTEGRALE (fix 2026-08-26 : l'objet a 5 champs perdait
+          // notes/fades/name du clip duplique), plain() car proxy Automerge
+          // T3 dual-aware : le musical se colle en ticks, l'absolu en samples
+          const dupCopy = {
+            ...(JSON.parse(JSON.stringify(clip)) as typeof clip),
+            id: copyId,
+          };
+          if (isMusicalClip(clip)) {
+            dupCopy.startTick = clampTick(sampleToTick(doc, start));
+          } else {
+            dupCopy.startSample = Math.round(start);
+          }
+          ctx.project.addClip(trackId, dupCopy);
+          copies.push(copyId);
         }
-        ctx.project.addClip(track.id, dupCopy);
+        ctx.project.endUndoGroup();
         sendLastChange();
-        ctx.selectedClipId = copyId;
+        setClipSelection(copies);
         renderTracks(true);
       }
       return;

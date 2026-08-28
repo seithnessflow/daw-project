@@ -320,3 +320,11 @@ body.compact-tracks .clip-name {
   pointer-events: none;
   z-index: 2;
 }
+
+/* ---- Lasso de selection des clips (2026-08-28) ------------------ */
+.clip-lasso {
+  position: fixed; pointer-events: none; z-index: 50;
+  border: 1px solid rgba(214, 205, 255, 0.85);
+  background: rgba(141, 122, 230, 0.16);
+}
+.tracks.lassoing, .tracks.lassoing * { cursor: crosshair !important; user-select: none; }

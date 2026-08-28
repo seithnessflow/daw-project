@@ -50,11 +50,12 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    (modele de SELECTION : clic = selectionner, lasso, glisser = deplacer
    le lot, bord droit = longueur, Alt+glisser / molette = velocite
    visible a l'intensite, Suppr, un geste = un undo, adresse occupee
-   refusee et montree ; spec piano-roll-gestures) ; **selection
-   multiple + lasso + Ctrl+D sur les CLIPS de l'arrangement (demande
-   utilisateur 2026-08-28 « comme dans Ableton » — passe devant le reste
-   de la vague)** ; piano-roll musical (nom des notes, zoom, plus d'une
-   mesure) ;
+   refusee et montree ; spec piano-roll-gestures) ; ~~selection
+   multiple + lasso + Ctrl+D sur les CLIPS~~ FAIT 2026-08-28 (demande
+   utilisateur « comme dans Ableton » : Shift/Ctrl+clic, lasso depuis le
+   vide d'une lane, glisser = deplacer le lot, Ctrl+D = dupliquer le
+   bloc, Suppr = le lot, un geste = un undo ; spec clips-multiselect) ;
+   piano-roll musical (nom des notes, zoom, plus d'une mesure) ;
    ~~ProcessContext~~ FAIT 2026-08-28 (ring v12, trace enfant :
    tempo 120 -> 93,5, playing 0 -> 1 ; reste l'oreille d'un LFO sync). Le **test Massive** (clavier du
    portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de
