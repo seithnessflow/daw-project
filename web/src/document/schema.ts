@@ -31,6 +31,13 @@ export interface TimeSignatureEvent {
  *  v2 : les notes d'un clip MUSICAL utilisent startTick/lengthTick (le
  *  domaine du clip parent gouverne — jamais un mix des deux). */
 export interface NoteDef {
+  /** Identite STABLE de la note (2026-08-28, additif : `n-` + 8 base36).
+   *  SCHEMA-V2 §4 voulait une map a ids ; une LISTE Automerge merge deja
+   *  les insertions concurrentes - ce qui manquait etait l'ADRESSE d'une
+   *  note pour l'editer (velocite, longueur, deplacement) sans la confondre
+   *  avec sa voisine : updateNote(id). Absent sur les notes historiques
+   *  (elles restent adressables par pitch+debut, comme avant). */
+  id?: string;
   pitch: number;         // 0..127
   velocity: number;      // 0..127
   /** Relatif au debut du clip (domaine absolu). T3 : OPTIONNEL - une

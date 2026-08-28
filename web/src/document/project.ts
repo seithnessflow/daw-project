@@ -273,6 +273,7 @@ export class Project {
         case 'moveProcessor':
           this.moveProcessor(op.trackId, op.processorId, op.toIndex); break;
         case 'toggleNote': this.toggleNote(op.trackId, op.clipId, op.note); break;
+        case 'updateNote': this.updateNote(op.trackId, op.clipId, op.noteId, op.patch); break;
         case 'renameScene': this.renameScene(op.sceneId, op.name); break;
         case 'deleteScene': this.deleteScene(op.sceneId); break;
         case 'restoreScene': this.restoreScene(op.scene, op.index, op.clips); break;
@@ -940,10 +941,43 @@ export class Project {
       if (i >= 0) c.notes.splice(i, 1);
       else {
         if (typeof note.startTick === 'number') ensureV2(d);
-        c.notes.push(note);
+        // Identite stable a la naissance (additif) - l'adresse des edits
+        c.notes.push({ ...note, id: note.id ?? ('n-' + Math.random().toString(36).slice(2, 10)) });
       }
     });
     this.capturePending();
+  }
+
+  /**
+   * Edite une note PAR SON ID (velocite, hauteur, position, longueur - les
+   * champs du domaine du clip). LWW par champ : deux pairs qui touchent
+   * des champs differents de la meme note convergent ; le meme champ, le
+   * dernier gagne. Undo-journalise (l'inverse = les valeurs d'avant).
+   * Une note historique sans id n'est pas adressable ici (toggleNote).
+   */
+  updateNote(trackId: string, clipId: string, noteId: string,
+             patch: Partial<Pick<NoteDef, 'pitch' | 'velocity' | 'startSample' |
+                                          'lengthSamples' | 'startTick' | 'lengthTick'>>): boolean {
+    const clip = this.doc.tracks.find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    const before = clip?.notes?.find((n) => n.id === noteId);
+    if (!before) return false;
+    const inverse: typeof patch = {};
+    for (const k of Object.keys(patch) as (keyof typeof patch)[]) {
+      if (typeof before[k] === 'number') inverse[k] = before[k] as number;
+    }
+    this.journal.capture({ type: 'updateNote', trackId, clipId, noteId, patch: inverse });
+    this.doc = Automerge.change(this.doc, (d) => {
+      const n = d.tracks.find((t) => t.id === trackId)
+        ?.clips.find((x) => x.id === clipId)?.notes?.find((x) => x.id === noteId);
+      if (!n) return;
+      for (const k of Object.keys(patch) as (keyof typeof patch)[]) {
+        const v = patch[k];
+        if (typeof v === 'number') (n as unknown as Record<string, number>)[k] = v;
+      }
+    });
+    this.capturePending();
+    return true;
   }
 
   /**

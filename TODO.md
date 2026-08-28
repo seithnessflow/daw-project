@@ -42,10 +42,14 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    (la cle pour piloter un plugin par le document sans sa fenetre) ;
    (c) la dette TRANSITOIRE DX10 ci-dessous (§3 moteur).
    Ensuite : Web MIDI ; ~~preuve CC64/pitch-bend sur un vrai synthe~~
-   FAIT (Dexed/Surge, IMidiMapping) ; notes en MAP a ids stables (ecart
-   SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ; velocite/
-   longueur/deplacement des notes editables (§5) ; piano-roll musical ;
-   ~~ProcessContext~~ FAIT 2026-08-28 (ring v12). Le **test Massive** (clavier du
+   FAIT (Dexed/Surge, IMidiMapping) ; ~~notes a ids stables~~ FAIT
+   2026-08-28 (`NoteDef.id` additif + `updateNote(id, patch)` undoable,
+   spec de concurrence 2 onglets ; la liste Automerge merge deja les
+   insertions, l'id est l'ADRESSE des edits) ; velocite/longueur/
+   deplacement des notes editables dans le piano-roll (§5 — le
+   mutateur existe, il manque le GESTE) ; piano-roll musical ;
+   ~~ProcessContext~~ FAIT 2026-08-28 (ring v12, trace enfant :
+   tempo 120 -> 93,5, playing 0 -> 1 ; reste l'oreille d'un LFO sync). Le **test Massive** (clavier du
    portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de
    vague, dans la forme tranchee par le spike : MIDI LAN -> rendu tour
    en exclusif 256 -> enceintes de la piece ; le retour vers le portable

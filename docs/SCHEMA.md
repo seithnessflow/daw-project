@@ -147,8 +147,9 @@ Performance state (which slot plays/is queued) is NEVER in the document.
 
 | Field | Type | Description |
 |---|---|---|
+| `id` | `string` | No (2026-08-28, additive): `n-` + 8 base36, written at creation by `toggleNote`. The ADDRESS of a note for edits (`updateNote(id, patch)`: velocity, pitch, position, length - LWW per field, undo-journalized). Absent on historical notes (still addressable by pitch+start through `toggleNote`). The engine ignores it. |
 | `pitch` | `int` | 0..127 |
-| `velocity` | `int` | 0..127 (UI writes 100; not yet editable - TODO) |
+| `velocity` | `int` | 0..127 (piano-roll writes 100; editable through `updateNote`) |
 | `startSample` / `lengthSamples` | `int64` | Relative to the clip start (absolute clip). |
 | `startTick` / `lengthTick` | `int64` | Relative to the clip start (musical clip). The parent clip's domain governs - never a mix. |
 

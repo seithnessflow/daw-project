@@ -76,6 +76,8 @@ export type InverseOp =
   // F7 : le toggle de note est SON PROPRE inverse (re-toggler la meme note
   // annule l'ajout/retrait) - on capture la note identique.
   | { type: 'toggleNote'; trackId: string; clipId: string; note: NoteDef }
+  | { type: 'updateNote'; trackId: string; clipId: string; noteId: string;
+      patch: Partial<Pick<NoteDef, 'pitch' | 'velocity' | 'startSample' | 'lengthSamples' | 'startTick' | 'lengthTick'>> }
   // F5+ gestion scenes : supprimer une scene emporte ses slots sur TOUTES les
   // pistes - l'inverse restaure la scene ET chaque clip a sa piste.
   | { type: 'renameScene'; sceneId: string; name: string }
@@ -141,6 +143,9 @@ function targetKey(op: InverseOp): string {
       // son sample) - les deux domaines ne se melangent jamais.
       return `note:${op.trackId}:${op.clipId}:${op.note.pitch}:` +
         `${op.note.startTick ?? op.note.startSample}`;
+    // Notes a ids stables (2026-08-28) : l'identite est l'id, un drag de
+    // velocite/position se regroupe sur lui (meme moule que les faders).
+    case 'updateNote': return `noteid:${op.trackId}:${op.clipId}:${op.noteId}`;
     case 'renameScene': return `scenename:${op.sceneId}`;
     case 'deleteScene': return `scene:${op.sceneId}`;
     case 'restoreScene': return `scene:${op.scene.id}`;

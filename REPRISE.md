@@ -2,9 +2,16 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
-**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
-de code de la session (ProcessContext ring v12, e7bae9a) est VERT en CI
-(run 33186614464). Aucun verdict en vol.
+**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
+sur le dernier push de la session (« notes a ids stables + trace
+ProcessContext », `git log -1`). `gh run list --limit 3`. AUCUN travail
+ne s'ouvre avant ce verdict. (e7bae9a, l'avant-dernier code, est VERT.)
+
+- **Notes a ids stables** : `NoteDef.id` additif, `updateNote(track,
+  clip, id, patch)` undoable — le socle de la velocite editable et du
+  deplacement des notes ; spec 2 onglets en concurrence verte.
+- **ProcessContext prouve cote plugin** : trace enfant tempo 120 ->
+  93,5 et playing 0 -> 1 (bornee, 12 lignes).
 
 - **ProcessContext (ring v12)** : les plugins recoivent position du
   bloc, tempo entier du document, play/stop, 4/4 (AUDIT-6 §6 solde) ;

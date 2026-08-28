@@ -2006,3 +2006,26 @@ synchronise ou un arpegiateur qui SUIT le tempo (a faire sur Surge XT :
 LFO tempo-sync, comparer 90 vs 120 BPM par la periode mesuree). Piege
 paye : le clean build ne construisait pas midi_send (3 specs rouges pour
 rien) — `rebuild_msvc.bat` le construit desormais.
+
+**2026-08-28 (nuit, suite — le plugin sait l'heure, les notes ont un
+nom) :** (1) trace bornee cote enfant de ce que le plugin RECOIT :
+`process-context tempo=120` au premier bloc, `tempo=93.5` apres le
+changement de tempo dans la page (doc -> rebuild -> setTempoMilliBpm ->
+ring -> ProcessContext), `playing=1` au PLAY avec la position qui
+avance — la chaine v12 est prouvee de bout en bout (reste l'oreille sur
+un LFO tempo-sync). (2) NOTES A IDS STABLES (l'ecart SCHEMA-V2 §4) :
+diagnostic honnete d'abord — une LISTE Automerge merge deja les
+insertions concurrentes (le dossier craignait a tort une divergence) ;
+ce qui manquait est l'ADRESSE d'une note pour l'editer sans la
+confondre avec sa voisine. Additif : `NoteDef.id` (`n-` + 8 base36)
+pose par toggleNote a la naissance, `Project.updateNote(track, clip, id,
+patch)` (velocite/pitch/position/longueur, LWW par champ,
+undo-journalise avec l'inverse = les valeurs d'avant, cle de groupe
+`noteid:`), id inconnu = false. Le moteur ignore le champ. Spec
+`notes-ids.spec.ts` : deux onglets posent C4 et E4 EN MEME TEMPS dans le
+meme clip -> les deux notes chez les deux avec les memes ids, velocite
+37 par l'id chez A vue chez B, Ctrl+Z chez A revenu a 100 chez B.
+Non-regression tempo/track-kinds/clip-split/undo-redo vertes (un faux
+rouge : mon moteur de test tenait 47821 pendant tempo.spec — tuer
+avant). C'est le socle de la velocite editable et du deplacement des
+notes (la suite de la Vague 3).

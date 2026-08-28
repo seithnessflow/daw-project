@@ -1229,6 +1229,24 @@ int runServe(const std::string& segment_path, const std::string& module_path,
             }
         }
         data.processContext = &ctx;
+        // Diagnostic (borne) : ce que le plugin RECOIT - au premier bloc, puis
+        // a chaque changement de tempo ou d'etat play/stop (12 lignes max).
+        {
+            static double last_tempo = -1.0;
+            static bool last_playing = false;
+            static uint32_t ctx_logged = 0;
+            const bool playing = (ctx.state & Vst::ProcessContext::kPlaying) != 0;
+            if (ctx_logged < 12 && (ctx_logged == 0 || ctx.tempo != last_tempo || playing != last_playing)) {
+                ++ctx_logged;
+                last_tempo = ctx.tempo;
+                last_playing = playing;
+                std::cerr << "plugin_host: process-context tempo=" << ctx.tempo
+                          << " pos=" << ctx.projectTimeSamples
+                          << " music=" << ctx.projectTimeMusic
+                          << " playing=" << (playing ? 1 : 0)
+                          << " (seq " << seq << ")" << std::endl;
+            }
+        }
 
         if (inst.processor->process(data) != kResultOk) {
             std::cerr << "plugin_host error: process refused at seq " << seq << std::endl;
