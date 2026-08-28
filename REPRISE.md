@@ -2,11 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : L'ENTREE MIDI LIVE EST PROUVEE EN VRAI
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le push « preuve MIDI en vrai » (`git log -1` : spec matrice +
-CLAUDE.md §8 + dettes). `gh run list --limit 3`. La spec midi-in SKIPPE
-en CI (pas de port) : un rouge serait ailleurs. AUCUN travail ne s'ouvre
-avant ce verdict.
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le push « preuve
+MIDI en vrai » (1020871) est VERT en CI (run 33178191452). Aucun verdict
+en vol.
 
 **Alerte a lire :** le test audible sur essai-claude (Dexed, patch
 restaure, vel 70, exclusif 256) a crete a **+19 dBFS** sur les T8V —

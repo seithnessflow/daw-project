@@ -10,7 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Verdict CI du push « preuve MIDI en vrai » (voir REPRISE.md).
+- Aucun verdict CI en vol (preuve MIDI en vrai verte, 2026-08-28 nuit).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
