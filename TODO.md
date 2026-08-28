@@ -10,7 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Verdict CI du push ring v11 (voir REPRISE.md) — a lever avant de coder.
+- Aucun (ring v11 vert en CI, 2026-08-28 soir).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)

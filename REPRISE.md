@@ -2,14 +2,11 @@
 
 ## TOUT EN HAUT (2026-08-28, soir) : CONTRAT DE PERIODE CLOS, LE RAIL MIDI EST POSE
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le push « ring v11 » (`git log -1`) : premier passage sous GCC du
-refus de periode, de `host/proxy_depth.h`, du FIFO MIDI generique et de
-l'acquisition du controleur d'edition a la ceremonie (Linux compris —
-`EditController`/`MidiParamMap` sont hors `#ifdef _WIN32`). `gh run list
---limit 3`. Rouge = job build-linux (compilation de plugin_host_main.cpp
-ou `testDevicePeriodRefusal` : le backend null doit honorer 374). AUCUN
-travail ne s'ouvre avant ce verdict.
+**A LIRE EN PREMIER — le point de synchro : LEVE.** Le ring v11
+(027781c) est VERT en CI (run 33171167476 : build-linux + e2e, 7 min) —
+refus de periode, `host/proxy_depth.h`, FIFO MIDI generique et
+acquisition du controleur a la ceremonie passent sous GCC. Aucun verdict
+en vol.
 
 ## Ce qui a ete fait (2026-08-28)
 
