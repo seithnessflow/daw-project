@@ -45,9 +45,12 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    FAIT (Dexed/Surge, IMidiMapping) ; ~~notes a ids stables~~ FAIT
    2026-08-28 (`NoteDef.id` additif + `updateNote(id, patch)` undoable,
    spec de concurrence 2 onglets ; la liste Automerge merge deja les
-   insertions, l'id est l'ADRESSE des edits) ; velocite/longueur/
-   deplacement des notes editables dans le piano-roll (§5 — le
-   mutateur existe, il manque le GESTE) ; piano-roll musical ;
+   insertions, l'id est l'ADRESSE des edits) ; ~~velocite/longueur/
+   deplacement des notes editables dans le piano-roll~~ FAIT 2026-08-28
+   (glisser = deplacer, bord droit = longueur, Alt+glisser / molette =
+   velocite visible a l'intensite, un geste = un undo, adresse occupee
+   refusee et montree ; spec piano-roll-gestures) ; piano-roll musical
+   (nom des notes, zoom, plus d'une mesure, selection multiple) ;
    ~~ProcessContext~~ FAIT 2026-08-28 (ring v12, trace enfant :
    tempo 120 -> 93,5, playing 0 -> 1 ; reste l'oreille d'un LFO sync). Le **test Massive** (clavier du
    portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de

@@ -35,6 +35,9 @@ import { orderedTracks } from '../document/schema';
 import { initTrackReorder } from './track_reorder';
 import { initDeviceReorder } from './device_reorder';
 
+/** Scroll du rack par piste (le piano-roll depasse le rack : voir render). */
+const rackScroll = new Map<string, number>();
+
 /**
  * V1.6: remote fade changes settle IN PLACE (the same-structure path
  * rebuilds nothing - without this, a peer's fade never showed).
@@ -191,6 +194,11 @@ export function renderTracks(force = false): void {
 
   // Device View for the selected track (bypass and params are DOCUMENT
   // state: the display only settles when the change comes back)
+  // Le rack est le scroller du piano-roll : un re-rendu ne doit pas
+  // ramener l'utilisateur en haut de la grille (le scroll se garde par
+  // piste ; premiere ouverture = centre sur C4, ou l'on pose ses notes).
+  const rackScrollKey = selectedTrack ? `rack:${selectedTrack.id}` : '';
+  if (rackScrollKey) rackScroll.set(rackScrollKey, els.deviceViewSlot.scrollTop);
   els.deviceViewSlot.innerHTML = '';
   els.deviceViewSlot.appendChild(createDeviceView(
     selectedTrack,
@@ -243,10 +251,20 @@ export function renderTracks(force = false): void {
       renderPianoRoll(roll, ctx.project!, selectedTrack.id, midiClip, () => {
         sendLastChange();
         renderTracks(true);
-      });
+      }, sendLastChange);  // pendant un glisser : pousser sans re-rendre
       slot.appendChild(roll);
     }
     els.deviceViewSlot.appendChild(slot);
+    const saved = rackScroll.get(rackScrollKey);
+    if (saved !== undefined && saved > 0) els.deviceViewSlot.scrollTop = saved;
+    else if (midiClip && !rackScroll.has(rackScrollKey)) {
+      const c4 = slot.querySelector<HTMLElement>('.pr-cell[data-pitch="60"][data-step="0"]');
+      if (c4) {
+        const top = c4.offsetTop - els.deviceViewSlot.clientHeight / 2;
+        els.deviceViewSlot.scrollTop = Math.max(0, top);
+        rackScroll.set(rackScrollKey, els.deviceViewSlot.scrollTop);
+      }
+    }
   }
 
   // Waveforms inside the freshly built clips (cached peaks draw

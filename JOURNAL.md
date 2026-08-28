@@ -2029,3 +2029,35 @@ Non-regression tempo/track-kinds/clip-split/undo-redo vertes (un faux
 rouge : mon moteur de test tenait 47821 pendant tempo.spec — tuer
 avant). C'est le socle de la velocite editable et du deplacement des
 notes (la suite de la Vague 3).
+
+**2026-08-28 (nuit, suite — les gestes du piano-roll) :** le mutateur
+`updateNote(id)` a maintenant son GESTE. `ui/piano_roll.ts` : glisser
+une note = la DEPLACER (temps et hauteur, au pas, bornes de la grille),
+tirer son bord droit (6 px) = sa LONGUEUR (>= 1 pas, jusqu'a la fin du
+clip), Alt+glisser verticalement (1 px = 1) ou molette (5 par cran) =
+sa VELOCITE, visible a l'intensite de la case (`--vel`, color-mix) et
+dans une ligne de statut sous la grille ; les notes longues sont
+peintes sur toute leur duree (queue = meme id) et un clic sur la queue
+enleve la note. Un glisser = UN groupe d'undo (beginUndoGroup /
+endUndoGroup ; les DEUX champs pitch+debut a chaque edit pour que la
+premiere capture garde tout l'avant-geste) ; le clic qui suit un
+glisser est avale (chaque poignee garde sa branche « sans mouvement »).
+Deplacer sur une adresse (pitch+debut) deja occupee par une autre note
+est REFUSE et montre (flash rouge de la grille), la note reste a la
+derniere position acceptee — deux notes a la meme adresse seraient
+indistinguables par toggleNote. Pendant le glisser la grille se repeint
+sur place (pas de re-rendu : la capture du pointeur survit) et chaque
+edit part au reseau (`onLive` = sendLastChange) ; le re-rendu vient en
+fin de geste. Trouvaille classe 2 corrigee en passant : le rack coupait
+la grille et C4 (la ou l'on pose ses notes) etait hors vue — le rack
+garde son scroll par piste entre deux rendus et s'ouvre centre sur C4.
+Spec `piano-roll-gestures.spec.ts` (a la souris, lue dans le document
+par l'id : deplacer, undo/redo d'un geste entier, longueur + queue,
+Alt+glisser 100 -> 70, molette -> 75, intensite 75/127, statut, refus,
+enlever par la queue) ; notes-ids / tempo / track-kinds / undo-redo /
+dnd-browser vertes ; tsc 0. Trace visuelle : accord C-E-G de 4 pas +
+ligne, velocites 30/50/60/70/100 lisibles a l'oeil. Faux positif paye :
+mon script de capture glissait une cellule HORS VUE (boundingBox sans
+scroll) — un premier glisser « rate » qui etait l'artefact, pas le
+geste. Critique au passage : 100 vs 60 de velocite se distinguent
+peu a l'oeil (30 oui) — a revoir si une lane de velocite arrive.

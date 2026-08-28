@@ -2,10 +2,16 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
-**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
-de code de la session (notes a ids stables + trace ProcessContext,
-8c53698) est VERT en CI (run 33188483347). Aucun verdict en vol.
+**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
+sur le dernier push de la session (« gestes du piano-roll », `git log
+-1`) ; `gh run list --limit 3`. L'avant-dernier push de code (8c53698,
+notes a ids stables) est VERT (run 33188483347).
 
+- **Les gestes du piano-roll** : glisser une note = la deplacer (temps
+  + hauteur), tirer son bord droit = longueur, Alt+glisser ou molette =
+  velocite (intensite de la case), un geste = un undo, adresse occupee
+  refusee et montree, clic sur la queue = enlever ; le rack garde son
+  scroll et s'ouvre centre sur C4. Spec `piano-roll-gestures.spec.ts`.
 - **Notes a ids stables** : `NoteDef.id` additif, `updateNote(track,
   clip, id, patch)` undoable — le socle de la velocite editable et du
   deplacement des notes ; spec 2 onglets en concurrence verte.
@@ -47,8 +53,8 @@ v)` (ou le rack). Rien ne tourne a la cloture.
 
 ## Quoi surveiller
 
-1. Rien en vol cote CI (regle : un verdict par session, sur le dernier
-   push — CLAUDE.md §5).
+1. Le verdict CI ci-dessus (regle : un verdict par session, sur le
+   dernier push — CLAUDE.md §5).
 2. `control-loop stall:` dans les logs moteur : tout gel > 50 ms est
    desormais ecrit (attendu : ~90 ms par PUT local, plus par tunnel).
 3. `plugin_host: serve thread MMCSS Pro Audio (critical)` dans le log
@@ -56,9 +62,8 @@ v)` (ou le rack). Rien ne tourne a la cloture.
 
 ## La suite (ORDRE GRAVE, TODO.md §1)
 
-1. Vague 3, suite : le GESTE d'edition dans le piano-roll (velocite /
-   longueur / deplacement — le mutateur `updateNote` par id existe),
-   preuve a l'oreille d'un LFO tempo-sync (Surge XT, 90 vs 120 BPM),
+1. Vague 3, suite : piano-roll musical (nom des notes, zoom, plus d'une
+   mesure, selection multiple), preuve a l'oreille d'un LFO tempo-sync (Surge XT, 90 vs 120 BPM),
    limiteur de sortie (point produit avant « jouer live »), C1 (HTTP
    hors de la boucle de controle, moule export_job), re-mesure
    exclusif 256 + MMCSS, Web MIDI, timeSignature du doc ->
