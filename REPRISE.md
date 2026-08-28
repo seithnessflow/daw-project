@@ -3,8 +3,8 @@
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
 **A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
-de code de la session (selection multiple des clips, 9332f14) est VERT
-(run 33191581566). Aucun verdict en vol.
+de code de la session (lasso = selection de temps, Ctrl+D de la plage,
+ac4990c) est VERT (run 33192628033). Aucun verdict en vol.
 
 - **Le piano-roll en modele de selection** (retour utilisateur « je peux
   pas deplacer ni selectionner » : la v1 effacait la note au clic) :
