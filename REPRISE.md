@@ -2,11 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-28, soir) : LE MINILAB JOUE DEXED DANS LES T8V — « OUI ! »
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le push « MMCSS + MiniLab » (`git log -1`). Le seul code touche est
-`plugin_host_main.cpp` (Windows-only, sous `#ifdef _WIN32`) ; un rouge
-serait ailleurs. `gh run list --limit 3`. AUCUN travail ne s'ouvre
-avant ce verdict.
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le push « MMCSS +
+MiniLab » (2c72685) est VERT en CI (run 33183052605). Aucun verdict en
+vol.
 
 ## Ce qui a ete fait (2026-08-28, dans l'ordre)
 
