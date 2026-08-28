@@ -10,8 +10,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Verdict CI du push « Vague 3 session A » (voir REPRISE.md) — a lever
+- Verdict CI du push « Vague 3 session B » (voir REPRISE.md) — a lever
   avant de coder.
+- PREALABLE UTILISATEUR : creer le port loopMIDI « MagicPotion » ->
+  rejouer `npx playwright test tests/e2e/midi-in.spec.ts` (preuve pilotee
+  du port en vrai) puis la manip audible.
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
@@ -27,14 +30,16 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    **session A LIVREE 2026-08-28** — file SPSC -> callback (drain par
    sous-bloc) -> `AudioGraph::setLiveMidi` -> instrument de la piste
    cible, gate monitoring a l'arret, 4 tests, 59/59, specs 25/25.
-   **Session B (suivante)** : port WinMM (`midi/midi_input_winmm.cpp`,
-   stub Linux), CLI `--list-midi-devices` / `--midi-in <nom>` /
-   `--midi-track <id>` (cible auto = premiere piste avec instrument),
-   contrats de log `midi-in: opened ...` et `midi-in stats: ...
-   queue-lat ... pipeline~...`, outil `engine/tools/midi_send.cpp`,
-   spec `midi-in.spec.ts` (skip si port « MagicPotion » absent, mda DX10),
-   manip audible sur Dexed en exclusif 256. PREALABLE UTILISATEUR :
-   creer le port loopMIDI « MagicPotion » (10 s).
+   **Session B LIVREE 2026-08-28** : port WinMM + stub Linux, CLI
+   `--list-midi-devices` / `--midi-in <nom>` / `--midi-track <id>`,
+   contrats de log, outil `midi_send`, spec `midi-in.spec.ts` (skip
+   propre sans le port). RESTE du maillon 1 : (a) le port loopMIDI
+   « MagicPotion » (utilisateur) -> spec verte = preuve pilotee du port
+   en vrai ; (b) la manip audible : `daw_engine --server ... --play
+   --start-stopped --exclusive --buffer-size 256 --midi-in <clavier>` sur
+   un projet avec Dexed -> une touche -> le son ; lire `midi-in stats`
+   (queue-lat + pipeline ~16 ms = le total percu) ; (c) `daw.ps1
+   -MidiIn <nom>` pour que la stack de tous les jours l'ouvre.
    Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
    synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
    (ecart SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ;

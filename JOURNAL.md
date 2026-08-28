@@ -1837,3 +1837,29 @@ suite **59/59**, hash absolu inchange, les 14 specs moteur reel
 + la spec pilotee + la manip audible. Piege paye : le cwd du shell
 persiste entre commandes (un `cd engine/build-msvc` a fait echouer le
 lancement du serveur ; toujours des chemins absolus).
+
+**2026-08-28 (Vague 3, session B — le vrai port, l'outil, la spec) :**
+`midi/midi_input.h` + `midi_input_winmm.cpp` (midiInOpen CALLBACK_FUNCTION,
+callback = parse + push + compteur, rien d'autre ; close = stop -> reset
+-> close ; noms UTF-8) + `midi_input_stub.cpp` (Linux : liste vide, refus
+en clair) ; `midi/midi_in_cli.*` (regle SPLITTER) : `--list-midi-devices`,
+`--midi-in <nom>` (sous-chaine, insensible a la casse), `--midi-track <id>`
+(sinon auto = premiere piste avec instrument, re-resolue a chaque rebuild,
+WARNING une fois si l'id demande n'existe pas ou n'a pas d'instrument),
+contrats de log `midi-in: opened "<port>"`, `midi-in: -> track "<id>"
+(auto|--midi-track)`, `midi-in stats: events= forwarded= dropped= unrouted=
+queue-lat last/max ms pipeline~ ms` toutes les 5 s ; `winmm` lie en WIN32 ;
+outil `engine/tools/midi_send.cpp` (cible midi_send, WinMM midiOut :
+--port/--note/--vel/--hold-ms/--cc/--bend/--list) ; spec
+`web/tests/e2e/midi-in.spec.ts` (skip propre hors Windows ou sans port
+« MagicPotion » ; moteur --mute --start-stopped + DX10 mda pose PAR LA PAGE
+via `__dawProject.addProcessor` ; midi_send ; crete de la piste > 0
+transport ARRETE + stats forwarded >= 2). Verifie : build vert, gtests
+59/59, hash intact, `--list-midi-devices` liste les deux ports Stream Deck
+de la tour, `midi_send --list` voit les sorties, port inconnu = ERROR
+actionnable, spec SKIP proprement (port absent). RESTE, cote utilisateur :
+creer le port loopMIDI « MagicPotion » -> la spec devient la preuve
+pilotee (a rejouer), puis la manip audible : `daw_engine ... --exclusive
+--buffer-size 256 --midi-in <clavier>` sur un projet Dexed. Non prouve
+tant que le port n'existe pas : le chemin WinMM -> callback en vrai (le
+routage l'est par gtest, le port par le smoke CLI).

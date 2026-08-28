@@ -26,6 +26,8 @@
 #include "host/plugin_scan.h"
 #include "host/proxy_node.h"
 #include "host/proxy_depth.h"
+#include "midi/midi_input.h"
+#include "midi/midi_in_cli.h"
 #include "network/server_client.h"
 #include "util/sha256.h"
 
@@ -108,6 +110,12 @@ void printUsage(const char* program) {
               << "  --mute-track <id>  Mute specified track (can be used multiple times)\n"
               << "  --list-devices     List available audio devices and exit\n"
               << "  --device <name>    Select audio device by name (substring match)\n"
+              << "  --list-midi-devices\n"
+              << "                     List MIDI input ports and exit\n"
+              << "  --midi-in <name>   Open a MIDI input port (substring match) and route it\n"
+              << "                     live to the target track's instrument (vst3 node)\n"
+              << "  --midi-track <id>  Target track for --midi-in (default: first track\n"
+              << "                     with an instrument)\n"
               << "  --help             Show this help\n"
               << "\n"
               << "Examples:\n"
@@ -133,6 +141,9 @@ struct Options {
     bool start_stopped = false;  // L1c: device up, transport ARMED but stopped (no sound until a PLAY command)
     bool editors = false;        // Fenetrage v1: children open the plugin's native GUI window
     bool list_devices = false;
+    bool list_midi_devices = false;  // Vague 3 : --list-midi-devices
+    std::string midi_in;             // Vague 3 : port MIDI d'entree (sous-chaine)
+    std::string midi_track;          // Vague 3 : piste cible (id), vide = auto
     uint32_t sample_rate = 48000;
     uint32_t bit_depth = 24;
     uint32_t buffer_size_frames = 512;  // SPIKE LATENCE : enfin reglable
@@ -313,6 +324,20 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             opts.mute_tracks.push_back(argv[i]);
         } else if (arg == "--list-devices") {
             opts.list_devices = true;
+        } else if (arg == "--list-midi-devices") {
+            opts.list_midi_devices = true;
+        } else if (arg == "--midi-in") {
+            if (++i >= argc) {
+                std::cerr << "Error: --midi-in requires a port name (substring)\n";
+                return false;
+            }
+            opts.midi_in = argv[i];
+        } else if (arg == "--midi-track") {
+            if (++i >= argc) {
+                std::cerr << "Error: --midi-track requires a track id\n";
+                return false;
+            }
+            opts.midi_track = argv[i];
         } else if (arg == "--device") {
             if (++i >= argc) {
                 std::cerr << "Error: --device requires a device name\n";
@@ -325,8 +350,8 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
         }
     }
 
-    // --list-devices doesn't require --doc
-    if (opts.list_devices) {
+    // --list-devices / --list-midi-devices don't require --doc
+    if (opts.list_devices || opts.list_midi_devices) {
         return true;
     }
 
@@ -1010,6 +1035,13 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
 
+    // Vague 3 : la file MIDI live, cablee AVANT initialize (le callback lit
+    // le pointeur sans synchronisation). Statiques : survivent a tout ici.
+    static daw::midi::LiveMidiQueue midi_queue;
+    static daw::midi::LiveMidiStats midi_stats;
+    daw::midi::MidiInput midi_in;
+    if (!opts.midi_in.empty()) device.setLiveMidi(&midi_queue, &midi_stats);
+
     if (!device.initialize(config)) {
         std::cerr << "Failed to initialize audio device\n";
         return 1;
@@ -1018,6 +1050,11 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     std::cout << "Audio Device: " << device.getDeviceName() << "\n"
               << "Sample Rate: " << device.getSampleRate() << " Hz\n"
               << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
+
+    if (!opts.midi_in.empty() &&
+        !daw::midi::openMidiInCli(opts.midi_in, midi_in, &midi_queue, &midi_stats)) {
+        return 1;
+    }
 
     // Build audio graph (shared ownership: audio thread and telemetry
     // readers acquire copies from the device's atomic slot)
@@ -1044,6 +1081,18 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
 
     graph->prepare(device.getSampleRate(), device.getBufferSize());
     std::cout << "Built graph with " << graph->getTrackCount() << " tracks\n";
+    // Vague 3 : la piste cible du MIDI live (auto ou --midi-track)
+    bool midi_track_warned = false;
+    std::string midi_track_logged;
+    if (midi_in.isOpen()) {
+        graph->setLiveMidiTrack(daw::midi::resolveLiveMidiTrack(
+            *graph, opts.midi_track, midi_track_warned, midi_track_logged));
+    }
+    const double midi_pipeline_ms =
+        1000.0 * static_cast<double>(proxy_depth * daw::host::kRingBlockSize +
+                                     device.getBufferSize()) /
+        static_cast<double>(device.getSampleRate());
+    auto last_midi_stats = std::chrono::steady_clock::now();
 
     // Apply initial solo/mute from CLI
     for (const auto& track_id : opts.solo_tracks) {
@@ -1126,6 +1175,12 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
             last_telemetry = now;
         }
 
+        // Vague 3 : stats de l'entree MIDI live toutes les 5 s
+        if (midi_in.isOpen() && now - last_midi_stats >= std::chrono::seconds(5)) {
+            daw::midi::logMidiStats(midi_stats, midi_pipeline_ms, std::cerr);
+            last_midi_stats = now;
+        }
+
         // Poll telemetry for CLI display
         while (auto telemetry = device.pollTelemetry()) {
             double position_sec = static_cast<double>(telemetry->position_samples) / device.getSampleRate();
@@ -1157,6 +1212,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     // Stop WebSocket server
     ws_server.stop();
 
+    midi_in.close();  // Vague 3 : plus de callback WinMM avant l'arret du device
     device.getTransport().stop();
     device.stop();
     device.shutdown();
@@ -1194,6 +1250,13 @@ int doPlayWithServer(const Options& opts) {
     static daw::audio::TapRing tap_ring;
     device.setTapRing(&tap_ring);
 
+    // Vague 3 : la file MIDI live (meme moule que le tap : statique, cablee
+    // avant initialize, lue par le callback sans synchronisation)
+    static daw::midi::LiveMidiQueue midi_queue;
+    static daw::midi::LiveMidiStats midi_stats;
+    daw::midi::MidiInput midi_in;
+    if (!opts.midi_in.empty()) device.setLiveMidi(&midi_queue, &midi_stats);
+
     if (!device.initialize(config)) {
         std::cerr << "Failed to initialize audio device\n";
         return 1;
@@ -1203,11 +1266,23 @@ int doPlayWithServer(const Options& opts) {
               << "Sample Rate: " << device.getSampleRate() << " Hz\n"
               << "Buffer Size: " << device.getBufferSize() << " frames\n\n";
 
+    if (!opts.midi_in.empty() &&
+        !daw::midi::openMidiInCli(opts.midi_in, midi_in, &midi_queue, &midi_stats)) {
+        return 1;
+    }
+
     // A3-2 : la profondeur proxy est fixee UNE fois par la periode
     // negociee (elle ne change pas d'un rebuild a l'autre) - et hors
     // contrat, on ne demarre pas.
     uint32_t proxy_depth = 1;
     if (!resolveProxyDepth(device.getBufferSize(), proxy_depth)) return 1;
+    const double midi_pipeline_ms =
+        1000.0 * static_cast<double>(proxy_depth * daw::host::kRingBlockSize +
+                                     device.getBufferSize()) /
+        static_cast<double>(device.getSampleRate());
+    bool midi_track_warned = false;
+    std::string midi_track_logged;
+    auto last_midi_stats = std::chrono::steady_clock::now();
 
     // Document: written by the network thread (load/apply under doc_mutex),
     // snapshotted by the builder in the main loop. The builder NEVER reads
@@ -1489,6 +1564,12 @@ int doPlayWithServer(const Options& opts) {
                         std::chrono::milliseconds(opts.debug_rebuild_delay_ms));
                 }
                 graph->prepare(device.getSampleRate(), device.getBufferSize());
+                // Vague 3 : la piste cible du MIDI live, re-resolue a
+                // chaque graphe (le document peut arriver/changer apres)
+                if (midi_in.isOpen()) {
+                    graph->setLiveMidiTrack(daw::midi::resolveLiveMidiTrack(
+                        *graph, opts.midi_track, midi_track_warned, midi_track_logged));
+                }
 
                 if (!playback_started) {
                     // First graph: apply CLI solo/mute
@@ -1771,6 +1852,12 @@ int doPlayWithServer(const Options& opts) {
         // A6 (mesure, une fois) : la FORME reelle des callbacks apres
         // ~200 callbacks - c'est la ligne que la matrice A6 lit. Un
         // partiel (non multiple de 256) = bypass plugin sur sa queue.
+        // Vague 3 : stats de l'entree MIDI live toutes les 5 s
+        if (midi_in.isOpen() && now - last_midi_stats >= std::chrono::seconds(5)) {
+            daw::midi::logMidiStats(midi_stats, midi_pipeline_ms, std::cerr);
+            last_midi_stats = now;
+        }
+
         static bool cb_shape_logged = false;
         if (!cb_shape_logged) {
             const auto shape = device.callbackShape();
@@ -1825,6 +1912,7 @@ int doPlayWithServer(const Options& opts) {
     export_job.shutdown();
     ws_server.stop();
     server_client.disconnect();
+    midi_in.close();  // Vague 3 : plus de callback WinMM avant l'arret du device
     device.getTransport().stop();
     device.stop();
     device.shutdown();
@@ -1922,6 +2010,9 @@ int main(int argc, char* argv[]) {
     // List devices mode
     if (opts.list_devices) {
         return doListDevices();
+    }
+    if (opts.list_midi_devices) {
+        return daw::midi::listMidiDevicesCli();
     }
 
     // Server mode - connect to sync server

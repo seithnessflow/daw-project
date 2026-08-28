@@ -188,6 +188,9 @@ add_library(daw_engine_lib STATIC
     src/audio/audio_device.cpp
     src/midi/midi_parse.h
     src/midi/live_midi.h
+    src/midi/midi_input.h
+    src/midi/midi_in_cli.h
+    src/midi/midi_in_cli.cpp
     src/graph/processor_node.h
     src/graph/gain_node.h
     src/graph/gain_node.cpp
@@ -255,6 +258,8 @@ target_link_libraries(daw_engine_lib PUBLIC
 
 # Platform-specific
 if(WIN32)
+    # Vague 3 : l'entree MIDI live (WinMM) - Windows seulement, stub ailleurs
+    target_sources(daw_engine_lib PRIVATE src/midi/midi_input_winmm.cpp)
     # Windows: link system libraries
     target_link_libraries(daw_engine_lib PUBLIC
         ws2_32      # Winsock2 (IXWebSocket)
@@ -263,10 +268,19 @@ if(WIN32)
         userenv     # Rust runtime
         bcrypt      # Rust crypto
         ntdll       # Rust runtime
+        winmm       # MIDI in (midiIn*) - Vague 3
     )
+    # Outil de preuve pilotee : envoie des notes sur un port de sortie
+    # (loopMIDI) que le moteur ecoute avec --midi-in.
+    add_executable(midi_send tools/midi_send.cpp)
+    target_link_libraries(midi_send PRIVATE winmm)
     # Disable specific MSVC warnings for third-party code
     target_compile_options(daw_engine_lib PRIVATE /W3)
-elseif(UNIX AND NOT APPLE)
+else()
+    # Hors Windows : pas de backend MIDI-in (stub, refus en clair)
+    target_sources(daw_engine_lib PRIVATE src/midi/midi_input_stub.cpp)
+endif()
+if(UNIX AND NOT APPLE)
     find_package(Threads REQUIRED)
     target_link_libraries(daw_engine_lib PUBLIC
         Threads::Threads
