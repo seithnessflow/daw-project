@@ -126,6 +126,12 @@ public:
      *  du fil) pour le bloc courant - l'entree live passe par la. AUDIO
      *  THREAD (appele par AudioGraph::process). Defaut no-op. */
     virtual void emitMidiEvent(const daw::host::MidiEvent& /*ev*/) noexcept {}
+    /** ProcessContext (v12) : ce que le transport sait, pour le bloc a
+     *  venir - etat play/stop et tempo (milli-BPM entier). Appele par
+     *  processTrack AVANT process() sur chaque node de la chaine ; seuls
+     *  les nodes qui hebergent un plugin (Proxy/SyncProxy) le relaient.
+     *  AUDIO THREAD (live) ou thread de controle (offline). Defaut no-op. */
+    virtual void setTransportContext(bool /*playing*/, int64_t /*tempo_milli_bpm*/) noexcept {}
 };
 
 }  // namespace daw::graph

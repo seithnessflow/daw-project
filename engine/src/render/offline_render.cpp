@@ -257,6 +257,9 @@ std::unique_ptr<graph::AudioGraph> OfflineRenderer::buildGraph(
 ) {
     auto graph_ptr = std::make_unique<graph::AudioGraph>();
     graph_ptr->setSampleRate(sample_rate);
+    // v12 : le tempo du projet vers les plugins (ProcessContext) - meme
+    // regle que le live : registre du document, 120 BPM pour un doc v1
+    graph_ptr->setTempoMilliBpm(doc.tempo_milli_bpm > 0 ? doc.tempo_milli_bpm : 120000);
     stem_substituted_nodes_ = 0;  // per-build accounting (S7 / R5)
     native_latency_ = 0;          // session 4.3 : latence des natifs
 

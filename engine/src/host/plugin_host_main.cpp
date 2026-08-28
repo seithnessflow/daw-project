@@ -34,6 +34,7 @@
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
 
 #include <bitset>
+#include <cmath>
 #include <map>
 
 #include <algorithm>
@@ -1199,6 +1200,35 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         data.outputs = &out_bus;
         data.inputParameterChanges = &param_changes;
         data.inputEvents = &event_list;  // v8 : les notes du bloc -> l'instrument
+
+        // v12 : ProcessContext - ce que le plugin sait du transport (AUDIT-6
+        // §6 : sans lui, delays synchronises / arpegiateurs / LFO tournent
+        // sur leur defaut). Position DU BLOC (par slot), tempo et play
+        // (globaux), temps musical en noires derive du tempo entier ; la
+        // signature reste 4/4 tant que le document ne la porte pas ici.
+        Vst::ProcessContext ctx{};
+        {
+            const int64_t pos = ring->in_slot_pos[slot].load(std::memory_order_relaxed);
+            const int64_t milli = ring->transport_tempo_milli_bpm.load(std::memory_order_relaxed);
+            const bool playing = ring->transport_playing.load(std::memory_order_relaxed) != 0;
+            const double sr = static_cast<double>(ring->sample_rate);
+            ctx.sampleRate = sr;
+            ctx.projectTimeSamples = pos;
+            ctx.continousTimeSamples = static_cast<int64>(seq) * static_cast<int64>(kHostBlockSize);
+            ctx.state = Vst::ProcessContext::kContTimeValid | Vst::ProcessContext::kProjectTimeMusicValid;
+            if (playing) ctx.state |= Vst::ProcessContext::kPlaying;
+            if (milli > 0) {
+                ctx.tempo = static_cast<double>(milli) / 1000.0;
+                ctx.state |= Vst::ProcessContext::kTempoValid;
+                ctx.projectTimeMusic = (static_cast<double>(pos) / sr) * (ctx.tempo / 60.0);
+                ctx.timeSigNumerator = 4;
+                ctx.timeSigDenominator = 4;
+                ctx.state |= Vst::ProcessContext::kTimeSigValid;
+                ctx.barPositionMusic = std::floor(ctx.projectTimeMusic / 4.0) * 4.0;
+                ctx.state |= Vst::ProcessContext::kBarPositionValid;
+            }
+        }
+        data.processContext = &ctx;
 
         if (inst.processor->process(data) != kResultOk) {
             std::cerr << "plugin_host error: process refused at seq " << seq << std::endl;

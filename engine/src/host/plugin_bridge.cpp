@@ -366,9 +366,16 @@ void PluginBridge::sendMidiNote(bool note_on, uint8_t pitch, uint8_t velocity,
     pushMidiEvent(ring_, note_on, pitch, velocity, channel, sample_offset);
 }
 
+void PluginBridge::setTransportContext(bool playing, int64_t tempo_milli_bpm) noexcept {
+    if (!ring_) return;
+    ring_->transport_tempo_milli_bpm.store(tempo_milli_bpm, std::memory_order_relaxed);
+    ring_->transport_playing.store(playing ? 1u : 0u, std::memory_order_relaxed);
+}
+
 bool PluginBridge::processBlockSync(const float* in_l, const float* in_r,
                                     float* out_l, float* out_r,
-                                    uint32_t n, uint32_t timeout_ms) {
+                                    uint32_t n, uint32_t timeout_ms,
+                                    int64_t position_samples) {
     if (!ring_ || n == 0 || n > kRingBlockSize) {
         error_ = "bad bridge state or block size";
         return false;
@@ -376,6 +383,7 @@ bool PluginBridge::processBlockSync(const float* in_l, const float* in_r,
 
     const uint64_t seq = ++next_seq_;
     const uint32_t slot = static_cast<uint32_t>(seq % kRingSlots);
+    ring_->in_slot_pos[slot].store(position_samples, std::memory_order_relaxed);  // v12
     std::memcpy(ring_->in[slot][0], in_l, n * sizeof(float));
     std::memcpy(ring_->in[slot][1], in_r, n * sizeof(float));
     if (n < kRingBlockSize) {

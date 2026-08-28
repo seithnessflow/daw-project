@@ -35,6 +35,7 @@ AudioGraph::AudioGraph(AudioGraph&& other) noexcept
     , master_peak_left_(other.master_peak_left_.load(std::memory_order_relaxed))
     , master_peak_right_(other.master_peak_right_.load(std::memory_order_relaxed))
     , live_midi_track_(other.live_midi_track_.load(std::memory_order_relaxed))
+    , tempo_milli_bpm_(other.tempo_milli_bpm_.load(std::memory_order_relaxed))
     , num_tracks_(other.num_tracks_)
     , peak_left_(std::move(other.peak_left_))
     , peak_right_(std::move(other.peak_right_)) {}
@@ -55,6 +56,8 @@ AudioGraph& AudioGraph::operator=(AudioGraph&& other) noexcept {
         master_peak_right_.store(other.master_peak_right_.load(std::memory_order_relaxed),
                                  std::memory_order_relaxed);
         live_midi_track_.store(other.live_midi_track_.load(std::memory_order_relaxed),
+                               std::memory_order_relaxed);
+        tempo_milli_bpm_.store(other.tempo_milli_bpm_.load(std::memory_order_relaxed),
                                std::memory_order_relaxed);
         num_tracks_ = other.num_tracks_;
         peak_left_ = std::move(other.peak_left_);
@@ -304,6 +307,15 @@ void AudioGraph::processTrack(
                 [inst, skip](bool on, uint8_t p, uint8_t v, uint32_t off) {
                     inst->emitMidi(on, p, v, off + skip);
                 });
+        }
+    }
+
+    // v12 : le transport vu par les plugins (tempo + play/stop) - un store
+    // relaxed par node hebergeant un plugin, no-op pour les natifs.
+    {
+        const int64_t tempo = tempo_milli_bpm_.load(std::memory_order_relaxed);
+        for (auto& processor : track.chain) {
+            processor->setTransportContext(transport_playing_, tempo);
         }
     }
 

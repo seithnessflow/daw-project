@@ -107,7 +107,12 @@ public:
      */
     bool processBlockSync(const float* in_l, const float* in_r,
                           float* out_l, float* out_r,
-                          uint32_t n, uint32_t timeout_ms = 2000);
+                          uint32_t n, uint32_t timeout_ms = 2000,
+                          int64_t position_samples = 0);
+
+    /** v12 : tempo (milli-BPM) + play/stop pour le ProcessContext du
+     *  plugin (offline : toujours "playing"). Thread de controle. */
+    void setTransportContext(bool playing, int64_t tempo_milli_bpm) noexcept;
 
     /** Control-thread liveness check via the process handle (timeout 0). */
     bool childAlive();

@@ -250,6 +250,17 @@ public:
      */
     void setTransportPlaying(bool playing) noexcept { transport_playing_ = playing; }
 
+    /**
+     * v12 (ProcessContext) : le tempo du projet (milli-BPM entier, le
+     * registre resolu du document ; 120000 par defaut). Control thread a
+     * la construction ; relaye a chaque bloc aux nodes de chaine avec
+     * l'etat play/stop (setTransportContext) - c'est ce que les plugins
+     * lisent dans leur ProcessContext.
+     */
+    void setTempoMilliBpm(int64_t milli_bpm) noexcept {
+        tempo_milli_bpm_.store(milli_bpm, std::memory_order_relaxed);
+    }
+
     // ---- Vague 3 : MIDI live -> instrument de la piste cible ---------------
     /**
      * Piste cible du MIDI live (index, -1 = aucune). Control thread
@@ -441,6 +452,8 @@ private:
     std::atomic<int32_t> launched_count_{0};
     // Etape 0 : transport en lecture ? (thread audio seul, pas atomique)
     bool transport_playing_ = true;
+    // v12 : tempo relaye aux plugins (control -> audio)
+    std::atomic<int64_t> tempo_milli_bpm_{120000};
     // Vague 3 : cible du MIDI live (control -> audio) + staging du sous-bloc
     // (thread audio seul) + memoire de routage pour l'all-notes-off.
     std::atomic<int32_t> live_midi_track_{-1};

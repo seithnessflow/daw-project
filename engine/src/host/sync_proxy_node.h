@@ -45,6 +45,11 @@ public:
     [[nodiscard]] float getParameter(const std::string&) const noexcept override { return 0.0f; }
     void prepare(uint32_t, uint32_t) override {}
     void reset() noexcept override {}
+    /** v12 : tempo + play vers le ring du pont (offline : le graphe dit
+     *  "playing" = true par defaut). */
+    void setTransportContext(bool playing, int64_t tempo_milli_bpm) noexcept override {
+        if (bridge_) bridge_->setTransportContext(playing, tempo_milli_bpm);
+    }
 
     /** True once any exchange failed - the render must be declared failed. */
     [[nodiscard]] bool failed() const noexcept { return failed_; }

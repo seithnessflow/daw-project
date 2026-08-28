@@ -47,6 +47,8 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
                            pushMidiEvent(ring_, on, pitch, vel, 0, off);
                        });
     }
+    // v12 : la position d'arrangement de CE bloc (ProcessContext de l'enfant)
+    ring_->in_slot_pos[slot].store(position_samples, std::memory_order_relaxed);
     // v10 : estampille du slot AVANT input_seq (l'enfant verifie que
     // l'entree qu'il lit est bien celle de seq - invariant input-dechire)
     ring_->in_slot_seq[slot].store(seq, std::memory_order_release);

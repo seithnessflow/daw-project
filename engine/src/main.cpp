@@ -803,6 +803,9 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     // (0 = legacy : loop_len du slot d'ancre, comportement F5+ intact)
     graph->setMusicalQuantum(
         daw::document::sessionQuantumSamples(project));
+    // v12 : le tempo du projet vers les plugins (ProcessContext) - le
+    // registre du document, 120 BPM quand un doc v1 ne le porte pas
+    graph->setTempoMilliBpm(project.tempo_milli_bpm > 0 ? project.tempo_milli_bpm : 120000);
 
     for (const auto& track_def : project.tracks) {
         daw::graph::AudioTrack track;

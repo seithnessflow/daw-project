@@ -41,12 +41,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    `plugin_host --params <module> --uid <uid>` = la liste des parametres
    (la cle pour piloter un plugin par le document sans sa fenetre) ;
    (c) la dette TRANSITOIRE DX10 ci-dessous (§3 moteur).
-   Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
-   synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
-   (ecart SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ;
-   velocite/longueur/deplacement des notes editables (§5) ; piano-roll
-   musical ; ProcessContext rempli pour les VST3 (tempo/position/
-   play-state, §6). Le **test Massive** (clavier du
+   Ensuite : Web MIDI ; ~~preuve CC64/pitch-bend sur un vrai synthe~~
+   FAIT (Dexed/Surge, IMidiMapping) ; notes en MAP a ids stables (ecart
+   SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ; velocite/
+   longueur/deplacement des notes editables (§5) ; piano-roll musical ;
+   ~~ProcessContext~~ FAIT 2026-08-28 (ring v12). Le **test Massive** (clavier du
    portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de
    vague, dans la forme tranchee par le spike : MIDI LAN -> rendu tour
    en exclusif 256 -> enceintes de la piece ; le retour vers le portable
@@ -175,8 +174,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 - A4-14 menu : `std::stoul` non protege (`--ws-port abc` = terminate) ;
   port pris = retry infini a 100 Hz ; garde frame_count > 65536 ;
   underruns uint64 tronques en uint32.
-- Hote VST3 vu du plugin (§6) : `ProcessContext` jamais rempli (ordre
-  grave 4) ; etat CONTROLLER non serialise (seul `IComponent::getState`
+- Hote VST3 vu du plugin (§6) : ~~`ProcessContext` jamais rempli~~ FAIT
+  2026-08-28 (ring v12 : position/tempo/play, signature 4/4 fixe tant
+  que le document ne la porte pas dans le ring — dette : timeSignature
+  du doc -> ProcessContext ; preuve a l'oreille d'un LFO tempo-sync a
+  faire) ; etat CONTROLLER non serialise (seul `IComponent::getState`
   voyage) ; un seul bus stereo (pas de multi-sorties ni sidechain de
   plugin) ; `outputParameterChanges` jamais lu ; params a offset 0 seul.
 - Blacklist au 2e crash d'INSTANTIATION par class-uid ; scan

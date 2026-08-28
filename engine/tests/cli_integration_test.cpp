@@ -2814,6 +2814,51 @@ bool testLiveMidiRouting() {
     return true;
 }
 
+// v12 (ProcessContext) : le graphe relaie tempo + play/stop a chaque
+// bloc, le proxy ecrit la position DU BLOC par slot - les trois
+// atterrissent dans le ring que l'enfant lit pour remplir ProcessContext.
+bool testProcessContextRing() {
+    std::cout << "Test: ProcessContext into the ring (v12)... ";
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    auto ring = std::make_unique<daw::host::SharedAudioRing>();
+    std::memset(static_cast<void*>(ring.get()), 0,
+                sizeof(daw::host::SharedAudioRing));
+    std::atomic<uint64_t> missed{0};
+    daw::graph::AudioGraph graph;
+    graph.setSampleRate(48000);
+    daw::graph::AudioTrack track;
+    track.id = "t";
+    track.name = "t";
+    auto node = std::make_unique<daw::host::ProxyNode>("p", ring.get(), &missed);
+    track.chain.push_back(std::move(node));
+    graph.addTrack(std::move(track));
+    graph.prepare(48000, kBlock);
+    graph.setTempoMilliBpm(93500);  // 93.5 BPM, entier
+    std::vector<float> out(kBlock * 2);
+
+    graph.setTransportPlaying(true);
+    graph.process(out.data(), kBlock, 123456);
+    const uint64_t seq1 = ring->input_seq.load();
+    if (ring->in_slot_pos[seq1 % daw::host::kRingSlots].load() != 123456 ||
+        ring->transport_tempo_milli_bpm.load() != 93500 ||
+        ring->transport_playing.load() != 1) {
+        std::cout << "FAILED: bloc 1 (pos/tempo/play)\n";
+        return false;
+    }
+    graph.setTransportPlaying(false);
+    graph.process(out.data(), kBlock, 123456 + kBlock);
+    const uint64_t seq2 = ring->input_seq.load();
+    if (seq2 != seq1 + 1 ||
+        ring->in_slot_pos[seq2 % daw::host::kRingSlots].load() != 123456 + kBlock ||
+        ring->in_slot_pos[seq1 % daw::host::kRingSlots].load() != 123456 ||
+        ring->transport_playing.load() != 0) {
+        std::cout << "FAILED: bloc 2 (position par slot / stop)\n";
+        return false;
+    }
+    std::cout << "OK (position par slot, tempo 93500, play puis stop)\n";
+    return true;
+}
+
 // util/net_loopback.h : `localhost` -> `127.0.0.1` (le connect ::1 de
 // ixwebsocket coutait 2 s par PUT/GET/WS - gel de la boucle de controle).
 bool testPreferIpv4Loopback() {
@@ -5024,6 +5069,7 @@ int main(int argc, char* argv[]) {
     run(testLiveMidiDrain);         // Vague 3 etape 2 : file SPSC + drain
     run(testLiveMidiRouting);       // Vague 3 etape 3 : routage vers l'instrument
     run(testPreferIpv4Loopback);    // localhost -> 127.0.0.1 (2 s de connect ::1 evites)
+    run(testProcessContextRing);    // v12 : position/tempo/play vers le ring (ProcessContext)
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);

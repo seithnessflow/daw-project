@@ -107,6 +107,13 @@ public:
     void emitMidiEvent(const MidiEvent& ev) noexcept override {
         if (ring_) pushMidiEvent(ring_, ev);
     }
+    /** v12 : tempo + play/stop vers le ring (globaux, relaxed) ; la
+     *  position du bloc, elle, est ecrite par slot dans process(). */
+    void setTransportContext(bool playing, int64_t tempo_milli_bpm) noexcept override {
+        if (!ring_) return;
+        ring_->transport_tempo_milli_bpm.store(tempo_milli_bpm, std::memory_order_relaxed);
+        ring_->transport_playing.store(playing ? 1u : 0u, std::memory_order_relaxed);
+    }
 
 private:
     std::string type_{TYPE};

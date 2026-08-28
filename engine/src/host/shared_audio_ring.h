@@ -43,7 +43,7 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 11;      // v11: FIFO MIDI GENERIQUE (note/CC/pitch-bend, format fil) ; v10: kRingSlots 8 + stamps par slot (A4-5) ; v9: editor_open ; v8: MIDI FIFO
+inline constexpr uint32_t kLayoutVersion = 12;      // v12: ProcessContext (position par slot, tempo, play) ; v11: FIFO MIDI generique ; v10: kRingSlots 8 + stamps par slot (A4-5) ; v9: editor_open ; v8: MIDI FIFO
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kMidiQueueSlots = 256;    // power of two; note events per block, drained by the child
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
@@ -172,6 +172,20 @@ struct SharedAudioRing {
     std::atomic<uint64_t> in_slot_seq[kRingSlots];
     std::atomic<uint64_t> out_slot_seq[kRingSlots];
 
+    // ---- ProcessContext (v12) : ce que le plugin sait du transport --------
+    // VST3 ne donne tempo/position/play qu'a travers ProcessData::
+    // processContext ; sans lui, delays synchronises, arpegiateurs et LFO
+    // tournent sur leur defaut interne (AUDIT-6 §6). L'ENGINE ecrit la
+    // position d'arrangement DU BLOC dans in_slot_pos[slot] (avant
+    // l'estampille du slot - c'est la position de CE bloc, pipeline
+    // compris), le tempo (milli-BPM entier, invariant document) et l'etat
+    // play/stop (globaux : un bloc de decalage est sans consequence).
+    // L'ENFANT lit tout ca en remplissant ProcessContext pour le bloc seq.
+    // Tempo 0 = inconnu (kTempoValid non pose).
+    std::atomic<int64_t> in_slot_pos[kRingSlots];
+    std::atomic<int64_t> transport_tempo_milli_bpm;
+    std::atomic<uint64_t> transport_playing;
+
     // ---- Planar audio, double-buffered: [slot][channel][frame] ----
     float in[kRingSlots][kRingChannels][kRingBlockSize];
     float out[kRingSlots][kRingChannels][kRingBlockSize];
@@ -213,16 +227,25 @@ static_assert(offsetof(SharedAudioRing, in_slot_seq) ==
 static_assert(offsetof(SharedAudioRing, out_slot_seq) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
                   8 * kRingSlots);
-static_assert(offsetof(SharedAudioRing, in) ==
+static_assert(offsetof(SharedAudioRing, in_slot_pos) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
                   16 * kRingSlots);
+static_assert(offsetof(SharedAudioRing, transport_tempo_milli_bpm) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  24 * kRingSlots);
+static_assert(offsetof(SharedAudioRing, transport_playing) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  24 * kRingSlots + 8);
+static_assert(offsetof(SharedAudioRing, in) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  24 * kRingSlots + 16);
 static_assert(offsetof(SharedAudioRing, out) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
-                  16 * kRingSlots +
+                  24 * kRingSlots + 16 +
                   kRingSlots * kRingChannels * kRingBlockSize * 4);
 static_assert(sizeof(SharedAudioRing) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
-                  16 * kRingSlots +
+                  24 * kRingSlots + 16 +
                   2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 

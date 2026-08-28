@@ -40,7 +40,8 @@ void SyncProxyNode::process(float* output, const float* input, uint32_t frame_co
                        });
     }
 
-    if (!bridge_->processBlockSync(in_l, in_r, out_l, out_r, frame_count)) {
+    if (!bridge_->processBlockSync(in_l, in_r, out_l, out_r, frame_count, 2000,
+                                   position_samples)) {
         failed_ = true;
         std::memset(output, 0, frame_count * 2 * sizeof(float));
         return;

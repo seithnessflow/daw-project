@@ -1981,3 +1981,28 @@ log, capture timing, note-on/skip/torn du child, bornes) restent en
 place — ce sont les yeux qu'AUDIT-5 reclamait. La dette « transitoire
 MIDI live » est FERMEE ; reste C1 (HTTP sur le thread de controle,
 ~90 ms par PUT local, secondes a travers un tunnel).
+
+**2026-08-28 (nuit, suite — ProcessContext : les plugins savent enfin
+l'heure) :** AUDIT-6 §6 [NOUVEAU] solde. Ring **v12** : `in_slot_pos`
+(position d'arrangement DU BLOC, par slot — pipeline compris),
+`transport_tempo_milli_bpm` et `transport_playing` (globaux, un bloc de
+decalage sans consequence) ; asserts d'offsets etendus (+24*kRingSlots
++16). `ProcessorNode::setTransportContext(playing, tempo)` (virtuel,
+no-op natif) appele par processTrack sur chaque node de la chaine avant
+process() ; ProxyNode et SyncProxyNode le relaient au ring (le second via
+`PluginBridge::setTransportContext`, `processBlockSync` prend la
+position) ; `AudioGraph::setTempoMilliBpm` pose a la construction (live
+main.cpp, offline OfflineRenderer::buildGraph : registre du document,
+120000 pour un doc v1). L'enfant remplit `Vst::ProcessContext` pour le
+bloc seq : sampleRate, projectTimeSamples, continousTimeSamples,
+tempo (milli/1000, kTempoValid si > 0), projectTimeMusic en noires,
+signature 4/4 (kTimeSigValid — le document ne la porte pas encore dans
+le ring), barPositionMusic, kPlaying. Preuves : `testProcessContextRing`
+(position par slot, tempo 93500 entier, play puis stop), suite 61/61,
+hash absolu 56729beb61993cd7 ET musical inchanges (les effets de test
+ignorent le contexte — l'additivite tient), specs moteur reel 14/14
+dont la matrice DX10/Dexed/Surge XT. NON PROUVE a l'oreille : un delay
+synchronise ou un arpegiateur qui SUIT le tempo (a faire sur Surge XT :
+LFO tempo-sync, comparer 90 vs 120 BPM par la periode mesuree). Piege
+paye : le clean build ne construisait pas midi_send (3 specs rouges pour
+rien) — `rebuild_msvc.bat` le construit desormais.
