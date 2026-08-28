@@ -261,6 +261,16 @@ public:
      * without synchronization.
      */
     void setTapRing(TapRing* ring) { callback_context_.tap_ring = ring; }
+
+    /**
+     * Vague 3 : attach the live MIDI queue + stats. MUST be called before
+     * initialize()/start() (read by the callback without synchronization).
+     * Null = no live MIDI (the silence path behaves exactly as before).
+     */
+    void setLiveMidi(daw::midi::LiveMidiQueue* queue, daw::midi::LiveMidiStats* stats) {
+        callback_context_.midi_in = queue;
+        callback_context_.midi_stats = stats;
+    }
 };
 
 }  // namespace daw::audio

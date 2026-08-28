@@ -2,6 +2,7 @@
 #include "audio_callback.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -93,7 +94,11 @@ void audioCallback(
     // F5 : on traite le graphe en LECTURE, ou si un slot de session est lance
     // (les slots jouent par-dessus un arrangement ARRETE - horloge de session
     // libre, position d'arrangement gelee). L'horloge avance a chaque bloc.
-    const bool session_only = !is_playing && graph && graph->anyLaunched();
+    // Vague 3 : le MIDI live arme (piste cible posee) traite aussi le graphe
+    // a l'arret - c'est le monitoring d'un instrument, la timeline se tait
+    // (etape 0, setTransportPlaying).
+    const bool session_only =
+        !is_playing && graph && (graph->anyLaunched() || graph->liveMidiArmed());
     if ((!is_playing && !session_only) || !graph) {
         // Not playing (and nothing launched) or no graph - output silence,
         // and the meters SAY silence (relaxed stores; stale peaks were
@@ -158,6 +163,22 @@ void audioCallback(
         // d'un meme callback verraient la meme position de slot).
         graph->setSessionClock(ctx->session_clock);
         ctx->session_clock += static_cast<int64_t>(chunk);
+        // Etape 0 (Vague 3) : le graphe sait si le transport joue - a
+        // l'arret (session seule, MIDI live) la timeline se tait.
+        graph->setTransportPlaying(is_playing);
+
+        // Vague 3 : drain de la file MIDI live pour CE sous-bloc (<= 64,
+        // le reste attend le suivant). steady_clock::now() = QPC en mode
+        // utilisateur (MSVC) / vDSO (glibc) : pas un syscall, un appel par
+        // sous-bloc, seulement si l'entree est cablee.
+        if (ctx->midi_in) {
+            const int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+            const uint32_t n = daw::midi::drainLiveMidi(
+                *ctx->midi_in, ctx->midi_stats, now_ns, ctx->live_midi,
+                daw::midi::kLiveMidiMaxPerBlock);
+            graph->setLiveMidi(ctx->live_midi, n, ctx->midi_stats);
+        }
 
         // Process this sub-block
         float* chunk_output = out + (frames_written * 2);  // stereo interleaved

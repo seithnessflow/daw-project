@@ -34,6 +34,7 @@ AudioGraph::AudioGraph(AudioGraph&& other) noexcept
     , master_gain_(other.master_gain_.load(std::memory_order_relaxed))
     , master_peak_left_(other.master_peak_left_.load(std::memory_order_relaxed))
     , master_peak_right_(other.master_peak_right_.load(std::memory_order_relaxed))
+    , live_midi_track_(other.live_midi_track_.load(std::memory_order_relaxed))
     , num_tracks_(other.num_tracks_)
     , peak_left_(std::move(other.peak_left_))
     , peak_right_(std::move(other.peak_right_)) {}
@@ -53,6 +54,8 @@ AudioGraph& AudioGraph::operator=(AudioGraph&& other) noexcept {
                                 std::memory_order_relaxed);
         master_peak_right_.store(other.master_peak_right_.load(std::memory_order_relaxed),
                                  std::memory_order_relaxed);
+        live_midi_track_.store(other.live_midi_track_.load(std::memory_order_relaxed),
+                               std::memory_order_relaxed);
         num_tracks_ = other.num_tracks_;
         peak_left_ = std::move(other.peak_left_);
         peak_right_ = std::move(other.peak_right_);
@@ -96,6 +99,49 @@ bool AudioGraph::process(
         if (track.solo.load(std::memory_order_relaxed)) {
             has_solo = true;
             break;
+        }
+    }
+
+    // Vague 3 : MIDI live -> instrument de la piste cible, AVANT la boucle
+    // des pistes (le ProxyNode de la cible drainera ces evenements avec le
+    // bloc qu'il depose ci-dessous). Offset 0 pour tous (v1 : gigue <= un
+    // sous-bloc ; placement par timestamp = dette datee). Meme thread que
+    // process() : la regle un-producteur-par-ring tient.
+    {
+        const int32_t target = live_midi_track_.load(std::memory_order_relaxed);
+        ProcessorNode* inst = nullptr;
+        bool routed = false;
+        if (target >= 0 && target < static_cast<int32_t>(tracks_.size())) {
+            const auto& t = tracks_[target];
+            const bool audible =
+                !t.mute.load(std::memory_order_relaxed) &&
+                (!has_solo || t.solo.load(std::memory_order_relaxed));
+            inst = t.instrument_node;
+            routed = audible && inst != nullptr;
+        }
+        // Transition route -> non-route (mute, solo ailleurs, cible retiree) :
+        // UN all-notes-off vers l'ancien instrument, sinon la note tenue au
+        // moment du mute resterait bloquee et ressortirait a l'un-mute.
+        if (live_midi_prev_routed_ && !routed && live_midi_prev_inst_) {
+            live_midi_prev_inst_->allNotesOff();
+        }
+        live_midi_prev_routed_ = routed;
+        live_midi_prev_inst_ = inst;
+        if (live_midi_count_ > 0) {
+            if (routed) {
+                for (uint32_t k = 0; k < live_midi_count_; ++k) {
+                    daw::host::MidiEvent ev = live_midi_events_[k];
+                    ev.sample_offset = 0;
+                    inst->emitMidiEvent(ev);
+                }
+                if (live_midi_stats_)
+                    live_midi_stats_->forwarded.fetch_add(live_midi_count_,
+                                                          std::memory_order_relaxed);
+            } else if (live_midi_stats_) {
+                live_midi_stats_->unrouted.fetch_add(live_midi_count_,
+                                                     std::memory_order_relaxed);
+            }
+            live_midi_count_ = 0;
         }
     }
 
@@ -195,8 +241,15 @@ void AudioGraph::processTrack(
     // Clear track buffer
     std::memset(output, 0, frame_count * 2 * sizeof(float));
 
-    // Render all clips and mix (sautes si un slot de session a pris la piste)
-    if (!session_active) {
+    // Etape 0 (Vague 3) : la timeline ne rend et n'emet QUE si le transport
+    // joue - transport arrete (session lancee, MIDI live), la position est
+    // gelee et rejouer le bloc serait un bourdon. Un slot lance prend aussi
+    // la piste (F5).
+    const bool timeline = transport_playing_ && !session_active;
+
+    // Render all clips and mix (sautes si un slot de session a pris la piste
+    // ou si le transport est arrete)
+    if (timeline) {
         for (auto& clip : track.clips) {
             if (clip.isActiveAt(position_samples, frame_count)) {
                 // Render clip into mix buffer
@@ -230,7 +283,7 @@ void AudioGraph::processTrack(
     // node draine son ring en process()). Le flag suppress coupe ses notes de
     // timeline ce bloc. Rebasage sur l'horloge de session (libre).
     if (track.instrument_node) {
-        track.instrument_node->setSuppressTimelineNotes(session_active);
+        track.instrument_node->setSuppressTimelineNotes(!timeline);
     }
     if (session_active) {
         const SessionSlot& slot = track.session_slots[launched];

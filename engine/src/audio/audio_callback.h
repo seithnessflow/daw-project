@@ -44,6 +44,7 @@
 
 #include "ring_buffer.h"
 #include "tap_ring.h"
+#include "../midi/live_midi.h"
 #include "../graph/audio_graph.h"
 #include "../transport/transport_state.h"
 
@@ -92,6 +93,8 @@ static_assert(std::atomic<bool>::is_always_lock_free,
               "playing/solo/mute flags must be lock-free");
 static_assert(std::atomic<float>::is_always_lock_free,
               "gain/peak values must be lock-free");
+static_assert(std::atomic<int32_t>::is_always_lock_free,
+              "live MIDI target index must be lock-free");
 
 /**
  * Context passed to the audio callback.
@@ -105,6 +108,14 @@ struct AudioCallbackContext {
     // S8a: the master tap (post-master PCM out to the local tab).
     // Plain pointer set before device start; may stay null (CLI mode).
     TapRing* tap_ring = nullptr;
+
+    // Vague 3 : l'entree MIDI live. File SPSC (producteur = la source, ex.
+    // thread WinMM ; consommateur = ce callback), compteurs, et le staging
+    // du sous-bloc courant (thread audio seul - le graphe se reconstruit,
+    // le contexte non). Pointeurs poses avant start ; null = pas de MIDI.
+    daw::midi::LiveMidiQueue* midi_in = nullptr;
+    daw::midi::LiveMidiStats* midi_stats = nullptr;
+    daw::host::MidiEvent live_midi[daw::midi::kLiveMidiMaxPerBlock];
 
     // Atomic slot holding the current audio graph, RAW pointer. The callback
     // must stay lock-free and std::atomic<std::shared_ptr> is NOT lock-free

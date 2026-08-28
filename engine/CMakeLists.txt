@@ -186,6 +186,8 @@ add_library(daw_engine_lib STATIC
     src/audio/audio_callback.cpp
     src/audio/audio_device.h
     src/audio/audio_device.cpp
+    src/midi/midi_parse.h
+    src/midi/live_midi.h
     src/graph/processor_node.h
     src/graph/gain_node.h
     src/graph/gain_node.cpp

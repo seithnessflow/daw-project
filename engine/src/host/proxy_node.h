@@ -102,6 +102,11 @@ public:
         if (!ring_) return;
         for (uint8_t p = 0; p < 128; ++p) pushMidiEvent(ring_, false, p, 0, 0, 0);
     }
+    /** Vague 3 : MIDI live generique (canal du fil conserve). Meme
+     *  producteur que process() - le thread audio - jamais un autre. */
+    void emitMidiEvent(const MidiEvent& ev) noexcept override {
+        if (ring_) pushMidiEvent(ring_, ev);
+    }
 
 private:
     std::string type_{TYPE};

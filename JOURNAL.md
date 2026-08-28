@@ -1811,3 +1811,29 @@ moteur reel fader-to-engine + stem-freshness + export-mixdown + tempo
 ne declare rien) — au premier maillon de la Vague 3. Menage :
 `rebuild_msvc.bat` construit `create_test_doc`. Piege paye : ne JAMAIS
 editer un .bat pendant que cmd l'execute (lecture par offset).
+
+**2026-08-28 (Vague 3, session A — le routage MIDI live, prouve sans
+materiel) :** plan ratifie (`.claude/plans/mellow-orbiting-aurora.md`) :
+source de preuve = port loopMIDI dedie « MagicPotion », piste cible auto
++ `--midi-track`. Au cadrage, un BUG LATENT trouve et corrige d'abord
+(etape 0, test qui echoue avant) : le graphe est une pure f(position) ;
+traite transport ARRETE (slot de session lance), une piste non lancee
+rejouait ses clips et re-declenchait ses notes de timeline a chaque bloc
+— `setTransportPlaying` (thread audio) gate desormais clips ET notes de
+timeline ; le rendu offline et le hash sont intacts (defaut true).
+Puis le rail : `midi/midi_parse.h` (message court WinMM -> MidiEvent,
+0xF8/0xFE/aftertouch/program refuses), `midi/live_midi.h` (file SPSC
+512, stats lock-free, `drainLiveMidi` <= 64 par sous-bloc avec latence
+de FILE last/max), `ProcessorNode::emitMidiEvent` (generique, canal du
+fil) + override ProxyNode, `AudioGraph::setLiveMidiTrack/setLiveMidi`
+(routage AVANT la boucle des pistes, offset 0, mute/solo = unrouted +
+UN all-notes-off a la transition), callback : gate `liveMidiArmed()`
+(monitoring a l'arret) + drain par sous-bloc (`steady_clock::now()` =
+QPC user-mode, un appel par sous-bloc si cable), `AudioDevice::
+setLiveMidi`. Preuves : 4 tests (`testStoppedTimelineSilent`,
+`testMidiShortParse`, `testLiveMidiDrain`, `testLiveMidiRouting`),
+suite **59/59**, hash absolu inchange, les 14 specs moteur reel
+**25/25**. Aucun WinMM encore : session B = le vrai port + `midi_send`
++ la spec pilotee + la manip audible. Piege paye : le cwd du shell
+persiste entre commandes (un `cd engine/build-msvc` a fait echouer le
+lancement du serveur ; toujours des chemins absolus).

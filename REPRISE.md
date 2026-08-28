@@ -1,56 +1,53 @@
 # REPRISE.md — point de reprise au demarrage
 
-## TOUT EN HAUT (2026-08-28, soir) : CONTRAT DE PERIODE CLOS, LE RAIL MIDI EST POSE
+## TOUT EN HAUT (2026-08-28, nuit) : VAGUE 3 SESSION A LIVREE, SESSION B A OUVRIR
 
-**A LIRE EN PREMIER — le point de synchro : LEVE.** Le ring v11
-(027781c) est VERT en CI (run 33171167476 : build-linux + e2e, 7 min) —
-refus de periode, `host/proxy_depth.h`, FIFO MIDI generique et
-acquisition du controleur a la ceremonie passent sous GCC. Aucun verdict
-en vol.
+**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
+sur le push « Vague 3 session A » (`git log -1`) : premier passage sous
+GCC de `midi/midi_parse.h`, `midi/live_midi.h`, du routage graphe et du
+gate du callback (aucun WinMM dedans — rien de Windows-only). `gh run
+list --limit 3`. AUCUN travail ne s'ouvre avant ce verdict.
 
-## Ce qui a ete fait (2026-08-28)
+## Ce qui a ete fait (2026-08-28, dans l'ordre)
 
-- **Matin — rangement documentaire** (4ee5ff6) : un proprietaire par
-  information, CLAUDE.md §3.
-- **Ring v10** (2ef82eb, CI verte) : estampilles par slot (A4-5).
-- **Soir — contrat de periode CLOS + ring v11** : refus de demarrer hors
-  contrat (periode non multiple de 256, depth > 6), FIFO MIDI generique
-  note/CC/pitch-bend, CC/PB -> parametres via IMidiMapping cote enfant,
-  un controleur d'edition par instance. gtests 55/55, specs moteur reel
-  10/10, hash absolu inchange. Details : JOURNAL.
-- Ordre grave re-arbitre par l'utilisateur (« go ») : Vague 3 entree
-  MIDI live EN TETE, devant T4 Link Etage 2.
+- Matin : rangement documentaire (4ee5ff6). Ring v10 (2ef82eb, CI verte).
+- Soir : contrat de periode CLOS + ring v11 FIFO MIDI generique
+  (027781c, CI verte).
+- Nuit : **Vague 3 session A** — un bug latent corrige d'abord (timeline
+  rejouee quand le graphe tourne transport arrete, etape 0, test qui
+  echouait avant), puis le rail complet file SPSC -> callback ->
+  instrument (voir JOURNAL). 59/59, specs moteur reel 25/25, hash intact.
+  Plan ratifie : `.claude/plans/mellow-orbiting-aurora.md`.
 
 ## Comment relancer
 
 - Stack : `start-daw.cmd` ou `scripts\daw.ps1 -Secure` ; arret
   `stop-daw.cmd`. Rien ne tourne a la cloture.
-- `rebuild_msvc.bat` construit desormais aussi `create_test_doc`.
-- ATTENTION nouvelle regle vivante : `--exclusive --buffer-size 128` et
-  toute periode partagee non multiple de 256 (ZenGo : demander 256 ou
-  128 en partage -> 374) sont REFUSES au demarrage avec la sortie dans
-  le message. `daw.ps1` (512 partage) n'est pas concerne.
+- Regle vivante : periode non multiple de 256 = refus de demarrer
+  (exclusif 128, partage 374) ; `daw.ps1` (512) n'est pas concerne.
 - Offre OUVERTE : `daw.ps1` en `--exclusive --buffer-size 256`.
 
 ## Quoi surveiller
 
 1. Le verdict CI ci-dessus.
-2. Au premier lancement audible apres pull : la ligne `audio-negotiation:`
-   puis soit « Built graph », soit le REFUS — dans ce cas, demander 512
-   ou `--exclusive --buffer-size 256`.
-3. Ligne `plugin_host: midi-mapping N controller assignment(s)` dans les
-   logs enfant : N > 0 sur un vrai synthe = le chemin CC64 existe ;
-   « declares none » sur AGain est normal.
+2. Aucun changement de comportement attendu SANS `--midi-in` (la file
+   n'est pas cablee : `midi_in == nullptr`, chemin silence identique).
+   Si un bourdon/mitraillette disparait en mode session avec des clips
+   sur une piste non lancee, c'est l'etape 0 qui l'a corrige (le dire).
 
 ## La suite (ORDRE GRAVE, TODO.md §1)
 
-1. **Vague 3, premier maillon** : MIDI-in moteur (clavier USB sur la
-   tour, WinMM) -> file SPSC MIDI-in -> thread audio -> `ProxyNode::
-   emitMidi` de l'instrument de tete de chaine de la piste ARMEE -> note
-   entendue en exclusif 256, latence mesuree. A cadrer en 3 lignes a
-   l'ouverture ; la contrainte a resoudre d'abord : UN producteur par
-   ring (le MIDI-in ne doit jamais ecrire le ring depuis un autre thread
-   que le callback).
+1. **Vague 3 session B** (plan, etapes 5-7) : port WinMM
+   (`midi_input_winmm.cpp` + stub Linux, `winmm` dans CMake WIN32),
+   CLI `--list-midi-devices` / `--midi-in <nom>` / `--midi-track <id>`
+   (`cli/midi_in_cli.*`, regle SPLITTER), contrats de log `midi-in:
+   opened "<name>" -> track "<id>"` et `midi-in stats: events=N
+   dropped=D unrouted=U queue-lat last=X.X ms max=Y.Y ms pipeline~Z.Z ms`,
+   outil `engine/tools/midi_send.cpp`, spec `midi-in.spec.ts` (skip si
+   port absent ; instrument mda DX10 ; `--mute` : le backend null appelle
+   le callback), manip audible : `--exclusive --buffer-size 256 --midi-in
+   <clavier>` sur un projet Dexed. PREALABLE UTILISATEUR : port loopMIDI
+   « MagicPotion » (loopMIDI tourne deja, ports Stream Deck intouches).
 2. Reliquat spike LAN (portable) ; 3. T4 Link Etage 2 ; 4. perf au
    regime de preuve ; 5. ratifications AUDIT-5 F / AUDIT-6.
 

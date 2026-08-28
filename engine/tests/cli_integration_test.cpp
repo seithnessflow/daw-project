@@ -26,6 +26,8 @@
 #include "../src/host/proxy_node.h"
 #include "../src/host/proxy_depth.h"
 #include "../src/audio/audio_device.h"
+#include "../src/midi/midi_parse.h"
+#include "../src/midi/live_midi.h"
 #include "../src/util/sha256.h"
 #include "../src/util/path_safety.h"
 #include "../src/websocket/websocket_server.h"
@@ -2544,6 +2546,273 @@ bool testMidiEventQueue() {
     return true;
 }
 
+// Vague 3 etape 0 (2026-08-28) : le graphe est une pure f(position) ; quand
+// le callback le traite transport ARRETE (session lancee, ou MIDI live
+// arme), une piste non lancee rejouait ses clips et re-declenchait ses notes
+// de timeline a chaque bloc (bourdon / mitraillette). Le graphe doit SAVOIR
+// que le transport est arrete : clips muets, notes de timeline supprimees.
+bool testStoppedTimelineSilent() {
+    std::cout << "Test: stopped transport = timeline silent... ";
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    auto ring = std::make_unique<daw::host::SharedAudioRing>();
+    std::memset(static_cast<void*>(ring.get()), 0,
+                sizeof(daw::host::SharedAudioRing));
+    std::atomic<uint64_t> missed{0};
+
+    // Un asset non nul de 4 blocs, un clip dessus a la position 0
+    daw::graph::AudioAsset asset;
+    asset.channels = 2;
+    asset.sample_rate = 48000;
+    asset.frame_count = kBlock * 4;
+    asset.samples.assign(asset.frame_count * 2, 0.25f);
+    daw::graph::ClipInfo info;
+    info.id = "clip-1";
+    info.asset_hash = "deadbeef";
+    info.start_sample = 0;
+    info.length_samples = static_cast<int64_t>(asset.frame_count);
+
+    daw::graph::AudioGraph graph;
+    graph.setSampleRate(48000);
+    daw::graph::AudioTrack track;
+    track.id = "t-1";
+    track.name = "inst";
+    daw::graph::ClipPlayer player;
+    player.setAsset(&asset);
+    player.setClip(info);
+    track.clips.push_back(std::move(player));
+    auto node = std::make_unique<daw::host::ProxyNode>("inst", ring.get(), &missed);
+    daw::host::ScheduledNote n;
+    n.pitch = 60; n.velocity = 100; n.start = 10; n.end = 4000;
+    node->setNotes({n});
+    track.instrument_node = node.get();
+    track.chain.push_back(std::move(node));
+    graph.addTrack(std::move(track));
+    graph.prepare(48000, kBlock);
+
+    std::vector<float> out(kBlock * 2, 1.0f);
+    daw::host::MidiEvent ev;
+
+    // ARRETE : sortie nulle, aucune note emise
+    graph.setTransportPlaying(false);
+    graph.process(out.data(), kBlock, 0);
+    for (float s : out) {
+        if (s != 0.0f) {
+            std::cout << "FAILED: clip rendu transport arrete (" << s << ")\n";
+            return false;
+        }
+    }
+    if (daw::host::popMidiEvent(ring.get(), ev)) {
+        std::cout << "FAILED: note de timeline emise transport arrete\n";
+        return false;
+    }
+
+    // EN LECTURE : le meme bloc rend le clip et emet la note. Le proxy
+    // (sans enfant) sert le bloc N-1 en DRY : on traite deux blocs et on
+    // juge le second (le premier restitue le silence du bloc arrete).
+    graph.setTransportPlaying(true);
+    graph.process(out.data(), kBlock, 0);
+    if (!daw::host::popMidiEvent(ring.get(), ev) ||
+        ev.kind != daw::host::MidiKind::NoteOn || ev.data1 != 60 ||
+        ev.sample_offset != 10) {
+        std::cout << "FAILED: note de timeline absente en lecture\n";
+        return false;
+    }
+    graph.process(out.data(), kBlock, kBlock);
+    bool nonzero = false;
+    for (float s : out) nonzero = nonzero || s != 0.0f;
+    if (!nonzero) {
+        std::cout << "FAILED: clip muet en lecture\n";
+        return false;
+    }
+    std::cout << "OK (arrete = clips muets + notes supprimees ; lecture = inchangee)\n";
+    return true;
+}
+
+// Vague 3 etape 1 : le parseur des messages MIDI courts (format WinMM
+// dwParam1 : statut, data1, data2). Pur, sans materiel.
+bool testMidiShortParse() {
+    std::cout << "Test: MIDI short message parse... ";
+    using daw::host::MidiKind;
+    auto packed = [](uint8_t s, uint8_t d1, uint8_t d2) {
+        return uint32_t(s) | (uint32_t(d1) << 8) | (uint32_t(d2) << 16);
+    };
+    const struct {
+        uint32_t word; bool ok; MidiKind kind; uint8_t ch, d1, d2; const char* what;
+    } cases[] = {
+        {packed(0x90, 60, 100), true, MidiKind::NoteOn, 0, 60, 100, "note-on ch0"},
+        {packed(0x93, 60, 0), true, MidiKind::NoteOff, 3, 60, 0, "note-on vel 0 = note-off ch3"},
+        {packed(0x81, 61, 40), true, MidiKind::NoteOff, 1, 61, 40, "note-off ch1"},
+        {packed(0xB0, 64, 127), true, MidiKind::ControlChange, 0, 64, 127, "CC64 sustain"},
+        {packed(0xE2, 0, 64), true, MidiKind::PitchBend, 2, 0, 64, "pitch-bend centre ch2"},
+        {packed(0xF8, 0, 0), false, MidiKind::NoteOff, 0, 0, 0, "horloge 0xF8 refusee"},
+        {packed(0xFE, 0, 0), false, MidiKind::NoteOff, 0, 0, 0, "active sensing refuse"},
+        {packed(0xA0, 60, 10), false, MidiKind::NoteOff, 0, 0, 0, "poly aftertouch refuse"},
+        {packed(0xC0, 5, 0), false, MidiKind::NoteOff, 0, 0, 0, "program change refuse"},
+    };
+    for (const auto& c : cases) {
+        daw::host::MidiEvent ev;
+        const bool ok = daw::midi::parseMidiShort(c.word, ev);
+        if (ok != c.ok) {
+            std::cout << "FAILED: " << c.what << " (ok=" << ok << ")\n";
+            return false;
+        }
+        if (ok && (ev.kind != c.kind || ev.channel != c.ch || ev.data1 != c.d1 ||
+                   ev.data2 != c.d2 || ev.sample_offset != 0)) {
+            std::cout << "FAILED: " << c.what << " decode faux\n";
+            return false;
+        }
+    }
+    std::cout << "OK (5 acceptes exacts, 4 refuses)\n";
+    return true;
+}
+
+// Vague 3 etape 2 : la file SPSC + le drain du callback (plafond par
+// sous-bloc, ordre, latence de file last/max, compteur drained).
+bool testLiveMidiDrain() {
+    std::cout << "Test: live MIDI queue drain... ";
+    daw::midi::LiveMidiQueue q;
+    daw::midi::LiveMidiStats st;
+    const int64_t now = 1'000'000'000;  // 1 s
+    for (uint32_t i = 0; i < 70; ++i) {
+        daw::midi::LiveMidiEvent e;
+        e.ev.kind = daw::host::MidiKind::NoteOn;
+        e.ev.data1 = static_cast<uint8_t>(i);
+        e.ev.data2 = 100;
+        e.t_push_ns = now - 1'000'000 * static_cast<int64_t>(70 - i);  // le 1er = 70 ms, le dernier = 1 ms
+        if (!q.push(e)) {
+            std::cout << "FAILED: push refuse a " << i << "\n";
+            return false;
+        }
+    }
+    daw::host::MidiEvent out[daw::midi::kLiveMidiMaxPerBlock];
+    uint32_t n = daw::midi::drainLiveMidi(q, &st, now, out, daw::midi::kLiveMidiMaxPerBlock);
+    if (n != 64 || out[0].data1 != 0 || out[63].data1 != 63) {
+        std::cout << "FAILED: premier drain n=" << n << "\n";
+        return false;
+    }
+    // Latence : le dernier draine (i=63) a 7 ms, le pire (i=0) 70 ms
+    if (st.lat_last_ns.load() != 7'000'000 || st.lat_max_ns.load() != 70'000'000) {
+        std::cout << "FAILED: latence last=" << st.lat_last_ns.load()
+                  << " max=" << st.lat_max_ns.load() << "\n";
+        return false;
+    }
+    n = daw::midi::drainLiveMidi(q, &st, now, out, daw::midi::kLiveMidiMaxPerBlock);
+    if (n != 6 || out[0].data1 != 64 || st.drained.load() != 70 ||
+        st.lat_last_ns.load() != 1'000'000) {
+        std::cout << "FAILED: second drain n=" << n << " drained=" << st.drained.load() << "\n";
+        return false;
+    }
+    if (daw::midi::drainLiveMidi(q, &st, now, out, 64) != 0) {
+        std::cout << "FAILED: file vide qui rend encore\n";
+        return false;
+    }
+    std::cout << "OK (64 puis 6, ordre FIFO, latence last 7 ms / max 70 ms)\n";
+    return true;
+}
+
+// Vague 3 etape 3 : le routage graphe -> instrument de la piste cible, a
+// offset 0 ; piste muette = rien de route + UN all-notes-off a la
+// transition (aucune note bloquee) ; un-mute = route a nouveau.
+bool testLiveMidiRouting() {
+    std::cout << "Test: live MIDI routing to instrument... ";
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    using daw::host::MidiKind;
+    auto ring = std::make_unique<daw::host::SharedAudioRing>();
+    std::memset(static_cast<void*>(ring.get()), 0,
+                sizeof(daw::host::SharedAudioRing));
+    std::atomic<uint64_t> missed{0};
+
+    daw::graph::AudioGraph graph;
+    graph.setSampleRate(48000);
+    daw::graph::AudioTrack track;
+    track.id = "synth";
+    track.name = "synth";
+    auto node = std::make_unique<daw::host::ProxyNode>("inst", ring.get(), &missed);
+    track.instrument_node = node.get();
+    track.chain.push_back(std::move(node));
+    graph.addTrack(std::move(track));
+    graph.prepare(48000, kBlock);
+    graph.setTransportPlaying(false);  // monitoring : transport arrete
+    daw::midi::LiveMidiStats st;
+    std::vector<float> out(kBlock * 2);
+
+    if (graph.liveMidiArmed()) {
+        std::cout << "FAILED: arme sans cible\n";
+        return false;
+    }
+    graph.setLiveMidiTrack(0);
+    if (!graph.liveMidiArmed()) {
+        std::cout << "FAILED: pas arme avec une cible\n";
+        return false;
+    }
+
+    // 3 evenements (NoteOn, CC64, PitchBend) avec des offsets fantaisistes
+    // -> routes dans l'ordre, a offset 0, canal conserve
+    daw::host::MidiEvent in[3];
+    in[0] = {MidiKind::NoteOn, 0, 60, 100, 99};
+    in[1] = {MidiKind::ControlChange, 1, 64, 127, 5};
+    in[2] = {MidiKind::PitchBend, 2, 0, 64, 200};
+    graph.setLiveMidi(in, 3, &st);
+    graph.process(out.data(), kBlock, 0);
+    daw::host::MidiEvent got;
+    for (int i = 0; i < 3; ++i) {
+        if (!daw::host::popMidiEvent(ring.get(), got) || got.kind != in[i].kind ||
+            got.channel != in[i].channel || got.data1 != in[i].data1 ||
+            got.data2 != in[i].data2 || got.sample_offset != 0) {
+            std::cout << "FAILED: evenement " << i << " mal route\n";
+            return false;
+        }
+    }
+    if (daw::host::popMidiEvent(ring.get(), got) || st.forwarded.load() != 3) {
+        std::cout << "FAILED: surplus ou forwarded=" << st.forwarded.load() << "\n";
+        return false;
+    }
+
+    // Bloc sans evenement : rien
+    graph.setLiveMidi(in, 0, &st);
+    graph.process(out.data(), kBlock, 0);
+    if (daw::host::popMidiEvent(ring.get(), got)) {
+        std::cout << "FAILED: evenement fantome sur bloc vide\n";
+        return false;
+    }
+
+    // Mute : la NoteOn n'est PAS routee (unrouted), et la transition
+    // emet exactement 128 NoteOff (aucune NoteOn)
+    graph.getTrack(0)->mute.store(true, std::memory_order_relaxed);
+    in[0] = {MidiKind::NoteOn, 0, 62, 100, 0};
+    graph.setLiveMidi(in, 1, &st);
+    graph.process(out.data(), kBlock, 0);
+    uint32_t offs = 0, ons = 0;
+    while (daw::host::popMidiEvent(ring.get(), got)) {
+        if (got.kind == MidiKind::NoteOff) ++offs;
+        else ++ons;
+    }
+    if (offs != 128 || ons != 0 || st.unrouted.load() != 1) {
+        std::cout << "FAILED: mute -> offs=" << offs << " ons=" << ons
+                  << " unrouted=" << st.unrouted.load() << "\n";
+        return false;
+    }
+    // Un second bloc mute : pas de nouvel all-notes-off (une seule transition)
+    graph.setLiveMidi(in, 0, &st);
+    graph.process(out.data(), kBlock, 0);
+    if (daw::host::popMidiEvent(ring.get(), got)) {
+        std::cout << "FAILED: all-notes-off repete\n";
+        return false;
+    }
+
+    // Un-mute : route a nouveau
+    graph.getTrack(0)->mute.store(false, std::memory_order_relaxed);
+    graph.setLiveMidi(in, 1, &st);
+    graph.process(out.data(), kBlock, 0);
+    if (!daw::host::popMidiEvent(ring.get(), got) || got.kind != MidiKind::NoteOn ||
+        got.data1 != 62 || st.forwarded.load() != 4) {
+        std::cout << "FAILED: un-mute -> pas route\n";
+        return false;
+    }
+    std::cout << "OK (3 routes a offset 0, mute = 128 note-off une fois, un-mute = route)\n";
+    return true;
+}
+
 // A3-2 (contrat de periode) : la profondeur proxy est ceil(period/256)
 // et le ring la REFUSE au-dela de kRingSlots-2 - plus aucun clamp.
 bool testProxyDepthContract() {
@@ -4726,6 +4995,10 @@ int main(int argc, char* argv[]) {
     run(testMidiEventQueue);       // v11 : FIFO MIDI generique (note/CC/bend)
     run(testProxyDepthContract);   // A3-2 : refus au-dela de kRingSlots-2
     run(testDevicePeriodRefusal);  // A3-3 : periode non multiple de 256 = refus
+    run(testStoppedTimelineSilent); // Vague 3 etape 0 : transport arrete = timeline muette
+    run(testMidiShortParse);        // Vague 3 etape 1 : parseur MIDI court
+    run(testLiveMidiDrain);         // Vague 3 etape 2 : file SPSC + drain
+    run(testLiveMidiRouting);       // Vague 3 etape 3 : routage vers l'instrument
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);

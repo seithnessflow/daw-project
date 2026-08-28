@@ -16,6 +16,7 @@
 #include "automation.h"             // A2 : enveloppes (evaluation pure)
 #include "stage_probe.h"            // preuve audio par etage (offline)
 #include "../host/midi_schedule.h"  // F5 : ScheduledNote pour les slots Session
+#include "../midi/live_midi.h"      // Vague 3 : MidiEvent + stats du MIDI live
 
 #include <atomic>
 #include <memory>
@@ -240,6 +241,45 @@ public:
     }
 
     /**
+     * Vague 3 etape 0 : le graphe SAIT si le transport joue. Quand le
+     * callback le traite a l'ARRET (slot de session lance, MIDI live arme),
+     * les clips de timeline se taisent et les notes de timeline ne sont pas
+     * emises - sinon une piste non lancee rejouerait le meme bloc a
+     * l'infini (position gelee). Thread audio seul (mold session_clock) ;
+     * defaut true : le rendu offline et les tests existants sont inchanges.
+     */
+    void setTransportPlaying(bool playing) noexcept { transport_playing_ = playing; }
+
+    // ---- Vague 3 : MIDI live -> instrument de la piste cible ---------------
+    /**
+     * Piste cible du MIDI live (index, -1 = aucune). Control thread
+     * (resolution a chaque build : --midi-track ou premiere piste avec
+     * instrument), lu par process(). Arme = le callback traite le graphe
+     * meme transport a l'arret (monitoring), comme un slot lance.
+     */
+    void setLiveMidiTrack(int32_t index) noexcept {
+        live_midi_track_.store(index, std::memory_order_relaxed);
+    }
+    [[nodiscard]] bool liveMidiArmed() const noexcept {
+        return live_midi_track_.load(std::memory_order_relaxed) >= 0;
+    }
+    /**
+     * Les evenements draines par le callback pour CE sous-bloc (thread
+     * audio seul, pointeur + compte : le tableau appartient au contexte du
+     * callback, pas au graphe qui se reconstruit sans arret). process() les
+     * route a offset 0 vers l'instrument de la piste cible si elle est
+     * audible (non mute, solo-coherente), sinon les compte unrouted ; une
+     * transition route -> non-route emet UN all-notes-off (jamais de note
+     * bloquee derriere un mute).
+     */
+    void setLiveMidi(const daw::host::MidiEvent* events, uint32_t count,
+                     daw::midi::LiveMidiStats* stats) noexcept {
+        live_midi_events_ = events;
+        live_midi_count_ = count;
+        live_midi_stats_ = stats;
+    }
+
+    /**
      * A2 : lanes d'automation du MASTER (racine du doc). A poser AVANT
      * l'activation (buildGraph) - immuables ensuite, lues par le thread
      * audio dans process() (application du master gain).
@@ -399,6 +439,16 @@ private:
     // pour que la promotion arrive meme transport a l'arret).
     std::atomic<int64_t> session_clock_{0};
     std::atomic<int32_t> launched_count_{0};
+    // Etape 0 : transport en lecture ? (thread audio seul, pas atomique)
+    bool transport_playing_ = true;
+    // Vague 3 : cible du MIDI live (control -> audio) + staging du sous-bloc
+    // (thread audio seul) + memoire de routage pour l'all-notes-off.
+    std::atomic<int32_t> live_midi_track_{-1};
+    const daw::host::MidiEvent* live_midi_events_ = nullptr;
+    uint32_t live_midi_count_ = 0;
+    daw::midi::LiveMidiStats* live_midi_stats_ = nullptr;
+    bool live_midi_prev_routed_ = false;
+    ProcessorNode* live_midi_prev_inst_ = nullptr;
     // F5+ : epoque du quantum (horloge au lancement de l'ANCRE - le 1er slot
     // parti quand rien ne jouait) et quantum (loop_len de l'ancre). Remis a
     // zero implicitement : reposes au prochain lancement d'ancre.

@@ -12,6 +12,10 @@
 #include <cstdint>
 #include <string>
 
+// Vague 3 : l'evenement MIDI generique du ring (host/shared_audio_ring.h).
+// Forward-declare seulement : le graphe ne tire pas le segment partage.
+namespace daw::host { struct MidiEvent; }
+
 namespace daw::graph {
 
 /**
@@ -118,6 +122,10 @@ public:
     /** Coupe toutes les notes en cours (note-off 0..127 au sample 0). Appele
      *  a la transition de launch pour ne laisser aucune note bloquee. */
     virtual void allNotesOff() noexcept {}
+    /** Vague 3 : un evenement MIDI GENERIQUE (note, CC, pitch-bend, canal
+     *  du fil) pour le bloc courant - l'entree live passe par la. AUDIO
+     *  THREAD (appele par AudioGraph::process). Defaut no-op. */
+    virtual void emitMidiEvent(const daw::host::MidiEvent& /*ev*/) noexcept {}
 };
 
 }  // namespace daw::graph

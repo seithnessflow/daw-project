@@ -10,7 +10,8 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun (ring v11 vert en CI, 2026-08-28 soir).
+- Verdict CI du push « Vague 3 session A » (voir REPRISE.md) — a lever
+  avant de coder.
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
@@ -22,14 +23,18 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
    contrat de periode est CLOS (2026-08-28 : ring v10 + refus de demarrer
    hors contrat + FIFO MIDI generique v11 note/CC/pitch-bend, CC/PB
    traduits par l'enfant via IMidiMapping) : le rail est pose.
-   PREMIER MAILLON, le plus bete et le plus prouvable : **MIDI-in moteur
-   (clavier USB sur la tour, WinMM) -> pushMidiEvent sur le ring de
-   l'instrument de tete de chaine de la piste ARMEE -> note entendue,
-   latence mesuree en exclusif 256 (< 20 ms vise)**. Pas de Web MIDI ni
-   de piano-roll d'abord. Prealable a resoudre au cadrage : le ring n'a
-   qu'UN producteur (ProxyNode, thread audio) — l'entree live doit
-   passer par le thread audio (file SPSC MIDI-in -> callback ->
-   ProxyNode::emitMidi), jamais un second ecrivain sur le ring.
+   PREMIER MAILLON (plan `.claude/plans/mellow-orbiting-aurora.md`) :
+   **session A LIVREE 2026-08-28** — file SPSC -> callback (drain par
+   sous-bloc) -> `AudioGraph::setLiveMidi` -> instrument de la piste
+   cible, gate monitoring a l'arret, 4 tests, 59/59, specs 25/25.
+   **Session B (suivante)** : port WinMM (`midi/midi_input_winmm.cpp`,
+   stub Linux), CLI `--list-midi-devices` / `--midi-in <nom>` /
+   `--midi-track <id>` (cible auto = premiere piste avec instrument),
+   contrats de log `midi-in: opened ...` et `midi-in stats: ...
+   queue-lat ... pipeline~...`, outil `engine/tools/midi_send.cpp`,
+   spec `midi-in.spec.ts` (skip si port « MagicPotion » absent, mda DX10),
+   manip audible sur Dexed en exclusif 256. PREALABLE UTILISATEUR :
+   creer le port loopMIDI « MagicPotion » (10 s).
    Ensuite : Web MIDI ; preuve du chemin CC64/pitch-bend sur un vrai
    synthe (Dexed/Surge : IMidiMapping) ; notes en MAP a ids stables
    (ecart SCHEMA-V2 §4 vs la LISTE implementee — champ additif) ;
@@ -177,6 +182,14 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   pas de fallback « parametre devine ». Le chemin IMidiMapping n'est
   prouve par aucun test (AGain ne declare rien) — preuve au premier vrai
   synthe (Vague 3).
+- MIDI live (session A) : placement sample-exact des evenements par
+  timestamp (v1 = offset 0, gigue <= un sous-bloc de 5,3 ms) ;
+  changement de piste cible a travers un rebuild sans all-notes-off (le
+  nouveau graphe ne connait pas l'ancien instrument) ; sysex non livre
+  (pas de `midiInPrepareHeader`) ; canal du fil conserve jusqu'au ring
+  (a verifier sur un synthe multi-timbral) ; telemetrie EngineState
+  `midi_in_*` (champs 11-13) et commande `SetMidiTarget` (tag 16) =
+  apres la session B.
 - Morts silencieuses 0xc0000409 en run audible (~2 h) : instrumentees
   (crash handler), pas reproduites depuis.
 
