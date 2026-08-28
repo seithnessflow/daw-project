@@ -24,7 +24,7 @@ import { ctx, els, sendLastChange } from './context';
 import { updateInsertMarker, refreshOverview, updateGridVars } from './navigation';
 import { refreshPalette } from './placement';
 import { renderPresence } from './presence_view';
-import { renderPianoRoll } from '../ui/piano_roll';
+import { renderPianoRoll, pianoRollGestureActive } from '../ui/piano_roll';
 import { renderSession } from '../ui/session';
 import { renderMixer } from '../ui/mixer';
 import { renderAutomationLanes } from '../ui/automation_lane';
@@ -199,6 +199,10 @@ export function renderTracks(force = false): void {
   // piste ; premiere ouverture = centre sur C4, ou l'on pose ses notes).
   const rackScrollKey = selectedTrack ? `rack:${selectedTrack.id}` : '';
   if (rackScrollKey) rackScroll.set(rackScrollKey, els.deviceViewSlot.scrollTop);
+  // Un geste est en cours dans le piano-roll : le rack reste tel quel (un
+  // echo reseau qui reconstruisait la grille tuait le glisser sous la
+  // souris) ; le re-rendu vient en fin de geste (onChange).
+  if (pianoRollGestureActive()) { finishRender(); return; }
   els.deviceViewSlot.innerHTML = '';
   els.deviceViewSlot.appendChild(createDeviceView(
     selectedTrack,
@@ -267,6 +271,12 @@ export function renderTracks(force = false): void {
     }
   }
 
+  finishRender();
+}
+
+/** La fin d'un rendu (tout ce qui suit le rack) - aussi quand le rack
+ *  est laisse en place pendant un geste du piano-roll. */
+function finishRender(): void {
   // Waveforms inside the freshly built clips (cached peaks draw
   // synchronously; new assets stream in from the store)
   fillWaveforms(els.tracks);

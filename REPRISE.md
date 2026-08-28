@@ -7,11 +7,16 @@ sur le dernier push de la session (« gestes du piano-roll », `git log
 -1`) ; `gh run list --limit 3`. L'avant-dernier push de code (8c53698,
 notes a ids stables) est VERT (run 33188483347).
 
-- **Les gestes du piano-roll** : glisser une note = la deplacer (temps
-  + hauteur), tirer son bord droit = longueur, Alt+glisser ou molette =
-  velocite (intensite de la case), un geste = un undo, adresse occupee
-  refusee et montree, clic sur la queue = enlever ; le rack garde son
-  scroll et s'ouvre centre sur C4. Spec `piano-roll-gestures.spec.ts`.
+- **Le piano-roll en modele de selection** (retour utilisateur « je peux
+  pas deplacer ni selectionner » : la v1 effacait la note au clic) :
+  clic = selectionner, lasso depuis une case vide, glisser = deplacer le
+  lot (temps + hauteur), bord droit = longueur, Alt+glisser ou molette =
+  velocite (intensite de la case), Suppr = effacer, Echap, Ctrl+A ; un
+  geste = un undo ; adresse occupee refusee et montree ; le rack ne se
+  reconstruit pas pendant un geste et garde son scroll (ouvert centre
+  sur C4). Spec `piano-roll-gestures.spec.ts` (glisser lent compris).
+- **Demande utilisateur a suivre** : la meme selection multiple + lasso
+  + Ctrl+D sur les CLIPS de l'arrangement (« comme dans Ableton »).
 - **Notes a ids stables** : `NoteDef.id` additif, `updateNote(track,
   clip, id, patch)` undoable — le socle de la velocite editable et du
   deplacement des notes ; spec 2 onglets en concurrence verte.

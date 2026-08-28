@@ -68,3 +68,18 @@
   padding: 5px 0 0 34px; min-height: 14px; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ---- Selection (2026-08-28) : notes selectionnees, lasso --------- */
+.pr-grid { position: relative; outline: none; }
+.pr-cell.pr-sel {
+  box-shadow: inset 0 0 0 1px #fff, inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+  filter: brightness(1.15);
+}
+.pr-cell.pr-sel.pr-tail { box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 #fff; }
+.pr-grid:focus-within .pr-cell.pr-sel, .pr-grid:focus .pr-cell.pr-sel { filter: brightness(1.25); }
+.pr-lasso {
+  position: absolute; pointer-events: none; z-index: 2;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(157, 137, 255, 0.18);
+}
+.pr-grid.pr-dragging[data-mode="lasso"] .pr-cell { cursor: crosshair; }

@@ -2061,3 +2061,30 @@ mon script de capture glissait une cellule HORS VUE (boundingBox sans
 scroll) — un premier glisser « rate » qui etait l'artefact, pas le
 geste. Critique au passage : 100 vs 60 de velocite se distinguent
 peu a l'oeil (30 oui) — a revoir si une lane de velocite arrive.
+
+**2026-08-28 (nuit, suite — le piano-roll en modele de selection) :**
+retour utilisateur sur l'onglet ouvert : « je peux pas deplacer les
+notes ni les selectionner (a la souris) ». Diagnostic : la v1 des
+gestes faisait du clic sur une note un TOGGLE (effacer) — le geste
+naturel « cliquer pour selectionner puis glisser » supprimait la note ;
+et il n'existait aucune selection. Hypothese secondaire testee par une
+sonde (MutationObserver pendant un glisser lent de 800 ms) : un echo
+reseau qui reconstruirait le rack sous la souris — NON reproduit (zero
+re-rendu pendant le geste) ; la garde `pianoRollGestureActive()` dans
+render.ts reste, elle est correcte et gratuite (un re-rendu concurrent
+pendant un geste tuerait la capture du pointeur). Livre : modele de
+selection comme tout DAW — clic sur une note = la selectionner
+(Shift/Ctrl = ajouter/retirer), LASSO depuis une case vide (rectangle
+visible, notes touchees), glisser = deplacer TOUT le lot d'un meme delta
+borne a la grille (refus + flash si une adresse cible est tenue par une
+note hors selection), bord droit = longueur du lot, Alt+glisser /
+molette = velocite du lot, Suppr/Retour = effacer le lot (un undo),
+Echap, Ctrl+A ; clic sur une case vide = poser une note selectionnee.
+La selection survit aux re-rendus (map par clip) et lache les ids
+disparus. Spec reecrite (glisser LENT de 600 ms avec waitForTimeout
+ASSUME — c'est la duree d'un vrai geste, pas un masque de race —, lasso
+-> 2 notes -> deplacement du lot -> un seul Ctrl+Z rend les deux, Suppr
+-> un undo rend les deux, Echap). 8 specs voisines vertes, tsc 0, CI
+verte sur e88fbfd (gestes v1). Demande utilisateur consignee en tete de
+vague : la meme selection + lasso + Ctrl+D sur les CLIPS de
+l'arrangement (« comme dans Ableton »).
