@@ -3,9 +3,9 @@
 *Un seul proprietaire par information : ce fichier possede l'etat
 (invariant, criteres, composants, perf, commandes). Le recit date vit
 dans JOURNAL.md, la file dans TODO.md, les hashes/mesures/decisions dans
-docs/DECISIONS.md. Derniere mise a jour : 2026-08-28 (rangement
-documentaire ; etat technique = cloture du 2026-08-27 soir, lot T tempo +
-lot A6 + lot P). Version narrative precedente :
+docs/DECISIONS.md. Derniere mise a jour : 2026-08-28 (ring v10 livre :
+kRingSlots 8 + estampilles par slot A4-5, gtests 52/52, specs proxy 8/8 ;
+rangement documentaire le meme jour). Version narrative precedente :
 docs/archive/STATUS-integral-2026-08-27.md.*
 
 ## L'INVARIANT PRODUIT (ADR-019)
@@ -35,7 +35,7 @@ Les deux autres piliers distribues :
 | # | Critere | Statut | Ou est la preuve |
 |---|---|---|---|
 | 1 | Rendu deterministe | ✅ | DEUX ancres : absolu `56729beb61993cd7` (inchange par toute la migration tempo) + musical `c1233ae9d6ab9e83` (T5), assertes dans `daw_engine_test` ET `ci.yml` (jumeaux), MSVC + GCC. Historique : docs/DECISIONS.md |
-| 2 | Test CLI sans navigateur | ✅ | `daw_engine_test.exe` 51/51 (2026-08-27) |
+| 2 | Test CLI sans navigateur | ✅ | `daw_engine_test.exe` 52/52 (2026-08-28) |
 | 3 | Convergence — redefini ADR-019 : DEUX machines, deux reseaux, un projet | ⚠️ PARTIEL | Sous-ensemble 2 onglets : ✅ reserve levee 2026-08-23 (trio deps-manquantes A4-1/2/3 solde, heartbeat, graine commune, gardes Rust 2 + sync-resilience.spec). Deux machines : convergence doc OBSERVEE au smoke 1bis (2026-08-23, les deux sens, niveau document) + S7 + L1b tenus. Le deroule E2E formel du critere redefini (item TODO) n'a pas eu lieu comme tel |
 | 4 | Acces moteur local depuis une origine HTTPS publique (Chrome LNA) | ✅ | SCEAU 2026-08-23 sur le vrai Chrome 151/Windows 11 (invite apparue et autorisee, fetch ET WS soumis au LNA, `permissions.query` lisible, AUTH OK + telemetrie). Inconnus dates et details de campagne : docs/DECISIONS.md « Critere 4 » |
 | 5 | WASAPI sans underrun | ⚠️ PARTIEL | 10 min sans charge (2026-08-20, ZenGo 48k/512) ✅ ; SOUS CHARGE 28 threads : 0 underrun sur 30 s en partage 512 ET en exclusif 256 (Lot P, `scripts/perf-underruns.ps1`, 2026-08-27). Les 10 min sous charge ne sont pas refaites — procedure ci-dessous |
@@ -45,7 +45,7 @@ Les deux autres piliers distribues :
 
 | Composant | Build | Tests | Ce qu'il sait faire |
 |---|---|---|---|
-| Engine C++ (MSVC local, GCC CI) | ✅ | gtests **51/51** (2 hashes ancres) ; CI verte jusqu'a 99190f4 | WASAPI partage/**exclusif** (`--exclusive --buffer-size`, 16 ms a 256), blocs internes 256, contrat de periode MESURE (multiples de 256 = callbacks fixes, WARNING si partiel), hote VST3 hors processus (ring v9, cold-restart, GUI a la demande TOPMOST, scan `--vst3-dir` cache), 5 natifs (utility/eq3/comp/drive/delay), stems + etat de plugin au store, PDC ecrivain (lecteur de stem avance de la latence declaree), rendu offline deterministe + `--probe` par etage, export sur thread ouvrier, MIDI note-on/off sample-accurate, Session (launch quantise, horloge libre), automation gain/pan/master (miroir exact du TS), noyau tempo entier `tempo.h` == `tempo.ts`, `resolveMusicalTime` = point d'etranglement, bascule de projet (SwitchProject), crash handler auto-symbolisant, `timeBeginPeriod(1)` |
+| Engine C++ (MSVC local, GCC CI) | ✅ | gtests **52/52** (2 hashes ancres) ; CI verte jusqu'a 99190f4, verdict ring v10 en vol | WASAPI partage/**exclusif** (`--exclusive --buffer-size`, 16 ms a 256, `--buffer-size` arrondi bruyamment au multiple de 256), blocs internes 256, contrat de periode MESURE (multiples de 256 = callbacks fixes, WARNING si partiel), hote VST3 hors processus (**ring v10** : 8 slots = depth <= 6, estampilles par slot — un slot perime ou une entree dechiree = DRY + compte, jamais un wet menteur ; clamp de profondeur bruyant ; cold-restart, GUI a la demande TOPMOST, scan `--vst3-dir` cache), 5 natifs (utility/eq3/comp/drive/delay), stems + etat de plugin au store, PDC ecrivain (lecteur de stem avance de la latence declaree), rendu offline deterministe + `--probe` par etage, export sur thread ouvrier, MIDI note-on/off sample-accurate, Session (launch quantise, horloge libre), automation gain/pan/master (miroir exact du TS), noyau tempo entier `tempo.h` == `tempo.ts`, `resolveMusicalTime` = point d'etranglement, bascule de projet (SwitchProject), crash handler auto-symbolisant, `timeBeginPeriod(1)` |
 | Server Rust | ✅ | cargo **9/9** | Persistance `.am` atomique par projet, refus bruyant des deps manquantes, heartbeat 15 s, relais `signal:` verbatim, store SHA-256 verifie au PUT, auth OPT-IN par token partage (`DAW_SERVER_TOKEN`, premier message WS + Bearer, temps constant), Origin local-first |
 | Web TypeScript | ✅ tsc 0 | e2e **99/99** (49 specs, moteur reel spawne sur les chemins critiques) | Etabli 3 colonnes + rack en bas (splitters persistes), paradigmes Arrangement/Session/Mixage, pistes typees audio/MIDI, clips (move/trim/split/fades/rename/duplicate/drag entre pistes), boucle utilisateur, undo par inverses, automation dessinee, piano-roll (ticks), tempo topbar + badge ♪ musical/absolu, navigateur instruments/effets/samples (catalogue 91 classes, drag & drop, pre-ecoute), import universel (mp3/flac/ogg -> WAV au taux du projet), export mixdown, gardes d'onglet (version, projet), jam P2P + badge, SYNC transport + horloge de session, VU avec ballistique |
 

@@ -8,41 +8,47 @@ SUPPRIME d'ici. Historique integral des files precedentes (avec tous les
 Reference des trouvailles : docs/audits/ (A3-x = AUDIT-3, A4-x = AUDIT-4,
 A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
-## 0. En cours / point de synchro
+## 0. Point de synchro
 
-- **Ring v10 NON COMMITE** (arbre de travail, 7 fichiers, ~175 lignes) :
-  kRingSlots 4 -> 8, estampilles PAR SLOT in/out (A4-5), invariant
-  input-dechire grave dans `shared_audio_ring.h`, clamp de profondeur
-  bruyant dans main.cpp, gtest ajoute. A VERIFIER (clean build — layout
-  de struct partagee — + gtests + spec proxy) puis commit. C'est
-  l'item 2 de l'ordre grave, entame.
+- Verdict CI du push ring v10 (voir REPRISE.md) — a lever avant de coder.
 
-## 1. ORDRE GRAVE (arbitrage utilisateur, cloture 2026-08-27 soir)
+## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
+## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
 
-1. **Reliquat spike latence** : mesure LAN 2 machines (tour <-> portable
-   TX15), courte ; confirme le terme reseau (~1-5 ms attendu, ne change
-   pas le verdict de docs/SPIKE-LATENCE.md).
-2. **Contrat de periode — fin** (A3-2 + A3-3 + A4-5, session ring
-   elargie) : kRingSlots=8 + seq par slot (en cours, item 0) ; refus de
-   demarrer hors contrat (periode non multiple de 256 ou depth >
-   supportee) au lieu du WARNING seul ; puis la **file d'ordres
-   GENERIQUE** (A3-1 : evenements `{type, id, value}` — param aujourd'hui,
-   note/CC demain) pour que l'entree MIDI live s'y branche sans re-bump
-   de layout.
-3. **T4 — Link Etage 2** (grille au quantum musical, rejoin aligne) :
+1. **Contrat de periode — reste** (A3-2 + A3-3) : le ring v10
+   (kRingSlots=8, estampilles par slot A4-5, invariant input-dechire,
+   clamp bruyant) est LIVRE 2026-08-28. Reste : refus de DEMARRER hors
+   contrat (periode non multiple de 256 apres negociation, ou depth >
+   kRingSlots-2) au lieu du WARNING + clamp ; puis la **file d'ordres
+   GENERIQUE** (A3-1 : evenements `{type, id, value}` — param
+   aujourd'hui, note/CC demain) pour que l'entree MIDI live s'y branche
+   sans re-bump de layout. Menage au passage : `rebuild_msvc.bat` ne
+   construit pas `create_test_doc` (les specs en dependent — un clean
+   build les fait tomber, vu 2026-08-28).
+2. **VAGUE 3 — MIDI + instruments AVEC l'entree LIVE dedans** (sequence
+   ratifiee 2026-08-27, docs/REVUE-EXTERNE-2026-08-27.md ; passee devant
+   T4 le 2026-08-28 : le spike a montre que la grille inter-machines sert
+   un usage qui n'existe pas encore, l'entree live fait le DAW).
+   PREMIER MAILLON, le plus bete et le plus prouvable : **MIDI-in moteur
+   (clavier USB sur la tour) -> file d'ordres -> instrument de tete de
+   chaine -> note entendue, latence mesuree en exclusif 256 (< 20 ms
+   vise)**. Pas de Web MIDI, pas de CC64, pas de piano-roll d'abord.
+   Ensuite : Web MIDI ; CC64/pitch-bend/canal dans le ring (§5) ; notes
+   en MAP a ids stables (ecart SCHEMA-V2 §4 vs la LISTE implementee —
+   champ additif) ; velocite/longueur/deplacement des notes editables
+   (§5) ; piano-roll musical ; ProcessContext rempli pour les VST3
+   (tempo/position/play-state, §6). Le **test Massive** (clavier du
+   portable -> synthe sur la tour) tombe EN DEMONSTRATION de fin de
+   vague, dans la forme tranchee par le spike : MIDI LAN -> rendu tour
+   en exclusif 256 -> enceintes de la piece ; le retour vers le portable
+   est du monitoring differe, pas du jeu.
+3. **Reliquat spike latence** : mesure LAN 2 machines (tour <-> portable
+   TX15), dix minutes quand le portable est allume ; confirme le terme
+   reseau (~1-5 ms attendu, ne change pas le verdict de
+   docs/SPIKE-LATENCE.md). Ne bloque rien — se glisse ou il peut.
+4. **T4 — Link Etage 2** (grille au quantum musical, rejoin aligne) :
    session dediee A PROPOSER (cadrage docs/LINK-DESIGN.md §3, le tempo
-   existe desormais).
-4. **VAGUE 3 — MIDI + instruments AVEC l'entree LIVE dedans** (sequence
-   ratifiee 2026-08-27, docs/REVUE-EXTERNE-2026-08-27.md) :
-   MIDI-in moteur (WinMM/RtMidi) + Web MIDI ; CC64/pitch-bend/canal dans
-   le ring (§5) ; notes en MAP a ids stables (ecart SCHEMA-V2 §4 vs la
-   LISTE implementee — champ additif) ; velocite/longueur/deplacement
-   des notes editables (§5) ; piano-roll musical ; ProcessContext rempli
-   pour les VST3 (tempo/position/play-state, §6). Le **test Massive**
-   (clavier du portable -> synthe sur la tour) tombe EN DEMONSTRATION de
-   fin de vague, dans la forme tranchee par le spike : MIDI LAN -> rendu
-   tour en exclusif 256 -> enceintes de la piece ; le retour vers le
-   portable est du monitoring differe, pas du jeu.
+   existe desormais). Recule derriere la Vague 3.
 5. **La performance au regime de preuve (suite du Lot P)** : compteur
    de churn des stems + fraicheur moyenne en edition simulee ; latence
    aller-retour en telemetrie permanente ; les declencheurs mesurables

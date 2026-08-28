@@ -43,12 +43,17 @@
 namespace daw::host {
 
 inline constexpr uint32_t kRingMagic = 0x52574144;  // 'DAWR'
-inline constexpr uint32_t kLayoutVersion = 9;       // v9: editor_open (moteur->enfant) - loge dans le padding de shutdown, offsets inchanges (v8: MIDI FIFO)
+inline constexpr uint32_t kLayoutVersion = 10;      // v10: kRingSlots 8 + stamps par slot (A4-5) ; v9: editor_open ; v8: MIDI FIFO
 inline constexpr uint32_t kParamQueueSlots = 64;    // power of two
 inline constexpr uint32_t kMidiQueueSlots = 256;    // power of two; note events per block, drained by the child
 inline constexpr uint32_t kRingBlockSize = 256;     // == audio::INTERNAL_BLOCK_SIZE
 inline constexpr uint32_t kRingChannels = 2;
-inline constexpr uint32_t kRingSlots = 4;           // power of two; covers depth <= 2
+// v10 (contrat de periode) : 8 slots couvrent depth <= 6 (periode
+// jusqu'a 1536 frames) avec separation ecriture/lecture. Le plafond de
+// profondeur des consommateurs est kRingSlots-2 ; le depasser demande
+// un nouveau bump de layout, JAMAIS un clamp silencieux (main.cpp
+// avertit en clair quand il clampe).
+inline constexpr uint32_t kRingSlots = 8;           // power of two; covers depth <= 6
 
 struct SharedAudioRing {
     // ---- Contract header (plain, written once by the engine) ----
@@ -144,6 +149,23 @@ struct SharedAudioRing {
     uint8_t  midi_channel[kMidiQueueSlots];   // 0..15
     uint32_t midi_offset[kMidiQueueSlots];    // offset en samples DANS le bloc
 
+    // ---- Estampilles PAR SLOT (v10, A4-5) --------------------------------
+    // in_slot_seq[slot] : l'ENGINE estampille seq APRES avoir ecrit
+    // in[slot] (release, avant input_seq). out_slot_seq[slot] :
+    // l'ENFANT estampille seq APRES que process() a ecrit out[slot].
+    // LE test de collecte est out_slot_seq[wslot] == want : un
+    // output_seq simplement avance peut pointer un slot PERIME quand
+    // l'enfant a saute des blocs (rattrapage) - le rejouer n'etait ni
+    // du wet ni compte (le bug A4-5).
+    // INVARIANT INPUT-DECHIRE (grave ici, la ou il vit) : le segment
+    // n'empeche PAS l'engine d'ecraser in[slot] pendant que l'enfant
+    // le lit (zero-copy). La detection : l'enfant RE-verifie
+    // in_slot_seq[slot] == seq apres process et NE PUBLIE PAS la
+    // sortie d'un bloc dont l'entree a bouge - l'engine le sert dry
+    // et le compte (blocks_missed), jamais un wet menteur.
+    std::atomic<uint64_t> in_slot_seq[kRingSlots];
+    std::atomic<uint64_t> out_slot_seq[kRingSlots];
+
     // ---- Planar audio, double-buffered: [slot][channel][frame] ----
     float in[kRingSlots][kRingChannels][kRingBlockSize];
     float out[kRingSlots][kRingChannels][kRingBlockSize];
@@ -180,12 +202,21 @@ static_assert(offsetof(SharedAudioRing, midi_pitch) == 112 + kParamQueueSlots * 
 static_assert(offsetof(SharedAudioRing, midi_velocity) == 112 + kParamQueueSlots * 12 + 2 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, midi_channel) == 112 + kParamQueueSlots * 12 + 3 * kMidiQueueSlots);
 static_assert(offsetof(SharedAudioRing, midi_offset) == 112 + kParamQueueSlots * 12 + 4 * kMidiQueueSlots);
-static_assert(offsetof(SharedAudioRing, in) == 112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, in_slot_seq) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots);
+static_assert(offsetof(SharedAudioRing, out_slot_seq) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  8 * kRingSlots);
+static_assert(offsetof(SharedAudioRing, in) ==
+              112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  16 * kRingSlots);
 static_assert(offsetof(SharedAudioRing, out) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  16 * kRingSlots +
                   kRingSlots * kRingChannels * kRingBlockSize * 4);
 static_assert(sizeof(SharedAudioRing) ==
               112 + kParamQueueSlots * 12 + 8 * kMidiQueueSlots +
+                  16 * kRingSlots +
                   2 * (kRingSlots * kRingChannels * kRingBlockSize * 4),
               "layout drifted - bump kLayoutVersion and fix BOTH sides");
 

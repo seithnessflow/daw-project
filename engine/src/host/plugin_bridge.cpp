@@ -382,11 +382,17 @@ bool PluginBridge::processBlockSync(const float* in_l, const float* in_r,
         std::memset(ring_->in[slot][0] + n, 0, (kRingBlockSize - n) * sizeof(float));
         std::memset(ring_->in[slot][1] + n, 0, (kRingBlockSize - n) * sizeof(float));
     }
+    // v10 : estampille du slot avant la publication (meme contrat que
+    // le producteur live - l'enfant verifie l'entree qu'il lit)
+    ring_->in_slot_seq[slot].store(seq, std::memory_order_release);
     ring_->input_seq.store(seq, std::memory_order_release);
 
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(timeout_ms);
-    while (ring_->output_seq.load(std::memory_order_acquire) < seq) {
+    // v10 (A4-5) : on attend l'estampille DU SLOT (le chemin sync est
+    // sequentiel, mais le contrat de collecte est UNIQUE : un slot
+    // perime ne passe jamais pour du wet).
+    while (ring_->out_slot_seq[slot].load(std::memory_order_acquire) != seq) {
         if (std::chrono::steady_clock::now() >= deadline) {
             error_ = "child did not produce block " + std::to_string(seq) +
                      (childAlive() ? " (alive, too slow)" : " (child DEAD)");

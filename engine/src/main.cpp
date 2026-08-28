@@ -226,6 +226,21 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
                 return false;
             }
             opts.buffer_size_frames = static_cast<uint32_t>(std::stoul(argv[i]));
+            // A3-3 (contrat de periode) : un buffer non multiple de 256
+            // produirait des callbacks partiels = bypass plugin sur
+            // chaque queue (proxy_node:13, mesure A6). ARRONDI AU
+            // MULTIPLE SUPERIEUR, en clair - jamais un demarrage muet
+            // hors contrat.
+            if (opts.buffer_size_frames % 256 != 0) {
+                const uint32_t rounded =
+                    ((opts.buffer_size_frames + 255) / 256) * 256;
+                std::cerr << "WARNING: --buffer-size "
+                          << opts.buffer_size_frames
+                          << " n'est pas un multiple de 256 (bloc interne)"
+                          << " - arrondi a " << rounded
+                          << " (contrat de periode, voir A6)\n";
+                opts.buffer_size_frames = rounded;
+            }
         } else if (arg == "--ws-port") {
             if (++i >= argc) {
                 std::cerr << "Error: --ws-port requires a value\n";
@@ -727,6 +742,26 @@ bool writeBlobToAssets(const std::string& assets_dir, const std::string& hash,
     return true;
 }
 
+// A3-2 (contrat de periode) : profondeur proxy = ceil(period/256),
+// plafond kRingSlots-2. Le clamp est BRUYANT - l'ancien clamp
+// silencieux etait une promesse de prose que le code ne tenait pas
+// (famille des 47 runs). Depasser le plafond legitimement = bump
+// kLayoutVersion (plus de slots), jamais un min() muet.
+static uint32_t proxyDepthFor(uint32_t buffer_frames) {
+    const uint32_t needed =
+        (buffer_frames + daw::host::kRingBlockSize - 1) /
+        daw::host::kRingBlockSize;
+    const uint32_t cap = daw::host::kRingSlots - 2;
+    if (needed > cap) {
+        std::cerr << "WARNING: periode " << buffer_frames
+                  << " frames -> depth " << needed << " > plafond " << cap
+                  << " (kRingSlots-2) - CLAMPE. Le ring plugin est "
+                  << "sous-provisionne : reduire --buffer-size ou bump "
+                  << "kLayoutVersion avec plus de slots.\n";
+    }
+    return (std::min)(cap, (std::max)(1u, needed));
+}
+
 std::unique_ptr<daw::graph::AudioGraph> buildGraph(
     const daw::document::ProjectDef& project,
     uint32_t sample_rate,
@@ -1000,14 +1035,8 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     auto project = doc.getDocument();
     daw::document::resolveMusicalTime(project);
 
-    // A6 : ceil, pas une division tronquee (periode 374 -> 2 blocs par
-    // callback, l'ancien max(1, 374/256)=1 sous-provisionnait le ring).
-    // Plafond reel du layout : kRingSlots-2 (le depasser = kLayoutVersion
-    // v10 + clean build - signale, jamais silencieux).
-    const uint32_t proxy_depth = (std::min)(
-        daw::host::kRingSlots - 2,
-        (device.getBufferSize() + daw::host::kRingBlockSize - 1) /
-            daw::host::kRingBlockSize);
+    // A6/A3-2 : ceil + clamp BRUYANT (helper unique proxyDepthFor)
+    const uint32_t proxy_depth = proxyDepthFor(device.getBufferSize());
     std::shared_ptr<daw::graph::AudioGraph> graph =
         buildGraph(project, device.getSampleRate(), opts.assets_dir,
                    asset_cache, plugin_registry, opts, proxy_depth);
@@ -1450,10 +1479,7 @@ int doPlayWithServer(const Options& opts) {
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,
                 plugin_registry, opts,
-                // A6 : ceil borne a kRingSlots-2 (jumeau du build initial)
-                (std::min)(daw::host::kRingSlots - 2,
-                    (device.getBufferSize() + daw::host::kRingBlockSize - 1) /
-                        daw::host::kRingBlockSize));
+                proxyDepthFor(device.getBufferSize()));
             if (graph) {
                 if (opts.debug_rebuild_delay_ms > 0) {
                     // Test hook: simulate an expensive (plugin) build

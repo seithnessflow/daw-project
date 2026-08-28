@@ -1763,3 +1763,23 @@ AMELIORATIONS.md archive. Points de synchro : les deux verdicts CI
 attendus (e512538, 99190f4) sont VERTS ; le ring v10 (kRingSlots 8,
 estampilles par slot) est NON COMMITE dans l'arbre, non verifie — REPRISE
 le porte en premier.
+
+**2026-08-28 (ring v10 — le contrat de collecte colle au slot) :** le
+diff laisse dans l'arbre a la cloture du 27 est verifie et livre. Clean
+build (layout de struct partagee), gtests **52/52** dont le nouveau
+`testStaleSlotDetection` (un enfant qui saute un bloc mais avance
+output_seq : l'ancien contrat servait le slot PERIME comme du wet — ni
+dry ni compte, le bug A4-5 ; v10 : DRY + compte), hash absolu
+56729beb61993cd7 inchange, specs proxy moteur reel fader-to-engine +
+stem-freshness + export-mixdown **8/8**. Contenu : kRingSlots 4 -> 8
+(depth <= 6, periodes jusqu'a 1536), `in_slot_seq`/`out_slot_seq` par
+slot (19+3 asserts d'offsets), l'enfant RE-verifie l'entree apres
+process et ne publie pas un bloc dont l'entree a bouge (invariant
+input-dechire, enfin grave la ou il vit), `proxyDepthFor` = ceil + clamp
+BRUYANT (plus de min() muet), `--buffer-size` non multiple de 256 arrondi
+en clair. Piege paye : `ninja clean` efface `create_test_doc.exe` que
+`rebuild_msvc.bat` ne reconstruit pas — 3 specs rouges pour rien avant
+de le rebuild a la main (note TODO). Arbitrage utilisateur du jour
+(« je suis chaud, go ») : la Vague 3 avec l'entree MIDI live passe
+DEVANT T4 Link Etage 2 ; premier maillon = clavier USB sur la tour ->
+note entendue en exclusif 256, latence mesuree.

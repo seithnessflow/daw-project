@@ -47,6 +47,9 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
                            pushMidiEvent(ring_, on, pitch, vel, 0, off);
                        });
     }
+    // v10 : estampille du slot AVANT input_seq (l'enfant verifie que
+    // l'entree qu'il lit est bien celle de seq - invariant input-dechire)
+    ring_->in_slot_seq[slot].store(seq, std::memory_order_release);
     ring_->input_seq.store(seq, std::memory_order_release);
 
     // Return block N-depth
@@ -69,7 +72,11 @@ void ProxyNode::process(float* output, const float* input, uint32_t frame_count,
         }
         return;
     }
-    if (ring_->output_seq.load(std::memory_order_acquire) >= want) {
+    // v10 (A4-5) : LE test de collecte est l'estampille DU SLOT, pas
+    // output_seq - un enfant qui a saute des blocs (rattrapage) laisse
+    // un slot PERIME sous un output_seq avance ; le rejouer n'etait ni
+    // du wet ni compte. Ici : slot perime = DRY + compte, comme un late.
+    if (ring_->out_slot_seq[wslot].load(std::memory_order_acquire) == want) {
         const float* const out_l = ring_->out[wslot][0];
         const float* const out_r = ring_->out[wslot][1];
         for (uint32_t i = 0; i < kRingBlockSize; ++i) {

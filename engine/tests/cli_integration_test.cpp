@@ -2381,6 +2381,77 @@ bool testPluginBridgeTransparency() {
 //     0.5 through the ring param channel), zero missed. The test paces the
 //     child (polls output_seq) so wet delivery is deterministic; the
 //     callback never does - that is exactly what (a) covers.
+// A4-5 (v10) : un enfant qui SAUTE un bloc mais avance output_seq
+// laissait un slot PERIME passer pour du wet (ni dry ni compte). Le
+// contrat v10 colle l'estampille AU SLOT : slot perime = DRY + compte.
+// Simule sans enfant reel (ring fabrique, enfant joue par le test).
+bool testStaleSlotDetection() {
+    std::cout << "Test: stale slot detection (A4-5, ring v10)... ";
+    constexpr uint32_t kBlock = daw::host::kRingBlockSize;
+    auto ring = std::make_unique<daw::host::SharedAudioRing>();
+    std::memset(static_cast<void*>(ring.get()), 0,
+                sizeof(daw::host::SharedAudioRing));
+    std::atomic<uint64_t> missed{0};
+    daw::host::ProxyNode node("stale", ring.get(), &missed);  // depth 1
+
+    auto fill = [](std::vector<float>& buf, int block) {
+        for (uint32_t i = 0; i < kBlock; ++i) {
+            const float v = static_cast<float>((block * 97 + int(i) * 13) %
+                                               20000 - 10000) / 32768.0f;
+            buf[2 * i] = v;
+            buf[2 * i + 1] = -v;
+        }
+    };
+    // L'enfant HONNETE pour le bloc s : copie in->out, estampille slot.
+    auto childProcess = [&](uint64_t s) {
+        const uint32_t slot = uint32_t(s % daw::host::kRingSlots);
+        std::memcpy(ring->out[slot][0], ring->in[slot][0],
+                    kBlock * sizeof(float));
+        std::memcpy(ring->out[slot][1], ring->in[slot][1],
+                    kBlock * sizeof(float));
+        ring->out_slot_seq[slot].store(s, std::memory_order_release);
+        ring->output_seq.store(s, std::memory_order_release);
+    };
+
+    std::vector<float> b1(kBlock * 2), b2(kBlock * 2), b3(kBlock * 2);
+    fill(b1, 1);
+    fill(b2, 2);
+    fill(b3, 3);
+
+    // Bloc 1 : depot (remplissage de pipeline, silence)
+    std::vector<float> buf = b1;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    childProcess(1);  // l'enfant traite le bloc 1 honnetement
+
+    // Bloc 2 : collecte du bloc 1 -> WET (identite ici), 0 manque
+    buf = b2;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    if (buf != b1 || missed.load() != 0) {
+        std::cout << "FAILED: le bloc honnete n'est pas passe wet\n";
+        return false;
+    }
+    // L'enfant MENTEUR : saute le bloc 2, avance output_seq quand meme
+    // (l'ancien contrat aurait servi out[2%8] PERIME comme du wet)
+    ring->output_seq.store(2, std::memory_order_release);
+
+    // Bloc 3 : collecte du bloc 2 -> le slot n'est PAS estampille 2 :
+    // DRY du bloc 2 + compte
+    buf = b3;
+    node.process(buf.data(), buf.data(), kBlock, 0);
+    if (buf != b2) {
+        std::cout << "FAILED: slot perime servi comme wet (A4-5)\n";
+        return false;
+    }
+    if (missed.load() != 1) {
+        std::cout << "FAILED: le bloc saute n'est pas compte (missed="
+                  << missed.load() << ")\n";
+        return false;
+    }
+
+    std::cout << "OK (perime = dry + compte, jamais un wet menteur)\n";
+    return true;
+}
+
 bool testProxyNodePipeline() {
     std::cout << "Test: Proxy node one-frame pipeline... ";
 
@@ -4503,6 +4574,7 @@ int main(int argc, char* argv[]) {
     run(testPluginHostSetupRefusal);
     run(testPluginBridgeTransparency);
     run(testProxyNodePipeline);
+    run(testStaleSlotDetection);   // A4-5 : ring v10, estampilles par slot
     run(testParamChannelSequence);
     run(testChildCrashRecovery);
     run(testPluginStateRoundtrip);

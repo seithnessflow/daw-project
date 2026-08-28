@@ -926,6 +926,14 @@ int runServe(const std::string& segment_path, const std::string& module_path,
         const uint64_t seq = s;
         const uint32_t slot = static_cast<uint32_t>(seq % daw::host::kRingSlots);
 
+        // v10 : l'entree de CE slot est-elle encore celle de seq ?
+        // (l'engine a pu la recouvrir si on est tres en retard - la
+        // traiter serait calculer sur un bloc futur et le publier sous
+        // un mauvais numero). Skip : l'engine sert dry et compte.
+        if (ring->in_slot_seq[slot].load(std::memory_order_acquire) != seq) {
+            continue;
+        }
+
         // v5 FIFO drain (see shared_audio_ring.h): EVERY pending pair
         // lands in this block's IParameterChanges - a rebuild's burst of
         // N params arrives whole, not just its last survivor.
@@ -1039,6 +1047,14 @@ int runServe(const std::string& segment_path, const std::string& module_path,
             return 1;
         }
 
+        // v10 (invariant input-dechire) : si l'engine a recouvert
+        // in[slot] PENDANT le process (zero-copy : detectable, pas
+        // empechable), la sortie est un melange de deux blocs - on ne
+        // la publie PAS (pas d'estampille : l'engine sert dry et
+        // compte). Le heartbeat avance quand meme (l'enfant est vivant).
+        if (ring->in_slot_seq[slot].load(std::memory_order_acquire) == seq) {
+            ring->out_slot_seq[slot].store(seq, std::memory_order_release);
+        }
         ring->output_seq.store(seq, std::memory_order_release);
         ring->child_heartbeat.store(++beats, std::memory_order_release);
         }  // backlog loop
