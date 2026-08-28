@@ -2,11 +2,10 @@
 
 ## TOUT EN HAUT (2026-08-28) : RING v10 LIVRE, VAGUE 3 ENTREE LIVE EN TETE
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le push du ring v10 (commit « ring v10 », voir `git log -1`) : c'est
-le premier passage du layout 8 slots + estampilles sous GCC. `gh run
-list --limit 3`. Rouge = lire le job build-linux (asserts d'offsets ou
-`testStaleSlotDetection`). AUCUN travail ne s'ouvre avant ce verdict.
+**A LIRE EN PREMIER — le point de synchro : LEVE.** Le ring v10
+(2ef82eb) est VERT en CI (run 33169563506 : build-linux + e2e 97/97,
+7 min) — premier passage du layout 8 slots + estampilles sous GCC,
+propre. Aucun verdict en vol.
 
 ## Ce qui a ete fait (2026-08-28)
 
