@@ -2,10 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-28, nuit) : LE MINILAB JOUE, LE PLUGIN SE PILOTE, LE GEL DE 2 s EST TROUVE
 
-**A LIRE EN PREMIER — le point de synchro :** un verdict CI est en vol
-sur le dernier push de la session (« selection multiple des clips »,
-`git log -1`) ; `gh run list --limit 3`. Les pushes precedents sont
-VERTS jusqu'a e88fbfd (gestes v1 du piano-roll, run 33190237491).
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
+de code de la session (selection multiple des clips, 9332f14) est VERT
+(run 33191581566). Aucun verdict en vol.
 
 - **Le piano-roll en modele de selection** (retour utilisateur « je peux
   pas deplacer ni selectionner » : la v1 effacait la note au clic) :

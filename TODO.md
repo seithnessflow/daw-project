@@ -10,7 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun verdict CI en vol (notes a ids stables vert, 2026-08-28 nuit).
+- Aucun verdict CI en vol (selection multiple des clips 9332f14 vert, 2026-08-28 nuit).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
