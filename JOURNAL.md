@@ -2232,3 +2232,11 @@ les prefixes des selecteurs et des logs ne bougent pas. Piege : le
 `newId` local de `duplicateScene` masquait l'import (tsc l'a dit).
 Spec `ids-unique.spec.ts` (deux pistes puis deux clips dans la meme
 milliseconde, 10 000 ids = 10 000, stems) ; 19 specs voisines vertes.
+
+**2026-08-29 (cloture de la suite) :** suite e2e complete 107/108 - le
+rouge etait un JUMEAU oublie (regle §10.2) : `clipDisplayName`
+(schema.ts) derivait le stem de l'id avec sa propre regex et affichait
+l'uuid brut d'un clip MIDI ; il passe par `clipStem()` desormais (les
+ids historiques base36 restent « MIDI »/« clip »). ui-rename +
+ids-unique + 3 voisines vertes ; A4-8 laisse en proposition (decision
+produit : refuser ou charger avec bandeau). Rien ne tourne.

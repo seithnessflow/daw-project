@@ -1,49 +1,55 @@
 # REPRISE.md — point de reprise au demarrage
 
-## TOUT EN HAUT (2026-08-29) : LE FUSIBLE EST POSE — les T8V ont un filet
+## TOUT EN HAUT (2026-08-29, soir) : LE FUSIBLE, L'ASSET QUI ARRIVE TARD, LES UUID
 
-**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
-de la session (25fb9ae, la spec seme son kit) est VERT (run
-33261252149). Aucun verdict en vol. Chemin : bff570f et 7613ba4 rouges
-(kit jamais seme au store en CI + moteur qui retient un 404 pour la
-session, famille « reading '0' » flaky), e6268b1 a fait parler le log,
-25fb9ae vert.
+**A LIRE EN PREMIER — le point de synchro CI : voir « Quoi surveiller »
+(verdict du dernier push de la session, lu une fois a la cloture ; s'il
+manque, `gh run list --limit 3` AVANT de coder).**
 
-- **Limiteur de sortie** (decision + preuves : docs/DECISIONS.md
-  2026-08-29) : brick-wall stereo lie, zero latence, sur la sortie
-  LIVE du moteur seulement — jamais dans les stems ni l'export (les
-  deux hashes d'ancre sont intacts). Plafond -0,3 dBFS par defaut,
-  `--limiter-ceiling <dBFS>`, `--no-limiter` = mesure A/B seulement.
-  Log : `output-limiter: ON ceiling=-0.3 dBFS release=80 ms`. Badge
-  `LIM` sur la tranche master (ambre + reduction en dB quand il
-  retient, barre rouge si desactive), sonde `window.__dawLimiter`.
-- Pourquoi pas un device : un device vit dans le document -> stems +
-  export + supprimable par un collaborateur. Un fusible se pose sur la
-  prise.
-- Trouve en route : le gain du limiteur vit en DOUBLE (en float le
-  relachement stagne a 0,999886 et l'identite ne revient jamais) ;
-  l'incremental a produit un moteur aux gtests verts et a la
-  telemetrie folle apres le changement de layout de
-  `AudioCallbackContext` — `ninja -t clean` a tout remis d'aplomb
-  (regle §10, encore une fois vraie).
-- gtests **62/62**, spec `limiter.spec.ts` + 5 voisines vertes, tsc 0,
-  suite e2e complete **106/106** (3,8 min).
+Trois livraisons, chacune avec sa spec sur le vrai moteur :
+
+1. **Le fusible** (docs/DECISIONS.md 2026-08-29) : limiteur brick-wall
+   zero latence sur la sortie LIVE du moteur seulement (jamais dans les
+   stems ni l'export, hashes d'ancre intacts). Plafond -0,3 dBFS,
+   `--limiter-ceiling`, `--no-limiter` (A/B). Badge **LIM** sur le
+   master (ambre + dB retenus ; barre rouge si desactive), sonde
+   `__dawLimiter`. Spec `limiter.spec.ts` (seme son kit : la CI ne
+   lance jamais make-kit).
+2. **L'asset qui arrive tard** (prealable sonne par la CI) : le moteur
+   retenait un 404 pour la session -> clip muet a vie. Desormais retry
+   au rebuild suivant avec backoff 1 s, x2, plafond 30 s ; logs `Asset
+   xxxxxxxx: retry in N s (attempt k)` puis `now on server after k
+   miss(es) - fetched`. Spec `asset-late.spec.ts`. Reste en dette : le
+   refus VISIBLE (badge « asset manquant » sur le clip).
+3. **A4-11, les ids** : `document/ids.ts` = UN fabricant, `newId(prefix,
+   stem?)` -> `<prefixe>[-stem]-<uuid v4>` ; `clipStem()` pour Ctrl+D.
+   23 sites, prefixes intacts. Spec `ids-unique.spec.ts`.
+
+Pieges payes : `std::max` / `time_point::max()` sans parentheses = la
+macro Windows (3 fois) ; gain du limiteur en DOUBLE (le float stagnait
+a 0,999886) ; l'incremental ment apres un changement de layout du
+contexte callback (`ninja clean`, regle §10) ; en CI le store n'a JAMAIS
+le kit du starter.
+
+gtests **62/62**, tsc 0, suite e2e complete : voir JOURNAL (derniere
+entree).
 
 ## Comment le voir / l'entendre (5 min)
 
-`start-daw.cmd`, onglet `?project=studio`, pousser le master a +6 dB et
-une piste a +6 dB, lecture : le badge **LIM** a droite du master
-s'allume en ambre avec la reduction (« LIM -2.4 »), la crete ne
-depasse jamais -0,3 dBFS au DAC. Au MiniLab : `scripts\daw.ps1 -MidiIn
-"Minilab3 MIDI"`, un patch chaud sur Dexed ne peut plus ecreter.
-Rien ne tourne a la cloture.
+`start-daw.cmd`, onglet `?project=studio`, master et une piste a +6 dB,
+lecture : le badge **LIM** s'allume en ambre avec la reduction ; rien ne
+depasse -0,3 dBFS au DAC. Au MiniLab (`scripts\daw.ps1 -MidiIn "Minilab3
+MIDI"`), un patch chaud sur Dexed ne peut plus ecreter les T8V. Rien ne
+tourne a la cloture.
 
 ## Quoi surveiller
 
-1. Le verdict CI du dernier push (regle : un verdict par session).
-2. Le VU master lit la crete AVANT le fusible (dette TODO §3) : le
-   badge dit ce qui est retenu, le VU ce que le mix produit.
-3. `control-loop stall:` dans les logs moteur (inchange).
+1. Le verdict CI du dernier push (un verdict par session).
+2. Famille « reading '0' » (doc serveur sans `tracks` sur connexion
+   fraiche, TODO §3) : flaky de charge vue 6x le 2026-08-29 sur des runs
+   Linux lents ; le seeder est garde, les specs `fader-to-engine:350` et
+   `tab-guards` non. A REPRODUIRE cote serveur avant de corriger.
+3. Le VU master lit la crete AVANT le fusible (dette TODO §3).
 
 ## La suite (ORDRE GRAVE, TODO.md §1)
 
@@ -55,11 +61,16 @@ Rien ne tourne a la cloture.
 2. Reliquat spike LAN ; 3. T4 Link Etage 2 ; 4. perf au regime de
    preuve ; 5. ratifications AUDIT-5 F / AUDIT-6.
 
-Proposition de la session du 2026-08-29 (a arbitrer, pas en file) :
-apres le fusible, les deux items « cheap et sur le differenciateur » —
-A4-11 (ids `Date.now()` -> UUID, collision inter-onglets) et A4-8
-(`validateDocument` jamais appele) — puis C1 avec l'eclatement de
-`main.cpp` (2077 lignes, `doPlayWithServer` ~730).
+Propositions de la session (a arbitrer, pas en file) :
+- **A4-8** (`validateDocument` jamais appele) : PAS fait — decision
+  produit avant d'etre du code : un document invalide (gain hors [0, 2],
+  id vide, version inconnue) se REFUSE bruyamment ou se CHARGE avec un
+  bandeau ? Le moteur a deja `validateDocument`, le web n'a que
+  `migrateDocument`. Une session : trancher, cabler aux deux etages,
+  une spec par refus.
+- **C1 + eclatement de `main.cpp`** (2077 lignes, `doPlayWithServer`
+  ~730) : sortir l'HTTP de la boucle de controle oblige a decouper ;
+  session dediee, moule `export_job`.
 
 ## Decisions ouvertes
 

@@ -6,7 +6,7 @@
  */
 
 import { effectiveMap, type TempoPoint } from './tempo';
-import { newId } from './ids';
+import { newId, clipStem } from './ids';
 
 /**
  * v2 (migration TEMPO T1, ADDITIVE-DUAL ratifie 2026-08-27) : le
@@ -240,11 +240,14 @@ export function clipDisplayName(
   clip: Pick<ClipDef, 'id' | 'name' | 'notes'>): string {
   const named = clip.name?.trim();
   if (named) return named;
-  const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
-  if (clip.id === `clip-${stem}` && /^[a-z0-9]{6,12}$/.test(stem)) {
+  // A4-11 : l'id est `clip[-stem]-<uuid>` (ids.ts, le seul fabricant) ;
+  // clipStem() comprend aussi les formes historiques (epoch, base36).
+  const stem = clipStem(clip.id);
+  const legacyRandom = clip.id === `clip-${stem}` && /^[a-z0-9]{6,12}$/.test(stem);
+  if (stem === 'clip' || legacyRandom) {
     return clip.notes ? 'MIDI' : 'clip';
   }
-  return stem || 'clip';
+  return stem;
 }
 
 /**
