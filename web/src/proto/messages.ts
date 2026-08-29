@@ -202,6 +202,17 @@ export interface EngineState {
   stemsRenderedTotal: number;
   devicePeriodFrames: number;
   deviceExclusive: boolean;
+  /**
+   * LE FUSIBLE (2026-08-29) : limiteur brick-wall de la sortie LIVE du
+   * moteur (jamais dans les stems ni l'export). Reduction de gain du
+   * dernier bloc (dB >= 0), blocs retenus cumules, plafond en vigueur.
+   * L'UI l'affiche (badge LIM sur le master) : une action qui retient
+   * le son se MONTRE, jamais en silence.
+   */
+  limiterReductionDb: number;
+  limiterEngagedBlocks: number;
+  limiterCeilingDb: number;
+  limiterEnabled: boolean;
 }
 
 /**
@@ -1528,6 +1539,10 @@ function createBaseEngineState(): EngineState {
     stemsRenderedTotal: 0,
     devicePeriodFrames: 0,
     deviceExclusive: false,
+    limiterReductionDb: 0,
+    limiterEngagedBlocks: 0,
+    limiterCeilingDb: 0,
+    limiterEnabled: false,
   };
 }
 
@@ -1562,6 +1577,18 @@ export const EngineState: MessageFns<EngineState> = {
     }
     if (message.deviceExclusive !== false) {
       writer.uint32(80).bool(message.deviceExclusive);
+    }
+    if (message.limiterReductionDb !== 0) {
+      writer.uint32(93).float(message.limiterReductionDb);
+    }
+    if (message.limiterEngagedBlocks !== 0) {
+      writer.uint32(96).uint64(message.limiterEngagedBlocks);
+    }
+    if (message.limiterCeilingDb !== 0) {
+      writer.uint32(109).float(message.limiterCeilingDb);
+    }
+    if (message.limiterEnabled !== false) {
+      writer.uint32(112).bool(message.limiterEnabled);
     }
     return writer;
   },
@@ -1659,6 +1686,38 @@ export const EngineState: MessageFns<EngineState> = {
             message.deviceExclusive = reader.bool();
             continue;
           }
+          case 11: {
+            if (tag !== 93) {
+              break;
+            }
+
+            message.limiterReductionDb = reader.float();
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.limiterEngagedBlocks = longToNumber(reader.uint64());
+            continue;
+          }
+          case 13: {
+            if (tag !== 109) {
+              break;
+            }
+
+            message.limiterCeilingDb = reader.float();
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.limiterEnabled = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1723,6 +1782,26 @@ export const EngineState: MessageFns<EngineState> = {
         : isSet(object.device_exclusive)
         ? globalThis.Boolean(object.device_exclusive)
         : false,
+      limiterReductionDb: isSet(object.limiterReductionDb)
+        ? globalThis.Number(object.limiterReductionDb)
+        : isSet(object.limiter_reduction_db)
+        ? globalThis.Number(object.limiter_reduction_db)
+        : 0,
+      limiterEngagedBlocks: isSet(object.limiterEngagedBlocks)
+        ? globalThis.Number(object.limiterEngagedBlocks)
+        : isSet(object.limiter_engaged_blocks)
+        ? globalThis.Number(object.limiter_engaged_blocks)
+        : 0,
+      limiterCeilingDb: isSet(object.limiterCeilingDb)
+        ? globalThis.Number(object.limiterCeilingDb)
+        : isSet(object.limiter_ceiling_db)
+        ? globalThis.Number(object.limiter_ceiling_db)
+        : 0,
+      limiterEnabled: isSet(object.limiterEnabled)
+        ? globalThis.Boolean(object.limiterEnabled)
+        : isSet(object.limiter_enabled)
+        ? globalThis.Boolean(object.limiter_enabled)
+        : false,
     };
   },
 
@@ -1758,6 +1837,18 @@ export const EngineState: MessageFns<EngineState> = {
     if (message.deviceExclusive !== false) {
       obj.deviceExclusive = message.deviceExclusive;
     }
+    if (message.limiterReductionDb !== 0) {
+      obj.limiterReductionDb = message.limiterReductionDb;
+    }
+    if (message.limiterEngagedBlocks !== 0) {
+      obj.limiterEngagedBlocks = Math.round(message.limiterEngagedBlocks);
+    }
+    if (message.limiterCeilingDb !== 0) {
+      obj.limiterCeilingDb = message.limiterCeilingDb;
+    }
+    if (message.limiterEnabled !== false) {
+      obj.limiterEnabled = message.limiterEnabled;
+    }
     return obj;
   },
 
@@ -1776,6 +1867,10 @@ export const EngineState: MessageFns<EngineState> = {
     message.stemsRenderedTotal = object.stemsRenderedTotal ?? 0;
     message.devicePeriodFrames = object.devicePeriodFrames ?? 0;
     message.deviceExclusive = object.deviceExclusive ?? false;
+    message.limiterReductionDb = object.limiterReductionDb ?? 0;
+    message.limiterEngagedBlocks = object.limiterEngagedBlocks ?? 0;
+    message.limiterCeilingDb = object.limiterCeilingDb ?? 0;
+    message.limiterEnabled = object.limiterEnabled ?? false;
     return message;
   },
 };

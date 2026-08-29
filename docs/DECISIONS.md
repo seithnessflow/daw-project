@@ -817,6 +817,53 @@ resolveMusicalTime -> noyau entier. Jumeaux : `expected_musical`
 mettre a jour ENSEMBLE et a documenter ici. Une deviation = une
 regression du noyau tempo ou de la resolution, jamais un bruit.
 
+### 2026-08-29 — LE FUSIBLE : limiteur de sortie sur la PRISE, pas dans la partition
+
+Decision (utilisateur : « soit un limiteur integre au site, soit un
+plugin limiteur modifiable sur le site, a toi de voir » ; arbitrage
+d'ingenierie) : le limiteur de sortie est une propriete de la SORTIE LIVE
+du moteur, pas un device du document.
+
+Pourquoi pas un device : un device vit dans le document, donc dans les
+stems et dans l'export — les deux ancres de hash (`56729beb61993cd7`,
+`c1233ae9d6ab9e83`) auraient bouge, un mixdown aurait porte un limiteur
+cache, et un collaborateur aurait pu le supprimer. La chaine master
+(AUDIT-6 §7) n'existe pas encore non plus. Un fusible se pose sur la
+prise ; il protege CE moteur et CES moniteurs.
+
+Mecanisme (`engine/src/audio/output_limiter.h`, `OutputLimiter`) :
+brick-wall stereo lie, zero latence (attaque instantanee g = plafond/|x|
+sur l'echantillon meme, relachement one-pole 80 ms, clamp dur final,
+NaN/Inf -> 0). Applique dans `audioCallback` par sous-bloc AVANT le tap
+(le pair du jam et le DAC entendent la meme sortie protegee). Le rendu
+offline (`--render`, stems, export) n'y passe JAMAIS. Sous le plafond :
+transparent au bit pres (g reste exactement 1 ; l'etat de gain vit en
+DOUBLE — en float le relachement stagnait a 0,999886 et l'identite ne
+revenait jamais, mesure par sonde). Plafond -0,3 dBFS par defaut,
+`--limiter-ceiling <dBFS>` ([-24, 0]), `--no-limiter` = mesure A/B
+seulement. Contrat de log : `output-limiter: ON ceiling=-0.3 dBFS
+release=80 ms (live output only)` ; bilan de sortie `Output limiter:
+engaged blocks N, max reduction X dB`.
+
+Visible (regle « une action qui retient le son se montre ») :
+EngineState champs 11-14 (`limiter_reduction_db` = crete tenue entre
+deux trames, `limiter_engaged_blocks`, `limiter_ceiling_db`,
+`limiter_enabled`) -> badge `#limiter-badge` sur la tranche master
+(`data-state` idle / active « LIM -X.X » / off barre rouge), sonde
+`window.__dawLimiter`.
+
+Preuves : gtest `testOutputLimiter` (sinus +6 dBFS -> aucun echantillon
+au-dessus du plafond, reduction > 5 dB ; -6 dBFS -> memcmp identique ;
+NaN/Inf -> 0 ; relachement -> identite exacte ; desactive -> identite) ;
+hashes de reference INCHANGES ; spec `limiter.spec.ts` (vrai moteur
+--mute, kit a +12 dB : blocs retenus > 0, badge actif, capture
+`test-results/limiter-active.png`).
+
+Non couvert (dette datee, TODO) : le VU master affiche la crete AVANT le
+fusible (getMasterPeaks du graphe) — le badge dit ce qui est retenu, le VU
+dit ce que le mix produit ; un plafond reglable depuis l'UI (aujourd'hui
+CLI seulement).
+
 ## Resultats historiques 2026-08-20 (resume)
 
 - **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,

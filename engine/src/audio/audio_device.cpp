@@ -156,6 +156,7 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     callback_context_.cb_max_frames = &cb_max_frames_;
     callback_context_.cb_partial_count = &cb_partial_count_;
     callback_context_.cb_total_count = &cb_total_count_;
+    callback_context_.limiter = &limiter_;
 
     device_config.pUserData = &callback_context_;
 
@@ -175,6 +176,12 @@ bool AudioDevice::initialize(const AudioDeviceConfig& config) {
     actual_exclusive_ =
         device_->playback.shareMode == ma_share_mode_exclusive;
     callback_context_.sample_rate = actual_sample_rate_;
+    // Le relachement du fusible se calcule au taux REEL du device
+    limiter_.prepare(actual_sample_rate_);
+    std::cerr << "output-limiter: "
+              << (limiter_.enabled() ? "ON" : "OFF (--no-limiter)")
+              << " ceiling=" << limiter_.ceilingDb() << " dBFS release="
+              << OutputLimiter::kDefaultReleaseMs << " ms (live output only)\n";
 
     // SPIKE LATENCE (2026-08-27) : la VERITE de la negociation, en clair -
     // periode interne, nombre de periodes, et la latence de sortie que ca

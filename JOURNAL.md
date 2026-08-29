@@ -2131,3 +2131,39 @@ presente, decalage = largeur de la bande (pps deduit de la geometrie
 d'un clip) et > longueur du bloc, la plage a suivi les copies. Trace
 visuelle : lasso puis Ctrl+D, 288000/720000 -> copies 1152000/1584000
 (decalage 864000 = la plage). 9 specs voisines vertes, tsc 0.
+
+**2026-08-29 (LE FUSIBLE — limiteur de sortie) :** reprise apres un
+regard d'ensemble (avis : moat prouve, docs qui marchent ; a regler en
+premier = le limiteur de sortie, seul item qui peut casser du materiel
+maintenant qu'on joue live au MiniLab). L'utilisateur a laisse le choix
+« integre au site ou plugin modifiable sur le site » ; arbitrage : le
+fusible se pose sur la PRISE, pas dans la partition (un device vivrait
+dans le document, donc dans les stems et l'export ; les deux ancres de
+hash auraient bouge ; un collaborateur pourrait le supprimer). Detail et
+preuves : docs/DECISIONS.md 2026-08-29.
+
+Livre : `OutputLimiter` (engine/src/audio/output_limiter.h) brick-wall
+stereo lie zero latence, applique dans `audioCallback` par sous-bloc
+avant le tap ; `--limiter-ceiling` / `--no-limiter` ; ligne de log
+`output-limiter:` + bilan de sortie ; EngineState 11-14 (proto regenere
+des deux cotes) ; badge `#limiter-badge` sur le master (module
+`ui/limiter_badge.ts`, `styles/limiter.css`), sonde `__dawLimiter`.
+
+Trouve en route : (1) `std::max` sans parentheses = la macro Windows
+(deux fois, header et test) ; (2) en FLOAT le relachement one-pole
+stagne a 0,999886 et ne revient jamais a 1 — vu par une sonde autonome
+(cl + printf du gain), pas par raisonnement : le gain vit en double,
+snap a 1 sous 1e-5 ; (3) la telemetrie 30 Hz lisait la reduction du
+DERNIER bloc et ratait les transitoires d'un bloc -> crete tenue entre
+deux trames (`takeReductionDb`), et le badge tenait « -0.0 » -> la
+valeur tenue est le max de la tenue ; (4) LA REGLE §10 EN VRAI : apres
+ces changements de layout (`AudioCallbackContext` + `AudioDevice`),
+l'incremental donnait gtests verts ET une telemetrie folle (reduction
+= denormal 1e-45, engagedBlocks = 85 milliards) - `ninja -t clean` +
+rebuild : reduction 2,4 dB sur le kick, 8 blocs, badge « LIM -2.4 ».
+Le moteur incremental MENT sur un layout partage, encore une fois.
+gtests 62/62, hash `56729beb61993cd7` intact, spec limiter + 5
+voisines vertes, capture web/test-results/limiter-active.png.
+
+Note d'ergonomie (dette TODO) : le VU master lit la crete AVANT le
+fusible ; le badge dit ce qui est retenu, le VU ce que le mix produit.

@@ -42,6 +42,10 @@
         <input type="range" id="master-gain" data-role="master-gain"
                min="0" max="2" step="0.01" value="1" aria-label="Master gain">
         <span class="master-db" id="master-db">0.0 dB</span>
+        <!-- LE FUSIBLE : le limiteur de sortie du moteur, visible quand il
+             retient (data-state idle / active / off) -->
+        <span class="limiter-badge" id="limiter-badge" data-role="limiter"
+              data-state="idle" title="Fusible de sortie (limiteur brick-wall du moteur)">LIM</span>
       </div>
       <div class="position">
         <span id="position">00:00.000</span>

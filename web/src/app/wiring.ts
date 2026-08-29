@@ -11,6 +11,7 @@ import { EngineClient } from '../network/engine_client';
 import { TIMELINE, formatGain, setPluginCatalog, noteStemFreshness,
          refreshStemBadges, resetOpenEditors } from '../ui/track';
 import * as life from '../ui/life';
+import { setLimiterState } from '../ui/limiter_badge';
 import { formatTime } from '../ui/transport';
 import { Library, loadKit } from '../ui/library';
 import { Overview } from '../ui/overview';
@@ -572,6 +573,7 @@ export async function init(): Promise<void> {
   };
   engineClient.onState = (state) => {
     life.setEngineState(state.pluginBlocksMissed);
+    setLimiterState(state);  // LE FUSIBLE : ce que la sortie retient, montre
   };
   // F5+ : verite des slots Session (l'etat optimiste local est reconcilie ;
   // applySessionState ne re-rend que si quelque chose a change)

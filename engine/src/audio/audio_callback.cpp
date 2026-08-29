@@ -105,6 +105,7 @@ void audioCallback(
         // ghost-reported by telemetry forever after a stop)
         std::memset(out, 0, frame_count * 2 * sizeof(float));
         if (graph) graph->clearMeters();
+        if (ctx->limiter) ctx->limiter->reset();  // le fusible se rearme au silence
         ctx->session_clock += static_cast<int64_t>(frame_count);  // reste continue
         // Still send telemetry
         sendTelemetry(*ctx, 0.0f, 0.0f);
@@ -187,6 +188,12 @@ void audioCallback(
         if (!success) {
             any_failure = true;
             std::memset(chunk_output, 0, chunk * 2 * sizeof(float));
+        }
+
+        // LE FUSIBLE : brick-wall sur ce qui part au DAC, avant le tap
+        // (le pair du jam entend la sortie protegee, pas la crue).
+        if (ctx->limiter) {
+            ctx->limiter->process(chunk_output, chunk);
         }
 
         // S8a: the master tap hears exactly what the device hears

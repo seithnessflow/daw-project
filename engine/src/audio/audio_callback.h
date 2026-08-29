@@ -44,6 +44,7 @@
 
 #include "ring_buffer.h"
 #include "tap_ring.h"
+#include "output_limiter.h"
 #include "../midi/live_midi.h"
 #include "../graph/audio_graph.h"
 #include "../transport/transport_state.h"
@@ -108,6 +109,12 @@ struct AudioCallbackContext {
     // S8a: the master tap (post-master PCM out to the local tab).
     // Plain pointer set before device start; may stay null (CLI mode).
     TapRing* tap_ring = nullptr;
+
+    // LE FUSIBLE (2026-08-29) : limiteur brick-wall de la sortie LIVE,
+    // applique par sous-bloc AVANT le tap (le jam et le DAC entendent la
+    // meme chose). Jamais dans le rendu offline. Pointeur pose avant
+    // start ; null = pas de fusible (tests unitaires du callback).
+    OutputLimiter* limiter = nullptr;
 
     // Vague 3 : l'entree MIDI live. File SPSC (producteur = la source, ex.
     // thread WinMM ; consommateur = ce callback), compteurs, et le staging

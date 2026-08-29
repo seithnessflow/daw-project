@@ -21,6 +21,7 @@
 #include "../src/render/offline_render.h"
 #include "../src/render/stem_render.h"
 #include "../src/audio/audio_callback.h"
+#include "../src/audio/output_limiter.h"
 #include "../src/audio/ring_buffer.h"
 #include "../src/host/plugin_bridge.h"
 #include "../src/host/proxy_node.h"
@@ -41,10 +42,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -713,6 +716,119 @@ bool testRingBuffer() {
     }
 
     std::cout << "OK\n";
+    return true;
+}
+
+// LE FUSIBLE : limiteur de sortie au signal connu (2026-08-29).
+// Cinq preuves : (1) un sinus a +6 dBFS ne depasse JAMAIS le plafond ;
+// (2) sous le plafond, transparent AU BIT PRES ; (3) NaN/Inf -> 0 ;
+// (4) le relachement ramene le gain a l'identite exacte apres la crete ;
+// (5) desactive = identite (la mesure A/B est honnete).
+bool testOutputLimiter() {
+    std::cout << "Test: Output limiter (brick-wall, live output fuse)... ";
+    using daw::audio::OutputLimiter;
+    constexpr uint32_t kSr = 48000;
+    constexpr uint32_t kN = 4800;  // 100 ms
+    constexpr double kPi2 = 6.283185307179586;
+    const float ceiling = std::pow(10.0f, OutputLimiter::kDefaultCeilingDb / 20.0f);
+
+    // 1. +6 dBFS (amplitude 2.0) : crete <= plafond sur CHAQUE echantillon,
+    //    reduction rapportee > 5 dB, blocs retenus comptes
+    OutputLimiter lim;
+    lim.prepare(kSr);
+    std::vector<float> hot(kN * 2);
+    for (uint32_t i = 0; i < kN; ++i) {
+        const float v = 2.0f * float(std::sin(kPi2 * 440.0 * i / kSr));
+        hot[i * 2] = hot[i * 2 + 1] = v;
+    }
+    float max_reduction = 0.0f;
+    for (uint32_t off = 0; off < kN; off += 256) {
+        const uint32_t n = (std::min<uint32_t>)(256, kN - off);
+        max_reduction = (std::max)(max_reduction, lim.process(hot.data() + off * 2, n));
+    }
+    for (uint32_t i = 0; i < kN * 2; ++i) {
+        if (!(std::fabs(hot[i]) <= ceiling + 1e-6f)) {
+            std::cout << "FAILED: sample " << i << " = " << hot[i]
+                      << " above ceiling " << ceiling << "\n";
+            return false;
+        }
+    }
+    if (max_reduction < 5.0f) {
+        std::cout << "FAILED: reduction " << max_reduction << " dB (attendu > 5)\n";
+        return false;
+    }
+    if (lim.engagedBlocks() == 0 || lim.maxReductionDb() < 5.0f) {
+        std::cout << "FAILED: stats engaged=" << lim.engagedBlocks()
+                  << " max=" << lim.maxReductionDb() << "\n";
+        return false;
+    }
+
+    // 2. -6 dBFS : transparent au bit pres (memes octets, 0 dB, 0 bloc)
+    OutputLimiter clean;
+    clean.prepare(kSr);
+    std::vector<float> soft(kN * 2), ref;
+    for (uint32_t i = 0; i < kN; ++i) {
+        const float v = 0.5f * float(std::sin(kPi2 * 440.0 * i / kSr));
+        soft[i * 2] = v; soft[i * 2 + 1] = -v * 0.7f;
+    }
+    ref = soft;
+    for (uint32_t off = 0; off < kN; off += 256) {
+        clean.process(soft.data() + off * 2, (std::min<uint32_t>)(256, kN - off));
+    }
+    if (std::memcmp(soft.data(), ref.data(), soft.size() * sizeof(float)) != 0) {
+        std::cout << "FAILED: not bit-transparent below ceiling\n";
+        return false;
+    }
+    if (clean.engagedBlocks() != 0 || clean.reductionDb() != 0.0f) {
+        std::cout << "FAILED: engaged below ceiling\n";
+        return false;
+    }
+
+    // 3. NaN / Inf -> 0, jamais au DAC
+    OutputLimiter fuse;
+    fuse.prepare(kSr);
+    float bad[8] = { std::numeric_limits<float>::quiet_NaN(), 0.1f,
+                     std::numeric_limits<float>::infinity(), -0.2f,
+                     0.3f, -std::numeric_limits<float>::infinity(), 0.0f, 0.0f };
+    fuse.process(bad, 4);
+    for (float v : bad) {
+        if (!std::isfinite(v) || std::fabs(v) > ceiling) {
+            std::cout << "FAILED: non-finite input leaked (" << v << ")\n";
+            return false;
+        }
+    }
+    if (bad[0] != 0.0f || bad[2] != 0.0f || bad[5] != 0.0f) {
+        std::cout << "FAILED: NaN/Inf not zeroed\n";
+        return false;
+    }
+
+    // 4. Relachement : apres la crete, 1 s de silence -> gain exactement 1
+    //    (un signal sous le plafond redevient bit-transparent)
+    std::vector<float> tail(kSr * 2, 0.0f);
+    for (uint32_t off = 0; off < kSr; off += 256) {
+        lim.process(tail.data() + off * 2, (std::min<uint32_t>)(256, kSr - off));
+    }
+    std::vector<float> probe(256 * 2);
+    for (uint32_t i = 0; i < 256; ++i) probe[i * 2] = probe[i * 2 + 1] = 0.25f;
+    std::vector<float> probe_ref = probe;
+    lim.process(probe.data(), 256);
+    if (std::memcmp(probe.data(), probe_ref.data(), probe.size() * sizeof(float)) != 0) {
+        std::cout << "FAILED: gain did not release to exact identity\n";
+        return false;
+    }
+
+    // 5. Desactive = identite meme au-dessus du plafond (mesure A/B)
+    OutputLimiter off_lim;
+    off_lim.prepare(kSr);
+    off_lim.setEnabled(false);
+    float loud[4] = { 1.5f, -1.5f, 1.5f, -1.5f };
+    off_lim.process(loud, 2);
+    if (loud[0] != 1.5f || loud[1] != -1.5f) {
+        std::cout << "FAILED: disabled limiter altered the signal\n";
+        return false;
+    }
+
+    std::cout << "OK (reduction " << max_reduction << " dB, ceiling " << ceiling << ")\n";
     return true;
 }
 
@@ -5022,6 +5138,7 @@ int main(int argc, char* argv[]) {
     run(testEq3Node);
     run(testCompressorNode);
     run(testDriveNode);
+    run(testOutputLimiter);       // LE FUSIBLE : brick-wall de la sortie live
     run(testDelayNode);
     run(testRingBuffer);
     run(testDocumentSerialization);

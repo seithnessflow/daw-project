@@ -251,10 +251,19 @@ private:
     std::atomic<uint64_t> cb_partial_count_{0};
     std::atomic<uint64_t> cb_total_count_{0};
 
+    // LE FUSIBLE : limiteur de la sortie live (parametres = atomiques,
+    // etat de gain = thread audio seul). Toujours cable ; `--no-limiter`
+    // le desactive (mesure A/B), jamais par defaut.
+    OutputLimiter limiter_;
+
     // Callback context (passed to audio thread)
     AudioCallbackContext callback_context_;
 
 public:
+    /** Le fusible de sortie : plafond, marche/arret, stats de telemetrie. */
+    OutputLimiter& limiter() { return limiter_; }
+    const OutputLimiter& limiter() const { return limiter_; }
+
     /**
      * S8a: attach the master tap ring. MUST be called before
      * initialize()/start() - the pointer is read by the audio callback

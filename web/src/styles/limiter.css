@@ -1,0 +1,28 @@
+/* LE FUSIBLE (2026-08-29) : badge LIM de la tranche master. Trois etats
+   portes par data-state : idle (discret), active (le moteur retient du
+   son : ambre, la reduction en dB), off (--no-limiter : rouge barre,
+   rien ne protege les moniteurs). */
+.limiter-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--text-3);
+  color: var(--text-3);
+  min-width: 34px;
+  text-align: center;
+  user-select: none;
+  transition: background 80ms linear, color 80ms linear;
+}
+.limiter-badge[data-state="active"] {
+  background: #f0913a;
+  border-color: #f0913a;
+  color: #1a1410;
+}
+.limiter-badge[data-state="off"] {
+  border-color: #e03131;
+  color: #e03131;
+  text-decoration: line-through;
+}

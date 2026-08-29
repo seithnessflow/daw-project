@@ -222,12 +222,11 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   PUT local mesure, des secondes a travers un tunnel), fetch d'asset et
   spawn idem. Le stall log le rend VISIBLE ; le fix = thread de service
   (export_job en est le moule).
-- **PAS DE LIMITEUR DE SORTIE** : un instrument live avec un patch
-  chaud ecreterait le DAC, rien ne protege les moniteurs (chaine master
-  absente, AUDIT-6 §7). Point produit, pas un incident (l'alerte
-  +19 dBFS du 2026-08-28 etait un artefact de parsing ; vraies cretes
-  ~0,1). Un clamp doux au master ou un limiteur = prealable a « jouer
-  live » pour de vrai.
+- Fusible de sortie (livre 2026-08-29, DECISIONS) — reliquats : le VU
+  master lit la crete AVANT le fusible (getMasterPeaks) ; plafond
+  reglable depuis l'UI (CLI seulement aujourd'hui). Declencheur : un
+  utilisateur qui veut voir la crete DAC ou changer le plafond sans
+  relancer.
 - MIDI live (session A) : placement sample-exact des evenements par
   timestamp (v1 = offset 0, gigue <= un sous-bloc de 5,3 ms) ;
   changement de piste cible a travers un rebuild sans all-notes-off (le

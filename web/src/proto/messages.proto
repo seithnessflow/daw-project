@@ -127,6 +127,15 @@ message EngineState {
     uint32 stems_rendered_total = 8;
     uint32 device_period_frames = 9;
     bool device_exclusive = 10;
+    // LE FUSIBLE (2026-08-29) : limiteur brick-wall de la sortie LIVE du
+    // moteur (jamais dans les stems ni l'export). Reduction de gain du
+    // dernier bloc (dB >= 0), blocs retenus cumules, plafond en vigueur.
+    // L'UI l'affiche (badge LIM sur le master) : une action qui retient
+    // le son se MONTRE, jamais en silence.
+    float limiter_reduction_db = 11;
+    uint64 limiter_engaged_blocks = 12;
+    float limiter_ceiling_db = 13;
+    bool limiter_enabled = 14;
 }
 
 // S8a: a batch of post-master audio blocks for the subscribed tab.

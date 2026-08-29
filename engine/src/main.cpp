@@ -94,6 +94,10 @@ void printUsage(const char* program) {
               << "  --assets <dir>     Directory containing audio assets (default: same as doc)\n"
               << "  --info             Show project information\n"
               << "  --mute             Use null audio backend (silent playback for testing)\n"
+              << "  --limiter-ceiling <dBFS>\n"
+              << "                     Output brick-wall ceiling (live output only, default -0.3;\n"
+              << "                     never applied to --render / stems)\n"
+              << "  --no-limiter       Disable the output limiter (A/B measurement only)\n"
               << "  --keepalive        File mode: loop the document instead of exiting at its end\n"
               << "  --sample-rate <n>  Sample rate for rendering (default: 48000)\n"
               << "  --bit-depth <n>    Bit depth for rendering (16, 24, 32; default: 24)\n"
@@ -149,6 +153,8 @@ struct Options {
     uint32_t bit_depth = 24;
     uint32_t buffer_size_frames = 512;  // SPIKE LATENCE : enfin reglable
     bool exclusive_mode = false;        // SPIKE s2 : WASAPI exclusif opt-in
+    float limiter_ceiling_db = daw::audio::OutputLimiter::kDefaultCeilingDb;  // le fusible
+    bool limiter_enabled = true;        // --no-limiter = mesure A/B seulement
     uint16_t ws_port = 47821;    // Changed default to 47821
     uint32_t debug_rebuild_delay_ms = 0;  // Test hook: simulate expensive graph builds
     std::string debug_proxy_module;  // 2.4c-1: --debug-proxy-again <AGain.vst3>
@@ -229,6 +235,25 @@ bool parseArgs(int argc, char* argv[], Options& opts) {
             // SPIKE LATENCE s2 : WASAPI exclusif (readback dans la ligne
             // audio-negotiation - la demande peut retomber en partage)
             opts.exclusive_mode = true;
+        } else if (arg == "--no-limiter") {
+            // LE FUSIBLE coupe : mesure A/B seulement, jamais une stack
+            // quotidienne (les T8V sont au bout)
+            opts.limiter_enabled = false;
+        } else if (arg == "--limiter-ceiling") {
+            if (++i >= argc) {
+                std::cerr << "Error: --limiter-ceiling requires a value (dBFS, e.g. -0.3)\n";
+                return false;
+            }
+            try {
+                opts.limiter_ceiling_db = std::stof(argv[i]);
+            } catch (...) {
+                std::cerr << "Error: --limiter-ceiling: not a number: " << argv[i] << "\n";
+                return false;
+            }
+            if (opts.limiter_ceiling_db > 0.0f || opts.limiter_ceiling_db < -24.0f) {
+                std::cerr << "Error: --limiter-ceiling must be in [-24, 0] dBFS\n";
+                return false;
+            }
         } else if (arg == "--buffer-size") {
             // SPIKE LATENCE : taille de buffer demandee au device (frames).
             // La negociation reelle est logguee (audio-negotiation:) - la
@@ -1040,6 +1065,10 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     config.exclusive_mode = opts.exclusive_mode;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
+    // LE FUSIBLE : plafond + marche, poses AVANT initialize (la ligne
+    // output-limiter: du log fait foi)
+    device.limiter().setCeilingDb(opts.limiter_ceiling_db);
+    device.limiter().setEnabled(opts.limiter_enabled);
 
     // Vague 3 : la file MIDI live, cablee AVANT initialize (le callback lit
     // le pointeur sans synchronisation). Statiques : survivent a tout ici.
@@ -1224,6 +1253,9 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     device.shutdown();
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
+    // Le bilan du fusible : combien de blocs il a retenus, et de combien
+    std::cout << "Output limiter: engaged blocks " << device.limiter().engagedBlocks()
+              << ", max reduction " << device.limiter().maxReductionDb() << " dB\n";
     if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
         std::cout << "Bridge blocks missed: "
                   << handle->blocks_missed.load(std::memory_order_relaxed)
@@ -1250,6 +1282,10 @@ int doPlayWithServer(const Options& opts) {
     config.exclusive_mode = opts.exclusive_mode;
     config.use_null_backend = opts.mute;
     config.device_name = opts.device_name;
+    // LE FUSIBLE : plafond + marche, poses AVANT initialize (la ligne
+    // output-limiter: du log fait foi)
+    device.limiter().setCeilingDb(opts.limiter_ceiling_db);
+    device.limiter().setEnabled(opts.limiter_enabled);
 
     // S8a: the master tap - wired BEFORE initialize (the callback reads
     // the pointer unsynchronized). Static: outlives everything here.
@@ -1954,6 +1990,9 @@ int doPlayWithServer(const Options& opts) {
     retired_graphs.clear();
 
     std::cout << "Done. Buffer underruns: " << device.getBufferUnderrunCount() << "\n";
+    // Le bilan du fusible : combien de blocs il a retenus, et de combien
+    std::cout << "Output limiter: engaged blocks " << device.limiter().engagedBlocks()
+              << ", max reduction " << device.limiter().maxReductionDb() << " dB\n";
     if (auto* handle = plugin_registry.find(kDebugProxyNodeId); handle && handle->bridge) {
         std::cout << "Bridge blocks missed: "
                   << handle->blocks_missed.load(std::memory_order_relaxed)

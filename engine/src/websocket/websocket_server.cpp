@@ -493,6 +493,14 @@ void WebSocketServer::broadcastTelemetry() {
     }
     state->set_device_period_frames(device_->getBufferSize());
     state->set_device_exclusive(device_->isExclusive());
+    // LE FUSIBLE : ce que le limiteur de sortie retient, en clair
+    {
+        auto& lim = device_->limiter();
+        state->set_limiter_reduction_db(lim.takeReductionDb());  // crete depuis la trame precedente
+        state->set_limiter_engaged_blocks(lim.engagedBlocks());
+        state->set_limiter_ceiling_db(lim.ceilingDb());
+        state->set_limiter_enabled(lim.enabled());
+    }
 
     // F5+ : verite des slots Session (l'UI n'affiche plus un etat local
     // optimiste). Toujours envoyee - une liste vide SIGNIFIE tout arrete.
