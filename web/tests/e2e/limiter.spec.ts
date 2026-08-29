@@ -91,8 +91,11 @@ test.describe('Output limiter (le fusible)', () => {
         await new Promise((r) => setTimeout(r, 200));
       }
       if ((await engaged()) === 0) {
-        // Le log moteur est la seule trace utile d'un runner CI : le dumper
-        console.log('engine log tail:', fs.readFileSync(logPath, 'utf8').slice(-3000));
+        // Le log moteur est la seule trace utile d'un runner CI : dumper
+        // les lignes qui parlent (assets, graphe, refus), pas les statuts
+        const lines = fs.readFileSync(logPath, 'utf8').split(String.fromCharCode(10))
+          .filter((l) => !/Peak L:/.test(l) && /asset|fetch|Graph|WARN|rror|clip|stall|store|resolve|stem/i.test(l));
+        console.log('engine log (assets/graph):', lines.slice(0, 60).join(' || '));
       }
       expect(await engaged(), 'the limiter never engaged on a +12 dB kit').toBeGreaterThan(0);
       await expect.poll(async () => (await limiter(page))?.state,

@@ -166,6 +166,21 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   multi-onglets, doc > quelques Mo.
 - Compaction : declencheur > ~100 000 changes (`.am` > 5 Ko ou load web
   > 500 ms). Coalescing des drags cote client : optionnel.
+- **Famille « reading '0' » (CI 2026-08-29, jamais vue avant)** : un doc
+  serveur SANS `tracks` recu sur une connexion fraiche, dans 3 specs
+  differentes (`seed-again.mjs:99` x3, `fader-to-engine:350` x2,
+  `tab-guards` x1) sur deux runs Linux plus lents (4,8 min vs 3,2).
+  Le seeder est garde (re-essaie), les specs non. A REPRODUIRE (server
+  : que renvoie-t-il en premier message juste apres un change pousse ?)
+  avant de corriger. Declencheur : le prochain run CI rouge sur cette
+  famille.
+- **`limiter.spec` sur le runner Linux** : le moteur joue du SILENCE
+  (`Peak L: 0 R: 0` pendant 30 s) avec le kit du starter, alors que
+  `transport-loop` (meme pose) passe - il ne prouve que la position.
+  Hypothese : l'asset PUT par l'onglet n'est pas encore au store quand
+  le moteur le cherche, et le rebuild suivant ne re-fetch pas. La spec
+  dumpe desormais les lignes asset/graphe du log moteur : lire le
+  prochain run. Sur Windows : vert (reduction 2,4 dB, 8 blocs).
 - A4-9 : `sameStructure` (render.ts) compare des COMPTES, pas la
   geometrie — un deplacement distant de clip peut ne pas se redessiner.
   A re-verifier au prochain smoke 2 onglets avec drag.

@@ -2180,3 +2180,14 @@ re-essaie au lieu de crasher (aucune assertion affaiblie) ; (b) spec
 limiter : moteur en `--limiter-ceiling -24` (l'option est testee au
 passage, contrat de log `ceiling=-24`), attente 30 s, log moteur dumpe
 en cas d'echec. Locales : limiter + clip-split + tab-guards 5/5.
+
+**2026-08-29 (suite — 7613ba4 encore ROUGE) :** `limiter.spec` x3 : le
+moteur Linux joue du SILENCE (`Peak L: 0 R: 0` sur 30 s) - pas le
+fusible, l'asset (hypothese TODO §3) ; `fader-to-engine:350` x2 : la
+meme famille « reading '0' » (doc serveur sans tracks) que le seeder,
+dans une spec qui n'est pas la mienne. Trois specs, un run plus lent
+(4,8 min) : une race serveur/onglet que ce jour a rendue visible, pas
+le limiteur. STOP a la regle des 3 echecs : etat et hypotheses dans
+TODO §3, la spec dumpe maintenant les lignes asset/graphe du log
+moteur pour que le prochain run PARLE. Le fusible lui-meme est prouve
+(gtest GCC+MSVC, spec Windows, capture).

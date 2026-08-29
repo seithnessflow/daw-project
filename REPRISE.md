@@ -2,12 +2,17 @@
 
 ## TOUT EN HAUT (2026-08-29) : LE FUSIBLE EST POSE — les T8V ont un filet
 
-**A LIRE EN PREMIER — le point de synchro CI.** bff570f (le fusible)
-fut ROUGE : `clip-split` (seeder qui crashe sur un doc serveur vide,
-garde posee) + `limiter.spec` flaky sur Linux (plafond -24 en spec).
-Le push suivant (seeder + spec durcis) porte le verdict a lire : voir
-« Quoi surveiller » ; s'il manque, `gh run list --limit 3` AVANT de
-coder.
+**A LIRE EN PREMIER — le point de synchro CI : ROUGE, deux fois
+(bff570f, 7613ba4), PAS a cause du fusible.** Deux familles (TODO §3) :
+(1) « reading '0' » = doc serveur SANS tracks sur une connexion fraiche,
+vu dans 3 specs (seeder x3 - garde posee -, fader-to-engine x2,
+tab-guards x1), jamais avant ce jour, runs Linux plus lents ; (2)
+`limiter.spec` sur Linux : le moteur joue du SILENCE avec le kit du
+starter (asset pas au store ?), alors que sur Windows la spec est verte.
+Le 3e push (diagnostic : la spec dumpe les lignes asset/graphe du log
+moteur) porte le verdict a lire : `gh run list --limit 3` AVANT de
+coder, puis LIRE le dump dans le log CI. Regle des 3 echecs : la session
+s'est arretee la.
 
 - **Limiteur de sortie** (decision + preuves : docs/DECISIONS.md
   2026-08-29) : brick-wall stereo lie, zero latence, sur la sortie
