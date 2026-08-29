@@ -2,9 +2,8 @@
 
 ## TOUT EN HAUT (2026-08-29, soir) : LE FUSIBLE, L'ASSET QUI ARRIVE TARD, LES UUID
 
-**A LIRE EN PREMIER — le point de synchro CI : voir « Quoi surveiller »
-(verdict du dernier push de la session, lu une fois a la cloture ; s'il
-manque, `gh run list --limit 3` AVANT de coder).**
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
+de la session (700d92f) est VERT (run 33262436609). Aucun verdict en vol.
 
 Trois livraisons, chacune avec sa spec sur le vrai moteur :
 
@@ -31,8 +30,8 @@ a 0,999886) ; l'incremental ment apres un changement de layout du
 contexte callback (`ninja clean`, regle §10) ; en CI le store n'a JAMAIS
 le kit du starter.
 
-gtests **62/62**, tsc 0, suite e2e complete : voir JOURNAL (derniere
-entree).
+gtests **62/62**, tsc 0, suite e2e complete 108/108 (apres le jumeau
+`clipDisplayName`, voir JOURNAL).
 
 ## Comment le voir / l'entendre (5 min)
 
