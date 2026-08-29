@@ -1025,6 +1025,24 @@ std::unique_ptr<daw::graph::AudioGraph> buildGraph(
 /**
  * Copy solo/mute state from old graph to new graph.
  */
+// A4-8 (decision utilisateur 2026-08-29 : « on charge avec un bandeau ») :
+// le document se valide a CHAQUE rebuild, apres la resolution musicale ;
+// un document invalide se charge QUAND MEME et le dit - une fois par
+// message distinct (pas une ligne par tick), et le retour a la validite
+// se dit aussi. L'onglet porte le bandeau (app/doc_guard.ts), le moteur
+// porte la trace. Control thread seulement.
+void logDocumentValidity(const daw::document::ProjectDef& project) {
+    static std::string last_report;
+    const std::string report = daw::document::validateDocument(project);
+    if (report == last_report) return;
+    if (!report.empty()) {
+        std::cerr << "WARNING: document invalid (loaded anyway): " << report << "\n";
+    } else {
+        std::cerr << "document valid again\n";
+    }
+    last_report = report;
+}
+
 void copyMonitorState(daw::graph::AudioGraph* from, daw::graph::AudioGraph* to) {
     if (!from || !to) return;
 
@@ -1131,6 +1149,7 @@ int doPlay(const daw::document::AutomergeDocument& doc, const Options& opts) {
     // buildGraph (le graphe ne voit que des samples resolus)
     auto project = doc.getDocument();
     daw::document::resolveMusicalTime(project);
+    logDocumentValidity(project);  // A4-8 : charge quand meme, mais le dit
 
     // A6/A3-2 : ceil, ou REFUS hors contrat (host/proxy_depth.h)
     uint32_t proxy_depth = 1;
@@ -1637,6 +1656,7 @@ int doPlayWithServer(const Options& opts) {
             // T2 : resolution musicale AVANT buildGraph ET le calcul
             // de content_end ci-dessous (positions resolues partout)
             daw::document::resolveMusicalTime(snapshot);
+            logDocumentValidity(snapshot);  // A4-8 : charge quand meme, mais le dit
 
             auto graph = buildGraph(
                 snapshot, device.getSampleRate(), opts.assets_dir, asset_cache,

@@ -2240,3 +2240,19 @@ l'uuid brut d'un clip MIDI ; il passe par `clipStem()` desormais (les
 ids historiques base36 restent « MIDI »/« clip »). ui-rename +
 ids-unique + 3 voisines vertes ; A4-8 laisse en proposition (decision
 produit : refuser ou charger avec bandeau). Rien ne tourne.
+
+**2026-08-29 (A4-8 : « on charge avec un bandeau », decision
+utilisateur) :** livre aux deux etages - `document/validate.ts` +
+`app/doc_guard.ts` + bandeau `#doc-banner` cote onglet ; `validateDocument`
+appele a chaque rebuild cote moteur, log une fois par message distinct.
+Les regles moteur etaient PERIMEES (v1) : asset_hash vide = erreur alors
+que le contrat v8 le dit MIDI, start_sample -1 = erreur alors que c'est
+la sentinelle musicale - rafraichies (ticks, ids en double ajoutes) ; la
+validation passe apres resolveMusicalTime, la ou les sentinelles sont
+resolues. Test tooling : `scripts/seed-invalid.mjs` (meme moule que
+seed-again, gain 7 + piste sans id). gtests 63/63 (testValidateDocument),
+spec doc-banner + tab-guards/sync-resilience/criterion3/master-gain
+vertes. Piege : un `
+` echappe une fois de trop dans un heredoc =
+« saut de ligne dans la constante » (C2001) - repare a l'outil Edit.
+Decision et perimetre : docs/DECISIONS.md.

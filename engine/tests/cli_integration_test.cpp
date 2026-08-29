@@ -585,6 +585,53 @@ bool testDelayNode() {
 // Session 4.3 : drive - LE test qui dit si l'oversampling fait son
 // travail (brief) : niveau d'alias du 3e harmonique sous un seuil.
 // Sinus 15 kHz a 48 kHz : 3e harmonique 45 kHz -> alias a 3 kHz.
+// A4-8 (2026-08-29) : les regles de validateDocument au document connu -
+// un doc sain (clip audio absolu + clip MIDI musical sans asset) = vide ;
+// un doc casse nomme CHAQUE faute (gain, id vide, id en double, version).
+bool testValidateDocument() {
+    std::cout << "Test: validateDocument rules... ";
+    using namespace daw::document;
+    ProjectDef good;
+    good.schema_version = 2;
+    good.sample_rate = 48000;
+    TrackDef t;
+    t.id = "track-a"; t.name = "A"; t.gain = 1.0f;
+    ClipDef audio;
+    audio.id = "clip-1"; audio.asset_hash = "abc"; audio.start_sample = 0;
+    audio.length_samples = 48000;
+    ClipDef midi;
+    midi.id = "clip-2"; midi.start_sample = 0; midi.length_samples = 48000;
+    midi.start_tick = 3840; midi.length_tick = 960;  // MIDI musical, sans asset
+    t.clips.push_back(audio);
+    t.clips.push_back(midi);
+    good.tracks.push_back(t);
+    const std::string ok = validateDocument(good);
+    if (!ok.empty()) {
+        std::cout << "FAILED: sane document flagged: " << ok << "\n";
+        return false;
+    }
+
+    ProjectDef bad = good;
+    bad.schema_version = 99;
+    bad.tracks[0].gain = 7.0f;
+    TrackDef dup = t;  // meme id de piste, memes ids de clips
+    bad.tracks.push_back(dup);
+    TrackDef noid;
+    noid.gain = 1.0f;
+    bad.tracks.push_back(noid);
+    const std::string report = validateDocument(bad);
+    for (const char* needle : { "Schema version 99", "invalid gain 7",
+                                "Track ID track-a is duplicated",
+                                "Clip ID clip-1 is duplicated", "has empty ID" }) {
+        if (report.find(needle) == std::string::npos) {
+            std::cout << "FAILED: report lacks '" << needle << "': " << report << "\n";
+            return false;
+        }
+    }
+    std::cout << "OK (" << report.size() << " chars of report)\n";
+    return true;
+}
+
 bool testDriveNode() {
     std::cout << "Test: Drive node (aliasing under threshold)... ";
     using daw::graph::DriveNode;
@@ -5138,6 +5185,7 @@ int main(int argc, char* argv[]) {
     run(testEq3Node);
     run(testCompressorNode);
     run(testDriveNode);
+    run(testValidateDocument);    // A4-8 : les regles au document connu
     run(testOutputLimiter);       // LE FUSIBLE : brick-wall de la sortie live
     run(testDelayNode);
     run(testRingBuffer);

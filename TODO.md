@@ -181,9 +181,6 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 - A4-9 : `sameStructure` (render.ts) compare des COMPTES, pas la
   geometrie — un deplacement distant de clip peut ne pas se redessiner.
   A re-verifier au prochain smoke 2 onglets avec drag.
-- A4-8 : `validateDocument`/`migrateDocument` jamais appeles au
-  chargement (moteur : `schema.cpp` mort ; web : idem) — un document
-  corrompu se charge sans un mot.
 - Un VIEUX projet (racine pre-graine) ne merge pas des editions faites
   hors-ligne avant premier contact (accepte, date).
 - 937+ fichiers `server/projects/` sans GC (artefacts de pilotage).

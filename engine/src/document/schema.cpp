@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "schema.h"
 
+#include <set>
 #include <sstream>
 
 namespace daw::document {
@@ -44,12 +45,17 @@ std::string validateDocument(const ProjectDef& doc) {
         errors << "Sample rate must be > 0. ";
     }
 
-    // Validate tracks
+    // Validate tracks (A4-8, 2026-08-29 : ids en double = erreur - deux
+    // pistes ou deux clips du meme id dans un doc partage, c'est la
+    // collision que les UUID doivent rendre impossible)
+    std::set<std::string> track_ids, clip_ids;
     for (size_t i = 0; i < doc.tracks.size(); ++i) {
         const auto& track = doc.tracks[i];
 
         if (track.id.empty()) {
             errors << "Track " << i << " has empty ID. ";
+        } else if (!track_ids.insert(track.id).second) {
+            errors << "Track ID " << track.id << " is duplicated. ";
         }
 
         if (track.gain < 0.0f || track.gain > 2.0f) {
@@ -69,11 +75,18 @@ std::string validateDocument(const ProjectDef& doc) {
             if (clip.id.empty()) {
                 errors << "Track " << track.id << " clip " << j
                        << " has empty ID. ";
+            } else if (!clip_ids.insert(clip.id).second) {
+                errors << "Clip ID " << clip.id << " is duplicated. ";
             }
 
-            if (clip.asset_hash.empty()) {
+            // (asset_hash vide = clip MIDI, contrat v8 : pas une erreur)
+            if (clip.start_tick != -1 && clip.start_tick < 0) {
                 errors << "Track " << track.id << " clip " << clip.id
-                       << " has empty asset hash. ";
+                       << " has negative start tick. ";
+            }
+            if (clip.length_tick != -1 && clip.length_tick <= 0) {
+                errors << "Track " << track.id << " clip " << clip.id
+                       << " has invalid length tick. ";
             }
 
             if (clip.start_sample < 0) {

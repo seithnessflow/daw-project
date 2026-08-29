@@ -1,11 +1,12 @@
 # REPRISE.md — point de reprise au demarrage
 
-## TOUT EN HAUT (2026-08-29, soir) : LE FUSIBLE, L'ASSET QUI ARRIVE TARD, LES UUID
+## TOUT EN HAUT (2026-08-29, soir) : LE FUSIBLE, L'ASSET TARDIF, LES UUID, LE BANDEAU
 
-**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
-de la session (700d92f) est VERT (run 33262436609). Aucun verdict en vol.
+**A LIRE EN PREMIER — le point de synchro CI : voir « Quoi surveiller »
+(verdict du dernier push, A4-8 ; s'il manque, `gh run list --limit 3`
+AVANT de coder). Precedent : 700d92f VERT (run 33262436609).**
 
-Trois livraisons, chacune avec sa spec sur le vrai moteur :
+Quatre livraisons, chacune avec sa spec sur le vrai moteur :
 
 1. **Le fusible** (docs/DECISIONS.md 2026-08-29) : limiteur brick-wall
    zero latence sur la sortie LIVE du moteur seulement (jamais dans les
@@ -23,6 +24,14 @@ Trois livraisons, chacune avec sa spec sur le vrai moteur :
 3. **A4-11, les ids** : `document/ids.ts` = UN fabricant, `newId(prefix,
    stem?)` -> `<prefixe>[-stem]-<uuid v4>` ; `clipStem()` pour Ctrl+D.
    23 sites, prefixes intacts. Spec `ids-unique.spec.ts`.
+4. **A4-8, le bandeau** (decision utilisateur : « on charge avec un
+   bandeau », docs/DECISIONS.md) : `document/validate.ts` + bandeau
+   `#doc-banner` (ambre, les fautes en clair) a chaque document recu ;
+   moteur : `validateDocument` a chaque rebuild, `WARNING: document
+   invalid (loaded anyway)` une fois par message. Regles moteur
+   rafraichies (MIDI sans asset, ticks, ids en double). Seeder
+   `scripts/seed-invalid.mjs`, spec `doc-banner.spec.ts`, sonde
+   `__dawDocValidity`.
 
 Pieges payes : `std::max` / `time_point::max()` sans parentheses = la
 macro Windows (3 fois) ; gain du limiteur en DOUBLE (le float stagnait
@@ -30,8 +39,7 @@ a 0,999886) ; l'incremental ment apres un changement de layout du
 contexte callback (`ninja clean`, regle §10) ; en CI le store n'a JAMAIS
 le kit du starter.
 
-gtests **62/62**, tsc 0, suite e2e complete 108/108 (apres le jumeau
-`clipDisplayName`, voir JOURNAL).
+gtests **63/63**, tsc 0, suite e2e complete **109/109** (3,8 min).
 
 ## Comment le voir / l'entendre (5 min)
 
@@ -60,16 +68,12 @@ tourne a la cloture.
 2. Reliquat spike LAN ; 3. T4 Link Etage 2 ; 4. perf au regime de
    preuve ; 5. ratifications AUDIT-5 F / AUDIT-6.
 
-Propositions de la session (a arbitrer, pas en file) :
-- **A4-8** (`validateDocument` jamais appele) : PAS fait — decision
-  produit avant d'etre du code : un document invalide (gain hors [0, 2],
-  id vide, version inconnue) se REFUSE bruyamment ou se CHARGE avec un
-  bandeau ? Le moteur a deja `validateDocument`, le web n'a que
-  `migrateDocument`. Une session : trancher, cabler aux deux etages,
-  une spec par refus.
-- **C1 + eclatement de `main.cpp`** (2077 lignes, `doPlayWithServer`
-  ~730) : sortir l'HTTP de la boucle de controle oblige a decouper ;
-  session dediee, moule `export_job`.
+Proposition de la session (a arbitrer, pas en file) : **C1 +
+eclatement de `main.cpp`** (2077 lignes, `doPlayWithServer` ~730) :
+sortir l'HTTP de la boucle de controle oblige a decouper ; session
+dediee, moule `export_job`. A4-8 : reste la REPARATION depuis le
+bandeau (clamp du gain, id regenere) - decision produit, avec
+l'arbitrage d'ecrivain.
 
 ## Decisions ouvertes
 

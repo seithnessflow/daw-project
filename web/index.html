@@ -84,6 +84,9 @@
          joue un autre projet que celui de l'onglet - rempli par
          app/project_guard.ts, jamais un etat qui ment par omission. -->
     <div id="project-banner" hidden></div>
+    <!-- A4-8 : le document recu est invalide (gain hors bornes, id vide ou
+         en double...) - charge quand meme, mais DIT (app/doc_guard.ts) -->
+    <div id="doc-banner" data-role="doc-banner" hidden></div>
 
     <!-- Refonte T5 : les slots gardent leurs id (le JS les remplit par id,
          jamais par position) - on ne fait que les RE-PARENTER.

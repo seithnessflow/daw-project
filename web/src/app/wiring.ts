@@ -50,6 +50,7 @@ import { renderTracks } from './render';
 import { wireExport } from './export';
 import { wireVersionGuard } from './version_guard';
 import { wireProjectGuard } from './project_guard';
+import { wireDocGuard, checkDocument } from './doc_guard';
 import { wireLoopRegion, reassertLoopRegion } from './loop_region';
 import { wireTempoField } from './tempo_field';
 import { wireTrackMenu } from './track_menu';
@@ -107,6 +108,7 @@ export async function init(): Promise<void> {
     // (bitten once, on duo). Offline edits take the merge road.
     if (firstContact && !hadPending && ctx.project!.isPristineSeed()) {
       ctx.project!.load(data);
+      checkDocument();  // A4-8 : charge quand meme, mais le dit
       renderTracks(true);
       const wantStarter =
         new URLSearchParams(window.location.search).get('starter') === '1';
@@ -146,6 +148,7 @@ export async function init(): Promise<void> {
     if (resyncCycles > 0) {
       serverClient.requestResync();
     }
+    checkDocument();  // A4-8 : chaque document fusionne repasse la garde
     if (firstContact) {
       // First contact via the LAUNCHER (?starter=1): offer the starter
       // choice (demo groove / start empty). Gated on the launcher flag so
@@ -167,6 +170,7 @@ export async function init(): Promise<void> {
       console.warn('Change failed to apply - requesting resync');
       serverClient.requestResync(200);
     }
+    checkDocument();  // A4-8
     renderTracks();
   };
 
@@ -588,6 +592,7 @@ export async function init(): Promise<void> {
   // a ete relancee sous l'onglet) + projet (badge, bandeau de desaccord)
   wireVersionGuard();
   wireProjectGuard();
+  wireDocGuard();  // A4-8 : bandeau de document invalide
   // Boucle utilisateur (AUDIT-6 QW) : drag sur la bande cycle de la regle
   wireLoopRegion();
   wireTempoField();  // T3 tempo

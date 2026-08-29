@@ -864,6 +864,34 @@ fusible (getMasterPeaks du graphe) — le badge dit ce qui est retenu, le VU
 dit ce que le mix produit ; un plafond reglable depuis l'UI (aujourd'hui
 CLI seulement).
 
+### 2026-08-29 — A4-8 : un document invalide se CHARGE et le DIT (bandeau)
+
+Decision utilisateur (« fais A4-8 : on charge avec un bandeau ») : la
+validation du document (gain hors [0, 2], pan hors [-1, 1], id vide ou
+en double, version de schema inconnue, taux <= 0, clip sans position ou
+sans longueur, device sans id/type) ne REFUSE jamais le document -
+refuser, c'est perdre le travail d'un pair. Elle l'annonce.
+
+Mecanisme : JUMEAU VOULU aux deux etages. Web : `document/validate.ts`
+(pure) + `app/doc_guard.ts` -> bandeau `#doc-banner` (ambre, les trois
+premieres fautes en clair, toutes dans le title), repasse a chaque
+document recu (premier contact, fusion, change), sonde
+`window.__dawDocValidity`. Moteur : `validateDocument` (schema.cpp,
+regles rafraichies : asset_hash vide = clip MIDI, ticks, ids en double)
+appele a chaque rebuild APRES resolveMusicalTime ; `WARNING: document
+invalid (loaded anyway): ...` une fois par message distinct, `document
+valid again` au retour ; le graphe se construit quand meme.
+
+Preuves : gtest `testValidateDocument` (doc sain avec clip MIDI musical
+sans asset = vide ; doc casse nomme version, gain, ids en double, id
+vide) ; spec `doc-banner.spec.ts` (seeder `scripts/seed-invalid.mjs` :
+gain 7 + piste sans id ; l'onglet charge la piste ET montre le bandeau,
+un onglet neuf aussi, le moteur loggue et construit son graphe) ;
+capture `web/test-results/doc-banner.png`.
+
+Non couvert : aucune reparation proposee depuis le bandeau (clamp du
+gain, id regenere) - decision produit a venir, avec l'arbitrage d'ecrivain.
+
 ## Resultats historiques 2026-08-20 (resume)
 
 - **Critere 5 sans charge :** ZenGo SC, 48 kHz, 512 frames, 599,5 s/600,
