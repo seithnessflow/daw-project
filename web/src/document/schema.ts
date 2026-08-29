@@ -6,6 +6,7 @@
  */
 
 import { effectiveMap, type TempoPoint } from './tempo';
+import { newId } from './ids';
 
 /**
  * v2 (migration TEMPO T1, ADDITIVE-DUAL ratifie 2026-08-27) : le
@@ -253,7 +254,7 @@ export function clipDisplayName(
  */
 export function makeTrackDef(name: string, kind?: TrackKind): TrackDef {
   const t: TrackDef = {
-    id: `track-${Date.now()}`,
+    id: newId('track'),
     name,
     gain: 1.0,
     clips: [],

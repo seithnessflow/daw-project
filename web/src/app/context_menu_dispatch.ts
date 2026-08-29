@@ -21,6 +21,7 @@ import { startInlineRename } from '../ui/inline_rename';
 import { renderSession } from '../ui/session';
 import { clipDisplayName } from '../document/schema';
 import * as life from '../ui/life';
+import { newId } from '../document/ids';
 
 function closest(el: EventTarget | null, sel: string): HTMLElement | null {
   return el instanceof Element ? (el.closest(sel) as HTMLElement | null) : null;
@@ -109,7 +110,7 @@ function buildItems(target: EventTarget | null, clickX: number): MenuItem[] | nu
         // a sa fin musicale) ; l'absolu garde le collage en samples.
         const copy = {
           ...(JSON.parse(JSON.stringify(c)) as typeof c),
-          id: `clip-${Math.random().toString(36).slice(2, 10)}`,
+          id: newId('clip'),
         };
         if (isMusicalClip(c)) {
           copy.startTick = c.startTick! + (c.lengthTick ??

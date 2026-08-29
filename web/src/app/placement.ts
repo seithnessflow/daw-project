@@ -17,6 +17,7 @@ import { renderTracks } from './render';
 import { renderBrowser } from '../ui/browser';
 import { markLanded } from './gestures';
 import { snapStep } from './navigation';
+import { newId } from '../document/ids';
 
 /**
  * A dropped file becomes a project asset + a clip: verify it is a WAV,
@@ -146,7 +147,7 @@ export async function handleFileDrop(
   const sec = Math.max(0, Math.round((laneX / TIMELINE.pps) / step) * step);
   const stem = file.name.replace(/\.[^.]+$/, '')
     .replace(/[^a-zA-Z0-9]+/g, '-').slice(0, 24) || 'audio';
-  const clipId = `clip-${stem}-${Date.now()}`;
+  const clipId = newId('clip', stem);
   ctx.project.addClip(trackId, {
     id: clipId,
     name: stem,
@@ -291,7 +292,7 @@ export function addDeviceToTrack(
   // ProcessorDef au moule du "+ device" vst3 (ui/track.ts) : id, type,
   // uid, name, bypass false, params vides.
   ctx.project.addProcessor(trackId, {
-    id: `dev-${Date.now()}`,
+    id: newId('dev'),
     type: 'vst3',
     uid: payload.uid,
     name: payload.name,
@@ -361,7 +362,7 @@ async function placeSampleFromDrop(
       `« ${sample.name} » est deja pose exactement ici`);
     return;
   }
-  const placedId = `clip-${sample.name}-${Date.now()}`;
+  const placedId = newId('clip', sample.name);
   ctx.project.addClip(trackId, {
     id: placedId,
     assetHash: sample.hash,

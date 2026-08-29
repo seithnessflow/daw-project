@@ -53,6 +53,7 @@ import { wireProjectGuard } from './project_guard';
 import { wireLoopRegion, reassertLoopRegion } from './loop_region';
 import { wireTempoField } from './tempo_field';
 import { wireTrackMenu } from './track_menu';
+import { newId, clipStem } from '../document/ids';
 
 declare global {
   interface Window {
@@ -739,7 +740,7 @@ export async function init(): Promise<void> {
           + 'meme pas de grille) - viser un autre pas ou zoomer');
         return;
       }
-      const placedId = `clip-${armed.name}-${Date.now()}`;
+      const placedId = newId('clip', armed.name);
       ctx.project.addClip(id, {
         id: placedId,
         assetHash: armed.hash,
@@ -859,11 +860,9 @@ export async function init(): Promise<void> {
         }
         const copies: string[] = [];
         ctx.project.beginUndoGroup();
-        let k = 0;
         for (const { trackId, clip } of lot) {
           const start = clipStartSamples(clip, doc) + shift;
-          const stem = clip.id.replace(/^clip-/, '').replace(/-\d+$/, '');
-          const copyId = `clip-${stem}-${Date.now()}${lot.length > 1 ? `-${k++}` : ''}`;
+          const copyId = newId('clip', clipStem(clip.id));
           // Copie INTEGRALE (fix 2026-08-26 : l'objet a 5 champs perdait
           // notes/fades/name du clip duplique), plain() car proxy Automerge
           // T3 dual-aware : le musical se colle en ticks, l'absolu en samples

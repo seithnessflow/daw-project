@@ -181,8 +181,6 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 - A4-9 : `sameStructure` (render.ts) compare des COMPTES, pas la
   geometrie — un deplacement distant de clip peut ne pas se redessiner.
   A re-verifier au prochain smoke 2 onglets avec drag.
-- A4-11 : ids fondes sur `Date.now()` (`makeTrackDef`, clips) vs UUID
-  exige par SCHEMA.md — collision inter-onglets possible.
 - A4-8 : `validateDocument`/`migrateDocument` jamais appeles au
   chargement (moteur : `schema.cpp` mort ; web : idem) — un document
   corrompu se charge sans un mot.

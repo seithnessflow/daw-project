@@ -2220,3 +2220,15 @@ l'echeance -> re-fetch loggue et le fusible a -24 dBFS atteste que ca
 JOUE. gtests 62/62. Piege a nouveau : `Clock::time_point::max()` sans
 parentheses = la macro Windows. Reste en dette : le refus VISIBLE
 (badge « asset manquant » sur le clip).
+
+**2026-08-29 (suite, tache 2 : A4-11, les ids) :** `track-${Date.now()}`
+(deux onglets, une milliseconde = le meme id dans un doc partage, sans un
+mot) et huit variantes `Math.random().toString(36).slice(2, 8)` (36^6)
+remplacees par UN fabricant, `document/ids.ts` : `newId(prefix, stem?)`
+= `<prefixe>[-stem]-<uuid v4>` (crypto.randomUUID, repli getRandomValues
+- jamais Math.random seul), `clipStem()` pour la duplication (garde le
+stem lisible, comprend les formes historiques). 23 sites, 7 fichiers ;
+les prefixes des selecteurs et des logs ne bougent pas. Piege : le
+`newId` local de `duplicateScene` masquait l'import (tsc l'a dit).
+Spec `ids-unique.spec.ts` (deux pistes puis deux clips dans la meme
+milliseconde, 10 000 ids = 10 000, stems) ; 19 specs voisines vertes.

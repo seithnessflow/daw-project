@@ -20,6 +20,7 @@ import { clampMilliBpm } from './tempo';
 import { clampTick } from './sanitize';
 import { UndoJournal, type InverseOp, type ClipTiming } from './undo';
 import { seedBytes } from './seed';
+import { newId } from './ids';
 
 /** T3 : la photo des champs temporels PRESENTS d'un clip (le vehicule
  *  de capture/restore dual-domaine - regle des jumeaux, une seule
@@ -700,7 +701,7 @@ export class Project {
     const left = at - startS;
     const right = startS + lenS - at;
     if (left < 1024 || right < 1024) return null;
-    const rightId = `clip-${Math.random().toString(36).slice(2, 10)}`;
+    const rightId = newId('clip');
     const fadeIn = clip.fadeInSamples ?? 0;
     const fadeOut = clip.fadeOutSamples ?? 0;
     // Automerge refuse undefined : ne poser que les champs presents
@@ -773,7 +774,7 @@ export class Project {
    * en tete de chaine de la piste le joue.
    */
   addMidiClip(trackId: string, startSample: number, lengthSamples: number): string {
-    const id = 'clip-' + Math.random().toString(36).slice(2, 10);
+    const id = newId('clip');
     // T3 : un clip MIDI FRAIS nait MUSICAL (ticks) - la cible en
     // samples de l'appelant passe par le pipeline sample -> tick.
     // Il suit desormais le tempo ; l'existant absolu ne bouge pas.
@@ -790,7 +791,7 @@ export class Project {
   /** T7 Session : ajoute une scene (une LIGNE du clip-launcher) et rend son
    *  id. F5+ : undo-journalisee (inverse = deleteScene). */
   addScene(name: string): string {
-    const id = 'scene-' + Math.random().toString(36).slice(2, 8);
+    const id = newId('scene');
     this.journal.capture({ type: 'deleteScene', sceneId: id });
     this.doc = Automerge.change(this.doc, (d) => {
       if (!d.scenes) d.scenes = [];
@@ -869,25 +870,25 @@ export class Project {
     const scene = (this.doc.scenes ?? []).find((s) => s.id === sceneId);
     if (!scene) return null;
     this.beginUndoGroup();
-    const newId = this.addScene(`${scene.name} (copie)`);
+    const copyId = this.addScene(`${scene.name} (copie)`);
     for (const t of this.doc.tracks) {
       const slot = t.clips.find((c) => c.sceneId === sceneId);
       if (slot) {
         this.addClip(t.id, {
           ...(plain(slot) as ClipDef),
-          id: 'clip-' + Math.random().toString(36).slice(2, 10),
-          sceneId: newId,
+          id: newId('clip'),
+          sceneId: copyId,
         });
       }
     }
     this.endUndoGroup();
-    return newId;
+    return copyId;
   }
 
   /** T7 Session : cree un SLOT (clip MIDI de session) sur une piste dans une
    *  scene. Porte sceneId -> le moteur l'ignore en timeline. */
   addSessionClip(trackId: string, sceneId: string): string {
-    const id = 'clip-' + Math.random().toString(36).slice(2, 10);
+    const id = newId('clip');
     const clip: ClipDef = {
       id, assetHash: '', startSample: 0, lengthSamples: 96000, offsetSamples: 0,
       notes: [], sceneId,
@@ -942,7 +943,7 @@ export class Project {
       else {
         if (typeof note.startTick === 'number') ensureV2(d);
         // Identite stable a la naissance (additif) - l'adresse des edits
-        c.notes.push({ ...note, id: note.id ?? ('n-' + Math.random().toString(36).slice(2, 10)) });
+        c.notes.push({ ...note, id: note.id ?? newId('n') });
       }
     });
     this.capturePending();
@@ -1103,7 +1104,7 @@ export class Project {
   addAutomationLane(trackId: string | null,
     target: { processorId?: string; param: string }): string {
     if (trackId !== null && !this.doc.tracks.some((t) => t.id === trackId)) return '';
-    const id = 'lane-' + Math.random().toString(36).slice(2, 10);
+    const id = newId('lane');
     this.journal.capture({ type: 'deleteAutomationLane', trackId, laneId: id });
     this.doc = Automerge.change(this.doc, (d) => {
       const lanes = ensureLanes(d, trackId);

@@ -10,6 +10,7 @@
  */
 
 import type { Project } from '../document/project';
+import { newId } from '../document/ids';
 
 interface DemoTrack {
   name: string;
@@ -93,13 +94,13 @@ async function loadDemo(project: Project, pushLast: () => void): Promise<void> {
   manifest.tracks.forEach((dt, i) => {
     let trackId = existing[i];
     if (!trackId) {
-      trackId = `track-${Date.now()}-${i}`;
+      trackId = newId('track');
       project.addTrack({ id: trackId, name: dt.name, gain: 1.0, clips: [], chain: [] });
       pushLast();  // every mutation reaches the server (getLastChange is scalar)
     }
-    dt.times.forEach((sec, k) => {
+    dt.times.forEach((sec) => {
       project.addClip(trackId, {
-        id: `clip-${dt.name}-${Date.now()}-${k}`,
+        id: newId('clip', dt.name),
         assetHash: dt.hash,
         startSample: Math.round(sec * sr),
         lengthSamples: Math.round(dt.seconds * sr),

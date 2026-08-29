@@ -30,6 +30,7 @@ import { ctx } from '../app/context';  // V1.3: undo groups on fader sweeps
 // re-rendus ; remise a zero quand le moteur part (ses enfants - et leurs
 // fenetres - meurent avec lui).
 const openEditors = new Set<string>();
+import { newId } from '../document/ids';
 export function isEditorOpen(procId: string): boolean {
   return openEditors.has(procId);
 }
@@ -662,14 +663,14 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   });
   gainBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.gain', bypass: false,
+      id: newId('dev'), type: 'builtin.gain', bypass: false,
       params: [{ key: 'gain', value: 1 }],
     });
     close();
   });
   utilBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.utility', name: 'Utility',
+      id: newId('dev'), type: 'builtin.utility', name: 'Utility',
       bypass: false,
       params: [
         { key: 'gain', value: 1 }, { key: 'pan', value: 0 },
@@ -680,7 +681,7 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   });
   eqBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.eq3', name: 'EQ Three',
+      id: newId('dev'), type: 'builtin.eq3', name: 'EQ Three',
       bypass: false,
       params: [
         { key: 'lowGainDb', value: 0 }, { key: 'lowFreq', value: 120 },
@@ -693,7 +694,7 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   });
   compBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.comp', name: 'Compressor',
+      id: newId('dev'), type: 'builtin.comp', name: 'Compressor',
       bypass: false,
       params: [
         { key: 'thresholdDb', value: -24 }, { key: 'ratio', value: 4 },
@@ -705,7 +706,7 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   });
   driveBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.drive', name: 'Drive',
+      id: newId('dev'), type: 'builtin.drive', name: 'Drive',
       bypass: false,
       params: [
         { key: 'driveDb', value: 12 }, { key: 'levelDb', value: -6 },
@@ -716,7 +717,7 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
   });
   delayBtn.addEventListener('click', () => {
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'builtin.delay', name: 'Delay',
+      id: newId('dev'), type: 'builtin.delay', name: 'Delay',
       bypass: false,
       params: [
         { key: 'timeMs', value: 350 }, { key: 'feedback', value: 0.35 },
@@ -736,7 +737,7 @@ function createAddDeviceMenu(onAddDevice: (proc: ProcessorDef) => void): HTMLEle
     }
     const label = nameInput.value.trim();
     onAddDevice({
-      id: `dev-${Date.now()}`, type: 'vst3', uid: uid.toUpperCase(),
+      id: newId('dev'), type: 'vst3', uid: uid.toUpperCase(),
       ...(label ? { name: label } : {}),
       bypass: false, params: [],
     });
