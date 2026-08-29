@@ -2,10 +2,12 @@
 
 ## TOUT EN HAUT (2026-08-29) : LE FUSIBLE EST POSE — les T8V ont un filet
 
-**A LIRE EN PREMIER — le point de synchro CI : voir le bloc « Quoi
-surveiller » ci-dessous (verdict du dernier push de la session du
-2026-08-29, lu une fois a la cloture ; s'il manque, `gh run list
---limit 3` AVANT de coder).**
+**A LIRE EN PREMIER — le point de synchro CI.** bff570f (le fusible)
+fut ROUGE : `clip-split` (seeder qui crashe sur un doc serveur vide,
+garde posee) + `limiter.spec` flaky sur Linux (plafond -24 en spec).
+Le push suivant (seeder + spec durcis) porte le verdict a lire : voir
+« Quoi surveiller » ; s'il manque, `gh run list --limit 3` AVANT de
+coder.
 
 - **Limiteur de sortie** (decision + preuves : docs/DECISIONS.md
   2026-08-29) : brick-wall stereo lie, zero latence, sur la sortie

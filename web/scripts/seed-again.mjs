@@ -62,7 +62,10 @@ if (!fs.existsSync(hashedPath)) {
 const sock = await openSocket();
 const serverDoc = Automerge.load(await nextMessage(sock));
 
-if (serverDoc.tracks[0]?.chain?.some((p) => p.id === 'mains-again')) {
+// Garde (CI 2026-08-29) : un doc serveur encore VIDE (pas de tracks) ne
+// doit pas faire crasher le seeder - il faut seeder, et la boucle de
+// confirmation doit RE-ESSAYER, pas mourir sur `undefined[0]`.
+if (serverDoc.tracks?.[0]?.chain?.some((p) => p.id === 'mains-again')) {
   console.log(`project '${projectId}' already seeded - nothing to do`);
   sock.close();  // natural exit once the socket drains
 } else {
@@ -96,7 +99,7 @@ for (let attempt = 0; attempt < 40; attempt++) {
   const s2 = await openSocket();
   const d = Automerge.load(await nextMessage(s2));
   s2.close();
-  if (d.tracks[0]?.chain?.some((p) => p.id === 'mains-again')) {
+  if (d.tracks?.[0]?.chain?.some((p) => p.id === 'mains-again')) {
     console.log(`project '${projectId}' seeded: clip (${baseClip.lengthSamples} samples) + AGain at 0.5, bypass off`);
     // natural exit once sockets drain - process.exit() here races the ws
     // teardown on Windows (libuv assertion)

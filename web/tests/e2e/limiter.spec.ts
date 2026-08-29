@@ -4,10 +4,12 @@
  * sortie LIVE (jamais dans les stems ni l'export). Ce que le gtest
  * testOutputLimiter prouve au signal connu (crete <= plafond, transparence
  * sous le plafond), cette spec le prouve DE BOUT EN BOUT sur le vrai
- * moteur : un kit pousse a +12 dB (piste x2, master x2) fait travailler le
- * fusible, la telemetrie le dit (EngineState 11-14) et l'UI le MONTRE
- * (badge LIM actif) - une action qui retient le son ne se cache pas.
- * Moteur reel en --mute (port 47821 libre exige).
+ * moteur : un kit pousse a +12 dB (piste x2, master x2) contre un plafond
+ * abaisse a -24 dBFS (`--limiter-ceiling`, l'option est testee au passage ;
+ * au plafond nominal le kit ne depasse que de ~2 dB, trop juste pour un
+ * runner CI lent) fait travailler le fusible, la telemetrie le dit
+ * (EngineState 11-14) et l'UI le MONTRE (badge LIM actif) - une action qui
+ * retient le son ne se cache pas. Moteur reel en --mute (port 47821 libre).
  */
 import { test, expect, Page } from '@playwright/test';
 import { spawn, ChildProcess } from 'child_process';
@@ -34,7 +36,8 @@ test.describe('Output limiter (le fusible)', () => {
     const engine: ChildProcess = spawn(
       engineExe,
       ['--server', 'ws://localhost:3000', '--project', projectId,
-       '--play', '--mute', '--ws-port', String(ENGINE_PORT)],
+       '--play', '--mute', '--ws-port', String(ENGINE_PORT),
+       '--limiter-ceiling', '-24'],
       { stdio: ['ignore', logFd, logFd] },
     );
     fs.closeSync(logFd);
@@ -44,8 +47,8 @@ test.describe('Output limiter (le fusible)', () => {
         await waitUntil(() => countInFile(logPath, 'WebSocket server') >= 1, 15000),
         `engine WS never came up (log: ${logPath})`,
       ).toBe(true);
-      // Le contrat de log : le fusible est ON par defaut, plafond -0.3
-      expect(countInFile(logPath, 'output-limiter: ON ceiling=-0.3'),
+      // Le contrat de log : le fusible est ON, plafond demande honore
+      expect(countInFile(logPath, 'output-limiter: ON ceiling=-24'),
         'output-limiter contract line').toBeGreaterThan(0);
 
       await page.goto(`/?project=${projectId}&lab=1`);
@@ -58,7 +61,7 @@ test.describe('Output limiter (le fusible)', () => {
       const badge = page.locator('#limiter-badge');
       await expect(badge).toBeVisible();
       await expect.poll(() => limiter(page), { timeout: 10000 })
-        .toMatchObject({ enabled: true, ceilingDb: expect.closeTo(-0.3, 2) });
+        .toMatchObject({ enabled: true, ceilingDb: expect.closeTo(-24, 2) });
       await expect(badge).toHaveAttribute('data-state', 'idle');
 
       // Un kit pose par l'UI, boucle ON pour que le son revienne
@@ -82,9 +85,16 @@ test.describe('Output limiter (le fusible)', () => {
 
       // Le moteur retient des blocs, et l'UI l'a MONTRE (badge actif,
       // reduction en dB dans le texte)
-      await expect.poll(async () => (await limiter(page))?.engagedBlocks ?? 0,
-        { timeout: 20000, message: 'the limiter never engaged on a +12 dB kit' })
-        .toBeGreaterThan(0);
+      const engaged = async () => (await limiter(page))?.engagedBlocks ?? 0;
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline && (await engaged()) === 0) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if ((await engaged()) === 0) {
+        // Le log moteur est la seule trace utile d'un runner CI : le dumper
+        console.log('engine log tail:', fs.readFileSync(logPath, 'utf8').slice(-3000));
+      }
+      expect(await engaged(), 'the limiter never engaged on a +12 dB kit').toBeGreaterThan(0);
       await expect.poll(async () => (await limiter(page))?.state,
         { timeout: 5000 }).toBe('active');
       await expect(badge).toHaveText(/LIM -\d+\.\d/);

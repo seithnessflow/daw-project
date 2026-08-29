@@ -2167,3 +2167,16 @@ voisines vertes, capture web/test-results/limiter-active.png.
 
 Note d'ergonomie (dette TODO) : le VU master lit la crete AVANT le
 fusible ; le badge dit ce qui est retenu, le VU ce que le mix produit.
+
+**2026-08-29 (suite — la CI de bff570f) :** ROUGE : 98 verts, 1 rouge
+(`clip-split` x3 : `seed-again.mjs:99` lit `d.tracks[0]` alors que le
+serveur renvoie encore un doc VIDE - la boucle de confirmation a 40
+essais existait pour ca mais mourait avant de re-essayer ; `tab-guards`
+a tape la meme pierre une fois), 2 flaky dont `limiter.spec` (Retry #2
+vert : au plafond nominal le kit ne depasse que de ~2 dB, trop juste
+quand l'asset arrive tard sur le runner Linux). MODIFICATIONS DE TESTS
+SIGNALEES : (a) seeder : `d.tracks?.[0]` aux deux lectures - le seeder
+re-essaie au lieu de crasher (aucune assertion affaiblie) ; (b) spec
+limiter : moteur en `--limiter-ceiling -24` (l'option est testee au
+passage, contrat de log `ceiling=-24`), attente 30 s, log moteur dumpe
+en cas d'echec. Locales : limiter + clip-split + tab-guards 5/5.
