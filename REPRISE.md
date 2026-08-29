@@ -9,10 +9,13 @@ vu dans 3 specs (seeder x3 - garde posee -, fader-to-engine x2,
 tab-guards x1), jamais avant ce jour, runs Linux plus lents ; (2)
 `limiter.spec` sur Linux : le moteur joue du SILENCE avec le kit du
 starter (asset pas au store ?), alors que sur Windows la spec est verte.
-Le 3e push (diagnostic : la spec dumpe les lignes asset/graphe du log
-moteur) porte le verdict a lire : `gh run list --limit 3` AVANT de
-coder, puis LIRE le dump dans le log CI. Regle des 3 echecs : la session
-s'est arretee la.
+Le 3e push a PARLE (e6268b1, 100 verts + limiter seul rouge) : le kit
+du starter n'est jamais seme au store en CI (`make-kit.mjs` n'y tourne
+pas) et le moteur retient un 404 pour la session -> clip muet. Le 4e
+push fait semer le kit par la spec ; c'est SON verdict qu'il faut lire
+(`gh run list --limit 3`) AVANT de coder. Trouvaille produit consignee
+en PREALABLE (TODO §3) : un asset qui arrive apres le premier rebuild
+reste muet a vie, sans refus visible.
 
 - **Limiteur de sortie** (decision + preuves : docs/DECISIONS.md
   2026-08-29) : brick-wall stereo lie, zero latence, sur la sortie

@@ -12,13 +12,13 @@
  * retient le son ne se cache pas. Moteur reel en --mute (port 47821 libre).
  */
 import { test, expect, Page } from '@playwright/test';
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
   waitForServerConnection, resolveBinary, waitUntil, countInFile,
-  getTrackIds, setTrackGain, waitForGain,
+  getTrackIds, setTrackGain, waitForGain, REPO_ROOT,
 } from './helpers';
 
 const ENGINE_PORT = 47821;
@@ -32,6 +32,13 @@ test.describe('Output limiter (le fusible)', () => {
     const projectId = `e2e-limiter-${Date.now()}`;
     const logPath = path.join(os.tmpdir(), `daw-e2e-limiter-${Date.now()}.log`);
     const engineExe = resolveBinary('ENGINE_EXE', 'daw_engine');
+    // Le kit du starter n'est au store que si quelqu'un l'y a mis
+    // (daw.ps1 lance make-kit.mjs ; la CI ne le fait pas) : sans lui le
+    // moteur prend un 404, le retient pour la session, et le clip reste
+    // MUET (CI Linux 2026-08-29 x3). La spec seme son propre kit, comme
+    // clip-split seme AGain. Idempotent (meme contenu = meme hash).
+    execFileSync('node', ['scripts/make-kit.mjs'],
+      { cwd: path.join(REPO_ROOT, 'web'), stdio: 'pipe' });
     const logFd = fs.openSync(logPath, 'w');
     const engine: ChildProcess = spawn(
       engineExe,

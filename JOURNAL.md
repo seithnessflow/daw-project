@@ -2191,3 +2191,15 @@ le limiteur. STOP a la regle des 3 echecs : etat et hypotheses dans
 TODO §3, la spec dumpe maintenant les lignes asset/graphe du log
 moteur pour que le prochain run PARLE. Le fusible lui-meme est prouve
 (gtest GCC+MSVC, spec Windows, capture).
+
+**2026-08-29 (suite — e6268b1, le dump parle) :** 100 verts, seul
+`limiter.spec` rouge, et le log moteur dit tout : `Asset 2f84b8...
+(kick) : not on server (404)` au premier rebuild, puis trois rebuilds
+sans re-fetch. Le kit du starter n'est au store que par
+`web/scripts/make-kit.mjs` (lance par `daw.ps1` ; la CI ne le lance
+jamais) et le moteur RETIENT un 404 pour la session (`failed_this_
+session`, dette 2.3b). Deux consequences : la spec seme son kit
+elle-meme (execFileSync make-kit.mjs, idempotent, meme moule que
+clip-split/AGain) ; la dette moteur monte en PREALABLE (TODO §3 :
+asset arrive tard = clip muet a vie, sans refus visible). La famille
+« reading '0' » n'est pas reapparue sur ce run (flaky de charge).
