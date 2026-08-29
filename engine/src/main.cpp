@@ -650,18 +650,41 @@ void wirePluginTelemetry(daw::websocket::WebSocketServer& ws_server,
  * 2.3b: fetch a missing asset from the server's content-addressed store
  * (the HTTP side of the triangle). Control thread, during buildGraph.
  * A sha256-keyed body is VERIFIED before it touches the assets dir
- * (legacy 16-char keys cannot be, accepted with a log). Failures are
- * remembered for the session - a burst of rebuilds must not become a
- * storm of GETs (dated debt: retry when the asset later appears).
+ * (legacy 16-char keys cannot be, accepted with a log). Un echec est
+ * RETENTE avec backoff (1 s, x2, plafond 30 s) au rebuild suivant - la
+ * dette « failures remembered for the session » a sonne le 2026-08-29
+ * (CI : clip pose avant que son asset ne soit au store = muet a vie).
+ * Une rafale de rebuilds ne fait toujours pas une tempete de GET : entre
+ * deux echeances, la reponse est immediate et silencieuse. Un corps qui
+ * ne correspond pas a son hash reste refuse pour la session (corruption
+ * cote store : retenter n'a pas de sens).
  */
 bool fetchAssetFromServer(const std::string& server_ws_url,
                           const std::string& hash,
                           const std::string& assets_dir) {
-    static std::set<std::string> failed_this_session;
-    if (server_ws_url.empty() || hash.empty() ||
-        failed_this_session.count(hash) > 0) {
-        return false;
+    using Clock = std::chrono::steady_clock;
+    struct Miss { Clock::time_point next_retry; int attempts; };
+    static std::map<std::string, Miss> missed;
+    if (server_ws_url.empty() || hash.empty()) return false;
+    auto miss = missed.find(hash);
+    if (miss != missed.end() && Clock::now() < miss->second.next_retry) {
+        return false;  // echeance pas atteinte : pas de GET, pas de log
     }
+    const int prior_attempts = miss != missed.end() ? miss->second.attempts : 0;
+    auto scheduleRetry = [&](bool permanent) {
+        Miss& m = missed[hash];
+        m.attempts = prior_attempts + 1;
+        if (permanent) {
+            m.next_retry = (Clock::time_point::max)();
+            return;
+        }
+        const int shift = (std::min)(m.attempts - 1, 5);
+        const auto delay = (std::min)(std::chrono::seconds(1LL << shift),
+                                      std::chrono::seconds(30));
+        m.next_retry = Clock::now() + delay;
+        std::cerr << "Asset " << hash.substr(0, 8) << ": retry in "
+                  << delay.count() << " s (attempt " << m.attempts << ")\n";
+    };
     // AUDIT-5 B5: hash comes from the document -> it is a path component on
     // WRITE (tmp/final below) and goes into the request URL. Reject traversal
     // and control chars (CRLF header injection) before either.
@@ -696,13 +719,13 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
     if (!response || response->statusCode != 200) {
         std::cerr << "Asset " << hash << ": not on server ("
                   << (response ? response->statusCode : 0) << ")\n";
-        failed_this_session.insert(hash);
+        scheduleRetry(false);
         return false;
     }
     if (hash.size() == 64 &&
         daw::util::sha256Hex(response->body.data(), response->body.size()) != hash) {
         std::cerr << "Asset " << hash << ": server body does not match its hash - REFUSED\n";
-        failed_this_session.insert(hash);
+        scheduleRetry(true);
         return false;
     }
 
@@ -718,15 +741,21 @@ bool fetchAssetFromServer(const std::string& server_ws_url,
         if (!out.good()) {
             std::cerr << "Asset " << hash << ": local write failed\n";
             fs::remove(tmp_path, ec);
-            failed_this_session.insert(hash);
+            scheduleRetry(false);
             return false;
         }
     }
     fs::rename(tmp_path, final_path, ec);
     if (ec) {
         fs::remove(tmp_path, ec);
-        failed_this_session.insert(hash);
+        scheduleRetry(false);
         return false;
+    }
+    if (prior_attempts > 0) {
+        // Le contrat de log de la reprise : l'asset est arrive tard, il joue
+        std::cerr << "Asset " << hash.substr(0, 8) << ": now on server after "
+                  << prior_attempts << " miss(es) - fetched\n";
+        missed.erase(hash);
     }
     std::cout << "Asset fetched from server: " << hash << " ("
               << response->body.size() << " bytes)\n";

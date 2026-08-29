@@ -174,15 +174,10 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
   : que renvoie-t-il en premier message juste apres un change pousse ?)
   avant de corriger. Declencheur : le prochain run CI rouge sur cette
   famille.
-- **ASSET ARRIVE TARD = CLIP MUET A VIE** (declencheur SONNE, CI Linux
-  2026-08-29 x3) : `fetchAssetFromServer` retient un 404 pour toute la
-  session (`failed_this_session`, dette datee de 2.3b) - un asset qui
-  apparait au store APRES le premier rebuild n'est jamais rejoue tant
-  que le moteur vit ; aucun refus visible dans l'UI. Vu avec le kit du
-  starter (jamais seme en CI ; en local `daw.ps1` le seme). Fix : oublier
-  l'echec quand le document change OU re-essayer avec backoff, et un
-  badge « asset manquant » sur le clip. Grille 1 (casse) - PREALABLE
-  avant tout smoke deux machines ou l'asset voyage.
+- Asset manquant : aucun refus VISIBLE dans l'UI (le moteur retente
+  avec backoff depuis le 2026-08-29, mais un clip dont l'asset n'est
+  toujours pas au store reste muet sans badge). Declencheur : un
+  utilisateur qui « n'entend pas » un clip pose depuis une autre machine.
 - A4-9 : `sameStructure` (render.ts) compare des COMPTES, pas la
   geometrie — un deplacement distant de clip peut ne pas se redessiner.
   A re-verifier au prochain smoke 2 onglets avec drag.

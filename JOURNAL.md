@@ -2203,3 +2203,20 @@ elle-meme (execFileSync make-kit.mjs, idempotent, meme moule que
 clip-split/AGain) ; la dette moteur monte en PREALABLE (TODO §3 :
 asset arrive tard = clip muet a vie, sans refus visible). La famille
 « reading '0' » n'est pas reapparue sur ce run (flaky de charge).
+
+**2026-08-29 (suite — « tu peux faire la suite », tache 1 : l'asset qui
+arrive tard) :** le prealable que la CI avait fait sonner. `fetchAsset
+FromServer` retenait un echec pour toute la session (dette 2.3b :
+« a burst of rebuilds must not become a storm of GETs ») ; desormais un
+echec est retente au rebuild suivant avec backoff 1 s, x2, plafond
+30 s (entre deux echeances : retour immediat, pas de GET, pas de log -
+la rafale reste bornee) ; un corps qui ne correspond pas a son hash
+reste refuse pour la session. Contrats de log : `Asset xxxxxxxx: retry
+in N s (attempt k)` puis `now on server after k miss(es) - fetched`.
+Spec `asset-late.spec.ts` (vrai moteur) : clip pose AVANT son asset
+(WAV unique genere par la spec, hash jamais vu du store) -> 404 +
+retry programme -> PUT au store -> un geste par tour au-dela de
+l'echeance -> re-fetch loggue et le fusible a -24 dBFS atteste que ca
+JOUE. gtests 62/62. Piege a nouveau : `Clock::time_point::max()` sans
+parentheses = la macro Windows. Reste en dette : le refus VISIBLE
+(badge « asset manquant » sur le clip).
