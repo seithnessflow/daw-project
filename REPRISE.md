@@ -2,20 +2,12 @@
 
 ## TOUT EN HAUT (2026-08-29) : LE FUSIBLE EST POSE — les T8V ont un filet
 
-**A LIRE EN PREMIER — le point de synchro CI : ROUGE, deux fois
-(bff570f, 7613ba4), PAS a cause du fusible.** Deux familles (TODO §3) :
-(1) « reading '0' » = doc serveur SANS tracks sur une connexion fraiche,
-vu dans 3 specs (seeder x3 - garde posee -, fader-to-engine x2,
-tab-guards x1), jamais avant ce jour, runs Linux plus lents ; (2)
-`limiter.spec` sur Linux : le moteur joue du SILENCE avec le kit du
-starter (asset pas au store ?), alors que sur Windows la spec est verte.
-Le 3e push a PARLE (e6268b1, 100 verts + limiter seul rouge) : le kit
-du starter n'est jamais seme au store en CI (`make-kit.mjs` n'y tourne
-pas) et le moteur retient un 404 pour la session -> clip muet. Le 4e
-push fait semer le kit par la spec ; c'est SON verdict qu'il faut lire
-(`gh run list --limit 3`) AVANT de coder. Trouvaille produit consignee
-en PREALABLE (TODO §3) : un asset qui arrive apres le premier rebuild
-reste muet a vie, sans refus visible.
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
+de la session (25fb9ae, la spec seme son kit) est VERT (run
+33261252149). Aucun verdict en vol. Chemin : bff570f et 7613ba4 rouges
+(kit jamais seme au store en CI + moteur qui retient un 404 pour la
+session, famille « reading '0' » flaky), e6268b1 a fait parler le log,
+25fb9ae vert.
 
 - **Limiteur de sortie** (decision + preuves : docs/DECISIONS.md
   2026-08-29) : brick-wall stereo lie, zero latence, sur la sortie

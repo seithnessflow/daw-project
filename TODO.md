@@ -10,7 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun verdict CI en vol (selection de temps + Ctrl+D de la plage ac4990c vert, 2026-08-28 nuit).
+- Aucun verdict CI en vol (le fusible + spec autonome, 25fb9ae vert, run 33261252149, 2026-08-29).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
