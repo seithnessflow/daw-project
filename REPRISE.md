@@ -2,9 +2,9 @@
 
 ## TOUT EN HAUT (2026-08-29, soir) : LE FUSIBLE, L'ASSET TARDIF, LES UUID, LE BANDEAU
 
-**A LIRE EN PREMIER — le point de synchro CI : voir « Quoi surveiller »
-(verdict du dernier push, A4-8 ; s'il manque, `gh run list --limit 3`
-AVANT de coder). Precedent : 700d92f VERT (run 33262436609).**
+**A LIRE EN PREMIER — le point de synchro CI : LEVE.** Le dernier push
+de la session (7bf0d07, A4-8) est VERT (run 33263430942). Aucun verdict
+en vol.
 
 Quatre livraisons, chacune avec sa spec sur le vrai moteur :
 

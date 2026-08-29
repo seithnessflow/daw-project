@@ -10,7 +10,7 @@ A/B/C/D/E/F = AUDIT-5, §n = AUDIT-6).*
 
 ## 0. Point de synchro
 
-- Aucun verdict CI en vol (fusible + asset tardif + UUID, 700d92f vert, run 33262436609, 2026-08-29).
+- Aucun verdict CI en vol (A4-8 bandeau, 7bf0d07 vert, run 33263430942, 2026-08-29).
 
 ## 1. ORDRE GRAVE (re-arbitre par l'utilisateur 2026-08-28 : « go » —
 ## la Vague 3 entree live passe DEVANT T4 Link Etage 2)
